@@ -406,11 +406,9 @@ try {
         photo(),
       ]);
       const [first, second] = result.reference.photos;
-      await admin
-        .collection(collection)
-        .update(result.reference.id, {
-          upload_receipts: JSON.stringify(['restore:0', 'restore:1']),
-        });
+      await admin.collection(collection).update(result.reference.id, {
+        upload_receipts: JSON.stringify(['restore:0', 'restore:1']),
+      });
       await save(owner, fixturePage.id, 'remove', { filename: first });
       const recovered = await save(owner, fixturePage.id, 'restore', values, [photo()]);
       assert.equal(recovered.reference.photos.length, 2);

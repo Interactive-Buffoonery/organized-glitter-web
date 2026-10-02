@@ -25,7 +25,9 @@ declare global {
 }
 
 const PayPalSupportSection: React.FC = () => {
+  const buttonId = import.meta.env.VITE_PAYPAL_BUTTON_ID?.trim();
   useEffect(() => {
+    if (!buttonId) return;
     // Load PayPal SDK script
     const script = document.createElement('script');
     script.src = 'https://www.paypalobjects.com/donate/sdk/donate-sdk.js';
@@ -35,7 +37,7 @@ const PayPalSupportSection: React.FC = () => {
       if (window.PayPal) {
         window.PayPal.Donation.Button({
           env: 'production',
-          hosted_button_id: 'TZ5FW9R4SLVJJ',
+          hosted_button_id: buttonId,
           image: {
             src: 'https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif',
             alt: 'Donate with PayPal button',
@@ -56,7 +58,7 @@ const PayPalSupportSection: React.FC = () => {
       // Script already loaded, just render the button
       window.PayPal.Donation.Button({
         env: 'production',
-        hosted_button_id: 'TZ5FW9R4SLVJJ',
+        hosted_button_id: buttonId,
         image: {
           src: 'https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif',
           alt: 'Donate with PayPal button',
@@ -73,7 +75,9 @@ const PayPalSupportSection: React.FC = () => {
         container.replaceChildren();
       }
     };
-  }, []);
+  }, [buttonId]);
+
+  if (!buttonId) return null;
 
   return (
     <div

@@ -4,7 +4,7 @@ Date: 2026-09-27
 
 ## Status
 
-Accepted. Supersedes [ADR-0021](./0021-diamond-catalog-supporter-and-tips.md).
+Accepted. Supersedes ADR-0021 (historical reference outside this extraction).
 
 ## Context
 

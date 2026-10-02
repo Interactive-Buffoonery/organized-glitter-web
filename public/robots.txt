@@ -85,4 +85,4 @@ Disallow: /delete-account
 Disallow: /test-*
 
 # Sitemap location
-Sitemap: https://organizedglitter.app/sitemap.xml
+Sitemap: https://app.invalid/sitemap.xml

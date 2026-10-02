@@ -272,13 +272,10 @@ try {
         return true;
       }
     );
-    await assert.rejects(
-      stale.send('/api/stats/summary', { method: 'GET' }),
-      error => {
-        assert.equal(error.status, 401);
-        return true;
-      }
-    );
+    await assert.rejects(stale.send('/api/stats/summary', { method: 'GET' }), error => {
+      assert.equal(error.status, 401);
+      return true;
+    });
   });
 
   await check('unverified password authentication is rejected by PocketBase', async () => {

@@ -294,7 +294,7 @@ pnpm deadcode:knip
 pnpm deadcode:ts-prune
 ```
 
-Narrative audits and historical findings: [`../audits/README.md`](../audits/README.md).
+Narrative audits and historical findings: `../audits/README.md` (historical reference outside this extraction).
 
 ## Related documentation
 

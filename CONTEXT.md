@@ -217,7 +217,7 @@ contract.
 ## Mobile
 
 For mobile app scope, navigation model, and timer plans, see
-[`docs/mobile/mobile-v1-scope.md`](./docs/mobile/mobile-v1-scope.md).
+`docs/mobile/mobile-v1-scope.md` (historical reference outside this extraction).
 
 ## Diamond catalog
 
@@ -248,7 +248,7 @@ Sarah's internal review workflow for kit-fact suggestions submitted by users
 through the URL kit import opt-in flow. Pending suggestions are not searchable
 in the catalog. Only accepted rows become live catalog entries. Rejected rows
 leave the queue without notifying the submitter in v1. See
-[`docs/plans/url-kit-import.md`](./docs/plans/url-kit-import.md) phase 2.
+`docs/plans/url-kit-import.md` (historical reference outside this extraction) phase 2.
 
 ## URL kit import
 
@@ -256,7 +256,7 @@ A paste-a-product-URL flow on Add Project. The user pastes a shop listing URL,
 the backend fetches structured product data, and the form prefills with editable
 metadata. The saved project is private. This is not a catalog crawl and not
 order-history import. See
-[`docs/plans/url-kit-import.md`](./docs/plans/url-kit-import.md).
+`docs/plans/url-kit-import.md` (historical reference outside this extraction).
 
 ## Work session
 
@@ -273,4 +273,4 @@ user may save the session alone or save it with an optional progress note
 companion record.
 
 For the full timer feature spec, see
-[`docs/mobile/mobile-v1-scope.md`](./docs/mobile/mobile-v1-scope.md).
+`docs/mobile/mobile-v1-scope.md` (historical reference outside this extraction).

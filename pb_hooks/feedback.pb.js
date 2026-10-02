@@ -109,11 +109,7 @@ routerAdd(
     if (!feedbackToEmail) {
       e.app
         .logger()
-        .error(
-          'Feedback recipient not configured',
-          'reason',
-          'feedback_recipient_missing'
-        );
+        .error('Feedback recipient not configured', 'reason', 'feedback_recipient_missing');
       return e.json(503, { error: 'Feedback is not configured for this server.' });
     }
     const message = new MailerMessage({

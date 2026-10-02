@@ -1,3 +1,4 @@
+import { publicUrl } from '@/lib/publicUrl';
 import MainLayout from '@/components/layout/MainLayout';
 import { useAppReady } from '@/hooks/useAppReady';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
@@ -13,11 +14,11 @@ const PAGE_METADATA = {
   title: 'Organized Glitter | Coloring Book & Diamond Art Tracker',
   description:
     'Track coloring books, coloring pages, diamond art projects, stash status, progress photos, palettes, and mystery reveals in one craft tracker.',
-  canonicalUrl: 'https://organizedglitter.app/',
+  canonicalUrl: publicUrl('/'),
   ...publicPageSocialMetadata(
     'Organized Glitter | Coloring Book & Diamond Art Tracker',
     'Track coloring books, coloring pages, diamond art projects, stash status, progress photos, palettes, and mystery reveals in one craft tracker.',
-    'https://organizedglitter.app/'
+    publicUrl('/')
   ),
 };
 

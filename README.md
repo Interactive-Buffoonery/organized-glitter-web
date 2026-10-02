@@ -1,8 +1,8 @@
 # Organized Glitter Web
 
 Organized Glitter is a coloring book and diamond art tracker. This repository
-contains the web app and PocketBase backend for self-hosting or local
-development.
+contains the complete website, including the tracker, Astro updates blog,
+newsletter templates, and PocketBase backend for self-hosting or local development.
 
 One public deployment example: [organizedglitter.app](https://organizedglitter.app).
 That hosted service is operated separately from this source tree.
@@ -30,7 +30,7 @@ See [`PRODUCT.md`](PRODUCT.md), [`DESIGN.md`](DESIGN.md), and [`docs/README.md`]
 
 - Node.js 24.x
 - pnpm 11.1.2 or newer
-- PocketBase 0.40.1 for local database work
+- PocketBase 0.40.4 for local database work
 
 The repo includes an `.nvmrc` set to Node 24.
 
@@ -125,3 +125,11 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 Licensed under the GNU Affero General Public License v3.0 or later. See
 [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), and [`BRAND.md`](BRAND.md).
+
+## Complete website and official services
+
+See [the official deployment boundary](docs/official-deployment.md) and
+[public configuration example](config/official-site.env.example). Ops builds a
+pinned public revision and supplies official services and credentials. The public
+source preserves the entire website. Optional integrations are disabled when
+configuration is absent.

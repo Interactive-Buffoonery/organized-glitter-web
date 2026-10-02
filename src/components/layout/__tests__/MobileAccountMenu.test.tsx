@@ -18,6 +18,11 @@ const {
   usePWAInstallMock: vi.fn(),
 }));
 
+vi.mock('@/constants/updates', () => ({
+  UPDATES_URL: 'https://site.example.test/updates/',
+  SUBSCRIBE_TO_UPDATES_URL: 'https://site.example.test/updates/#subscribe',
+}));
+
 vi.mock('react-router-dom', async importOriginal => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
@@ -130,7 +135,7 @@ describe('MobileAccountMenu', () => {
     expect(screen.getByRole('button', { name: 'Send feedback' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Subscribe to Updates' })).toHaveAttribute(
       'href',
-      'https://updates.organizedglitter.app/#subscribe'
+      'https://site.example.test/updates/#subscribe'
     );
     expect(screen.getByRole('button', { name: 'Install Web App' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'About' })).not.toBeInTheDocument();

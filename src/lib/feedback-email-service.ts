@@ -77,8 +77,6 @@ const getFallbackResponseMessage = (response: Response) =>
 
 export { getContactEmail as FEEDBACK_CONTACT_EMAIL };
 
-const MAILTO_FALLBACK_MESSAGE = getMailtoFallbackMessage();
-
 const readFeedbackResponse = async (response: Response): Promise<FeedbackResponse> => {
   try {
     return (await response.json()) as FeedbackResponse;
@@ -262,12 +260,15 @@ Technical Error: ${error instanceof Error ? error.message : String(error)}
       `.trim()
       );
 
-      const mailtoUrl = `mailto:${getContactEmail()}?subject=${subject}&body=${body}`;
+      const contactEmail = getContactEmail();
+      if (!contactEmail)
+        return { success: false, error: getMailtoFallbackMessage(), reason: 'contact_unavailable' };
+      const mailtoUrl = `mailto:${contactEmail}?subject=${subject}&body=${body}`;
       window.open(mailtoUrl, '_blank');
 
       return {
         success: false,
-        error: MAILTO_FALLBACK_MESSAGE,
+        error: getMailtoFallbackMessage(),
         reason: 'mailto_fallback',
       };
     } catch (_fallbackError) {

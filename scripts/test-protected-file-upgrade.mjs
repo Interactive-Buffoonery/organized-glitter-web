@@ -75,12 +75,7 @@ const tokenExpirySeconds = token => {
   return payload.exp;
 };
 // Last committed schema before INT-1081; keep this fixture stable after merge.
-const baseRef = '7bd43f82fc274e5bd10c498ea238cdce80c4c94c';
-const git = args => {
-  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout;
-};
+
 const portServer = net.createServer();
 await new Promise(resolve => portServer.listen(0, '127.0.0.1', resolve));
 const port = portServer.address().port;
@@ -234,7 +229,7 @@ try {
   await start(baseline);
   let admin = await login(adminEmail, '_superusers');
   const priorSchema = JSON.parse(
-    git(['show', `${baseRef}:docs/pocketbase/collections.schema.json`])
+    readFileSync(path.join(root, 'scripts/fixtures/protected-file-baseline.schema.json'), 'utf8')
   );
   const inventory = JSON.parse(
     readFileSync(path.join(root, 'scripts/fixtures/production-index-inventory.json'), 'utf8')

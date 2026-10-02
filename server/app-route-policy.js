@@ -1,4 +1,4 @@
-export const PUBLIC_PAGE_PATHS = ['/about', '/links', '/privacy', '/terms'];
+export const PUBLIC_PAGE_PATHS = ['/about', '/links', '/privacy', '/terms', '/contact'];
 
 // Keep this list in sync with APP_ROUTES. app-route-policy.test.js enforces parity.
 export const APP_ROUTE_PATHS = [
@@ -41,7 +41,7 @@ export const APP_ROUTE_PATHS = [
   '/randomizer',
   '/stats',
   '/notes',
-  ...PUBLIC_PAGE_PATHS,
+  ...PUBLIC_PAGE_PATHS.filter(route => route !== '/contact'),
 ];
 
 const routePatterns = APP_ROUTE_PATHS.map(route =>

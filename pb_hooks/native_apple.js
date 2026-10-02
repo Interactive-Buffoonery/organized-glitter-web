@@ -1,7 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-const NATIVE_CLIENT_ID = 'com.interactivebuffoonery.organizedglitter';
-
 module.exports = {
   createProvider(configuration, context) {
     const provider = configuration.appleConfig.initProvider();
@@ -20,17 +18,22 @@ module.exports = {
       provider => provider.name === 'apple' && provider.clientId && provider.clientSecret
     );
     const limits = app.settings().rateLimits;
-    const hasRateRule = (label, audience) => limits.rules.some(
-      rule => rule.label === label && rule.audience === audience &&
-        rule.maxRequests > 0 && rule.duration > 0
-    );
-    const nativeClientId = NATIVE_CLIENT_ID;
+    const hasRateRule = (label, audience) =>
+      limits.rules.some(
+        rule =>
+          rule.label === label &&
+          rule.audience === audience &&
+          rule.maxRequests > 0 &&
+          rule.duration > 0
+      );
+    const nativeClientId = config.nativeClientId;
     const grantKey = config.grantEncryptionKey;
     if (!users.oauth2.enabled || !appleConfig) {
       return configReader.unavailable(app, 'apple_provider_unavailable');
     }
     if (
-      !limits.enabled || !hasRateRule('POST /api/auth/apple/native', '@guest') ||
+      !limits.enabled ||
+      !hasRateRule('POST /api/auth/apple/native', '@guest') ||
       !hasRateRule('GET /api/auth/apple/native/readiness', '')
     ) {
       return configReader.unavailable(app, 'apple_rate_limits_unavailable');

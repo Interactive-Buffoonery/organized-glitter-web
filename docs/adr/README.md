@@ -17,16 +17,16 @@ Add one when a choice is **stable**, **cross-cutting**, and **costly to reverse*
 | ID                                                          | Title                                                         | Status     |
 | ----------------------------------------------------------- | ------------------------------------------------------------- | ---------- |
 | [0001](./0001-pocketbase-cost-and-platform.md)              | Stay on PocketBase (cost and platform fit)                    | Accepted   |
-| [0002](./0002-expo-repo-and-package-structure.md)           | Keep web at root and add Expo app workspace                   | Superseded |
+| 0002 (historical reference outside this extraction)         | Keep web at root and add Expo app workspace                   | Superseded |
 | [0003](./0003-client-rendered-spa.md)                       | Build the web app as a client-rendered SPA on Vite            | Accepted   |
 | [0004](./0004-react-query-server-state.md)                  | Use React Query for server state, keep client state minimal   | Accepted   |
 | [0005](./0005-pocketbase-access-boundary.md)                | Route all PocketBase access through a typed service layer     | Accepted   |
 | [0006](./0006-no-realtime-last-write-wins.md)               | Ship without realtime; online-only writes, last-write-wins    | Accepted   |
 | [0007](./0007-auth-providers-and-token-model.md)            | Authenticate with PocketBase auth: email/password and OAuth   | Accepted   |
-| [0008](./0008-railway-web-hosting.md)                       | Host the web app on Railway behind a small Node server        | Superseded |
-| [0009](./0009-pocketbase-on-pikapods.md)                    | Keep PocketBase hosted on PikaPods, separate from web hosting | Accepted   |
+| 0008 (historical reference outside this extraction)         | Host the web app on Railway behind a small Node server        | Superseded |
+| 0009 (historical reference outside this extraction)         | Keep PocketBase hosted on PikaPods, separate from web hosting | Accepted   |
 | [0010](./0010-backend-logic-placement.md)                   | Place backend logic in pb_hooks, api/ routes, or the server   | Accepted   |
-| [0011](./0011-pwa-first-native-undecided.md)                | Stay PWA-first; leave the native mobile app undecided         | Superseded |
+| 0011 (historical reference outside this extraction)         | Stay PWA-first; leave the native mobile app undecided         | Superseded |
 | [0012](./0012-app-owned-design-system.md)                   | Build an app-owned design system on Tailwind and Radix        | Accepted   |
 | [0013](./0013-testing-bar-and-a11y-gate.md)                 | Gate PRs on typecheck, lint, unit tests, and accessibility    | Accepted   |
 | [0014](./0014-agpl-license.md)                              | License the project AGPL-3.0-or-later                         | Accepted   |
@@ -36,5 +36,5 @@ Add one when a choice is **stable**, **cross-cutting**, and **costly to reverse*
 | [0018](./0018-tiptap-rich-text-notes.md)                    | Use TipTap for rich text notes, stored as Markdown            | Accepted   |
 | [0019](./0019-client-side-image-pipeline.md)                | Process images client-side before uploading to PocketBase     | Accepted   |
 | [0020](./0020-native-swiftui-app-in-separate-repository.md) | Build the native SwiftUI app in a separate repository         | Accepted   |
-| [0021](./0021-diamond-catalog-supporter-and-tips.md)        | Fund the diamond catalog through Supporter and tips           | Superseded |
+| 0021 (historical reference outside this extraction)         | Fund the diamond catalog through Supporter and tips           | Superseded |
 | [0022](./0022-free-catalog-and-optional-tips.md)            | Keep the catalog free and launch optional tips first          | Accepted   |

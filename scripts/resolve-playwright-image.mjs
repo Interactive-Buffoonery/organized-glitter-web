@@ -7,7 +7,11 @@ export async function resolvePlaywrightImage(
   version,
   { fetchFn = fetch, sleepFn = setTimeout } = {}
 ) {
-  if (typeof version !== 'string' || version !== version.trim() || !/^\d+\.\d+\.\d+$/.test(version)) {
+  if (
+    typeof version !== 'string' ||
+    version !== version.trim() ||
+    !/^\d+\.\d+\.\d+$/.test(version)
+  ) {
     throw new Error('Playwright image requires an exact stable package version.');
   }
   const image = `mcr.microsoft.com/playwright:v${version}-noble`;
@@ -19,7 +23,8 @@ export async function resolvePlaywrightImage(
       response = await fetchFn(url, {
         method: 'HEAD',
         headers: {
-          Accept: 'application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json',
+          Accept:
+            'application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json',
         },
         signal: AbortSignal.timeout(30_000),
       });
@@ -31,7 +36,11 @@ export async function resolvePlaywrightImage(
 
     if (response.ok) {
       const digest = response.headers.get('docker-content-digest');
-      if (typeof digest !== 'string' || digest.length !== 71 || !/^sha256:[a-f0-9]{64}$/.test(digest)) {
+      if (
+        typeof digest !== 'string' ||
+        digest.length !== 71 ||
+        !/^sha256:[a-f0-9]{64}$/.test(digest)
+      ) {
         throw new Error(`Registry returned an invalid image digest for ${image}.`);
       }
       return `${image}@${digest}`;

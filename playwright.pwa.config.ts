@@ -19,6 +19,7 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       PORT: '4183',
+      VITE_APP_URL: 'http://localhost:4183',
       VITE_APP_VERSION: 'pwa-navigation-test',
       VITE_POCKETBASE_URL: 'http://localhost:4183',
       APP_TEST_ENV: 'test',

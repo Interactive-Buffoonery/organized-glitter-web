@@ -35,7 +35,11 @@ module.exports = {
     try {
       app.runInTransaction(txApp => {
         e.app = txApp;
-        if (!identityHash || !clientId || (e.oAuth2User && e.oAuth2User.refreshToken && !ciphertext)) {
+        if (
+          !identityHash ||
+          !clientId ||
+          (e.oAuth2User && e.oAuth2User.refreshToken && !ciphertext)
+        ) {
           throw new ApiError(503, 'Apple sign-in is temporarily unavailable. Please try again.', {
             reason: new ValidationError('apple_grant_prepare_failed', 'Grant preparation failed.'),
           });
@@ -54,7 +58,10 @@ module.exports = {
         if (ciphertext) {
           try {
             grantStore.upsert(txApp, {
-              userId: e.record.id, identityHash, clientId, ciphertext,
+              userId: e.record.id,
+              identityHash,
+              clientId,
+              ciphertext,
             });
           } catch (_) {
             grantFailure = true;

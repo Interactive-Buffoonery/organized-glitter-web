@@ -129,3 +129,14 @@ describe('PocketBase prior-schema upgrade gate', () => {
     }
   });
 });
+
+it('recognizes only an empty root commit as a bootstrap baseline', async () => {
+  const { isBootstrapBaseline } = await import('../validate-pocketbase-upgrade.mjs');
+  expect(isBootstrapBaseline('root', () => '')).toBe(true);
+  expect(
+    isBootstrapBaseline('existing', args => (args[0] === 'ls-tree' ? 'README.md\n' : ''))
+  ).toBe(false);
+  expect(
+    isBootstrapBaseline('deleted-tree', args => (args[0] === 'ls-tree' ? '' : 'parent-sha'))
+  ).toBe(false);
+});

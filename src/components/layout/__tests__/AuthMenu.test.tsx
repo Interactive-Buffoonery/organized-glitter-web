@@ -8,6 +8,11 @@ const { signOutMock } = vi.hoisted(() => ({
   signOutMock: vi.fn(),
 }));
 
+vi.mock('@/constants/updates', () => ({
+  UPDATES_URL: 'https://site.example.test/updates/',
+  SUBSCRIBE_TO_UPDATES_URL: 'https://site.example.test/updates/#subscribe',
+}));
+
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     user: { id: 'u1', email: 'test@example.com' },
@@ -78,7 +83,7 @@ describe('AuthMenu', () => {
     expect(screen.getByText('test@example.com')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Subscribe to Updates' })).toHaveAttribute(
       'href',
-      'https://updates.organizedglitter.app/#subscribe'
+      'https://site.example.test/updates/#subscribe'
     );
     expect(screen.queryByText('Navigation')).not.toBeInTheDocument();
     expect(screen.getByText('Logout')).toBeInTheDocument();

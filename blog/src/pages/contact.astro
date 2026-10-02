@@ -1,0 +1,23 @@
+---
+import BlogLayout from '../layouts/BlogLayout.astro';
+
+import { optionalServiceUrl } from '../lib/deployment.mjs';
+const contactUrl = optionalServiceUrl(process.env.WORDPRESS_CONTACT_URL);
+---
+
+<BlogLayout title="Contact" description="Contact Organized Glitter with a question or feedback." canonicalPath="/contact">
+  <div class="post-page support-page">
+    <section class="post-paper support-paper" aria-labelledby="contact-heading">
+      <span class="paper-tape paper-tape-left" aria-hidden="true"></span>
+      <span class="paper-tape paper-tape-right" aria-hidden="true"></span>
+      <a class="back-link" href="/updates/">All updates</a>
+      <header class="post-heading">
+        <h1 id="contact-heading">Contact</h1>
+      </header>
+      <div class="post-content">
+        {contactUrl ? <Fragment><iframe class="contact-frame" title="Contact Organized Glitter" src={contactUrl} referrerpolicy="strict-origin-when-cross-origin"></iframe>
+        <p><a href={contactUrl}>Open the contact form on WordPress</a></p></Fragment> : <p>Contact is not configured for this instance.</p>}
+      </div>
+    </section>
+  </div>
+</BlogLayout>

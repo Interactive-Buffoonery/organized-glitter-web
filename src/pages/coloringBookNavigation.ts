@@ -3,8 +3,8 @@ const COLORING_DASHBOARD_PATH = '/dashboard?craft=coloring';
 export const getColoringDashboardReturnPath = (returnTo: unknown): string => {
   if (typeof returnTo !== 'string') return COLORING_DASHBOARD_PATH;
   try {
-    const parsed = new URL(returnTo, 'https://organizedglitter.app');
-    if (parsed.origin !== 'https://organizedglitter.app') return COLORING_DASHBOARD_PATH;
+    const parsed = new URL(returnTo, 'https://navigation.invalid');
+    if (parsed.origin !== 'https://navigation.invalid') return COLORING_DASHBOARD_PATH;
     if (parsed.pathname !== '/dashboard' || parsed.searchParams.get('craft') !== 'coloring') {
       return COLORING_DASHBOARD_PATH;
     }

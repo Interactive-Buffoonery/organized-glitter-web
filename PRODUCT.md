@@ -53,8 +53,7 @@ access or promise of future paid access. Analytics and purchases do not control
 access to tracking or the catalog. Tip amounts and launch timing remain open.
 
 [ADR-0022](./docs/adr/0022-free-catalog-and-optional-tips.md) records the
-current direction. [ADR-0021](./docs/adr/0021-diamond-catalog-supporter-and-tips.md)
-preserves the earlier plan.
+current direction.
 
 ## Accessibility & Inclusion
 

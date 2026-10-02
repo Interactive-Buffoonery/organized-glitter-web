@@ -6,23 +6,25 @@ afterEach(() => {
 });
 
 describe('updates links', () => {
-  it('keeps the WordPress URL when the blog is disabled', async () => {
-    vi.stubEnv('VITE_BLOG_ENABLED', 'false');
+  it('has no external destination without operator configuration', async () => {
+    vi.stubEnv('VITE_UPDATES_URL', '');
     vi.resetModules();
-
     const links = await import('../updates');
-
-    expect(links.UPDATES_URL).toBe('https://updates.organizedglitter.app/');
-    expect(links.SUBSCRIBE_TO_UPDATES_URL).toBe('https://updates.organizedglitter.app/#subscribe');
+    expect(links.UPDATES_URL).toBeNull();
+    expect(links.SUBSCRIBE_TO_UPDATES_URL).toBeNull();
   });
 
-  it('links to the integrated blog when the build enables it', async () => {
-    vi.stubEnv('VITE_BLOG_ENABLED', 'true');
+  it('retains configured official-site updates and subscribe behavior', async () => {
+    vi.stubEnv('VITE_UPDATES_URL', 'https://updates.example.test/');
     vi.resetModules();
-
     const links = await import('../updates');
+    expect(links.UPDATES_URL).toBe('https://updates.example.test/');
+    expect(links.SUBSCRIBE_TO_UPDATES_URL).toBe('https://updates.example.test/#subscribe');
+  });
 
-    expect(links.UPDATES_URL).toBe('/updates/');
-    expect(links.SUBSCRIBE_TO_UPDATES_URL).toBe('/updates/#subscribe');
+  it('rejects non-HTTP links', async () => {
+    vi.stubEnv('VITE_UPDATES_URL', 'javascript:alert(1)');
+    vi.resetModules();
+    expect((await import('../updates')).UPDATES_URL).toBeNull();
   });
 });

@@ -10,7 +10,7 @@ browser cache rule.
 With `BLOG_ENABLED=true`, the combined build also includes Astro's static
 `/updates/` pages, RSS, and sitemap. The blog owns that path, including missing
 post 404s; it must not fall through to the React app shell or the service
-worker's navigation fallback. See the [blog runbook](./astro-blog.md) for
+worker's navigation fallback. See the [website configuration](./official-deployment.md) for
 build commands, MailPoet checks, and the separate production cutover.
 
 Run `pnpm spacefast:stage` after building. It copies the Function and shared
@@ -58,7 +58,7 @@ type and `X-Content-Type-Options: nosniff`.
 
 Related work:
 
-- [SpaceFast domain cutover runbook](./spacefast-cutover.md) (INT-1139)
+- SpaceFast domain cutover runbook (historical reference outside this extraction) (INT-1139)
 
 https://linear.app/interactive-buffoonery/issue/INT-1135/match-frontend-routing-and-headers-on-spacefast
 

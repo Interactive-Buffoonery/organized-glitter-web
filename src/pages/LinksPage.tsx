@@ -1,3 +1,4 @@
+import { publicUrl } from '@/lib/publicUrl';
 /**
  * Links page - A link-in-bio style page for social media sharing
  * @author @serabi
@@ -13,11 +14,11 @@ import { usePageMetadata } from '@/hooks/usePageMetadata';
 import { cn } from '@/lib/utils';
 
 const logger = createLogger('LinksPage');
-const LINKS_PAGE_URL = 'https://organizedglitter.app/links';
+const LINKS_PAGE_URL = publicUrl('/links');
 const LINKS_PAGE_TITLE = "Sarah's Links | Organized Glitter";
 const LINKS_PAGE_DESCRIPTION =
   "Sarah's current Organized Glitter links: the free coloring book and diamond art tracker, craft videos, affiliate codes, and Instagram.";
-const SOCIAL_IMAGE_URL = 'https://organizedglitter.app/images/social-preview-2026-09-27.jpg';
+const SOCIAL_IMAGE_URL = publicUrl('/images/social-preview-2026-09-27.jpg');
 const SOCIAL_IMAGE_ALT =
   'Organized Glitter: track your coloring books and diamond art, with taped-in photos of a coloring page and a finished diamond painting';
 
@@ -40,7 +41,7 @@ const primaryLinks = [
   {
     title: 'Try Organized Glitter',
     description: 'Track your coloring books and diamond art projects with ease',
-    url: 'https://organizedglitter.app',
+    url: publicUrl('/'),
     iconSrc: '/images/logo.png',
     featured: true,
   },
@@ -86,12 +87,12 @@ const structuredData = {
   isPartOf: {
     '@type': 'WebSite',
     name: 'Organized Glitter',
-    url: 'https://organizedglitter.app',
+    url: publicUrl('/'),
   },
   about: {
     '@type': 'WebApplication',
     name: 'Organized Glitter',
-    url: 'https://organizedglitter.app',
+    url: publicUrl('/'),
     applicationCategory: 'LifestyleApplication',
     operatingSystem: 'Web',
   },

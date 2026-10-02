@@ -4,10 +4,7 @@ import type { PostHogConfig } from 'posthog-js';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
 const posthogKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY as string | undefined;
-const posthogHost = import.meta.env.PROD
-  ? '/glimmer'
-  : ((import.meta.env.VITE_PUBLIC_POSTHOG_HOST as string | undefined) ??
-    'https://us.i.posthog.com');
+const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST?.trim();
 
 const posthogOptions: Partial<PostHogConfig> = {
   api_host: posthogHost,
@@ -49,7 +46,7 @@ const AnalyticsEffects: React.FC = () => {
  * If no API key is configured, renders children without PostHog.
  */
 export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  if (!posthogKey) {
+  if (!posthogKey?.trim() || !posthogHost) {
     if (import.meta.env.DEV) {
       console.debug('[analytics] VITE_PUBLIC_POSTHOG_KEY not set, analytics disabled');
     }

@@ -1,3 +1,5 @@
+import { getSupportUrl, getSupportMailto } from '@/lib/contactConfig';
+import { publicUrl } from '@/lib/publicUrl';
 import { Mail } from 'lucide-react';
 
 import MainLayout from '@/components/layout/MainLayout';
@@ -9,11 +11,11 @@ const PAGE_METADATA = {
   title: 'About | Organized Glitter',
   description:
     "Organized Glitter is a craft tracker built from Sarah's love of diamond painting, mystery coloring books, and programming.",
-  canonicalUrl: 'https://organizedglitter.app/about',
+  canonicalUrl: publicUrl('/about'),
   ...publicPageSocialMetadata(
     'About | Organized Glitter',
     "Organized Glitter is a craft tracker built from Sarah's love of diamond painting, mystery coloring books, and programming.",
-    'https://organizedglitter.app/about'
+    publicUrl('/about')
   ),
 };
 
@@ -72,7 +74,7 @@ const About = () => {
 
                 <div className="space-y-2">
                   <a
-                    href="https://updates.organizedglitter.app/contact/"
+                    href={getSupportUrl() || getSupportMailto() || '/profile?tab=support'}
                     className="text-foreground hover:text-link focus-visible:outline-primary flex min-h-11 items-center gap-3 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
                   >
                     <Mail className="text-primary size-4" aria-hidden="true" />

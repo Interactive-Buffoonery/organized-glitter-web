@@ -12,7 +12,7 @@
  *
  * Usage:
  *   set -a; . ./.env.e2e; set +a
- *   export VITE_POCKETBASE_URL=https://data.organizedglitter.app
+ *   export VITE_POCKETBASE_URL=http://localhost:8090
  *   node scripts/seed-e2e-randomizer-fixture.mjs
  *
  * Prints:

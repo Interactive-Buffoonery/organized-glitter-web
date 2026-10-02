@@ -5,6 +5,8 @@ on:
   push:
     branches: [main, dev]
   workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * 0'
 
 permissions:
   contents: read
@@ -22,6 +24,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: ./.github/actions/setup-project
       - run: pnpm test:ci:static
 
@@ -33,19 +36,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: ./.github/actions/setup-project
       - run: pnpm test:ci:unit
 
   backend:
-    name: PocketBase schema
+    name: PocketBase integration
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: ./.github/actions/setup-project
-      - run: pnpm pb:validate:schema && pnpm pb:validate:migrations
+      - run: pnpm pb:validate:schema && pnpm pb:validate:migrations && pnpm pb:validate:upgrade && pnpm pb:test:protected-file-upgrade && pnpm pb:test:auth-verification && pnpm pb:test:feedback && pnpm pb:test:native-oauth-association && pnpm pb:test:auth-step-up && pnpm pb:test:native-apple && pnpm pb:test:archive-restore-v3 && pnpm pb:test:mobile-sync
 
   build:
     name: Production build
@@ -60,14 +65,45 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: ./.github/actions/setup-project
       - run: pnpm build
       - run: pnpm build:budget
 
+  react-doctor:
+    name: React review
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-project
+      - run: pnpm test:ci:react
+
+  browser:
+    name: Browser validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      VITE_POCKETBASE_URL: http://127.0.0.1:8090
+      VITE_APP_URL: http://127.0.0.1:3000
+      VITE_APP_VERSION: ${{ github.sha }}
+      APP_TEST_ENV: test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-project
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: pnpm test:not-found && pnpm test:pwa:navigation && pnpm qa:browser:ci && pnpm test:protected-file-rotation-browser && pnpm qa:blog
+
   result:
     name: CI result
     if: always()
-    needs: [static-checks, unit-tests, backend, build]
+    needs: [static-checks, unit-tests, backend, build, browser, react-doctor]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

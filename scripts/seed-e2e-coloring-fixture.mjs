@@ -12,7 +12,7 @@
  *
  * Usage:
  *   set -a; . ./.env.e2e; set +a
- *   export VITE_POCKETBASE_URL=https://data.organizedglitter.app
+ *   export VITE_POCKETBASE_URL=http://localhost:8090
  *   node scripts/seed-e2e-coloring-fixture.mjs
  *
  * Prints the resulting ids as KEY=VALUE lines (E2E_COLORING_BOOK_ID,

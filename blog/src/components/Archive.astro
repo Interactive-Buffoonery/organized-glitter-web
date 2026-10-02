@@ -1,0 +1,104 @@
+---
+import Subscribe from './Subscribe.astro';
+import BlogLayout from '../layouts/BlogLayout.astro';
+import { formatEditorialDate, formatFeaturedDate } from '../lib/dates.mjs';
+import { pageCount, postsForPage } from '../lib/snapshot.mjs';
+
+interface Props {
+  page: number;
+}
+
+const { page } = Astro.props;
+const posts = postsForPage(page);
+const featuredPost = page === 1 ? posts[0] : null;
+const remainingPosts = featuredPost ? posts.slice(1) : posts;
+const path = page === 1 ? '/updates/' : `/updates/page/${page}/`;
+---
+
+<BlogLayout
+  title="Updates"
+  description="News and notes from Organized Glitter, the coloring book and diamond art tracker."
+  canonicalPath={path}
+>
+  {page === 1 ? (
+    <section class="updates-hero" aria-labelledby="updates-heading">
+      <div class="updates-hero-inner">
+        <div class="hero-copy">
+          <h1 id="updates-heading">What’s new in Organized Glitter</h1>
+          <p>Release notes and updates on Organized Glitter development.</p>
+          <div class="hero-actions">
+            <a class="button-primary" href="#subscribe">Subscribe to updates</a>
+          </div>
+        </div>
+        <figure class="hero-photo">
+          <img
+            src="/images/marketing/coloring-in-progress.webp"
+            alt="A colorful illustration being filled in with pencils and markers"
+            width="720"
+            height="960"
+            fetchpriority="high"
+          />
+          <figcaption>mystery coloring books are our favorite</figcaption>
+        </figure>
+      </div>
+    </section>
+  ) : (
+    <header class="archive-heading">
+      <div class="archive-inner">
+        <a class="back-link" href="/updates/">All updates</a>
+        <h1>Updates</h1>
+        <p>News and notes from Organized Glitter.</p>
+      </div>
+    </header>
+  )}
+
+  <section class="recent-section" id="recent-updates" aria-labelledby="recent-heading">
+    <div class="recent-inner">
+      <div class="recent-heading-row">
+        <h2 id="recent-heading">Recent updates</h2>
+      </div>
+
+      {featuredPost && (
+        <article class="featured-panel">
+          <div class="featured-meta">
+            <time datetime={featuredPost.displayDate} aria-label={formatEditorialDate(featuredPost.displayDate)}>
+              {formatFeaturedDate(featuredPost.displayDate)}
+            </time>
+          </div>
+          <div class="featured-copy">
+            <h3><a href={featuredPost.url}>{featuredPost.title}</a></h3>
+            {featuredPost.excerpt && <p>{featuredPost.excerpt}</p>}
+            <a class="read-link" href={featuredPost.url}>Read update <span aria-hidden="true">→</span></a>
+          </div>
+        </article>
+      )}
+
+      {remainingPosts.length > 0 ? (
+        <div class="post-list">
+          {remainingPosts.map(post => (
+            <article class="post-summary">
+              <time datetime={post.publishedAt}>{formatEditorialDate(post.displayDate)}</time>
+              <h3><a href={post.url}>{post.title}</a></h3>
+              {post.excerpt && <p>{post.excerpt}</p>}
+              <a class="read-link" href={post.url} aria-label={`Read ${post.title}`}>Read post <span aria-hidden="true">→</span></a>
+            </article>
+          ))}
+        </div>
+      ) : posts.length === 0 ? (
+        <p class="empty-state">No updates have been published yet.</p>
+      ) : null}
+
+      {pageCount > 1 && (
+        <nav class="pagination" aria-label="Updates pages">
+          {page > 1 ? (
+            <a href={page === 2 ? '/updates/' : `/updates/page/${page - 1}/`}>Newer posts</a>
+          ) : <span></span>}
+          <span>Page {page} of {pageCount}</span>
+          {page < pageCount ? <a href={`/updates/page/${page + 1}/`}>Older posts</a> : <span></span>}
+        </nav>
+      )}
+    </div>
+  </section>
+
+  <div class="subscribe-wrap"><Subscribe /></div>
+</BlogLayout>

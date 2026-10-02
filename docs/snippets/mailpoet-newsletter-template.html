@@ -1,0 +1,366 @@
+<!-- wp:html -->
+<style>
+  body.page-template-newsletter-pages {
+    --og-page-bg: #151533;
+    --og-page-fg: #f7f2f7;
+    --og-page-muted: #beb1c3;
+    --og-page-link: #f58ab5;
+    --og-page-border: #474059;
+    --og-paper-bg: #e7dece;
+    --og-paper-fg: #48333f;
+    --og-paper-link: #a92358;
+    background: var(--og-page-bg);
+    color: var(--og-page-fg);
+    font-family: var(--wp--preset--font-family--karla);
+  }
+
+  body.page-template-newsletter-pages .wp-site-blocks {
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+    padding: 0;
+  }
+
+  body.page-template-newsletter-pages .wp-site-blocks > * {
+    margin-block-start: 0;
+  }
+
+  .og-newsletter-header {
+    border-bottom: 1px solid var(--og-page-border);
+    padding: 20px max(20px, calc((100% - 1120px) / 2));
+  }
+
+  .og-newsletter-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    color: var(--og-page-fg) !important;
+    font-family: var(--wp--preset--font-family--caveat);
+    font-size: clamp(28px, 6vw, 36px);
+    font-weight: 700;
+    line-height: 1.1;
+    text-decoration: none;
+  }
+
+  .og-newsletter-brand img {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  body.page-template-newsletter-pages .og-newsletter-main {
+    flex: 1;
+    width: 100%;
+    margin: 0;
+    padding: 48px 20px 56px;
+  }
+
+  .og-newsletter-paper {
+    position: relative;
+    width: min(100%, 880px);
+    margin-inline: auto;
+    padding: clamp(24px, 5vw, 48px);
+    border: 1px solid #d8cbbd;
+    border-radius: 6px;
+    background: var(--og-paper-bg);
+    color: var(--og-paper-fg);
+    box-shadow: 0 8px 24px #00000014;
+    overflow-wrap: anywhere;
+    color-scheme: light;
+  }
+
+  .og-newsletter-paper::before,
+  .og-newsletter-paper::after {
+    position: absolute;
+    top: -12px;
+    width: 90px;
+    height: 26px;
+    content: '';
+    background: repeating-linear-gradient(115deg, #fbd6e1 0 10px, #fff0f4 10px 20px);
+    pointer-events: none;
+  }
+
+  .og-newsletter-paper::before {
+    left: 24px;
+    transform: rotate(-4deg);
+  }
+
+  .og-newsletter-paper::after {
+    right: 24px;
+    transform: rotate(4deg);
+    background: repeating-linear-gradient(115deg, #eadcf8 0 10px, #f6effc 10px 20px);
+  }
+
+  .og-newsletter-paper .wp-block-post-title {
+    margin: 0 0 24px;
+    color: var(--og-paper-fg);
+    font-family: var(--wp--preset--font-family--caveat);
+    font-size: clamp(30px, 5vw, 40px);
+    line-height: 1.15;
+  }
+
+  .og-newsletter-paper h2,
+  .og-newsletter-paper h3 {
+    color: var(--og-paper-fg);
+    font-family: var(--wp--preset--font-family--karla);
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .og-newsletter-paper .wp-block-post-content {
+    margin: 0;
+    color: var(--og-paper-fg);
+    font-size: 18px;
+    line-height: 1.6;
+  }
+
+  .og-newsletter-paper p,
+  .og-newsletter-paper label,
+  .og-newsletter-paper legend {
+    color: var(--og-paper-fg);
+  }
+
+  .og-newsletter-paper a {
+    color: var(--og-paper-link);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .og-newsletter-paper input,
+  .og-newsletter-paper select,
+  .og-newsletter-paper textarea {
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  .og-newsletter-paper select {
+    min-height: 44px;
+  }
+
+  .og-newsletter-paper input[type='submit'],
+  .og-newsletter-paper button[type='submit'] {
+    min-height: 44px;
+    background: #d13d78;
+    color: #ffffff;
+  }
+
+  .og-newsletter-paper .mailpoet_confirm_unsubscribe a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription .mailpoet_paragraph {
+    margin: 0 0 24px;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription .mailpoet_text_label,
+  .og-newsletter-paper .mailpoet-manage-subscription .mailpoet_select_label,
+  .og-newsletter-paper .mailpoet-change-email-info {
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .og-newsletter-paper .mailpoet-change-email-info {
+    margin-top: 8px;
+    font-size: 16px;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription .mailpoet_text,
+  .og-newsletter-paper .mailpoet-manage-subscription .mailpoet_select {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 48px;
+    padding: 10px 14px;
+    border: 1px solid #8c7584;
+    border-radius: 10px;
+    background: #fdf6ed;
+    color: var(--og-paper-fg);
+    font-family: inherit;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription .mailpoet_select {
+    appearance: none;
+    padding-right: 40px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%2348333f' stroke-width='2'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription-section-description,
+  .og-newsletter-paper #mailpoet_manage_subscription_status_description {
+    display: none;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .og-newsletter-paper .mailpoet_segment_label {
+    margin-bottom: 8px;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription-lists-description {
+    margin: 0 0 20px;
+    font-size: 16px;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription-list-row {
+    padding-block: 20px;
+    border-top: 1px solid #bdaab7;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription-list-name {
+    font-weight: 600;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription-list-description {
+    margin-top: 4px;
+    font-size: 16px;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription-list-choice {
+    margin-top: 12px !important;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription-choice-legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription-choice-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    margin-right: 24px;
+    cursor: pointer;
+  }
+
+  .og-newsletter-paper .mailpoet_radio {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: #a92358;
+  }
+
+  .og-newsletter-paper .mailpoet-manage-subscription-actions {
+    margin-top: 24px;
+  }
+
+  .og-newsletter-footer {
+    border-top: 1px solid color-mix(in srgb, var(--og-page-border) 40%, transparent);
+    background: color-mix(in srgb, var(--og-page-bg) 60%, transparent);
+    backdrop-filter: blur(8px);
+    color: var(--og-page-muted);
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .og-newsletter-footer-inner {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    max-width: 1280px;
+    margin-inline: auto;
+    padding: 32px 16px;
+  }
+
+  .og-newsletter-footer nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .og-newsletter-footer a {
+    display: inline-block;
+    padding-block: 12px;
+    margin-block: -12px;
+    color: var(--og-page-muted);
+    text-decoration: none;
+  }
+
+  .og-newsletter-footer a:hover {
+    color: var(--og-page-fg);
+  }
+
+  @media (min-width: 768px) {
+    .og-newsletter-footer-inner {
+      box-sizing: border-box;
+      flex-direction: row;
+    }
+  }
+
+  .og-newsletter-header a:focus-visible,
+  .og-newsletter-main a:focus-visible,
+  .og-newsletter-footer a:focus-visible {
+    outline: 3px solid #d13d78;
+    outline-offset: 4px;
+  }
+
+  @media (prefers-color-scheme: light) {
+    body.page-template-newsletter-pages {
+      --og-page-bg: #f8e8f6;
+      --og-page-fg: #48333f;
+      --og-page-muted: #765669;
+      --og-page-link: #ba2863;
+      --og-page-border: #e5cdd9;
+      --og-paper-bg: #fdf6f9;
+    }
+  }
+</style>
+<header class="og-newsletter-header">
+  <a
+    class="og-newsletter-brand"
+    href="https://organizedglitter.app/"
+    aria-label="Organized Glitter home"
+  >
+    <img src="https://organizedglitter.app/images/logo.png" alt="" width="40" height="40" />
+    <span>Organized Glitter</span>
+  </a>
+</header>
+<!-- /wp:html -->
+
+<!-- wp:group {"tagName":"main","className":"og-newsletter-main","layout":{"type":"default"}} -->
+<main class="wp-block-group og-newsletter-main">
+  <!-- wp:group {"className":"og-newsletter-paper","layout":{"type":"default"}} -->
+  <div class="wp-block-group og-newsletter-paper">
+    <!-- wp:post-title {"level":1} /-->
+    <!-- wp:post-content {"layout":{"type":"default"}} /-->
+  </div>
+  <!-- /wp:group -->
+</main>
+<!-- /wp:group -->
+
+<!-- wp:html -->
+<footer class="og-newsletter-footer">
+  <div class="og-newsletter-footer-inner">
+    <span>&copy; 2026 Organized Glitter</span>
+    <nav aria-label="Footer">
+      <a href="https://organizedglitter.app/privacy">Privacy</a>
+      <a href="https://organizedglitter.app/terms">Terms</a>
+      <a href="https://organizedglitter.app/about">About</a>
+      <a href="https://organizedglitter.app/links">Links</a>
+      <a href="https://organizedglitter.app/updates/">Updates</a>
+    </nav>
+  </div>
+</footer>
+<!-- /wp:html -->

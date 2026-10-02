@@ -9,7 +9,7 @@ export function sanitizeMarkdownUrl(url: string): string {
 
   try {
     const baseUrl =
-      typeof window === 'undefined' ? 'https://organizedglitter.app' : window.location.origin;
+      typeof window === 'undefined' ? 'https://markdown.invalid' : window.location.origin;
     const parsed = new URL(value, baseUrl);
 
     if (!SAFE_PROTOCOLS.has(parsed.protocol)) {

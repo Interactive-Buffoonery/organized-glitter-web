@@ -13,7 +13,9 @@ for (const file of ['handler.js', 'posthog.js']) {
   cpSync(resolve(root, 'spacefast', file), resolve(output, 'spacefast', file));
 }
 mkdirSync(resolve(output, 'server'), { recursive: true });
-cpSync(resolve(root, 'server/app-route-policy.js'), resolve(output, 'server/app-route-policy.js'));
+for (const file of ['app-route-policy.js', 'deployment-config.js']) {
+  cpSync(resolve(root, 'server', file), resolve(output, 'server', file));
+}
 const shell = readFileSync(resolve(output, 'index.html'), 'utf8');
 const notFound = readFileSync(resolve(output, '404.html'), 'utf8');
 const headerRules = readFileSync(resolve(output, '_headers'), 'utf8');

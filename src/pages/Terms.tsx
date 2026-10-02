@@ -1,3 +1,4 @@
+import { publicUrl } from '@/lib/publicUrl';
 import MainLayout from '@/components/layout/MainLayout';
 import { Link } from 'react-router-dom';
 import { useAppReady } from '@/hooks/useAppReady';
@@ -170,7 +171,7 @@ const sections = [
       <p className="text-foreground/90 leading-relaxed">
         Your use of the Service is also governed by our Privacy Policy, which can be found at{' '}
         <Link to="/privacy" className="text-link underline underline-offset-4">
-          organizedglitter.app/privacy
+          the privacy policy for this instance
         </Link>
         . The Privacy Policy is incorporated into these Terms by reference.
       </p>
@@ -266,11 +267,11 @@ const PAGE_METADATA = {
   title: 'Terms of service | Organized Glitter',
   description:
     'Review the Organized Glitter terms of service for account responsibilities, acceptable use, content ownership, and service availability.',
-  canonicalUrl: 'https://organizedglitter.app/terms',
+  canonicalUrl: publicUrl('/terms'),
   ...publicPageSocialMetadata(
     'Terms of service | Organized Glitter',
     'Review the Organized Glitter terms of service for account responsibilities, acceptable use, content ownership, and service availability.',
-    'https://organizedglitter.app/terms'
+    publicUrl('/terms')
   ),
 };
 

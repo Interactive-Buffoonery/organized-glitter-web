@@ -207,16 +207,18 @@ export function MobileAccountMenu({
               </MenuSection>
 
               <MenuSection title="App">
-                <a
-                  href={SUBSCRIBE_TO_UPDATES_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={closeDrawer}
-                  className="hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-ring flex min-h-11 items-center gap-3 px-4 py-3 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  <Bell className="text-primary size-4" aria-hidden />
-                  Subscribe to Updates
-                </a>
+                {SUBSCRIBE_TO_UPDATES_URL && (
+                  <a
+                    href={SUBSCRIBE_TO_UPDATES_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={closeDrawer}
+                    className="hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-ring flex min-h-11 items-center gap-3 px-4 py-3 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    <Bell className="text-primary size-4" aria-hidden />
+                    Subscribe to Updates
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() => runAndClose(handleFeedback)}

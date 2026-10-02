@@ -51,7 +51,7 @@
     // Vite may leave an unreplaced placeholder if env is missing at build time.
     if (key.indexOf('%VITE_') === 0 || key === 'undefined') key = '';
     if (host.indexOf('%VITE_') === 0 || host === 'undefined') host = '';
-    return { key: key, host: host, release: raw.release };
+    return { key: key, host: host, release: raw.release, environment: raw.environment };
   }
 
   function resolveIngestBase(host) {
@@ -145,16 +145,9 @@
     var path = win.location && win.location.pathname;
     var hostname = win.location && win.location.hostname;
     var environment =
-      ['organizedglitter.app', 'www.organizedglitter.app'].indexOf(hostname) !== -1
-        ? 'production'
-        : [
-              'organized-glitter-preview.up.railway.app',
-              'organized-glitter-preview.view.fast',
-            ].indexOf(hostname) !== -1
-          ? 'preview'
-          : ['localhost', '127.0.0.1', '[::1]'].indexOf(hostname) !== -1
-            ? 'local'
-            : 'other';
+      ['localhost', '127.0.0.1', '[::1]'].indexOf(hostname) !== -1
+        ? 'local'
+        : config.environment || 'production';
     var segment = typeof path === 'string' ? path.split('/')[1] : '';
     var routes = [
       'login',
@@ -192,7 +185,7 @@
     if (isDoNotTrackEnabled(options.navigator, options.window)) return false;
 
     var config = options.config || readPublicConfig(options.root || global);
-    if (!config.key) return false;
+    if (!config.key || !config.host) return false;
 
     var ingestBase = resolveIngestBase(config.host);
     var url = ingestBase + '/e/';

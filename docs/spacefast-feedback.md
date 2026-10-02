@@ -28,6 +28,6 @@ acceptance pass. Do not use the old `/api/send-feedback` Function route.
 The earlier Function candidate failed because the preview worker did not receive
 its declared outbound fetch capability or feedback variables. Its design and
 probe results remain in the
-[IP investigation record](./audits/spacefast-feedback-ip-2026-09-24.md).
+IP investigation record (historical reference outside this extraction).
 Outbound fetch is still needed by the separate PostHog proxy; see
 [PostHog on SpaceFast](./spacefast-posthog.md).

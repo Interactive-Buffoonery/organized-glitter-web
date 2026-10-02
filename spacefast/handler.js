@@ -7,10 +7,10 @@ const htmlHeaders = {
   ...HTML_SECURITY_HEADERS,
 };
 export default {
-  async fetch(request) {
+  async fetch(request, env = {}) {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/glimmer/')) {
-      return proxyPosthog(request);
+      return proxyPosthog(request, env);
     }
 
     if (url.pathname.startsWith('/api/')) {

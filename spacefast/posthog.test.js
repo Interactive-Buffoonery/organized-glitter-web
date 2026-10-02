@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { proxyPosthog } from './posthog.js';
 import handler from './handler.js';
 
+const proxyEnv = {
+  POSTHOG_PROXY_HOST: 'https://us.i.posthog.com',
+  POSTHOG_PROXY_ASSET_HOST: 'https://us-assets.i.posthog.com',
+};
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Spacefast PostHog proxy', () => {
@@ -11,7 +15,7 @@ describe('Spacefast PostHog proxy', () => {
 
     const response = await handler.fetch(
       new Request('https://organizedglitter.app/glimmer/e/?v=3'),
-      {}
+      proxyEnv
     );
 
     expect(response.status).toBe(204);
@@ -31,24 +35,35 @@ describe('Spacefast PostHog proxy', () => {
       );
     vi.stubGlobal('fetch', send);
 
-    const response = await proxyPosthog(new Request(`https://organizedglitter.app${path}`));
+    const response = await proxyPosthog(new Request(`https://app.example.test${path}`), proxyEnv);
 
     expect(response.status).toBe(200);
     expect(send.mock.calls[0][0].toString()).toBe(target);
   });
 
-  it.each(['/glimmer//evil.example/x', '/glimmer/%2F%2Fevil.example/x'])(
-    'keeps %s on the PostHog host',
-    async path => {
-      const send = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
-      vi.stubGlobal('fetch', send);
+  it.each(['/glimmer/%2F%2Fevil.example/x'])('keeps %s on the PostHog host', async path => {
+    const send = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', send);
 
-      expect((await proxyPosthog(new Request(`https://organizedglitter.app${path}`))).status).toBe(
-        204
-      );
-      expect(send.mock.calls[0][0].origin).toBe('https://us.i.posthog.com');
-    }
-  );
+    expect(
+      (await proxyPosthog(new Request(`https://app.example.test${path}`), proxyEnv)).status
+    ).toBe(204);
+    expect(send.mock.calls[0][0].origin).toBe('https://us.i.posthog.com');
+  });
+
+  it('rejects a protocol-relative path without sending a request', async () => {
+    const send = vi.fn();
+    vi.stubGlobal('fetch', send);
+    expect(
+      (
+        await proxyPosthog(
+          new Request('https://app.example.test/glimmer//evil.example/x'),
+          proxyEnv
+        )
+      ).status
+    ).toBe(404);
+    expect(send).not.toHaveBeenCalled();
+  });
 
   it('forwards capture body without visitor credentials or forwarding headers', async () => {
     const send = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
@@ -65,7 +80,7 @@ describe('Spacefast PostHog proxy', () => {
       body: '{"event":"migration_test"}',
     });
 
-    expect((await proxyPosthog(request)).status).toBe(204);
+    expect((await proxyPosthog(request, proxyEnv)).status).toBe(204);
     const options = send.mock.calls[0][1];
     expect(options.method).toBe('POST');
     expect(new TextDecoder().decode(options.body)).toBe('{"event":"migration_test"}');
@@ -80,12 +95,16 @@ describe('Spacefast PostHog proxy', () => {
       new Request('https://organizedglitter.app/glimmer/e/', {
         method: 'POST',
         body: 'x'.repeat(1_048_577),
-      })
+      }),
+      proxyEnv
     );
     expect(oversized.status).toBe(413);
     expect(send).not.toHaveBeenCalled();
 
-    const failed = await proxyPosthog(new Request('https://organizedglitter.app/glimmer/decide/'));
+    const failed = await proxyPosthog(
+      new Request('https://app.example.test/glimmer/decide/'),
+      proxyEnv
+    );
     expect(failed.status).toBe(204);
   });
 });

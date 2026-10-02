@@ -47,14 +47,18 @@ routerAdd(
     ) {
       throw new BadRequestError('Invalid Apple sign-in request.');
     }
-    if (data.name !== undefined && (
-      typeof data.name !== 'object' || !data.name || Array.isArray(data.name) ||
-      Object.keys(data.name).some(key => !['givenName', 'familyName'].includes(key)) ||
-      ['givenName', 'familyName'].some(key =>
-        data.name[key] !== undefined &&
-        (typeof data.name[key] !== 'string' || data.name[key].length > 100)
-      )
-    )) {
+    if (
+      data.name !== undefined &&
+      (typeof data.name !== 'object' ||
+        !data.name ||
+        Array.isArray(data.name) ||
+        Object.keys(data.name).some(key => !['givenName', 'familyName'].includes(key)) ||
+        ['givenName', 'familyName'].some(
+          key =>
+            data.name[key] !== undefined &&
+            (typeof data.name[key] !== 'string' || data.name[key].length > 100)
+        ))
+    ) {
       throw new BadRequestError('Invalid Apple sign-in request.');
     }
 
@@ -70,7 +74,10 @@ routerAdd(
     let authUser;
     let provider;
     try {
-      provider = require(`${__hooks}/native_apple.js`).createProvider(configuration, e.request.context());
+      provider = require(`${__hooks}/native_apple.js`).createProvider(
+        configuration,
+        e.request.context()
+      );
     } catch (_) {
       throw unavailable();
     }
@@ -120,14 +127,19 @@ routerAdd(
       const links = txApp.findRecordsByFilter(
         '_externalAuths',
         'collectionRef = {:collection} && provider = "apple" && providerId = {:subject}',
-        '', 1, 0, { collection: users.id, subject }
+        '',
+        1,
+        0,
+        { collection: users.id, subject }
       );
       if (links.length > 0) {
         record = txApp.findRecordById('users', links[0].getString('recordRef'));
         if (!record.getBool('verified')) {
           const storedEmail = record.getString('email');
           if (!email || (storedEmail && storedEmail.toLowerCase() !== email.toLowerCase())) {
-            throw new ForbiddenError('Apple cannot verify this account. Use another sign-in method.');
+            throw new ForbiddenError(
+              'Apple cannot verify this account. Use another sign-in method.'
+            );
           }
           record.setRandomPassword();
           txApp.deleteAllExternalAuthsByRecord(record);
@@ -147,8 +159,8 @@ routerAdd(
         }
         const matches = email
           ? txApp.findRecordsByFilter('users', 'email:lower = {:email}', '', 1, 0, {
-            email: email.toLowerCase(),
-          })
+              email: email.toLowerCase(),
+            })
           : [];
         if (matches.length > 0) {
           collision = true;
@@ -179,11 +191,17 @@ routerAdd(
       }
 
       require(`${__hooks}/apple_grant_store.js`).upsert(txApp, {
-        userId: record.id, identityHash, clientId: nativeClientId, ciphertext,
+        userId: record.id,
+        identityHash,
+        clientId: nativeClientId,
+        ciphertext,
       });
     });
     if (collision) {
-      throw new ApiError(409, 'An account already uses this email. Sign in first, then connect Apple from Account settings.');
+      throw new ApiError(
+        409,
+        'An account already uses this email. Sign in first, then connect Apple from Account settings.'
+      );
     }
     return $apis.recordAuthResponse(e, record, 'oauth2', { isNew });
   },

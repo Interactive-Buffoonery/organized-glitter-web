@@ -121,6 +121,7 @@ describe('Local build server static files', () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 
     if (server?.listening) {
       await close(server);
@@ -291,27 +292,17 @@ describe('Local build server static files', () => {
       '/',
       'index.html',
       'Organized Glitter | Coloring Book &amp; Diamond Art Tracker',
-      'https://organizedglitter.app/',
+      'https://app.invalid/',
     ],
-    ['/about', 'about.html', 'About | Organized Glitter', 'https://organizedglitter.app/about'],
-    [
-      '/links',
-      'links.html',
-      "Sarah's Links | Organized Glitter",
-      'https://organizedglitter.app/links',
-    ],
+    ['/about', 'about.html', 'About | Organized Glitter', 'https://app.invalid/about'],
+    ['/links', 'links.html', "Sarah's Links | Organized Glitter", 'https://app.invalid/links'],
     [
       '/privacy',
       'privacy.html',
       'Privacy policy | Organized Glitter',
-      'https://organizedglitter.app/privacy',
+      'https://app.invalid/privacy',
     ],
-    [
-      '/terms',
-      'terms.html',
-      'Terms of service | Organized Glitter',
-      'https://organizedglitter.app/terms',
-    ],
+    ['/terms', 'terms.html', 'Terms of service | Organized Glitter', 'https://app.invalid/terms'],
   ])(
     'serves route-specific metadata for %s before JavaScript runs',
     async (requestPath, fileName, title, canonical) => {
@@ -486,6 +477,8 @@ describe('Local build server feedback handling', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     sendMock.mockReset();
     delete process.env.RESEND_API_KEY;
+    vi.stubEnv('FEEDBACK_FROM_EMAIL', 'feedback@example.test');
+    vi.stubEnv('FEEDBACK_TO_EMAIL', 'admin@example.test');
     delete process.env.FEEDBACK_BODY_LIMIT_BYTES;
     delete process.env.FEEDBACK_RATE_LIMIT_MAX;
     delete process.env.FEEDBACK_RATE_LIMIT_WINDOW_MS;
@@ -497,6 +490,7 @@ describe('Local build server feedback handling', () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 
     if (server?.listening) {
       await close(server);
@@ -950,21 +944,10 @@ describe('Local build server content security policy', () => {
     expect(policy).toContain("img-src 'self' http://127.0.0.1:8090");
   });
 
-  it('does not add non-loopback or production runtime origins', () => {
-    const baseline = buildContentSecurityPolicy({});
-
-    expect(
-      buildContentSecurityPolicy({
-        APP_TEST_ENV: 'test',
-        VITE_POCKETBASE_URL: 'https://attacker.example',
-      })
-    ).toBe(baseline);
-    expect(
-      buildContentSecurityPolicy({
-        APP_TEST_ENV: 'production',
-        VITE_POCKETBASE_URL: 'http://127.0.0.1:8090',
-      })
-    ).toBe(baseline);
+  it('uses the configured production backend without official defaults', () => {
+    const policy = buildContentSecurityPolicy({ VITE_POCKETBASE_URL: 'https://data.example.test' });
+    expect(policy).toContain('https://data.example.test');
+    expect(policy).not.toContain('organizedglitter.app');
   });
 });
 
@@ -972,6 +955,8 @@ describe('Local build server PostHog proxy', () => {
   let server;
 
   beforeEach(() => {
+    vi.stubEnv('POSTHOG_PROXY_HOST', 'https://us.i.posthog.com');
+    vi.stubEnv('POSTHOG_PROXY_ASSET_HOST', 'https://us-assets.i.posthog.com');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     delete process.env.GLIMMER_PROXY_BODY_LIMIT_BYTES;
@@ -980,6 +965,7 @@ describe('Local build server PostHog proxy', () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 
     if (server?.listening) {
       await close(server);
@@ -1225,7 +1211,7 @@ describe('Local build server PostHog proxy', () => {
       const response = await request(port, path);
 
       expect(response.statusCode).toBe(404);
-      expect(response.body).toBe('');
+      expect(response.body).toBe('Not found');
       expect(fetchSpy).not.toHaveBeenCalled();
     }
   );
@@ -1250,6 +1236,7 @@ describe('Local build server graceful shutdown', () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 
     if (server?.listening) {
       await close(server);

@@ -8,6 +8,7 @@ import { installPocketBase } from './install-pocketbase.mjs';
 
 // Exercise the actual HTTP route: a mock cannot catch static-route precedence,
 // an authentication requirement, a redirect, or the wrong response content type.
+const configured = !process.argv.includes('--unconfigured');
 const directory = mkdtempSync(path.join(tmpdir(), 'og-native-association-'));
 let socket;
 let server;
@@ -38,7 +39,13 @@ try {
       `--hooksDir=${hooks}`,
       `--migrationsDir=${migrations}`,
     ],
-    { stdio: 'ignore' }
+    {
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        APPLE_APP_IDS: configured ? 'AAAAAAAAAA.test.example.app,invalid' : '',
+      },
+    }
   );
   let startupError;
   server.once('error', error => {
@@ -65,13 +72,13 @@ try {
   assert.equal(response.status, 200);
   assert.match(response.headers.get('content-type'), /^application\/json/);
   assert.deepEqual(await response.json(), {
-    webcredentials: { apps: ['7CNK4YPCQX.com.interactivebuffoonery.organizedglitter'] },
+    webcredentials: { apps: configured ? ['AAAAAAAAAA.test.example.app'] : [] },
   });
   // The web callback keeps its existing missing-state failure redirect.
   const callback = await fetch(`${baseURL}/api/oauth2-redirect`, { redirect: 'manual' });
   assert.equal(callback.status, 307);
   assert.match(callback.headers.get('location'), /oauth2-redirect-failure$/);
-  console.log('Native association HTTP checks passed');
+  console.log(`Native association HTTP checks passed (${configured ? 'configured' : 'disabled'})`);
 } finally {
   if (socket?.listening) await new Promise(resolve => socket.close(resolve));
   if (server?.pid && server.exitCode === null && server.signalCode === null) {

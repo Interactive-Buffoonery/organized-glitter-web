@@ -84,6 +84,8 @@ cronAdd('apple_grant_revocation', '*/5 * * * *', () => {
   try {
     require(`${__hooks}/apple_revocation.js`).processPending($app);
   } catch (_) {
-    $app.logger().warn('Apple revocation worker failed.', 'reason', 'apple_revocation_worker_failed');
+    $app
+      .logger()
+      .warn('Apple revocation worker failed.', 'reason', 'apple_revocation_worker_failed');
   }
 });

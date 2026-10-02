@@ -1,25 +1,9 @@
+import { analyticsProxyTarget } from '../server/deployment-config.js';
+
 const BODY_LIMIT = 1_048_576;
 const ALLOWED_METHODS = new Set(['GET', 'HEAD', 'POST']);
 const REQUEST_HEADERS = ['accept', 'content-type'];
 const RESPONSE_HEADERS = ['content-type', 'cache-control', 'etag', 'last-modified'];
-
-function targetFor(url) {
-  let origin = 'https://us.i.posthog.com';
-  let pathname;
-  if (url.pathname.startsWith('/glimmer/static/')) {
-    origin = 'https://us-assets.i.posthog.com';
-    pathname = url.pathname.replace('/glimmer/static/', '/static/');
-  } else if (url.pathname.startsWith('/glimmer/array/')) {
-    origin = 'https://us-assets.i.posthog.com';
-    pathname = url.pathname.replace('/glimmer/array/', '/array/');
-  } else {
-    pathname = url.pathname.replace('/glimmer/', '/');
-  }
-  const target = new URL(origin);
-  target.pathname = pathname;
-  target.search = url.search;
-  return target;
-}
 
 async function boundedBody(request) {
   const declaredLength = request.headers.get('Content-Length');
@@ -51,11 +35,12 @@ async function boundedBody(request) {
   return body;
 }
 
-export async function proxyPosthog(request) {
+export async function proxyPosthog(request, env = {}) {
   if (!ALLOWED_METHODS.has(request.method)) {
     return new Response('Method not allowed', { status: 405 });
   }
-  const target = targetFor(new URL(request.url));
+  const target = analyticsProxyTarget(new URL(request.url), env);
+  if (!target) return new Response('Not found', { status: 404 });
   const headers = new Headers();
   for (const name of REQUEST_HEADERS) {
     const value = request.headers.get(name);

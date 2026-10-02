@@ -31,3 +31,6 @@ playwright-artifacts/
 /.spacefast-*
 .DS_Store
 .worktrees/
+blog/dist/
+blog/.astro/
+blog/.generated/

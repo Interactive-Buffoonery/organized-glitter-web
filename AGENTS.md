@@ -2,12 +2,12 @@
 
 Concise map for contributors and automation working in this repository.
 
-| Need | Doc |
-| ---- | --- |
-| Where code lives | [`docs/codebase/README.md`](./docs/codebase/README.md) |
-| Domain terms | [`CONTEXT.md`](./CONTEXT.md) |
-| Product or UX | [`PRODUCT.md`](./PRODUCT.md) |
-| Visual system | [`DESIGN.md`](./DESIGN.md) |
+| Need              | Doc                                                                  |
+| ----------------- | -------------------------------------------------------------------- |
+| Where code lives  | [`docs/codebase/README.md`](./docs/codebase/README.md)               |
+| Domain terms      | [`CONTEXT.md`](./CONTEXT.md)                                         |
+| Product or UX     | [`PRODUCT.md`](./PRODUCT.md)                                         |
+| Visual system     | [`DESIGN.md`](./DESIGN.md)                                           |
 | UI implementation | [`docs/design-system/overview.md`](./docs/design-system/overview.md) |
 
 ## Stack
@@ -38,15 +38,15 @@ React + TypeScript + Vite with a PocketBase backend.
 
 ## Commands
 
-| Area | Commands |
-| ---- | -------- |
-| Install | `pnpm install`; clean reinstall: `pnpm setup` |
-| App | `pnpm dev:local`, `pnpm dev:lan` |
-| PocketBase | `pnpm pb:local`, `pnpm pb:bootstrap:local -- --seed` |
-| Checks | `pnpm typecheck`, `pnpm lint`, `pnpm lint:pb-boundary`, `pnpm format:check` |
-| Tests | `pnpm test`; pre-PR: `pnpm test:pr` |
-| Build | `pnpm build`, `pnpm preview` |
-| PB types | `pnpm pb:types`, `pnpm pb:types:local`, `pnpm pb:validate:schema`, `pnpm pb:validate:migrations` |
+| Area       | Commands                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| Install    | `pnpm install`; clean reinstall: `pnpm setup`                                                    |
+| App        | `pnpm dev:local`, `pnpm dev:lan`                                                                 |
+| PocketBase | `pnpm pb:local`, `pnpm pb:bootstrap:local -- --seed`                                             |
+| Checks     | `pnpm typecheck`, `pnpm lint`, `pnpm lint:pb-boundary`, `pnpm format:check`                      |
+| Tests      | `pnpm test`; pre-PR: `pnpm test:pr`                                                              |
+| Build      | `pnpm build`, `pnpm preview`                                                                     |
+| PB types   | `pnpm pb:types`, `pnpm pb:types:local`, `pnpm pb:validate:schema`, `pnpm pb:validate:migrations` |
 
 Local PocketBase: [`docs/pocketbase/local-development.md`](./docs/pocketbase/local-development.md).
 

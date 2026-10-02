@@ -11,7 +11,7 @@ squares, a white center square, and a raspberry diamond on navy.
 ## Source and regeneration
 
 [app-icon-source.png](../icons/app-icon-source.png) is the unchanged 2048px
-master supplied by Sarah. [app-icon.html](../icons/app-icon.html) previews it.
+master supplied by Sarah. app-icon.html (historical reference outside this extraction) previews it.
 The renderer trims seven pixels from every edge to remove a gray fringe at the
 top and right while keeping the crop square. It then resizes the artwork,
 rounds web tiles, and adds navy safe-area padding to the maskable export.

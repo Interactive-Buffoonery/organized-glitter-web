@@ -324,7 +324,7 @@ Findings:
 
 Pasting a public Shopify **product** URL to prefill a private diamond project
 is a separate proposed flow. See
-[`plans/url-kit-import.md`](./plans/url-kit-import.md). That plan is not order
+`plans/url-kit-import.md` (historical reference outside this extraction). That plan is not order
 import and is not a shared catalog crawl.
 
 References:

@@ -1,4 +1,6 @@
-const SOCIAL_IMAGE_URL = 'https://organizedglitter.app/images/social-preview-2026-09-27.jpg';
+import { publicUrl } from '@/lib/publicUrl';
+
+const SOCIAL_IMAGE_URL = publicUrl('/images/social-preview-2026-09-27.jpg');
 const SOCIAL_IMAGE_ALT =
   'Organized Glitter: track your coloring books and diamond art, with taped-in photos of a coloring page and a finished diamond painting';
 

@@ -115,7 +115,7 @@ describe('ImageGallery', () => {
   });
 
   it('keeps the open dialog and focused control mounted when a file token rotates', async () => {
-    const privateUrl = 'https://data.organizedglitter.app/api/files/projects/one/cover.jpg';
+    const privateUrl = 'http://localhost:8090/api/files/projects/one/cover.jpg';
     const view = render(
       <PrivateFileTokenContext.Provider value={{ userId: 'owner', value: 'first', issuedAt: 1 }}>
         <ImageGallery imageUrl={privateUrl} alt="Private cover" />

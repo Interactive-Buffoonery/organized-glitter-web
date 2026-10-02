@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const authState = vi.hoisted(() => ({
   isAuthenticated: true,
@@ -22,6 +22,10 @@ vi.mock('@/lib/pocketbase', () => ({
 const { sendFeedbackEmail } = await import('../feedback-email-service');
 
 describe('sendFeedbackEmail', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
   beforeEach(() => {
     authState.isAuthenticated = true;
     authState.token = 'session-token';

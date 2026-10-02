@@ -41,7 +41,7 @@ export function resolveBaseRef(argv, env = process.env) {
     getArgValue(argv, '--base-ref') ||
     env.GITHUB_BASE_SHA ||
     env.GITHUB_EVENT_BEFORE ||
-    'origin/dev';
+    'origin/main';
   if (!baseRef || /^0+$/.test(baseRef)) {
     throw new Error(
       'PocketBase upgrade validation needs a real base commit; the push before SHA is missing.'
@@ -58,6 +58,13 @@ const git = args => {
   }
   return result.stdout;
 };
+
+export function isBootstrapBaseline(baseCommit, gitFn = git) {
+  return (
+    !gitFn(['ls-tree', '--name-only', baseCommit]).trim() &&
+    !gitFn(['show', '-s', '--format=%P', baseCommit]).trim()
+  );
+}
 
 export function parseChangedPaths(output) {
   return output
@@ -343,6 +350,12 @@ export async function validatePocketBaseUpgrade(argv = process.argv.slice(2)) {
   const baseCommit = git(['rev-parse', '--verify', `${baseRef}^{commit}`]).trim();
   const changes = collectUpgradeChanges({ baseCommit });
   const { addedMigrations } = classifyUpgradeChanges(changes);
+  if (isBootstrapBaseline(baseCommit)) {
+    console.log(
+      'Empty public root has no prior deployed schema. Fresh installation and protected-file baseline checks are required separately.'
+    );
+    return { addedMigrations, skipped: true, bootstrap: true };
+  }
   const baseSchemaSource = git(['show', `${baseCommit}:${schemaPath}`]);
   const headSchemaSource = readFileSync(path.join(rootDir, schemaPath), 'utf8');
   const schemaContractChanged = !schemasHaveSameContract(baseSchemaSource, headSchemaSource);

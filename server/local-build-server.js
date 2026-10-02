@@ -8,6 +8,11 @@ import { addAbortSignal, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import {
+  buildContentSecurityPolicy as deploymentCsp,
+  analyticsProxyTarget,
+} from './deployment-config.js';
+
 import sendFeedbackHandler, { applyFeedbackCorsHeaders } from '../api/send-feedback.js';
 import { PUBLIC_PAGE_PATHS, isKnownAppRoute, isStaticFileRequest } from './app-route-policy.js';
 
@@ -21,9 +26,6 @@ const DEFAULT_FEEDBACK_RATE_LIMIT_MAX_WINDOWS = 10_000;
 const DEFAULT_FEEDBACK_TRUSTED_PROXY_HOPS = 1;
 const DEFAULT_GLIMMER_PROXY_BODY_LIMIT_BYTES = 1_048_576;
 const DEFAULT_GLIMMER_PROXY_BODY_TIMEOUT_MS = 10_000;
-
-const productionCsp =
-  "default-src 'self'; script-src 'self' 'unsafe-inline' data: https://accounts.google.com https://www.paypalobjects.com https://apis.google.com https://www.gstatic.com https://ssl.gstatic.com https://cdn.jsdelivr.net https://w.behold.so https://us-assets.i.posthog.com; connect-src 'self' https://data.organizedglitter.app https://*.organizedglitter.app https://images.organizedglitter.app https://www.paypal.com https://www.paypalobjects.com https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://securetoken.googleapis.com https://discord.com https://discordapp.com wss://gateway.discord.gg https://*.behold.so https://us.i.posthog.com https://us-assets.i.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://ssl.gstatic.com https://discord.com https://discordapp.com; img-src 'self' data: blob: https://data.organizedglitter.app https://*.organizedglitter.app https://images.organizedglitter.app https://organized-glitter-images.diamondartchive.workers.dev https://*.workers.dev https://*.googleusercontent.com https://www.paypal.com https://www.paypalobjects.com https://www.google.com https://*.gstatic.com https://i.ytimg.com https://placehold.co https://discord.com https://discordapp.com https://cdn.discordapp.com https://*.behold.so https://behold.pictures https://*.behold.pictures https://*.cdninstagram.com; font-src 'self' data: https://fonts.gstatic.com https://ssl.gstatic.com https://discord.com https://discordapp.com; worker-src 'self' blob:; frame-src 'self' https://updates.organizedglitter.app https://accounts.google.com https://www.paypal.com https://discord.com https://discordapp.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none';";
 
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -45,25 +47,7 @@ const contentTypes = new Map([
 const APPLE_APP_SITE_ASSOCIATION_PATH = '/.well-known/apple-app-site-association';
 
 export function buildContentSecurityPolicy(env = process.env) {
-  if (env.APP_TEST_ENV !== 'test' || !env.VITE_POCKETBASE_URL) return productionCsp;
-
-  let pocketBaseOrigin;
-  try {
-    const pocketBaseUrl = new URL(env.VITE_POCKETBASE_URL);
-    if (
-      pocketBaseUrl.protocol !== 'http:' ||
-      !['localhost', '127.0.0.1', '::1'].includes(pocketBaseUrl.hostname)
-    ) {
-      return productionCsp;
-    }
-    pocketBaseOrigin = pocketBaseUrl.origin;
-  } catch {
-    return productionCsp;
-  }
-
-  return productionCsp
-    .replace("connect-src 'self'", `connect-src 'self' ${pocketBaseOrigin}`)
-    .replace("img-src 'self'", `img-src 'self' ${pocketBaseOrigin}`);
+  return deploymentCsp(env);
 }
 
 function applySecurityHeaders(res) {
@@ -426,11 +410,6 @@ export async function serveFile(
   }
 }
 
-const allowedProxyOrigins = new Set([
-  'https://us.i.posthog.com',
-  'https://us-assets.i.posthog.com',
-]);
-
 const privateProxyRequestHeaders = [
   'authorization',
   'cf-connecting-ip',
@@ -446,31 +425,9 @@ const privateProxyRequestHeaders = [
 ];
 
 async function proxyPostHog(req, res, url) {
-  const proxyTarget = (() => {
-    if (url.pathname.startsWith('/glimmer/static/')) {
-      return new URL(
-        url.pathname.replace('/glimmer/static/', '/static/') + url.search,
-        'https://us-assets.i.posthog.com'
-      );
-    }
-
-    if (url.pathname.startsWith('/glimmer/array/')) {
-      return new URL(
-        url.pathname.replace('/glimmer/array/', '/array/') + url.search,
-        'https://us-assets.i.posthog.com'
-      );
-    }
-
-    return new URL(url.pathname.replace('/glimmer/', '/') + url.search, 'https://us.i.posthog.com');
-  })();
-
-  if (!allowedProxyOrigins.has(proxyTarget.origin)) {
-    console.warn('Rejected PostHog proxy target outside allowlist:', {
-      path: url.pathname,
-    });
-    applySecurityHeaders(res);
-    res.writeHead(404);
-    res.end();
+  const proxyTarget = analyticsProxyTarget(url, process.env);
+  if (!proxyTarget) {
+    sendText(res, 404, 'Not found');
     return;
   }
 

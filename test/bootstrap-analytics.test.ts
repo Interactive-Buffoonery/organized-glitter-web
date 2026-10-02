@@ -210,12 +210,12 @@ describe('bootstrap-analytics beacon helper', () => {
     expect(JSON.stringify(payload)).not.toMatch(/private-token|Mozilla|Safari\/|verify-email/);
   });
 
-  it('classifies Spacefast bootstrap failures as preview events', () => {
+  it('uses the configured preview environment', () => {
     const api = loadAnalytics();
     const fetchFn = vi.fn((_url: string, _options: { body: string }) => Promise.resolve());
 
     api.captureBootstrapFailureShown('module_resource', {
-      config: { key: 'phc_test', host: '/glimmer' },
+      config: { key: 'phc_test', host: '/glimmer', environment: 'preview' },
       navigator: { doNotTrack: '0' },
       window: { location: { hostname: 'organized-glitter-preview.view.fast', pathname: '/login' } },
       sendBeacon: () => false,

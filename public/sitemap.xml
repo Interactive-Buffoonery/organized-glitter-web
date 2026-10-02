@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://organizedglitter.app/</loc>
+    <loc>https://app.invalid/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://organizedglitter.app/about</loc>
+    <loc>https://app.invalid/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://organizedglitter.app/links</loc>
+    <loc>https://app.invalid/links</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://organizedglitter.app/privacy</loc>
+    <loc>https://app.invalid/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://organizedglitter.app/terms</loc>
+    <loc>https://app.invalid/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

@@ -112,14 +112,11 @@ describe('library CSV export analytics', () => {
   it('does not download a partial coloring page export when the complete page read fails', async () => {
     serviceMocks.coloringService.listAllBooks.mockResolvedValue([{ id: 'book-1' }]);
     serviceMocks.coloringService.listAllPagesByBook.mockRejectedValue(
-      Object.assign(
-        new Error('Contact support at contact@example.test so we can help you.'),
-        {
-          type: 'validation',
-          retryable: false,
-          reason: 'read_limit_exceeded',
-        }
-      )
+      Object.assign(new Error('Contact support at contact@example.test so we can help you.'), {
+        type: 'validation',
+        retryable: false,
+        reason: 'read_limit_exceeded',
+      })
     );
     serviceMocks.coloringMediumsService.listColoringMediums.mockResolvedValue({ items: [] });
     serviceMocks.coloringPageProgressNotesService.listAllForUser.mockResolvedValue([]);

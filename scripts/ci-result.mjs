@@ -1,7 +1,14 @@
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-export const requiredJobs = ['static-checks', 'unit-tests', 'backend', 'build'];
+export const requiredJobs = [
+  'static-checks',
+  'unit-tests',
+  'backend',
+  'build',
+  'browser',
+  'react-doctor',
+];
 
 export function evaluateCiResult(needs) {
   if (!needs || typeof needs !== 'object' || Array.isArray(needs)) {

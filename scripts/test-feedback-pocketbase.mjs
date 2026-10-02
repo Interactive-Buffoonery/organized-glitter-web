@@ -46,7 +46,10 @@ const server = spawn(
     `--hooksDir=${hooksDir}`,
     `--migrationsDir=${migrationsDir}`,
   ],
-  { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, FEEDBACK_TO_EMAIL: 'feedback@example.test' } }
+  {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, FEEDBACK_TO_EMAIL: 'feedback@example.test' },
+  }
 );
 server.stdout.on('data', chunk => (output += chunk.toString()));
 server.stderr.on('data', chunk => (output += chunk.toString()));

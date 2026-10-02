@@ -1,3 +1,4 @@
+import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 import { logger } from '@/utils/logger';
 
 /**
@@ -17,6 +18,14 @@ interface ResourceError {
 // Track resource errors for analytics
 const resourceErrors: ResourceError[] = [];
 const MAX_TRACKED_ERRORS = 50;
+
+function isBackendUrl(value: string): boolean {
+  try {
+    return new URL(value).origin === new URL(POCKETBASE_URL).origin;
+  } catch {
+    return false;
+  }
+}
 
 export function withoutFileToken(rawUrl: string): string {
   try {
@@ -70,7 +79,7 @@ const trackResourceError = (url: string, type: ResourceError['type'], status?: n
   logger.warn(`🚨 Resource loading failed: ${type} - ${safeUrl}`, { status });
 
   // Special handling for PocketBase file errors
-  if (safeUrl.includes('data.organizedglitter.app') && type === 'image') {
+  if (isBackendUrl(safeUrl) && type === 'image') {
     logger.error('PocketBase image failed to load - this may indicate URL generation issues:', {
       url: safeUrl,
       urlParts: {
@@ -140,9 +149,7 @@ const getResourceErrorStats = () => {
       {} as Record<ResourceError['type'], number>
     ),
     recent: resourceErrors.filter(error => Date.now() - error.timestamp < 5 * 60 * 1000), // Last 5 minutes
-    pocketbaseErrors: resourceErrors.filter(error =>
-      error.url.includes('data.organizedglitter.app')
-    ),
+    pocketbaseErrors: resourceErrors.filter(error => isBackendUrl(error.url)),
   };
 
   return stats;

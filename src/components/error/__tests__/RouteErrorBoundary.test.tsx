@@ -107,7 +107,7 @@ describe('RouteErrorBoundary', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Email support' })).toHaveAttribute(
       'href',
-      'mailto:contact@example.test?subject=App%20won%27t%20load'
+      "mailto:contact@example.test?subject=App%20won't%20load"
     );
   });
 

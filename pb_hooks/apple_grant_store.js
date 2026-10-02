@@ -15,19 +15,29 @@ function linkedGrantKeys(app, grants, providerNames) {
   const links = app.findRecordsByFilter(
     '_externalAuths',
     `collectionRef = {:collection} && (${users.join(' || ')}) && (${providers.join(' || ')})`,
-    '', 0, 0, params
+    '',
+    0,
+    0,
+    params
   );
-  return new Set(links.map(link =>
-    `${link.getString('recordRef')}:${$security.sha256(link.getString('providerId'))}`
-  ));
+  return new Set(
+    links.map(
+      link => `${link.getString('recordRef')}:${$security.sha256(link.getString('providerId'))}`
+    )
+  );
 }
 
 function hasPendingGrant(app, identityHash) {
-  return app.findRecordsByFilter(
-    'apple_oauth_grants',
-    'provider_id_hash = {:identity} && state = "revocation_pending"',
-    '', 1, 0, { identity: identityHash }
-  ).length > 0;
+  return (
+    app.findRecordsByFilter(
+      'apple_oauth_grants',
+      'provider_id_hash = {:identity} && state = "revocation_pending"',
+      '',
+      1,
+      0,
+      { identity: identityHash }
+    ).length > 0
+  );
 }
 
 function hasOrphanedGrant(app, identityHash, providerName, response) {
@@ -37,13 +47,15 @@ function hasOrphanedGrant(app, identityHash, providerName, response) {
     const grants = app.findRecordsByFilter(
       'apple_oauth_grants',
       'provider_id_hash = {:identity} && id > {:cursor}',
-      'id', 100, 0, { identity: identityHash, cursor }
+      'id',
+      100,
+      0,
+      { identity: identityHash, cursor }
     );
     if (grants.length === 0) return false;
     const linked = linkedGrantKeys(app, grants, [providerName]);
-    if (grants.some(grant => !linked.has(
-      `${grant.getString('user_id')}:${identityHash}`
-    ))) return true;
+    if (grants.some(grant => !linked.has(`${grant.getString('user_id')}:${identityHash}`)))
+      return true;
     if (grants.length < 100) return false;
     cursor = grants[grants.length - 1].id;
     checked += grants.length;
@@ -51,7 +63,10 @@ function hasOrphanedGrant(app, identityHash, providerName, response) {
       const remaining = app.findRecordsByFilter(
         'apple_oauth_grants',
         'provider_id_hash = {:identity} && id > {:cursor}',
-        'id', 1, 0, { identity: identityHash, cursor }
+        'id',
+        1,
+        0,
+        { identity: identityHash, cursor }
       );
       if (remaining.length === 0) return false;
       response.header().set('Retry-After', '30');
@@ -63,11 +78,16 @@ function hasOrphanedGrant(app, identityHash, providerName, response) {
 }
 
 function hasActiveGrant(app, identityHash, clientId) {
-  return app.findRecordsByFilter(
-    'apple_oauth_grants',
-    'provider_id_hash = {:identity} && client_id = {:client} && state = "active"',
-    '', 1, 0, { identity: identityHash, client: clientId }
-  ).length > 0;
+  return (
+    app.findRecordsByFilter(
+      'apple_oauth_grants',
+      'provider_id_hash = {:identity} && client_id = {:client} && state = "active"',
+      '',
+      1,
+      0,
+      { identity: identityHash, client: clientId }
+    ).length > 0
+  );
 }
 
 function requireActive(
@@ -90,13 +110,17 @@ function requireActive(
     });
   }
   if (!hasNewGrant && !hasActiveGrant(app, identityHash, clientId)) {
-    throw new ApiError(503, preparationFailed
-      ? 'Apple sign-in is temporarily unavailable. Please try again.'
-      : 'Apple authorization needs a fresh grant. Please try again.', {
-      reason: preparationFailed
-        ? new ValidationError('apple_grant_prepare_failed', 'Grant preparation failed.')
-        : new ValidationError('apple_grant_required', 'Fresh authorization is required.'),
-    });
+    throw new ApiError(
+      503,
+      preparationFailed
+        ? 'Apple sign-in is temporarily unavailable. Please try again.'
+        : 'Apple authorization needs a fresh grant. Please try again.',
+      {
+        reason: preparationFailed
+          ? new ValidationError('apple_grant_prepare_failed', 'Grant preparation failed.')
+          : new ValidationError('apple_grant_required', 'Fresh authorization is required.'),
+      }
+    );
   }
 }
 
@@ -107,7 +131,10 @@ module.exports = {
     const matches = app.findRecordsByFilter(
       'apple_oauth_grants',
       'provider_id_hash = {:identity} && client_id = {:client}',
-      '', 1, 0, { identity: identityHash, client: clientId }
+      '',
+      1,
+      0,
+      { identity: identityHash, client: clientId }
     );
     if (!ciphertext) {
       if (matches.length === 0) {
@@ -115,9 +142,10 @@ module.exports = {
       }
       return;
     }
-    const grant = matches.length > 0
-      ? matches[0]
-      : new Record(app.findCollectionByNameOrId('apple_oauth_grants'));
+    const grant =
+      matches.length > 0
+        ? matches[0]
+        : new Record(app.findCollectionByNameOrId('apple_oauth_grants'));
     grant.set('user_id', userId);
     grant.set('provider_id_hash', identityHash);
     grant.set('client_id', clientId);

@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 describe('public CI workflows', () => {
-  it('does not run Playwright browser smoke in the default CI workflow', () => {
+  it('runs browser smoke on public runners without deployment credentials', () => {
     const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
-    expect(workflow).not.toContain('qa:browser');
+    expect(workflow).toContain('qa:browser:ci');
     expect(workflow).not.toContain('playwright-image');
-    expect(workflow).not.toContain('react-doctor');
+    expect(workflow).toContain('react-doctor');
+    expect(workflow).not.toContain('secrets.');
+    expect(workflow).not.toContain('self-hosted');
   });
 });

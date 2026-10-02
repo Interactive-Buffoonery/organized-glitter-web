@@ -48,7 +48,7 @@ test('a controlling service worker preserves route and missing-page responses', 
       expect(response?.fromServiceWorker()).toBe(false);
       await expect(publicPage.locator('link[rel="canonical"]')).toHaveAttribute(
         'href',
-        `https://organizedglitter.app${route}`
+        new URL(route, 'http://localhost:4183').href
       );
     } finally {
       await publicPage.close();

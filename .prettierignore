@@ -69,3 +69,8 @@ public/sitemap.xml
 
 # Vendored Claude Code skills (keep in sync with upstream; do not reformat)
 .claude/skills/
+
+# Local validation artifacts
+.tmp/
+playwright-report/
+test-results/

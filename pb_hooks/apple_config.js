@@ -67,6 +67,12 @@ module.exports = {
       if (typeof config.teamId !== 'string' || !/^[A-Z0-9]{10}$/.test(config.teamId)) {
         return unavailable(app, 'apple_config_invalid_team_id');
       }
+      if (
+        typeof config.nativeClientId !== 'string' ||
+        !/^[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)+$/.test(config.nativeClientId)
+      ) {
+        return unavailable(app, 'apple_config_invalid_native_client_id');
+      }
       if (typeof config.keyId !== 'string' || !/^[A-Z0-9]{10}$/.test(config.keyId)) {
         return unavailable(app, 'apple_config_invalid_key_id');
       }

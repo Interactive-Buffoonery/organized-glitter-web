@@ -6,6 +6,12 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { APP_ROUTE_PATHS, PUBLIC_PAGE_PATHS } from './server/app-route-policy.js';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { writeFileSync, readFileSync } from 'node:fs';
+import {
+  buildContentSecurityPolicy,
+  configuredOrigin,
+  escapeOriginForRegExp,
+} from './server/deployment-config.js';
 import { injectAppIconLinks } from './scripts/app-icon-links.mjs';
 import { ensureStartupScriptsBeforeAppModules } from './scripts/ensure-startup-script-order.mjs';
 
@@ -14,22 +20,18 @@ import { ensureStartupScriptsBeforeAppModules } from './scripts/ensure-startup-s
  * pre-React bootstrap shell can beacon bootstrap_failure_shown without the
  * React AnalyticsProvider. Uses the same public Vite env vars as the SDK.
  */
-function injectPublicAnalyticsConfig(
-  isProduction: boolean,
-  env: Record<string, string>,
-  buildId: string
-): Plugin {
+function injectPublicAnalyticsConfig(env: Record<string, string>, buildId: string): Plugin {
   return {
     name: 'og-inject-public-analytics-config',
     transformIndexHtml(html) {
       const key = env.VITE_PUBLIC_POSTHOG_KEY?.trim() || '';
-      const host = isProduction
-        ? '/glimmer'
-        : env.VITE_PUBLIC_POSTHOG_HOST?.trim() || 'https://us.i.posthog.com';
+      const host = env.VITE_PUBLIC_POSTHOG_HOST?.trim() || '';
+      const enabledKey = host ? key : '';
       const snippet = `<script>window.__OG_PUBLIC_ANALYTICS__=${JSON.stringify({
-        key,
+        key: enabledKey,
         host,
         release: buildId,
+        environment: env.VITE_DEPLOYMENT_ENVIRONMENT || 'production',
       })};</script>`;
       if (!html.includes('<!-- og-public-analytics -->')) {
         return html;
@@ -55,13 +57,58 @@ function preserveStartupScriptOrder(): Plugin {
   };
 }
 
+function deploymentOutput(env: Record<string, string>): Plugin {
+  const origin = configuredOrigin(env.VITE_APP_URL) || 'http://localhost:3000';
+  const contact = env.VITE_CONTACT_EMAIL?.trim() || '';
+  if (contact && !/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(contact)) {
+    throw new Error('Invalid VITE_CONTACT_EMAIL');
+  }
+  return {
+    name: 'og-deployment-output',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html) {
+        return (
+          contact
+            ? html
+            : html.replace(
+                /<a href="mailto:contact@example.invalid[^"]*">Email support<\/a>/g,
+                '<span>Contact is not configured for this instance.</span>'
+              )
+        )
+          .replaceAll('https://app.invalid', origin)
+          .replaceAll('contact@example.invalid', contact);
+      },
+    },
+    writeBundle(options) {
+      const directory = options.dir || 'dist';
+      const headers = readFileSync(path.join(directory, '_headers'), 'utf8');
+      writeFileSync(
+        path.join(directory, '_headers'),
+        headers.replace(
+          /Content-Security-Policy: [^\n]+/,
+          `Content-Security-Policy: ${buildContentSecurityPolicy(env)}`
+        )
+      );
+      for (const name of ['robots.txt', 'sitemap.xml']) {
+        const file = path.join(directory, name);
+        writeFileSync(file, readFileSync(file, 'utf8').replaceAll('https://app.invalid', origin));
+      }
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production';
   const projectRoot = fileURLToPath(new URL('.', import.meta.url));
   const worktreeParent = path.dirname(projectRoot);
   const dependencyRoot =
     path.basename(worktreeParent) === '.worktrees' ? path.dirname(worktreeParent) : projectRoot;
-  const env = loadEnv(mode, projectRoot, '');
+  const env = { ...loadEnv(mode, projectRoot, ''), ...process.env } as Record<string, string>;
+  if (isProduction && !env.VITE_POCKETBASE_URL)
+    throw new Error('VITE_POCKETBASE_URL is required for production builds');
+  const backendOrigin = configuredOrigin(env.VITE_POCKETBASE_URL || 'http://localhost:8090')!;
+  const escapedBackend = escapeOriginForRegExp(backendOrigin);
 
   const resolvedBuildIdFromEnv =
     process.env.GITHUB_SHA || process.env.RAILWAY_GIT_COMMIT_SHA || process.env.VITE_APP_VERSION;
@@ -86,8 +133,9 @@ export default defineConfig(({ mode }) => {
       __APP_TEST_ENV__: JSON.stringify(process.env.APP_TEST_ENV || ''),
     },
     plugins: [
+      deploymentOutput(env),
       { name: 'og-app-icon-links', transformIndexHtml: injectAppIconLinks },
-      injectPublicAnalyticsConfig(isProduction, env, buildId),
+      injectPublicAnalyticsConfig(env, buildId),
       tailwindcss(),
       react(),
       VitePWA({
@@ -123,17 +171,17 @@ export default defineConfig(({ mode }) => {
           // noise returns; files and health checks are read-only (GET).
           runtimeCaching: (['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'HEAD'] as const)
             .map(method => ({
-              urlPattern: /^https:\/\/data\.organizedglitter\.app\/api\/collections\//i,
+              urlPattern: new RegExp(`^${escapedBackend}/api/collections/`, 'i'),
               handler: 'NetworkOnly' as const,
               method,
             }))
             .concat({
-              urlPattern: /^https:\/\/data\.organizedglitter\.app\/api\/files\//i,
+              urlPattern: new RegExp(`^${escapedBackend}/api/files/`, 'i'),
               handler: 'NetworkOnly' as const,
               method: 'GET' as const,
             })
             .concat({
-              urlPattern: /^https:\/\/data\.organizedglitter\.app\/api\/health$/i,
+              urlPattern: new RegExp(`^${escapedBackend}/api/health$`, 'i'),
               handler: 'NetworkOnly' as const,
               method: 'GET' as const,
             }),
@@ -221,6 +269,13 @@ export default defineConfig(({ mode }) => {
           links: fileURLToPath(new URL('./links.html', import.meta.url)),
           privacy: fileURLToPath(new URL('./privacy.html', import.meta.url)),
           terms: fileURLToPath(new URL('./terms.html', import.meta.url)),
+          ...(env.BLOG_ENABLED === 'true'
+            ? {
+                blogNavigation: fileURLToPath(
+                  new URL('./src/blog-navigation.tsx', import.meta.url)
+                ),
+              }
+            : {}),
         },
         output: {
           manualChunks(id) {

@@ -35,7 +35,7 @@ describe('LinksPage', () => {
     expect(cardActionLinks).toHaveLength(4);
     expect(screen.getByRole('link', { name: /Try Organized Glitter/i })).toHaveAttribute(
       'href',
-      'https://organizedglitter.app'
+      new URL('/', window.location.origin).href
     );
     expect(screen.getByRole('link', { name: /26 for 26/i })).toHaveAttribute(
       'href',
@@ -76,10 +76,10 @@ describe('LinksPage', () => {
     expect(container.innerHTML).not.toMatch(/gradient|glass/i);
     expect(document.title).toBe("Sarah's Links | Organized Glitter");
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
-      'https://organizedglitter.app/links'
+      new URL('/links', window.location.origin).href
     );
     expect(document.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
-      'https://organizedglitter.app/links'
+      new URL('/links', window.location.origin).href
     );
     expect(
       document.querySelector<HTMLScriptElement>(

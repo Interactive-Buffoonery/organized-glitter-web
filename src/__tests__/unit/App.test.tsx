@@ -145,7 +145,7 @@ describe('App', () => {
       expect(input).toHaveValue('unfinished project');
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(fetchMock).toHaveBeenLastCalledWith(
-        'https://data.organizedglitter.app/api/health',
+        'http://localhost:8090/api/health',
         expect.objectContaining({ method: 'GET', cache: 'no-store' })
       );
       expect(reloadSpy).not.toHaveBeenCalled();

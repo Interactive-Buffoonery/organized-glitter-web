@@ -13,9 +13,7 @@ const directory = mkdtempSync(path.join(tmpdir(), 'og-mobile-sync-'));
 const dataDir = path.join(directory, 'data');
 const hooksDir = path.join(directory, 'hooks');
 mkdirSync(hooksDir);
-for (const file of readdirSync(path.join(root, 'pb_hooks')).filter(name =>
-  name.endsWith('.js')
-)) {
+for (const file of readdirSync(path.join(root, 'pb_hooks')).filter(name => name.endsWith('.js'))) {
   copyFileSync(path.join(root, 'pb_hooks', file), path.join(hooksDir, file));
 }
 const binary = await installPocketBase({
@@ -186,7 +184,10 @@ try {
   const collisionReplay = await request(ownerClient, 'apply', collisionOperation);
   assert.equal(collisionReplay.status, 200);
   assert.equal((await collisionReplay.json()).outcome, 'replayed');
-  assert.equal((await admin.collection('projects').getOne(collisionProject.id)).title, 'Collision handled');
+  assert.equal(
+    (await admin.collection('projects').getOne(collisionProject.id)).title,
+    'Collision handled'
+  );
   const conflict = await request(ownerClient, 'apply', {
     ...operation,
     operationId: 'test-operation-0002',
@@ -305,7 +306,11 @@ try {
   const updatedPage = (await updatePage.json()).record;
   assert.equal(updatedPage.status, 'in_progress');
   assert.equal(updatedPage.started_at, page.started_at, 'status-only sync preserves started_at');
-  assert.equal(updatedPage.completed_at, page.completed_at, 'status-only sync preserves completed_at');
+  assert.equal(
+    updatedPage.completed_at,
+    page.completed_at,
+    'status-only sync preserves completed_at'
+  );
   assert.ok(
     (await admin.collection('coloring_books').getOne(book.id)).last_activity_at,
     'the page persistence hook updates book activity'

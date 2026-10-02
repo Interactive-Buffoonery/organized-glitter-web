@@ -72,12 +72,14 @@ export function AuthMenu({
             <Mail className="mr-2 size-4" />
             Send Feedback
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <a href={SUBSCRIBE_TO_UPDATES_URL} target="_blank" rel="noopener noreferrer">
-              <Bell className="mr-2 size-4" aria-hidden />
-              Subscribe to Updates
-            </a>
-          </DropdownMenuItem>
+          {SUBSCRIBE_TO_UPDATES_URL && (
+            <DropdownMenuItem asChild>
+              <a href={SUBSCRIBE_TO_UPDATES_URL} target="_blank" rel="noopener noreferrer">
+                <Bell className="mr-2 size-4" aria-hidden />
+                Subscribe to Updates
+              </a>
+            </DropdownMenuItem>
+          )}
           {showInstallOption && (
             <DropdownMenuItem onClick={handleInstallClick}>
               <Download className="mr-2 size-4" />

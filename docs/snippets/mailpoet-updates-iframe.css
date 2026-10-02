@@ -1,0 +1,52 @@
+form.mailpoet_form_iframe {
+  padding: 0 !important;
+  color: #4b3344;
+  font-family: Karla, Arial, sans-serif;
+}
+
+.mailpoet_form_iframe .mailpoet-heading {
+  display: none;
+}
+
+.mailpoet_form_iframe .mailpoet_paragraph {
+  margin-bottom: 16px;
+}
+
+.mailpoet_form_iframe .mailpoet_paragraph.last {
+  margin-bottom: 0;
+}
+
+.mailpoet_form_iframe .mailpoet_text,
+.mailpoet_form_iframe .mailpoet_submit {
+  width: 100% !important;
+  min-height: 56px;
+  padding: 16px 18px !important;
+  font-family: inherit !important;
+  font-size: 16px !important;
+  box-sizing: border-box;
+}
+
+.mailpoet_form_iframe .mailpoet_text {
+  background: #f3eadb !important;
+  color: #4b3344 !important;
+  border-color: #796477 !important;
+}
+
+.mailpoet_form_iframe .mailpoet_submit {
+  background: #f58ab7 !important;
+  color: #151533 !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+}
+
+.mailpoet_form_iframe input:focus-visible,
+.mailpoet_form_iframe button:focus-visible,
+.mailpoet_form_iframe a:focus-visible {
+  outline: 3px solid #ad285e;
+  outline-offset: 3px;
+}
+
+.mailpoet_form_iframe .mailpoet_message {
+  padding: 0;
+  line-height: 1.5;
+}

@@ -201,7 +201,7 @@ from `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`. Prints
 
 ```bash
 set -a; . ./.env.e2e; set +a
-export VITE_POCKETBASE_URL=https://data.organizedglitter.app
+export VITE_POCKETBASE_URL=http://localhost:8090
 node scripts/seed-e2e-coloring-fixture.mjs
 ```
 
@@ -217,7 +217,7 @@ projects.
 
 ```bash
 set -a; . ./.env.e2e; set +a
-export VITE_POCKETBASE_URL=https://data.organizedglitter.app
+export VITE_POCKETBASE_URL=http://localhost:8090
 node scripts/seed-e2e-randomizer-fixture.mjs
 ```
 

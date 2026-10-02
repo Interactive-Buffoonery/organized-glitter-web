@@ -1,3 +1,4 @@
+import { publicUrl } from '@/lib/publicUrl';
 import MainLayout from '@/components/layout/MainLayout';
 import { useAppReady } from '@/hooks/useAppReady';
 import { usePageMetadata } from '@/hooks/usePageMetadata';
@@ -8,11 +9,11 @@ const PAGE_METADATA = {
   title: 'Privacy policy | Organized Glitter',
   description:
     'Organized Glitter does not sell your data. Learn what information is collected, how it is used, and what controls you have over your crafting project data.',
-  canonicalUrl: 'https://organizedglitter.app/privacy',
+  canonicalUrl: publicUrl('/privacy'),
   ...publicPageSocialMetadata(
     'Privacy policy | Organized Glitter',
     'Organized Glitter does not sell your data. Learn what information is collected, how it is used, and what controls you have over your crafting project data.',
-    'https://organizedglitter.app/privacy'
+    publicUrl('/privacy')
   ),
 };
 

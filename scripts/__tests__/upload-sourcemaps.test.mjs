@@ -168,7 +168,7 @@ describe('upload-sourcemaps script', () => {
       const inject = spawnPosthogCli(cliBin, ['sourcemap', 'inject', '--directory', rootDir], {
         cwd: rootDir,
         env: {
-          POSTHOG_CLI_API_KEY: 'local-test-posthog-cli-key',
+          POSTHOG_CLI_API_KEY: 'phx_local_test_posthog_cli_key',
           POSTHOG_CLI_PROJECT_ID: '1',
           POSTHOG_CLI_HOST: 'http://127.0.0.1:1',
         },

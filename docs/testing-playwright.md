@@ -228,7 +228,7 @@ guard.
 
 When reading older hosted-run results from before this skip behavior, classify
 guard failures separately from real product bugs. The
-[preview E2E verification report](./audits/preview-e2e-verification-2026-09-09.md)
+preview E2E verification report (historical reference outside this extraction)
 documents one full classification pass from that earlier state.
 
 ## Coloring date editor navigation regression

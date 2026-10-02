@@ -11,17 +11,17 @@ describe('authoritative CI result', () => {
   });
 
   it.each(['failure', 'cancelled', 'skipped', undefined])(
-    'rejects an expected browser job with result %s',
+    'rejects an expected build job with result %s',
     result => {
       const jobs = successfulJobs();
-      jobs.browser = { result };
-      expect(evaluateCiResult(jobs).find(job => job.name === 'browser').passed).toBe(false);
+      jobs.build = { result };
+      expect(evaluateCiResult(jobs).find(job => job.name === 'build').passed).toBe(false);
     }
   );
 
   it('rejects absent jobs even when every supplied result passed', () => {
     const jobs = successfulJobs();
-    delete jobs['react-doctor'];
+    delete jobs.backend;
     expect(evaluateCiResult(jobs).every(job => job.passed)).toBe(false);
   });
 

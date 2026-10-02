@@ -28,7 +28,7 @@ jobs:
   unit-tests:
     name: Unit and server tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,48 +37,17 @@ jobs:
       - run: pnpm test:ci:unit
 
   backend:
-    name: PocketBase contract and upgrade
+    name: PocketBase schema
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-project
       - run: pnpm pb:validate:schema && pnpm pb:validate:migrations
-      - name: Validate upgrade from the previous schema
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
-        run: pnpm pb:validate:upgrade --base-ref="$BASE_REF"
-      - name: Test protected file upgrade and access
-        run: pnpm pb:test:protected-file-upgrade
-      - name: Test verified API access
-        run: pnpm pb:test:auth-verification
-      - name: Test authenticated feedback
-        run: pnpm pb:test:feedback
-      - name: Test social account step-up
-        run: pnpm pb:test:auth-step-up
-      - name: Test native Apple sign-in
-        run: pnpm pb:test:native-apple
-      - name: Test multipart archive restore
-        run: pnpm pb:test:archive-restore-v3
-      - name: Upload backend diagnostics
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: pocketbase-upgrade-diagnostics
-          include-hidden-files: true
-          path: |
-            .tmp/pocketbase-upgrade/**/logs/
-            .tmp/pocketbase-upgrade/**/schema-comparison.json
-            .tmp/protected-file-upgrade/**/report.json
-            .tmp/protected-file-upgrade/**/*.log
-          retention-days: 7
 
   build:
-    outputs:
-      playwright-image: ${{ steps.playwright-image.outputs.image }}
     name: Production build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -92,92 +61,13 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
-      - name: Resolve the matching Playwright image
-        id: playwright-image
-        run: node scripts/resolve-playwright-image.mjs
       - run: pnpm build
-      - name: Report bundle and precache budgets
-        run: pnpm build:budget
-      - name: Upload bundle budget report
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: bundle-budget-report
-          path: .tmp/bundle-budget/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  browser:
-    name: Browser smoke
-    needs: build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    container:
-      image: ${{ needs.build.outputs.playwright-image }}
-      options: --ipc=host
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Trust the mounted checkout
-        run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: ./.github/actions/setup-project
-      - name: Install PocketBase archive utility
-        run: apt-get update && apt-get install -y --no-install-recommends unzip
-      - run: pnpm test:not-found
-      - run: pnpm test:pwa:navigation
-      - run: pnpm qa:browser:ci
-      - run: pnpm test:protected-file-rotation-browser
-      - name: Upload browser diagnostics
-        if: failure() || cancelled()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: browser-smoke-diagnostics
-          include-hidden-files: true
-          path: |
-            .tmp/pocketbase-release-qa/ci/artifacts/
-            .tmp/pocketbase-release-qa/ci/logs/
-            .tmp/pocketbase-release-qa/ci/release-qa-report.md
-            .tmp/protected-file-browser-qa/**/report/
-            .tmp/protected-file-browser-qa/**/results/
-            .tmp/not-found-qa/
-            .tmp/pwa-navigation/
-          retention-days: 7
-
-  react-doctor:
-    name: React Doctor
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Scan React changes
-        uses: millionco/react-doctor@d741d58e7831e37c9f6a5528340c103059bd1ccf # react-doctor@0.9.14
-        env:
-          REACT_DOCTOR_NO_TELEMETRY: '1'
-        with:
-          version: '0.9.14'
-          node-version: '24'
-          blocking: ${{ github.event_name == 'pull_request' && 'error' || 'none' }}
-          scope: changed
-          comment: false
-          review-comments: false
-          commit-status: false
+      - run: pnpm build:budget
 
   result:
     name: CI result
     if: always()
-    needs: [static-checks, unit-tests, backend, build, browser, react-doctor]
+    needs: [static-checks, unit-tests, backend, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

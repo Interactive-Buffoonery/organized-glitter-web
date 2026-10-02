@@ -1,0 +1,66 @@
+name: Browser validation
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '23 8 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-image:
+    name: Resolve Playwright image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      image: ${{ steps.playwright-image.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-project
+      - name: Resolve the matching Playwright image
+        id: playwright-image
+        run: node scripts/resolve-playwright-image.mjs
+
+  browser:
+    needs: browser-image
+    name: Full Chromium and WebKit validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container:
+      image: ${{ needs.browser-image.outputs.image }}
+      options: --ipc=host
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Trust the mounted checkout
+        run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: ./.github/actions/setup-project
+      - name: Install PocketBase archive utility
+        run: apt-get update && apt-get install -y --no-install-recommends unzip
+      - name: Validate production browser flows
+        run: pnpm qa:browser:full --run-id=full
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: full-browser-diagnostics
+          include-hidden-files: true
+          path: |
+            .tmp/pocketbase-release-qa/full/artifacts/
+            .tmp/pocketbase-release-qa/full/logs/
+            .tmp/pocketbase-release-qa/full/release-qa-report.md
+          retention-days: 7

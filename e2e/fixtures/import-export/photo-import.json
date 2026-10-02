@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "photos/cover.jpg",
+      "title": "{{RUN_PREFIX}} Organized CSV Project",
+      "targetType": "project-cover"
+    },
+    {
+      "path": "photos/progress.jpg",
+      "title": "{{RUN_PREFIX}} Organized CSV Project",
+      "targetType": "project-progress-note",
+      "date": "2026-05-12",
+      "note": "Imported E2E progress photo"
+    },
+    {
+      "path": "photos/unmatched.jpg"
+    }
+  ]
+}

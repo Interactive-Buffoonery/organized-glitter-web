@@ -1,0 +1,228 @@
+/// <reference path="../pb_data/types.d.ts" />
+migrate((app) => {
+  const collection = new Collection({
+    "createRule": null,
+    "deleteRule": null,
+    "fields": [
+      {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "help": "",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "cascadeDelete": true,
+        "collectionId": "_pb_users_auth_",
+        "help": "",
+        "hidden": false,
+        "id": "relation2375276105",
+        "maxSelect": 1,
+        "minSelect": 0,
+        "name": "user",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "relation"
+      },
+      {
+        "autogeneratePattern": "",
+        "help": "",
+        "hidden": false,
+        "id": "text2478663497",
+        "max": 64,
+        "min": 0,
+        "name": "backup_id",
+        "pattern": "^[a-f0-9-]+$",
+        "presentable": false,
+        "primaryKey": false,
+        "required": true,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "help": "",
+        "hidden": false,
+        "id": "text309285470",
+        "max": 255,
+        "min": 0,
+        "name": "item_id",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": true,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "help": "",
+        "hidden": false,
+        "id": "select4092917794",
+        "maxSelect": 1,
+        "name": "item_kind",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "select",
+        "values": [
+          "diamond-project",
+          "diamond-project-note",
+          "coloring-medium",
+          "coloring-book",
+          "coloring-page",
+          "coloring-page-note",
+          "coloring-color-reference",
+          "asset"
+        ]
+      },
+      {
+        "autogeneratePattern": "",
+        "help": "",
+        "hidden": false,
+        "id": "text2347488637",
+        "max": 64,
+        "min": 0,
+        "name": "item_digest",
+        "pattern": "^[a-f0-9]{64}$",
+        "presentable": false,
+        "primaryKey": false,
+        "required": true,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "help": "",
+        "hidden": false,
+        "id": "text129393498",
+        "max": 64,
+        "min": 0,
+        "name": "descriptor_digest",
+        "pattern": "^[a-f0-9]{64}$",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "help": "",
+        "hidden": false,
+        "id": "number3293052533",
+        "max": 1000000,
+        "min": 0,
+        "name": "asset_position",
+        "onlyInt": true,
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "number"
+      },
+      {
+        "help": "",
+        "hidden": false,
+        "id": "select2744374011",
+        "maxSelect": 1,
+        "name": "state",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "select",
+        "values": [
+          "scaffold",
+          "complete"
+        ]
+      },
+      {
+        "autogeneratePattern": "",
+        "help": "",
+        "hidden": false,
+        "id": "text3466706339",
+        "max": 80,
+        "min": 0,
+        "name": "target_collection",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": true,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "help": "",
+        "hidden": false,
+        "id": "text2034829088",
+        "max": 32,
+        "min": 0,
+        "name": "target_record_id",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": true,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "help": "",
+        "hidden": false,
+        "id": "text3881754196",
+        "max": 80,
+        "min": 0,
+        "name": "target_field",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "help": "",
+        "hidden": false,
+        "id": "text3750672823",
+        "max": 255,
+        "min": 0,
+        "name": "stored_filename",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
+      }
+    ],
+    "id": "pbc_2443615626",
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_archive_restore_items_identity` ON `archive_restore_items` (`user`, `backup_id`, `item_id`)",
+      "CREATE INDEX `idx_archive_restore_items_user_state` ON `archive_restore_items` (`user`, `state`)"
+    ],
+    "listRule": "user = @request.auth.id",
+    "name": "archive_restore_items",
+    "system": false,
+    "type": "base",
+    "updateRule": null,
+    "viewRule": "user = @request.auth.id"
+  });
+
+  return app.save(collection);
+}, (app) => {
+  const collection = app.findCollectionByNameOrId("pbc_2443615626");
+  const receipts = app.findRecordsByFilter("archive_restore_items", "id != ''", "", 1, 0);
+  if (receipts.length) {
+    throw new Error("Refusing rollback while archive restore receipts exist; retain the additive collection for retry safety.");
+  }
+
+  return app.delete(collection);
+})

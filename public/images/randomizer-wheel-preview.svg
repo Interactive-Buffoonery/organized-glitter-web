@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <title>Randomizer wheel preview</title>
+  <desc>A paper-style preview of the Organized Glitter randomizer wheel.</desc>
+  <circle cx="128" cy="128" r="106" fill="#f7f6f9" stroke="#e0dde3" stroke-width="2" />
+  <circle cx="128" cy="128" r="83" fill="#fbf7ef" />
+  <g transform="translate(128 128)">
+    <path d="M0 0L0 -83A83 83 0 0 1 58.69 -58.69Z" fill="#7dd3c7" />
+    <path d="M0 0L58.69 -58.69A83 83 0 0 1 83 0Z" fill="#f4c2d7" />
+    <path d="M0 0L83 0A83 83 0 0 1 58.69 58.69Z" fill="#e0c15f" />
+    <path d="M0 0L58.69 58.69A83 83 0 0 1 0 83Z" fill="#a78bfa" />
+    <path d="M0 0L0 83A83 83 0 0 1 -58.69 58.69Z" fill="#8ecae6" />
+    <path d="M0 0L-58.69 58.69A83 83 0 0 1 -83 0Z" fill="#c084fc" />
+    <path d="M0 0L-83 0A83 83 0 0 1 -58.69 -58.69Z" fill="#f6d365" />
+    <path d="M0 0L-58.69 -58.69A83 83 0 0 1 0 -83Z" fill="#5fb3a8" />
+  </g>
+  <circle cx="128" cy="128" r="84" fill="none" stroke="#fbf7ef" stroke-width="5" />
+</svg>

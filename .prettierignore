@@ -1,0 +1,71 @@
+# Local planning / agent artifacts
+.pi/
+
+# Build outputs
+dist/
+build/
+blog/dist/
+blog/.astro/
+blog/.generated/
+
+# Dependencies
+node_modules/
+
+# Generated files
+src/types/pocketbase.types.ts
+src/types/pocketbase.types.local.ts
+
+# Database files
+local-pb-db/
+pb_data/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage
+coverage/
+
+# Performance reports
+performance-reports/
+
+# Screenshots
+screenshots/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# Bundle analysis
+bundle-report.html
+
+# Sitemap (generated)
+public/sitemap.xml
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Plan files (JSON content with .md extension — Prettier mangles them)
+.pi/
+
+# Claude Code Action workflows (must match main exactly for OIDC validation)
+.github/workflows/claude.yml
+.github/workflows/claude-code-review.yml
+
+# Vendored Claude Code skills (keep in sync with upstream; do not reformat)
+.claude/skills/

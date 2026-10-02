@@ -1,0 +1,328 @@
+{
+  "name": "Organized Glitter",
+  "description": "A multi-craft project tracker for hobbyists who actually finish things.",
+  "register": "product",
+  "northStar": "The Quiet Notebook. iOS Settings restraint plus Apple Notes warmth, with Caveat-handwritten H1s as the personal-library signature. Glass is a structural means to that feel, never decoration. The page uses a viewport-fixed Berry Cream atmosphere; chrome stays flat.",
+  "tokenSystem": {
+    "format": "Tailwind v4 @theme inline + HSL CSS custom properties",
+    "configLocation": "src/index.css",
+    "rawColorSpace": "HSL",
+    "rationale": "Hex frontmatter is for Stitch tooling compatibility; HSL is canonical in source. Keep docs aligned to src/index.css unless the token system migrates."
+  },
+  "colorMeta": {
+    "primary": {
+      "hsl": "336 62% 53%",
+      "hex": "#d13d78",
+      "role": "Berry Cream primary. Used on the single high-emphasis CTA per region."
+    },
+    "primary-dark-mode": {
+      "hsl": "336 84% 75%",
+      "hex": "#f58ab5",
+      "role": "Berry Cream after dark raspberry for the same semantic role."
+    },
+    "accent": {
+      "hsl": "270 65% 52%",
+      "hex": "#8535d4",
+      "role": "Purple accent reserved for selected states and deliberate emphasis."
+    },
+    "accent-dark-mode": {
+      "hsl": "267 88% 81%",
+      "hex": "#caa4f9"
+    },
+    "destructive": {
+      "hsl": "0 65% 48%",
+      "hex": "#ca2b2b",
+      "role": "Filled destructive controls in Light. Standalone danger text uses the same red."
+    },
+    "destructive-dark-mode": {
+      "hsl": "0 65% 48%",
+      "hex": "#ca2b2b",
+      "role": "Filled destructive controls in Dark (`--destructive`). Same fill as Light; pair with destructive-foreground."
+    },
+    "destructive-text-dark-mode": {
+      "hsl": "0 80% 72%",
+      "hex": "#f17e7e",
+      "role": "Standalone danger text in Dark (`--destructive-text` / `text-destructive-text`). Do not use the fill token for text."
+    },
+    "background": {
+      "hsl": "308 52% 94%",
+      "hex": "#f8e8f6",
+      "role": "Berry Cream page surface."
+    },
+    "background-dark": {
+      "hsl": "240 42% 14%",
+      "hex": "#151533",
+      "role": "Berry Cream after dark navy page surface. Lifted from the iOS #05051A stage for readability on larger screens."
+    },
+    "foreground": { "hsl": "324 17% 24%", "hex": "#48333f" },
+    "foreground-dark": { "hsl": "300 24% 96%", "hex": "#f7f2f7" },
+    "card-light": { "hsl": "338 67% 98%", "hex": "#fdf6f9" },
+    "card-dark": { "hsl": "250 34% 18%", "hex": "#231e3e" },
+    "muted": { "hsl": "328 38% 92%", "hex": "#f2e3eb" },
+    "muted-dark": { "hsl": "251 30% 22%", "hex": "#2d2749" },
+    "muted-foreground": { "hsl": "324 16% 40%", "hex": "#765669" },
+    "muted-foreground-dark": { "hsl": "283 13% 73%", "hex": "#beb1c3" },
+    "border": { "hsl": "330 32% 85%", "hex": "#e5cdd9" },
+    "border-dark": { "hsl": "256 16% 30%", "hex": "#474059" },
+    "aurora-purple": {
+      "hsl": "270 65% 62%",
+      "hex": "#9e5fdd",
+      "role": "Deprecated. Aurora atmosphere retired; tokens kept for archival reference only."
+    },
+    "aurora-pink": {
+      "hsl": "336 62% 53%",
+      "hex": "#d13d78",
+      "role": "Deprecated. Aurora atmosphere retired."
+    },
+    "aurora-blue": {
+      "hsl": "228 64% 64%",
+      "hex": "#6880de",
+      "role": "Deprecated. Aurora atmosphere retired."
+    },
+    "aurora-teal": {
+      "hsl": "151 49% 48%",
+      "hex": "#3eb67c",
+      "role": "Deprecated. Aurora atmosphere retired."
+    },
+    "glass": {
+      "bg-light": "hsl(338 67% 98% / 0.85)",
+      "bg-dark": "hsl(250 34% 18% / 0.74)",
+      "border-light": "hsl(324 17% 24% / 0.1)",
+      "border-dark": "hsl(300 24% 96% / 0.1)",
+      "highlight-light": "hsl(0 0% 100% / 0.6)",
+      "highlight-dark": "hsl(300 24% 96% / 0.12)"
+    },
+    "paper": {
+      "scope": "Marketing surfaces only (HomeHero subtree). Deliberately non-themed sub-system; same paper across Light and Dark.",
+      "bg-light": "hsl(338 67% 98%)",
+      "bg-dark-soften": "hsl(338 40% 90%)",
+      "edge-light": "hsl(330 32% 85%)",
+      "edge-dark-soften": "hsl(330 16% 76%)",
+      "bg-warm-light": "hsl(340 71% 99%)",
+      "bg-warm-dark-soften": "hsl(340 45% 92%)",
+      "fg": "hsl(324 17% 24%)",
+      "muted": "hsl(324 16% 40%)",
+      "list": "hsl(324 17% 32%)",
+      "marketing-bg-start": "hsl(340 79% 96%)",
+      "marketing-bg-middle": "hsl(308 52% 94%)",
+      "marketing-bg-end": "hsl(259 74% 93%)",
+      "rationale": "Real paper does not theme-shift. Dark-mode tokens soften against the navy stage while keeping their material identity. Dark marketing lets the product page atmosphere show behind paper surfaces."
+    },
+    "washi": {
+      "scope": "Decorative tape strips on marketing surfaces only.",
+      "sage": "hsl(151 49% 87%)",
+      "peach": "hsl(342 84% 90%)",
+      "sky": "hsl(228 80% 91%)",
+      "butter": "hsl(43 92% 86%)",
+      "dusty": "hsl(276 72% 91%)",
+      "lav-computed": "hsl(var(--primary) / 0.55)",
+      "rationale": "Soft craft-paper tones. tape--lav bridges marketing into brand primary at low alpha."
+    }
+  },
+  "tonalRamps": {
+    "primary": ["bg-primary/10", "bg-primary/20", "bg-primary/40", "bg-primary/80", "bg-primary"],
+    "neutral": ["bg-muted", "bg-card", "bg-background", "bg-foreground/5", "bg-foreground/10"]
+  },
+  "typography": {
+    "fontStack": {
+      "display": "Caveat Variable, Caveat, cursive",
+      "ui": "Karla, ui-sans-serif, system-ui, sans-serif",
+      "mono": "JetBrains Mono Variable, ui-monospace, SFMono-Regular, monospace"
+    },
+    "selfHosted": true,
+    "loadedVia": "@fontsource/* in src/index.css",
+    "scale": {
+      "display": {
+        "size": "clamp(1.875rem, 4vw, 2.5rem)",
+        "weight": 500,
+        "lineHeight": 1.05,
+        "letterSpacing": "-0.01em"
+      },
+      "headline": {
+        "size": "1.5rem",
+        "weight": 600,
+        "lineHeight": 1.2,
+        "letterSpacing": "-0.01em"
+      },
+      "title": { "size": "1.125rem", "weight": 600, "lineHeight": 1.35 },
+      "body": { "size": "0.9375rem", "weight": 400, "lineHeight": 1.55 },
+      "label": { "size": "0.75rem", "weight": 500, "lineHeight": 1.3, "letterSpacing": "0.04em" },
+      "mono": { "size": "0.8125rem", "weight": 400, "lineHeight": 1.5 }
+    },
+    "rules": [
+      "Caveat appears once per page on the H1 only.",
+      "Karla everywhere else; weight contrast carries hierarchy.",
+      "Mobile inputs use 16px to defeat iOS Safari zoom-on-focus.",
+      "Body line length capped 65-75ch."
+    ]
+  },
+  "rounded": {
+    "sm": "8px",
+    "md": "10px",
+    "lg": "12px",
+    "panel": "16px",
+    "full": "9999px"
+  },
+  "spacing": {
+    "xs": "4px",
+    "sm": "8px",
+    "md": "16px",
+    "lg": "24px",
+    "xl": "32px"
+  },
+  "elevation": {
+    "philosophy": "Flat-by-default. Surfaces are flat at rest; shadow is a response to state, not baseline ornament. Glass earns depth from translucency plus a 1px inset highlight, not stacked drop shadows.",
+    "shadows": {
+      "glass-rest": "inset 0 1px 0 hsl(var(--glass-highlight)), 0 10px 30px rgba(0,0,0,0.08)",
+      "glass-rest-dark": "inset 0 1px 0 hsl(var(--glass-highlight)), 0 16px 40px rgba(0,0,0,0.35)",
+      "glass-button-hover": "inset 0 1px 0 hsl(var(--glass-highlight)), 0 4px 14px rgba(0,0,0,0.12)",
+      "glow-hover-light": "0 0 12px hsl(var(--primary) / 0.08), 0 2px 8px rgba(0,0,0,0.06)",
+      "glow-hover-dark": "0 0 20px hsl(var(--primary) / 0.18), 0 4px 12px rgba(0,0,0,0.25)",
+      "glass-3d": "inset 0 1px 0 hsl(var(--glass-highlight)), 0 10px 30px rgba(0,0,0,0.08)"
+    },
+    "namedRules": [
+      "Flat-By-Default Rule: shadow responds to state, never baseline.",
+      "One-Panel-Per-Region Rule: max one GlassPanel per page region; use Section helper inside.",
+      "Translucent-Not-Layered Rule: depth from translucency plus inset highlight, never stacked shadows or gradient backplates."
+    ]
+  },
+  "motion": {
+    "durations": {
+      "instant": "120ms",
+      "fast": "180ms",
+      "default": "240ms",
+      "slow": "320ms"
+    },
+    "easings": {
+      "default": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "comment": "ease-out-quart for exits and reveals; no bounce, no elastic."
+    },
+    "rules": [
+      "Never animate CSS layout properties.",
+      "Respect prefers-reduced-motion: reduce; the CSS already disables animate-spin-custom, animate-float, animate-glow-pulse under that media query.",
+      "Motion is never the only signal; status changes also update label, hue, and icon."
+    ]
+  },
+  "gradients": {
+    "stance": "Banned on chrome. The product body uses one documented atmosphere (`--page-atmosphere` on `.page-atmosphere`): Light blush-to-lilac wash, Dark navy plus quiet lavender bloom. No new gradients on buttons, panels, chips, headers, or state.",
+    "documented": [
+      {
+        "name": "page-atmosphere-light",
+        "where": ".page-atmosphere in Light",
+        "value": "linear-gradient(180deg, hsl(340 79% 96%) 0%, hsl(308 52% 94%) 48%, hsl(259 74% 93%) 100%)",
+        "purpose": "Match the iOS Berry Cream page wash."
+      },
+      {
+        "name": "page-atmosphere-dark",
+        "where": ".page-atmosphere in Dark",
+        "value": "radial-gradient(ellipse 120% 76% at 50% 118%, hsl(271 28% 52% / 0.45) 0%, hsl(270 26% 34% / 0.22) 42%, transparent 72%) over navy --background",
+        "purpose": "Quiet lavender bloom for Berry Cream after dark. Lower saturation than the iOS grape hotspot."
+      },
+      {
+        "name": "image-scrim",
+        "where": "ProjectImageDropzone filled state, top-right corner",
+        "value": "bg-gradient-to-b from-black/35 via-black/10 to-transparent",
+        "purpose": "Contrast under floating glass icon-buttons over user photos."
+      },
+      {
+        "name": "progressive-placeholder",
+        "where": ".progressive-placeholder utility while images load",
+        "value": "linear-gradient shimmer for loading state.",
+        "purpose": "Perceived performance for image-heavy lists."
+      }
+    ],
+    "banned": [
+      "background-clip: text gradient hero text",
+      "Gradient-accented metric cards",
+      "Gradient borders or hover states on chrome",
+      "Gradient backplates behind glass panels"
+    ]
+  },
+  "breakpoints": {
+    "phone": { "max": "640px", "hook": "useIsPhone" },
+    "tablet": { "max": "1024px", "hook": "useIsMobile" },
+    "rationale": "useIsPhone (640px) for tight-viewport-specific decisions like bottom-nav and 70dvh drawers; useIsMobile (1024px) reserved for tablet-and-below logic."
+  },
+  "components": {
+    "button-primary": {
+      "html": "<button type=\"button\" class=\"inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none\">Save</button>",
+      "css": ".button-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-radius: 10px; height: 36px; padding: 0 16px; transition: all 240ms cubic-bezier(0.22,1,0.36,1); }",
+      "usage": "One per region, single high-emphasis action."
+    },
+    "button-glass": {
+      "html": "<button type=\"button\" class=\"inline-flex h-9 items-center justify-center gap-2 rounded-md border border-[hsl(var(--glass-border))] bg-[hsl(var(--glass-bg))] px-4 text-sm font-medium text-foreground shadow-[inset_0_1px_0_hsl(var(--glass-highlight))] backdrop-blur-xl backdrop-saturate-150 transition-all hover:brightness-110 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none\">Edit</button>",
+      "css": ".button-glass { background: hsl(var(--glass-bg)); border: 1px solid hsl(var(--glass-border)); box-shadow: inset 0 1px 0 hsl(var(--glass-highlight)); backdrop-filter: blur(24px) saturate(150%); border-radius: 10px; height: 36px; padding: 0 16px; }",
+      "usage": "Secondary controls inside or near a GlassPanel. Do not use for top-bar Back, Edit, or overflow chrome; those are ghost buttons."
+    },
+    "button-glass-destructive": {
+      "html": "<button type=\"button\" class=\"inline-flex h-9 items-center justify-center gap-2 rounded-md bg-destructive/80 px-4 text-sm font-medium text-white shadow-[inset_0_1px_0_hsl(var(--glass-highlight))] backdrop-blur-xl backdrop-saturate-150 transition-all hover:bg-destructive focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none\">Remove</button>",
+      "usage": "Inline destructive actions. AlertDialog confirms need the className workaround (variant prop is dropped by shadcn)."
+    },
+    "panel": {
+      "html": "<div class=\"relative overflow-hidden rounded-2xl border border-[hsl(var(--glass-border))] bg-[hsl(var(--glass-bg))] p-6 shadow-[inset_0_1px_0_hsl(var(--glass-highlight)),0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur-xl backdrop-saturate-150\"><!-- content --></div>",
+      "css": ".glass-panel { background: hsl(var(--glass-bg)); border: 1px solid hsl(var(--glass-border)); border-radius: 16px; padding: 24px; backdrop-filter: blur(24px) saturate(150%); box-shadow: inset 0 1px 0 hsl(var(--glass-highlight)), 0 10px 30px rgba(0,0,0,0.08); }",
+      "usage": "Signature container. One per page region; use Section helper inside for grouped controls."
+    },
+    "section": {
+      "html": "<div class=\"space-y-6\"><section class=\"\"><h3 class=\"text-foreground inline-flex items-center gap-2.5 text-sm font-semibold tracking-tight\"><span aria-hidden=\"true\" class=\"bg-primary inline-block h-[2px] w-[22px] rounded-sm\"></span>Display</h3><div class=\"mt-3\"><!-- fields --></div></section><section class=\"border-border/60 border-t pt-6\"><h3 class=\"text-foreground inline-flex items-center gap-2.5 text-sm font-semibold tracking-tight\"><span aria-hidden=\"true\" class=\"bg-primary inline-block h-[2px] w-[22px] rounded-sm\"></span>Sync</h3><div class=\"mt-3\"><!-- fields --></div></section></div>",
+      "usage": "Section rhythm inside panels. Hairline divider above every group except the first."
+    },
+    "chip-status": {
+      "html": "<span class=\"inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1 text-xs font-medium text-foreground\"><svg class=\"size-3\" aria-hidden=\"true\"><!-- status icon --></svg>In Progress</span>",
+      "usage": "Status hue plus icon plus label. Never hue alone."
+    },
+    "input-field": {
+      "html": "<input type=\"text\" class=\"flex h-9 w-full rounded-md border border-input bg-card px-3 py-2 text-base md:text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none\" />",
+      "rules": [
+        "Mobile font-size 16px to defeat iOS Safari zoom.",
+        "Date inputs left-align text to defeat iOS Safari centering."
+      ]
+    },
+    "bottom-nav": {
+      "html": "<nav class=\"fixed inset-x-0 bottom-0 grid grid-cols-5 border-t border-border/60 bg-[hsl(var(--glass-bg))] backdrop-blur-xl pb-[env(safe-area-inset-bottom)]\" aria-label=\"Primary\"><!-- 5 slots, slot 3 is centered creation CTA with bg-primary/10 --></nav>",
+      "rules": [
+        "Phone surfaces only (useIsPhone).",
+        "Slot 3 is the centered creation '+' CTA.",
+        "44px touch targets, safe-area aware."
+      ]
+    }
+  },
+  "surfaceGuidance": {
+    "dashboard": [
+      "DashboardShell owns the Caveat H1, craft SegmentedControl, and the single New project action.",
+      "Desktop filter sidebars use one GlassPanel; result grids and lists stay flat on the page surface.",
+      "Diamond, coloring book, and coloring page panes should share sidebar/content rhythm instead of feeling like separate apps."
+    ],
+    "randomizer": [
+      "One main GlassPanel contains craft choice, eligibility filters, wheel, and result.",
+      "Desktop target selection and spin history are flat adjacent regions; mobile target selection folds into the main panel below the wheel.",
+      "The wheel is a deliberate full-palette data visualization exception with pattern overlays, a key, label fallbacks, and reduced-motion behavior. Do not reuse wheel colors as ordinary chrome."
+    ],
+    "coloringBooks": [
+      "Book detail uses a cover-led flat header, ghost top chrome, SectionHeading region markers, and a dense page grid.",
+      "Book covers default to a 3:4 crop. Mystery is a small primary chip, not a hidden-card gimmick.",
+      "Publishers, illustrators, tags, and notes extend the shared library model rather than creating a separate app surface."
+    ],
+    "coloringPages": [
+      "The artwork/photo canvas stays large and flat.",
+      "Status, dates, mediums, and mystery reveal live in one right-rail GlassPanel.",
+      "Page photos default to preserving the whole page because they are documentary records first."
+    ]
+  },
+  "accessibility": {
+    "wcag": "2.2 AA",
+    "touchTarget": "44px minimum on phone surfaces",
+    "focusRing": "3px ring (focus-visible:ring-ring/50). Never outline: none without a replacement.",
+    "colorIndependence": "Status communicated by hue + icon + label. Never hue alone.",
+    "reducedMotion": "prefers-reduced-motion: reduce disables animate-spin-custom, animate-float, animate-glow-pulse via CSS media query.",
+    "reducedContrast": "prefers-contrast: more degrades tokens gracefully.",
+    "screenReaders": "aria-label and aria-pressed on interactive status cards; type=\"button\" unless intentionally submit/reset; lists announce position and total."
+  },
+  "antiReferences": [
+    "Literal craft-store aesthetic (bows, glitter graphics, scrapbook fonts, chalkboard, Cricut energy)",
+    "Generic SaaS dashboard (hero KPI tiles, gradient-accented metric cards, engagement framing)",
+    "AI slop tells (gradient hero text, identical card grids, drive-by glassmorphism, side-stripe colored borders)",
+    "Pinterest-style endless masonry",
+    "Forum-era craft software (skeuomorphic notebooks, faux-leather, widget-panel sidebars)"
+  ]
+}

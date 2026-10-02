@@ -1,0 +1,158 @@
+name: PR Size
+
+on:
+  pull_request_target:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Label PR size
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout base repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 1
+
+      - name: Apply size label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { execFileSync } = require('node:child_process');
+
+            const pr = context.payload.pull_request;
+            const baseSha = pr.base.sha;
+            const expectedHeadSha = pr.head.sha;
+            const prHeadRef = `refs/remotes/pr/${pr.number}/head`;
+            const sizeLabels = ['size:XS', 'size:S', 'size:M', 'size:L', 'size:XL', 'size:XXL'];
+            const labelConfig = {
+              'size:XS': { color: '0e8a16', description: 'Tiny pull request' },
+              'size:S': { color: '5db85b', description: 'Small pull request' },
+              'size:M': { color: 'fbca04', description: 'Medium pull request' },
+              'size:L': { color: 'fef2c0', description: 'Large pull request' },
+              'size:XL': { color: 'd93f0b', description: 'Extra large pull request' },
+              'size:XXL': { color: 'b60205', description: 'Very large pull request' },
+            };
+
+            const runGit = (args) =>
+              execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+            // Label-only workflow: fetch PR git data, never execute untrusted PR code.
+            runGit(['fetch', '--no-tags', '--depth=1', 'origin', baseSha]);
+            runGit([
+              'fetch',
+              '--no-tags',
+              '--depth=1',
+              'origin',
+              `+pull/${pr.number}/head:${prHeadRef}`,
+            ]);
+
+            const fetchedHeadSha = runGit(['rev-parse', prHeadRef]);
+            if (fetchedHeadSha !== expectedHeadSha) {
+              core.setFailed(
+                `Fetched PR head ${fetchedHeadSha} did not match event head ${expectedHeadSha}.`,
+              );
+              return;
+            }
+
+            const numstat = runGit(['diff', '--numstat', baseSha, fetchedHeadSha, '--']);
+            const files = numstat
+              .split('\n')
+              .filter(Boolean)
+              .map((line) => {
+                const [addedRaw, deletedRaw, ...pathParts] = line.split('\t');
+                const path = pathParts[pathParts.length - 1] || '';
+                const added = Number.parseInt(addedRaw, 10);
+                const deleted = Number.parseInt(deletedRaw, 10);
+
+                return {
+                  path,
+                  changed:
+                    (Number.isFinite(added) ? added : 0) +
+                    (Number.isFinite(deleted) ? deleted : 0),
+                };
+              });
+
+            const isTestPath = (path) =>
+              path.includes('/__tests__/') ||
+              path.startsWith('__tests__/') ||
+              path.includes('/test/') ||
+              path.startsWith('test/') ||
+              path.includes('/tests/') ||
+              path.startsWith('tests/') ||
+              path.startsWith('e2e/') ||
+              path.startsWith('scripts/__tests__/') ||
+              /\.(test|spec)\.[^/]+$/.test(path);
+
+            const hasNonTestChanges = files.some((file) => !isTestPath(file.path));
+            const effectiveFiles = hasNonTestChanges
+              ? files.filter((file) => !isTestPath(file.path))
+              : files;
+            const changedLines = effectiveFiles.reduce((total, file) => total + file.changed, 0);
+
+            const sizeLabel =
+              changedLines <= 10
+                ? 'size:XS'
+                : changedLines <= 50
+                  ? 'size:S'
+                  : changedLines <= 200
+                    ? 'size:M'
+                    : changedLines <= 500
+                      ? 'size:L'
+                      : changedLines <= 1000
+                        ? 'size:XL'
+                        : 'size:XXL';
+
+            const { owner, repo } = context.repo;
+            const existingLabels = pr.labels.map((label) => label.name);
+            const labelsToRemove = sizeLabels.filter(
+              (label) => label !== sizeLabel && existingLabels.includes(label),
+            );
+
+            for (const label of sizeLabels) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name: label });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+
+                await github.rest.issues.createLabel({
+                  owner,
+                  repo,
+                  name: label,
+                  ...labelConfig[label],
+                });
+              }
+            }
+
+            for (const label of labelsToRemove) {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number: pr.number,
+                name: label,
+              });
+            }
+
+            if (!existingLabels.includes(sizeLabel)) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: pr.number,
+                labels: [sizeLabel],
+              });
+            }
+
+            core.info(`Applied ${sizeLabel} from ${changedLines} effective changed lines.`);

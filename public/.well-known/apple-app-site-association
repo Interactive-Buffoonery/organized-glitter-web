@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appID": "7CNK4YPCQX.com.interactivebuffoonery.organizedglitter",
+        "components": [
+          {
+            "/": "/auth/confirm-password-reset/*",
+            "comment": "Open Organized Glitter password reset links in the iOS app."
+          }
+        ]
+      }
+    ]
+  }
+}

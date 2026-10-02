@@ -1,0 +1,14 @@
+import { IMAGE_MAX_FILE_SIZE_BYTES } from '@/utils/image/imagePolicy';
+
+const MB = 1024 * 1024;
+
+export const PROGRESS_NOTE_MAX_FILE_SIZE = IMAGE_MAX_FILE_SIZE_BYTES;
+export const PROJECT_IMAGE_MAX_FILE_SIZE = IMAGE_MAX_FILE_SIZE_BYTES;
+export const AVATAR_ORIGINAL_MAX_FILE_SIZE = 200 * MB;
+export const AVATAR_PROCESSED_MAX_FILE_SIZE = 5 * MB;
+
+export const AVATAR_RESIZE_OPTIONS = {
+  MAX_WIDTH: 800,
+  MAX_HEIGHT: 800,
+  QUALITY: 0.95,
+} as const;

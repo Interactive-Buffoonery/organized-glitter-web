@@ -1,0 +1,47 @@
+import { Link } from 'react-router-dom';
+
+import { UPDATES_URL } from '@/constants/updates';
+
+interface SiteFooterProps {
+  currentPage?: string;
+}
+
+const footerLinks = [
+  { label: 'Privacy', page: 'Privacy', path: '/privacy' },
+  { label: 'Terms', page: 'Terms', path: '/terms' },
+  { label: 'About', page: 'About', path: '/about' },
+  { label: 'Links', page: 'Links', path: '/links' },
+] as const;
+
+export function SiteFooter({ currentPage = '' }: SiteFooterProps) {
+  const year = new Date().getFullYear();
+
+  return (
+    <footer className="border-border/40 bg-background/60 border-t backdrop-blur-sm">
+      <div className="text-muted-foreground container mx-auto flex flex-col items-center justify-between gap-3 px-4 py-8 text-sm md:flex-row">
+        <span>&copy; {year} Organized Glitter</span>
+        <div className="flex items-center gap-4">
+          {footerLinks.map(({ label, page, path }) =>
+            currentPage === page ? (
+              <span key={page} aria-current="page" className="text-foreground pointer-events-none">
+                {label}
+              </span>
+            ) : (
+              <Link key={page} to={path} className="hover:text-foreground">
+                {label}
+              </Link>
+            )
+          )}
+          <a
+            href={UPDATES_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground"
+          >
+            Updates
+          </a>
+        </div>
+      </div>
+    </footer>
+  );
+}

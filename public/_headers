@@ -1,0 +1,14 @@
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' data: https://accounts.google.com https://www.paypalobjects.com https://apis.google.com https://www.gstatic.com https://ssl.gstatic.com https://cdn.jsdelivr.net https://w.behold.so https://us-assets.i.posthog.com; connect-src 'self' https://data.organizedglitter.app https://*.organizedglitter.app https://images.organizedglitter.app https://www.paypal.com https://www.paypalobjects.com https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://securetoken.googleapis.com https://discord.com https://discordapp.com wss://gateway.discord.gg https://*.behold.so https://us.i.posthog.com https://us-assets.i.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://ssl.gstatic.com https://discord.com https://discordapp.com; img-src 'self' data: blob: https://data.organizedglitter.app https://*.organizedglitter.app https://images.organizedglitter.app https://organized-glitter-images.diamondartchive.workers.dev https://*.workers.dev https://*.googleusercontent.com https://www.paypal.com https://www.paypalobjects.com https://www.google.com https://*.gstatic.com https://i.ytimg.com https://placehold.co https://discord.com https://discordapp.com https://cdn.discordapp.com https://*.behold.so https://behold.pictures https://*.behold.pictures https://*.cdninstagram.com; font-src 'self' data: https://fonts.gstatic.com https://ssl.gstatic.com https://discord.com https://discordapp.com; worker-src 'self' blob:; frame-src 'self' https://updates.organizedglitter.app https://accounts.google.com https://www.paypal.com https://discord.com https://discordapp.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none';
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+/assets/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+/updates/_astro/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+/.well-known/apple-app-site-association
+  Content-Type: application/json; charset=utf-8

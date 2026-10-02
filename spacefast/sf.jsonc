@@ -1,0 +1,8 @@
+{
+  "$schema": "https://spacefast.com/schemas/sf.json",
+  "runtime": {
+    "kind": "functions",
+    "entry": "spacefast/handler.js",
+    "fetch": true,
+  },
+}

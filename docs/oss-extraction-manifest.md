@@ -1,9 +1,18 @@
 # Organized Glitter public extraction manifest
 
-Status: source remediation integrated, 2026-10-03. Public extraction PR #1 is
-awaiting its final current-head CI and merge. Publication safeguards from PR #2
-and review fixes from PR #10 are merged into the extraction branch. The repository
-is already public. No deployment, domain, or production data has changed.
+Status: public extraction merged, 2026-10-03. Public extraction PR #1 merged into
+`main` on 2026-10-03, including publication safeguards from PR #2, review fixes
+from PR #10, and publication evidence from PR #11. The repository is public and
+`main` is the default branch. Follow-up application and validation changes target
+`dev`; release PRs merge `dev` into `main`.
+
+The active publication security ruleset requires both `Publication security` and
+`CI result` from GitHub Actions on `main`, `dev`, and
+`bootstrap/public-extraction`, with up-to-date branches and no bypass actors.
+See [branch protection](agents/main-branch-protection.md). A merged extraction
+does not complete the remaining validation or production cutover gates below.
+The extraction and ruleset updates perform no deployment, domain change, or
+production data migration.
 
 ## Source and scope
 
@@ -77,6 +86,7 @@ fact; later approvals and passing checks do not rewrite that sequence.
   findings need review; a scan alone cannot prove absence of all private data.
 - Retained asset permissions are recorded in the asset inventory. New assets
   still need publication rights and applicable notices.
-- Branch protection and repository settings remain separate owner actions.
+- The required validation checks are enforced by the active ruleset. Additional
+  repository protections and fork execution still need separate verification.
 - Ops creation, backup/migration planning, official service validation, domain
   cutover, and deployment remain separate work requiring explicit authorization.

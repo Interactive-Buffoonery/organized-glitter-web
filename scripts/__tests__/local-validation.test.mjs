@@ -12,15 +12,16 @@ import {
   parseArgs,
   publicBuildEnvironmentDigest,
   recordPhaseFailure,
+  formatValidationReport,
   validationEnvironment,
 } from '../run-local-validation.mjs';
 
 describe('local validation orchestrator', () => {
-  it('runs static checks first and preserves every existing PR gate', () => {
+  it('runs PocketBase first and preserves every existing PR gate', () => {
     expect(buildPhasePlan('pr')).toEqual([
+      ['backend', 'test:ci:backend'],
       ['static', 'test:ci:static'],
       ['unit', 'test:ci:unit'],
-      ['backend', 'test:ci:backend'],
       ['react', 'test:ci:react'],
       ['build', 'test:ci:build'],
       ['publication', 'test:publication'],
@@ -30,6 +31,20 @@ describe('local validation orchestrator', () => {
       ['protected-file-browser', 'test:protected-file-rotation-browser'],
       ['blog-browser', 'qa:blog'],
     ]);
+  });
+
+  it('can run and report only the local PocketBase gate', () => {
+    expect(buildPhasePlan('backend')).toEqual([['backend', 'test:ci:backend']]);
+    const report = formatValidationReport({
+      outcome: 'failed',
+      repository: { head: { commit: 'abc123' }, base: { sha: 'def456' } },
+      platform: { operatingSystem: 'darwin', architecture: 'arm64' },
+      phases: [{ name: 'backend', outcome: 'failed', durationMs: 1000, exitCode: 1 }],
+    });
+    expect(report).toContain('PocketBase');
+    expect(report).toContain('darwin/arm64');
+    expect(report).toContain('failed');
+    expect(report).toContain('abc123');
   });
 
   it('uses the broader browser inventory for a release gate', () => {

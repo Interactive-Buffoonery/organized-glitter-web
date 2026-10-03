@@ -42,8 +42,10 @@ and the removed unconfirmed photo.
   build and runtime. It is an example, not evidence of deployed configuration.
 - CSP and backend service-worker caching use configured origins. Metadata and
   sitemaps use the configured site origin.
-- CI uses public runners, read-only repository permissions, local fixtures, and
-  no deployment credentials. Backend integration and browser gates remain.
+- GitHub Actions uses public runners and read-only permissions for static,
+  unit, build and publication checks, without deployment credentials.
+  PocketBase integration and dependent browser gates run on the local test
+  computer, with backend results reported before PR creation.
 
 ## Licensing and publication evidence
 

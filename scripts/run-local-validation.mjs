@@ -17,12 +17,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const summaryRoot = path.join(rootDir, '.tmp', 'local-validation');
-const profiles = new Set(['pr', 'release']);
+const profiles = new Set(['pr', 'release', 'backend']);
 
 const sharedPhases = [
+  ['backend', 'test:ci:backend'],
   ['static', 'test:ci:static'],
   ['unit', 'test:ci:unit'],
-  ['backend', 'test:ci:backend'],
   ['react', 'test:ci:react'],
   ['build', 'test:ci:build'],
   ['publication', 'test:publication'],
@@ -37,6 +37,7 @@ const trailingBrowserPhases = [
 
 export function buildPhasePlan(profile) {
   if (!profiles.has(profile)) throw new Error(`Unknown validation profile: ${profile}`);
+  if (profile === 'backend') return [['backend', 'test:ci:backend']];
   return [
     ...sharedPhases,
     profile === 'release' ? ['browser-full', 'qa:browser:full'] : ['browser-smoke', 'qa:browser'],
@@ -196,8 +197,31 @@ const toolIdentity = () => ({
   ),
 });
 
+export function formatValidationReport(summary) {
+  return [
+    '# Local PocketBase and CI results',
+    '',
+    `Result: ${summary.outcome}`,
+    `Computer: ${summary.platform.operatingSystem}/${summary.platform.architecture}`,
+    `Source: ${summary.repository.head.commit}`,
+    `Comparison baseline: ${summary.repository.base.sha}`,
+    '',
+    '| Phase | Result | Seconds | Exit code |',
+    '| --- | --- | --- | --- |',
+    ...summary.phases.map(
+      phase =>
+        `| ${phase.name} | ${phase.outcome} | ${((phase.durationMs || 0) / 1000).toFixed(1)} | ${phase.exitCode ?? ''} |`
+    ),
+    '',
+    'PocketBase tests boot local checksum-verified binaries with synthetic data.',
+    'This report does not verify hosted hooks or migrations.',
+    '',
+  ].join('\n');
+}
+
 const writeSummary = (summaryPath, summary) => {
   writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
+  writeFileSync(path.join(path.dirname(summaryPath), 'report.md'), formatValidationReport(summary));
 };
 
 export function recordPhaseFailure(phase, error, startedAtMs, finishedAtMs = Date.now()) {
@@ -251,6 +275,7 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
   };
   writeSummary(summaryPath, summary);
   process.stdout.write(`Local validation summary: ${summaryPath}\n`);
+  process.stdout.write(`Local validation report: ${path.join(runDir, 'report.md')}\n`);
 
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
   for (const [name, script] of buildPhasePlan(profile)) {

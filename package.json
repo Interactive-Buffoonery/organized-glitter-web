@@ -78,6 +78,7 @@
     "pb:types:local": "dotenv -e .env -- sh -c 'PB_TYPEGEN_URL=\"$LOCAL_POCKETBASE_URL\" PB_TYPEGEN_EMAIL=\"$LOCAL_POCKETBASE_ADMIN_EMAIL\" PB_TYPEGEN_PASSWORD=\"$LOCAL_POCKETBASE_ADMIN_PASSWORD\" pocketbase-typegen --env --out src/types/pocketbase.types.local.ts'",
     "pb:local": "./start-local-dev.sh",
     "pb:lan": "LOCAL_POCKETBASE_HTTP_HOST=0.0.0.0 ./start-local-dev.sh",
+    "pb:validate:local": "node scripts/run-local-validation.mjs --profile=backend --base=${VALIDATION_BASE_REF:-origin/dev}",
     "pb:validate:schema": "node scripts/validate-pocketbase-schema.mjs",
     "pb:validate:migrations": "node scripts/validate-migration.cjs pb_migrations/*.js",
     "pb:test:protected-file-upgrade": "node scripts/test-protected-file-upgrade.mjs",

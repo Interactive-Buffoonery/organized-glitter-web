@@ -21,6 +21,9 @@ pnpm setup
 
 ## CI helpers
 
+- `node scripts/check-publication-files.mjs` rejects private runtime paths and
+  SQLite database blobs in the current tree and complete Git history. Schema JSON,
+  hooks, and migration source remain public. Run it before pushing source.
 - `node scripts/generate-not-found.mjs` generates `public/404.html` from the
   shared recovery content and HTML template. `--check` rejects stale output.
   `pnpm build` generates the page; static CI checks its committed version.

@@ -1,8 +1,10 @@
 # Branch protection
 
-The public extraction PR targets the empty `main` branch. Current GitHub state
-was checked on 2026-10-02: `main` and `bootstrap/public-extraction` have no branch
-protection or rulesets. This cleanup does not change repository settings.
+The public extraction PR targets the empty `main` branch. The publication security ruleset requires
+`Publication security` from GitHub Actions on `main`, `dev`, and
+`bootstrap/public-extraction`. It has no bypass actors. GitHub secret scanning and
+push protection are enabled. The security workflow must land through its PR before
+branches without it can satisfy the required check.
 
 Once the workflow is observed on the current public head, an owner can configure:
 

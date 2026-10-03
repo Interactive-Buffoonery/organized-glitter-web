@@ -1,0 +1,2 @@
+node scripts/check-publication-files.mjs || exit 1
+gitleaks git --log-opts=--all --config .gitleaks.toml --redact=100 --ignore-gitleaks-allow --no-banner

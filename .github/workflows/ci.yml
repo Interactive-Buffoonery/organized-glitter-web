@@ -100,10 +100,46 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium webkit
       - run: pnpm test:not-found && pnpm test:pwa:navigation && pnpm qa:browser:ci && pnpm test:protected-file-rotation-browser && pnpm qa:blog
 
+  publication-security:
+    name: Publication security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VITE_POCKETBASE_URL: http://127.0.0.1:8090
+      VITE_APP_URL: http://127.0.0.1:3000
+      VITE_APP_VERSION: ${{ github.sha }}
+      APP_TEST_ENV: test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-project
+      - name: Install verified Gitleaks
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$RUNNER_TEMP/gitleaks.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/gitleaks-bin"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
+          echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
+      - name: Reject private runtime files and databases
+        run: node scripts/check-publication-files.mjs
+      - name: Scan complete history and tracked tree
+        run: |
+          gitleaks git --log-opts=--all --config .gitleaks.toml --redact=100 --ignore-gitleaks-allow --no-banner
+          PUBLICATION_TREE=$(mktemp -d "$RUNNER_TEMP/publication-tree.XXXXXX")
+          git archive HEAD | tar -x -C "$PUBLICATION_TREE"
+          gitleaks dir "$PUBLICATION_TREE" --config .gitleaks.toml --redact=100 --ignore-gitleaks-allow --no-banner
+      - run: pnpm build
+      - name: Scan generated website
+        run: gitleaks dir dist --config .gitleaks.toml --redact=100 --ignore-gitleaks-allow --no-banner
+
   result:
     name: CI result
     if: always()
-    needs: [static-checks, unit-tests, backend, build, browser, react-doctor]
+    needs: [static-checks, unit-tests, backend, build, browser, react-doctor, publication-security]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

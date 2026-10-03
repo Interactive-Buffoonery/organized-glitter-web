@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useColoringPageCommand } from '@/hooks/coloring/useColoringPageCommand';
 import type { UseColoringPageCommandExecutorResult } from '@/hooks/coloring/useColoringPageCommandExecutor';
 import type { ColoringPageDTO } from '@/services/pocketbase/coloring.service';
@@ -28,11 +28,10 @@ export function useColoringPageMysteryReveal(
     const nextRevealedSubject = page?.revealedSubject ?? '';
     setPrevPageId(page?.id);
     setIsEditingReveal(false);
-    revealedSubjectRef.current = nextRevealedSubject;
     setRevealedSubject(nextRevealedSubject);
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     revealedSubjectRef.current = revealedSubject;
   }, [revealedSubject]);
 

@@ -38,5 +38,17 @@ disclosure.
 
 ## Secrets
 
-Never commit credentials, signing keys, database dumps, or production URLs to
-this repository. Use environment variables and your secret store instead.
+Never commit credentials, signing keys, runtime database files, database dumps,
+backups, user uploads, or authentication state. Store credentials in your secret
+store. Public service URLs are configuration, not credentials.
+
+PocketBase schema definitions, hooks, migrations, and generated types belong in
+this repository. PocketBase `pb_data/`, `local-pb-db/`, and backup files do not.
+The publication check rejects private runtime paths and SQLite databases in Git
+history, including deleted or renamed databases. Ignore rules alone do not
+protect files that are already tracked.
+
+GitHub secret scanning and push protection are enabled. The `Publication security`
+CI job checks history, tracked files, and generated website files with redacted
+output. See [the CI contract](docs/agents/ci.md). Rotate or revoke a confirmed
+exposed credential before cleaning up Git history.

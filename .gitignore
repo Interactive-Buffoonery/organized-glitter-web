@@ -13,6 +13,7 @@ local-pb-db/
 pb_data/
 /pocketbase
 backups/
+backup/
 **/apple-auth-private/
 *.p8
 *.pem
@@ -21,6 +22,8 @@ backups/
 *.db-*
 *.sqlite
 *.sqlite-*
+*.sqlite3
+*.sqlite3-*
 *.dump
 .pocketbase-schema.config.ts
 e2e/.auth/

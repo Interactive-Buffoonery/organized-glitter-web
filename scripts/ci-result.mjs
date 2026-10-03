@@ -8,6 +8,7 @@ export const requiredJobs = [
   'build',
   'browser',
   'react-doctor',
+  'publication-security',
 ];
 
 export function evaluateCiResult(needs) {

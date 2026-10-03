@@ -55,9 +55,9 @@ the repository README.
 
 ## Other licensed assets
 
-Bundled fonts are not covered by this brand notice. Karla and Caveat are
-distributed under the SIL Open Font License. Preserve the included font license
-notices, including `public/fonts/karla-LICENSE.txt`.
+Bundled fonts are not covered by this brand notice. Karla, Caveat, and JetBrains Mono
+are distributed under the SIL Open Font License. Preserve the included copyright
+and license notices in `public/fonts/*-LICENSE.txt`.
 
 ## Ownership
 

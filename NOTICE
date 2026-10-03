@@ -26,3 +26,7 @@ THIRD PARTY COMPONENTS:
 This software includes components from various open source projects.
 See package.json for a complete list of dependencies and their licenses.
 All third-party components remain under their original licenses.
+
+BUNDLED FONTS:
+Karla, Caveat, and JetBrains Mono are distributed under the SIL Open Font
+License 1.1. Their copyright and license notices are in public/fonts/.

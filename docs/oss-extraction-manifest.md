@@ -1,8 +1,9 @@
 # Organized Glitter public extraction manifest
 
-Status: remediation in progress, 2026-10-02. Public extraction PR #1 already
-exists. The repository is already public. No deployment, domain, production data,
-repository settings, or merge has changed during this cleanup.
+Status: source remediation integrated, 2026-10-03. Public extraction PR #1 is
+awaiting its final current-head CI and merge. Publication safeguards from PR #2
+and review fixes from PR #10 are merged into the extraction branch. The repository
+is already public. No deployment, domain, or production data has changed.
 
 ## Source and scope
 
@@ -28,7 +29,8 @@ Runtime databases, backups, user uploads, authentication state, environment file
 private Apple configuration, internal operations history, and private agent
 configuration remain excluded. The [inventory](extraction-inventory.json) records included and rewritten paths,
 provenance and file hashes, plus excluded source counts by directory. The
-[asset inventory](extraction-asset-inventory.json) records publication-rights gates.
+[asset inventory](extraction-asset-inventory.json) records publication permissions
+and the removed unconfirmed photo.
 
 ## Public configuration
 
@@ -48,15 +50,19 @@ provenance and file hashes, plus excluded source counts by directory. The
 The existing public package, LICENSE, README, and NOTICE use AGPL-3.0-or-later.
 This cleanup retains that license; it does not infer a new licensing decision from
 the earlier plan's abbreviated AGPL-3.0 wording. Native code and third-party
-licenses are unaffected. Owners must confirm publication rights for artwork,
-photographs, fonts, marks, and embedded content; preserving the requested site
-is not proof of third-party asset rights. Keep existing attribution and notices.
+licenses are unaffected. On 2026-10-03, Sarah confirmed permission to retain the
+brand assets, craft photos, screenshots, previews, and synthetic test fixtures
+listed in the asset inventory. The unconfirmed washi-tape photo was removed.
+Karla, Caveat, and JetBrains Mono retain their SIL Open Font License notices.
+Brand terms still apply, and photo confirmation does not grant rights to
+third-party artwork depicted in photos. Keep existing attribution and notices.
 
 The repository was made public before all planned gates were complete. Do not
 represent the historical checklist as completed publication approval. Secret
 scanner results, test evidence, and unresolved rights/deployment gates belong in
 the current PR and session record. Do not transfer private history to resolve a
-missing test fixture.
+missing test fixture. The original premature publication remains a historical
+fact; later approvals and passing checks do not rewrite that sequence.
 
 ## Required validation and remaining gates
 
@@ -69,7 +75,8 @@ missing test fixture.
 - Current-head CI, a clean public clone, and fork behavior without secrets.
 - Tree, fresh public history, and generated artifact secret scans. Scanner
   findings need review; a scan alone cannot prove absence of all private data.
-- Asset rights and copyright-holder confirmation remain owner gates.
+- Retained asset permissions are recorded in the asset inventory. New assets
+  still need publication rights and applicable notices.
 - Branch protection and repository settings remain separate owner actions.
 - Ops creation, backup/migration planning, official service validation, domain
   cutover, and deployment remain separate work requiring explicit authorization.

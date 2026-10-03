@@ -25,7 +25,12 @@ Passing checks do not prove official provider, mail, backup, or deployment gates
 ## Publication security
 
 `Publication security` runs on standard GitHub-hosted Ubuntu runners without
-service credentials. It checks all available Git history and the tracked tree,
+service credentials. The installed Husky pre-push hook rejects private runtime
+files and scans Git history before upload. Install Gitleaks 8.30.1 from its
+[official releases](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1)
+alongside the repo toolchain. A missing scanner blocks the push.
+
+The CI job checks all available Git history and the tracked tree,
 then builds and scans the generated website. Gitleaks 8.30.1 is pinned and its
 download checksum is verified. Scanner output is fully redacted. This job does
 not upload source, databases, auth state, traces, or scanner reports as artifacts.

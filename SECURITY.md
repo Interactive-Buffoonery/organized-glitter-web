@@ -44,7 +44,7 @@ store. Public service URLs are configuration, not credentials.
 
 PocketBase schema definitions, hooks, migrations, and generated types belong in
 this repository. PocketBase `pb_data/`, `local-pb-db/`, and backup files do not.
-The publication check rejects private runtime paths and SQLite databases in Git
+The installed pre-push hook and publication check reject private runtime paths and SQLite databases in Git
 history, including deleted or renamed databases. Ignore rules alone do not
 protect files that are already tracked.
 

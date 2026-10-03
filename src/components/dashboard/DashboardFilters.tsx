@@ -2,7 +2,7 @@ import React from 'react';
 import { usePostHog } from '@posthog/react';
 import FilterDropdown from '@/components/dashboard/FilterDropdown';
 import TagMultiSelectFilter from '@/components/dashboard/TagMultiSelectFilter';
-import ViewToggle from '@/components/dashboard/ViewToggle';
+import LibraryViewToggle from '@/components/shared/LibraryViewToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -200,7 +200,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
           {!hideViewToggle && (
             <div className="space-y-2 md:space-y-3">
               <h3 className="text-sm font-semibold">View</h3>
-              <ViewToggle
+              <LibraryViewToggle
                 activeView={viewType}
                 onViewChange={nextView => {
                   updateViewType(nextView);

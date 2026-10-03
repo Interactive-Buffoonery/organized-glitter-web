@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,6 +24,20 @@ describe('FeedbackDialog', () => {
     sendFeedbackEmailMock.mockReset();
     clearSessionDrafts();
     vi.stubEnv('VITE_CONTACT_EMAIL', 'contact@example.test');
+  });
+
+  it('retains its accessible name and announces successful delivery', async () => {
+    sendFeedbackEmailMock.mockResolvedValue({ success: true });
+    render(<FeedbackDialog isOpen onOpenChange={vi.fn()} />);
+    const dialog = screen.getByRole('dialog', { name: 'Share Your Feedback' });
+    const status = screen.getByRole('status');
+    expect(status).toBeEmptyDOMElement();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), {
+      target: { value: 'A valid feedback message.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Feedback' }));
+    await waitFor(() => expect(status).toHaveTextContent('Thank you'));
+    expect(dialog).toHaveAccessibleName('Share Your Feedback');
   });
 
   it('explains the length rule and blocks feedback the service would reject', async () => {

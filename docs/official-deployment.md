@@ -41,6 +41,15 @@ The Apple association endpoint defaults to an empty app list. Configure
 configuration alongside its signing and grant encryption keys. The official
 native client ID is `com.interactivebuffoonery.organizedglitter`.
 
+The authenticated PocketBase feedback route is preferred. The legacy Node mail
+route uses the TCP peer for rate limiting by default. Set
+`FEEDBACK_TRUSTED_PROXY_HOPS` only behind a trusted proxy that overwrites
+`X-Real-IP` and `X-Forwarded-For` and prevents direct access to the Node server.
+
+Analytics sanitizes URL and path properties at the SDK emission boundary,
+including session-entry and initial person properties. Authentication tokens,
+query strings, and fragments must not be sent to analytics.
+
 ## Cutover gates
 
 A passing source PR does not prove a deployed site. Before switching the official

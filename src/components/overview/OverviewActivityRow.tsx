@@ -68,7 +68,7 @@ export function OverviewActivityRow({ item }: OverviewActivityRowProps) {
 
         <span className="text-muted-foreground text-sm">{item.activityLabel}</span>
 
-        <span className="text-primary flex items-center gap-1 text-sm font-semibold sm:justify-end">
+        <span className="text-foreground flex items-center gap-1 text-sm font-semibold sm:justify-end">
           {actionLabel}
           <ChevronRight aria-hidden="true" className="size-4" />
         </span>

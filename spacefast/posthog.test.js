@@ -6,7 +6,10 @@ const proxyEnv = {
   POSTHOG_PROXY_HOST: 'https://us.i.posthog.com',
   POSTHOG_PROXY_ASSET_HOST: 'https://us-assets.i.posthog.com',
 };
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 describe('Spacefast PostHog proxy', () => {
   it('routes same-origin analytics requests through the runtime entry', async () => {
@@ -85,6 +88,31 @@ describe('Spacefast PostHog proxy', () => {
     expect(options.method).toBe('POST');
     expect(new TextDecoder().decode(options.body)).toBe('{"event":"migration_test"}');
     expect([...options.headers.keys()]).toEqual(['content-type']);
+  });
+
+  it('cancels a stalled request body after ten seconds without contacting upstream', async () => {
+    vi.useFakeTimers();
+    const send = vi.fn();
+    const cancel = vi.fn();
+    vi.stubGlobal('fetch', send);
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1]));
+      },
+      cancel,
+    });
+    const pending = proxyPosthog(
+      new Request('https://app.example.test/glimmer/e/', {
+        method: 'POST',
+        body: stream,
+        duplex: 'half',
+      }),
+      proxyEnv
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect((await pending).status).toBe(408);
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('rejects oversized bodies and makes upstream errors best effort', async () => {

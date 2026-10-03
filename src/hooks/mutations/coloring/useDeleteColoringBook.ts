@@ -25,11 +25,11 @@ export function useDeleteColoringBook() {
       const previousBook = getCachedColoringBook(queryClient, bookId);
       return { previousBook };
     },
-    onSuccess: (_data, bookId) => {
+    onSuccess: async (_data, bookId) => {
       runPostWriteEffect(logger, 'Coloring book Stats refresh failed after delete', () => {
         invalidateStatsQueries(queryClient, 'coloring');
       });
-      clearDeletedColoringBook(queryClient, bookId);
+      await clearDeletedColoringBook(queryClient, bookId);
     },
     onSettled: (_data, error, _bookId, context) => {
       if (error) return;

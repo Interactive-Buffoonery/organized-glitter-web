@@ -19,6 +19,8 @@ const {
     createBookWithTags: vi.fn(),
     updateBookWithTags: vi.fn(),
     deleteBook: vi.fn(),
+    getBookById: vi.fn(),
+    listPages: vi.fn(),
     updatePage: vi.fn(),
     setMainPagePhoto: vi.fn(),
   },
@@ -78,6 +80,8 @@ import { queryKeys } from '../../../queries/queryKeys';
 import { useCreateColoringBook } from '../useCreateColoringBook';
 import { useUpdateColoringBook } from '../useUpdateColoringBook';
 import { useDeleteColoringBook } from '../useDeleteColoringBook';
+import { useColoringBook } from '../../../queries/coloring/useColoringBook';
+import { useColoringPages } from '../../../queries/coloring/useColoringPages';
 import { useUpdateColoringPage } from '../useUpdateColoringPage';
 import { useCreateBookPublisher } from '../useCreateBookPublisher';
 import { useCreateBookIllustrator } from '../useCreateBookIllustrator';
@@ -418,7 +422,39 @@ describe('coloring mutation hooks', () => {
     );
   });
 
-  it('deletes a coloring book and invalidates book and page keys', async () => {
+  it('does not refetch deleted books or pages while the detail view is still mounted', async () => {
+    const client = makeClient();
+    coloringMock.getBookById.mockResolvedValue(book);
+    coloringMock.listPages.mockResolvedValue({ items: [page], totalItems: 1 });
+    coloringMock.deleteBook.mockResolvedValue(undefined);
+    const otherPage = { ...page, id: 'other-page', bookId: 'other-book' };
+    client.setQueryData(queryKeys.coloring.pages.detail(otherPage.id), otherPage);
+    const { result, rerender } = renderHook(
+      () => ({
+        book: useColoringBook(book.id),
+        pages: useColoringPages({ bookId: book.id }),
+        deleteBook: useDeleteColoringBook(),
+      }),
+      { wrapper: makeWrapper(client) }
+    );
+    await waitFor(() => {
+      expect(result.current.book.data).toEqual(book);
+      expect(result.current.pages.data?.items).toEqual([page]);
+    });
+    coloringMock.getBookById.mockClear();
+    coloringMock.listPages.mockClear();
+
+    await act(async () => {
+      await result.current.deleteBook.mutateAsync(book.id);
+    });
+    rerender();
+
+    expect(coloringMock.getBookById).not.toHaveBeenCalled();
+    expect(coloringMock.listPages).not.toHaveBeenCalled();
+    expect(client.getQueryData(queryKeys.coloring.pages.detail(otherPage.id))).toEqual(otherPage);
+  });
+
+  it('deletes a coloring book and refreshes surviving collection queries', async () => {
     const client = makeClient();
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
     const removeSpy = vi.spyOn(client, 'removeQueries');
@@ -430,13 +466,16 @@ describe('coloring mutation hooks', () => {
     });
 
     expect(coloringMock.deleteBook).toHaveBeenCalledWith(book.id);
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.coloring.books.all });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.coloring.books.lists() });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.coloring.books.detail(book.id),
+      refetchType: 'none',
     });
-    expect(removeSpy).toHaveBeenCalledWith({ queryKey: queryKeys.coloring.books.detail(book.id) });
-    expect(removeSpy).toHaveBeenCalledWith({ queryKey: queryKeys.coloring.pages.all });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.coloring.pages.all });
+    expect(removeSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.coloring.books.detail(book.id),
+      type: 'inactive',
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.coloring.tags.stats() });
     expect(captureMock).toHaveBeenCalledWith('coloring_book_deleted', {
       craft: 'coloring',
       surface: 'coloring_book_detail',

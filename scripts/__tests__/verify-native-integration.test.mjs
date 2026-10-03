@@ -38,6 +38,7 @@ describe('isolated native integration', () => {
     expect(nativeTestArguments('/run', 'phone')).toContain(
       '-only-testing:OrganizedGlitterTests/PocketBaseClientTests/seededBackendRoundTripsDisposableRecordsAndMultipartFiles()'
     );
+    expect(nativeTestArguments('/run', 'phone')).not.toContain('CODE_SIGNING_ALLOWED=NO');
     expect(
       nativeTestEnvironment(
         { PATH: '/bin', SERVICE_TOKEN: 'private', SEEDED_PB_URL: 'https://production.test' },

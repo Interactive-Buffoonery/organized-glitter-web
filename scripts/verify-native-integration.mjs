@@ -69,7 +69,6 @@ export function nativeTestArguments(output, simulator) {
     '-parallel-testing-enabled',
     'NO',
     '-only-testing:OrganizedGlitterTests/PocketBaseClientTests/seededBackendRoundTripsDisposableRecordsAndMultipartFiles()',
-    'CODE_SIGNING_ALLOWED=NO',
   ];
 }
 

@@ -214,12 +214,40 @@ export function recordPhaseFailure(phase, error, startedAtMs, finishedAtMs = Dat
   phase.outcome = 'failed';
 }
 
+export function runAdvisoryNativeReport(base, runDir, runFn = run, env = process.env) {
+  if (env.CI) return { outcome: 'skipped', reason: 'Local-only report.' };
+  const output = path.join(runDir, 'native-sync');
+  try {
+    const result = runFn(
+      process.execPath,
+      [
+        path.join(rootDir, 'scripts/native-sync-report.mjs'),
+        `--base=${base}`,
+        `--output=${output}`,
+      ],
+      { env: validationEnvironment(base, env), stdio: 'inherit', encoding: undefined }
+    );
+    if (result.status !== 0 || !existsSync(path.join(output, 'report.json'))) {
+      return { outcome: 'unavailable', reason: 'Compatibility remains unverified.' };
+    }
+    const report = JSON.parse(readFileSync(path.join(output, 'report.json'), 'utf8'));
+    return {
+      outcome: report.outcome,
+      integration: report.integration.outcome,
+      reportPath: path.join(output, 'report.md'),
+    };
+  } catch {
+    return { outcome: 'unavailable', reason: 'Compatibility remains unverified.' };
+  }
+}
+
 export function runLocalValidation(argv = process.argv.slice(2)) {
   const { base, profile } = parseArgs(argv);
   const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}-${profile}`;
   const runDir = path.join(summaryRoot, runId);
   const summaryPath = path.join(runDir, 'summary.json');
   mkdirSync(runDir, { recursive: true });
+  const nativeSync = runAdvisoryNativeReport(base, runDir);
   const repository = repositoryIdentity(base);
   const buildEnvironment = environmentForPhase(
     'build',
@@ -247,6 +275,7 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
       localBuildEnvironmentFilesSha256: localBuildEnvironmentFilesDigest(),
       publicBuildEnvironmentSha256: publicBuildEnvironmentDigest(buildEnvironment),
     },
+    nativeSync,
     phases: [],
   };
   writeSummary(summaryPath, summary);

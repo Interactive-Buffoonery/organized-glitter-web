@@ -15,7 +15,9 @@ data, without credentials.
 | Publication security   | Production build and budget; runtime paths, SQLite blobs, complete history, tracked tree, and generated website secrets |
 | CI result              | Selected jobs must pass; jobs omitted by the plan must be skipped; missing, canceled, or inconsistent results fail      |
 
-`pnpm test:pr` runs the complete local PR gate with static checks first. It also
+`pnpm test:pr` first writes a local advisory [native app sync report](../native-sync-report.md).
+Its findings do not block the web gate, and it is skipped in CI. The required
+phases of the complete local PR gate start with static checks. It also
 runs the production build and budget, publication scans, backend integration,
 unit tests, and the PR browser selection. `pnpm test:release` uses the same local
 gate with the broader browser selection. Browser runners print report and trace

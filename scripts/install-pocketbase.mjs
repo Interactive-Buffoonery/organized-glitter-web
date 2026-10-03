@@ -15,6 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const POCKETBASE_VERSION = '0.40.4';
@@ -111,9 +112,33 @@ export function hasVerifiedCachedBinary(destination, release) {
   return getFileSha256(destination) === release.binarySha256;
 }
 
+export async function downloadPocketBaseArchive(url, { fetchFn = fetch, sleepFn = sleep } = {}) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    let response;
+    try {
+      response = await fetchFn(url, { signal: AbortSignal.timeout(30_000) });
+      if (response.ok) return Buffer.from(await response.arrayBuffer());
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (response && !response.ok) {
+      lastError = new Error(`PocketBase download failed with HTTP ${response.status}: ${url}`);
+      await response.body?.cancel();
+      if (![500, 502, 503, 504].includes(response.status)) throw lastError;
+    }
+
+    if (attempt === 3) throw lastError;
+    await sleepFn(250 * attempt);
+  }
+}
+
 export async function installPocketBase({
   destination,
   fetchFn = fetch,
+  sleepFn = sleep,
   platform = process.platform,
   arch = process.arch,
   spawnSyncFn = spawnSync,
@@ -125,16 +150,13 @@ export async function installPocketBase({
   if (hasVerifiedCachedBinary(destination, release)) return destination;
 
   const downloadUrl = `https://github.com/pocketbase/pocketbase/releases/download/v${version}/${release.archive}`;
-  const response = await fetchFn(downloadUrl, { signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) {
-    throw new Error(`PocketBase download failed with HTTP ${response.status}: ${downloadUrl}`);
-  }
+  const archiveBytes = await downloadPocketBaseArchive(downloadUrl, { fetchFn, sleepFn });
 
   const temporaryDir = mkdtempSync(path.join(tmpdir(), 'organized-glitter-pocketbase-'));
   const archivePath = path.join(temporaryDir, release.archive);
 
   try {
-    writeFileSync(archivePath, Buffer.from(await response.arrayBuffer()));
+    writeFileSync(archivePath, archiveBytes);
     verifyArchive(archivePath, release.sha256);
 
     const extractedDir = path.join(temporaryDir, 'extracted');

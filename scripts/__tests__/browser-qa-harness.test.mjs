@@ -17,6 +17,7 @@ import {
 } from '../run-local-release-qa.mjs';
 import {
   hasVerifiedCachedBinary,
+  downloadPocketBaseArchive,
   installPocketBase,
   POCKETBASE_BASELINE_VERSION,
   POCKETBASE_VERSION,
@@ -25,6 +26,84 @@ import {
 } from '../install-pocketbase.mjs';
 
 describe('PocketBase installer', () => {
+  it('retries a transient HTTP 500 before accepting the archive bytes', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('', { status: 500 }))
+      .mockResolvedValueOnce(new Response('archive'));
+    const sleepFn = vi.fn(async () => {});
+    await expect(
+      downloadPocketBaseArchive('https://example.test/pocketbase.zip', { fetchFn, sleepFn })
+    ).resolves.toEqual(Buffer.from('archive'));
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(sleepFn).toHaveBeenCalledWith(250);
+  });
+
+  it('retries transport and response-body failures with fresh abort signals', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce({
+        ok: true,
+        arrayBuffer: async () => {
+          throw new TypeError('connection closed');
+        },
+      })
+      .mockResolvedValueOnce(new Response('archive'));
+    const sleepFn = vi.fn(async () => {});
+    await expect(
+      downloadPocketBaseArchive('https://example.test/pocketbase.zip', { fetchFn, sleepFn })
+    ).resolves.toEqual(Buffer.from('archive'));
+    const signals = fetchFn.mock.calls.map(([, options]) => options.signal);
+    expect(new Set(signals).size).toBe(3);
+    expect(signals.every(signal => signal instanceof AbortSignal)).toBe(true);
+    expect(sleepFn.mock.calls).toEqual([[250], [500]]);
+  });
+
+  it.each([500, 502, 503, 504])('stops after three HTTP %i failures', async status => {
+    const fetchFn = vi.fn(async () => new Response('', { status }));
+    const sleepFn = vi.fn(async () => {});
+    await expect(
+      downloadPocketBaseArchive('https://example.test/pocketbase.zip', { fetchFn, sleepFn })
+    ).rejects.toThrow(`HTTP ${status}`);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+    expect(sleepFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a missing release asset', async () => {
+    const fetchFn = vi.fn(async () => new Response('', { status: 404 }));
+    const sleepFn = vi.fn(async () => {});
+    await expect(
+      downloadPocketBaseArchive('https://example.test/pocketbase.zip', { fetchFn, sleepFn })
+    ).rejects.toThrow('HTTP 404');
+    expect(fetchFn).toHaveBeenCalledOnce();
+    expect(sleepFn).not.toHaveBeenCalled();
+  });
+
+  it('still rejects tampered bytes after a successful retry', async () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'og-pocketbase-retry-'));
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('', { status: 500 }))
+      .mockResolvedValueOnce(new Response('tampered'));
+    const spawnSyncFn = vi.fn();
+    try {
+      await expect(
+        installPocketBase({
+          destination: path.join(directory, 'pocketbase'),
+          fetchFn,
+          sleepFn: async () => {},
+          spawnSyncFn,
+          platform: 'linux',
+          arch: 'x64',
+        })
+      ).rejects.toThrow(/checksum mismatch/i);
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+      expect(spawnSyncFn).not.toHaveBeenCalled();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
   it('pins checksum-verified macOS and Linux archives', () => {
     expect(resolveArchive('darwin', 'arm64')).toMatchObject({
       archive: 'pocketbase_0.40.4_darwin_arm64.zip',
@@ -75,7 +154,7 @@ describe('PocketBase installer', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'og-pocketbase-fetch-'));
     const fetchFn = vi.fn(async (_url, options) => {
       expect(options.signal).toBeInstanceOf(AbortSignal);
-      return new Response('', { status: 503 });
+      return new Response('', { status: 404 });
     });
     try {
       await expect(
@@ -85,7 +164,7 @@ describe('PocketBase installer', () => {
           fetchFn,
           platform: 'linux',
         })
-      ).rejects.toThrow(/HTTP 503/);
+      ).rejects.toThrow(/HTTP 404/);
       expect(fetchFn).toHaveBeenCalledOnce();
     } finally {
       rmSync(directory, { recursive: true, force: true });

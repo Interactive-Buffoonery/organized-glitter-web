@@ -9,8 +9,6 @@
 import type { ColoringBooksStatusOptions } from '@/types/pocketbase.types';
 import { LIBRARY_PAGE_SIZES } from '@/constants/pagination';
 
-export { LIBRARY_PAGE_SIZES as COLORING_PAGE_SIZES };
-
 export type ColoringSortField =
   | 'date_added'
   | 'title'

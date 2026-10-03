@@ -293,21 +293,22 @@ function FeedbackDialog({
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent layout="keyboard-safe" className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
-          {!state.isSubmitted && (
-            <DialogHeader>
-              <DialogTitle>{title}</DialogTitle>
-              <DialogDescription>{subtitle}</DialogDescription>
-            </DialogHeader>
-          )}
-
-          {state.isSubmitted ? (
-            <div className="py-8 text-center">
-              <p className="text-primary text-lg font-medium">{successMessage}</p>
+          <DialogHeader className={state.isSubmitted ? 'sr-only' : undefined}>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{subtitle}</DialogDescription>
+          </DialogHeader>
+          <div className={state.isSubmitted ? 'py-8 text-center' : 'sr-only'}>
+            <p className="text-primary text-lg font-medium" role="status" aria-atomic="true">
+              {state.isSubmitted ? successMessage : ''}
+            </p>
+            {state.isSubmitted && (
               <p className="text-muted-foreground mt-2 text-sm">
                 If you left your email address, we'll be in touch.
               </p>
-            </div>
-          ) : (
+            )}
+          </div>
+
+          {!state.isSubmitted && (
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">

@@ -17,6 +17,20 @@ const getReadinessUsage = (source: string) => {
 
   const visit = (node: ts.Node) => {
     if (
+      ts.isImportDeclaration(node) &&
+      ts.isStringLiteral(node.moduleSpecifier) &&
+      node.moduleSpecifier.text === '@/hooks/useAppReady' &&
+      !node.importClause?.isTypeOnly &&
+      node.importClause?.namedBindings &&
+      ts.isNamedImports(node.importClause.namedBindings) &&
+      node.importClause.namedBindings.elements.some(
+        element =>
+          !element.isTypeOnly && (element.propertyName ?? element.name).text === 'useAppReady'
+      )
+    ) {
+      usage.push('import useAppReady');
+    }
+    if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
       ['useAppReady', 'useHideSplash'].includes(node.expression.text)
@@ -111,10 +125,10 @@ describe('route app-ready coverage', () => {
   const authFormReadyPages = ['src/pages/Login.tsx', 'src/pages/Register.tsx'];
 
   it.each(mountReadyPages)('%s dispatches app-ready on mount', (file: string) => {
-    const source = readSource(file);
+    const source = getReadinessUsage(readSource(file));
 
-    expect(source).toContain("import { useAppReady } from '@/hooks/useAppReady';");
-    expect(source).toContain('useAppReady();');
+    expect(source).toMatch(/^import useAppReady$/m);
+    expect(source).toMatch(/^useAppReady\(\)$/m);
   });
 
   it.each(splashHideOnlyGates)('%s hides splash without marking ready', (file: string) => {

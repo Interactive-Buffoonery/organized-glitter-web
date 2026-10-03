@@ -5,6 +5,11 @@ on:
   push:
     branches: [main, dev]
   workflow_dispatch:
+    inputs:
+      comparison_base:
+        description: Base commit or ref for changed-source and upgrade checks
+        required: false
+        type: string
   schedule:
     - cron: '0 9 * * 0'
 
@@ -16,6 +21,33 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  scope:
+    name: Select CI scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      base_sha: ${{ steps.scope.outputs.base_sha }}
+      plan: ${{ steps.scope.outputs.plan }}
+      run_backend: ${{ steps.scope.outputs.run_backend }}
+      run_browser: ${{ steps.scope.outputs.run_browser }}
+      run_full_browser: ${{ steps.scope.outputs.run_full_browser }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: scope
+        name: Resolve comparison and execution plan
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_PUSH_BEFORE_SHA: ${{ github.event.before }}
+          CI_EXPLICIT_BASE: ${{ inputs.comparison_base || '04789b9d000e6eb1390ca2a6ae60f855a3b1fca6' }}
+          CI_BRANCH_CREATION_BASE: 04789b9d000e6eb1390ca2a6ae60f855a3b1fca6
+          CI_HEAD_SHA: ${{ github.sha }}
+          CI_TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
+        run: node scripts/ci-scope.mjs
+
   static-checks:
     name: Static checks
     runs-on: ubuntu-24.04
@@ -42,6 +74,8 @@ jobs:
 
   backend:
     name: PocketBase integration
+    needs: scope
+    if: needs.scope.outputs.run_backend == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -50,28 +84,13 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
-      - run: pnpm pb:validate:schema && pnpm pb:validate:migrations && pnpm pb:validate:upgrade && pnpm pb:test:protected-file-upgrade && pnpm pb:test:auth-verification && pnpm pb:test:feedback && pnpm pb:test:native-oauth-association && pnpm pb:test:auth-step-up && pnpm pb:test:native-apple && pnpm pb:test:archive-restore-v3 && pnpm pb:test:mobile-sync
-
-  build:
-    name: Production build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      VITE_POCKETBASE_URL: http://127.0.0.1:8090
-      VITE_APP_URL: http://127.0.0.1:3000
-      VITE_APP_VERSION: ${{ github.sha }}
-      APP_TEST_ENV: test
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: ./.github/actions/setup-project
-      - run: pnpm build
-      - run: pnpm build:budget
+      - run: pnpm test:ci:backend
+        env:
+          CI_BASE_SHA: ${{ needs.scope.outputs.base_sha }}
 
   react-doctor:
     name: React review
+    needs: scope
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -81,9 +100,13 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
       - run: pnpm test:ci:react
+        env:
+          CI_BASE_SHA: ${{ needs.scope.outputs.base_sha }}
 
   browser:
     name: Browser validation
+    needs: scope
+    if: needs.scope.outputs.run_browser == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -98,7 +121,12 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
       - run: pnpm exec playwright install --with-deps chromium webkit
-      - run: pnpm test:not-found && pnpm test:pwa:navigation && pnpm qa:browser:ci && pnpm test:protected-file-rotation-browser && pnpm qa:blog
+      - name: Run pull request browser selection
+        if: needs.scope.outputs.run_full_browser != 'true'
+        run: pnpm test:not-found && pnpm test:pwa:navigation && pnpm qa:browser:ci && pnpm test:protected-file-rotation-browser && pnpm qa:blog
+      - name: Run full browser selection
+        if: needs.scope.outputs.run_full_browser == 'true'
+        run: pnpm test:not-found && pnpm test:pwa:navigation && pnpm qa:browser:full:ci && pnpm test:protected-file-rotation-browser && pnpm qa:blog
 
   publication-security:
     name: Publication security
@@ -115,31 +143,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
-      - name: Install verified Gitleaks
-        run: |
-          curl --fail --silent --show-error --location --retry 3 \
-            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
-            --output "$RUNNER_TEMP/gitleaks.tar.gz"
-          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
-          mkdir -p "$RUNNER_TEMP/gitleaks-bin"
-          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
-          echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
-      - name: Reject private runtime files and databases
-        run: node scripts/check-publication-files.mjs
-      - name: Scan complete history and tracked tree
-        run: |
-          gitleaks git --log-opts=--all --config .gitleaks.toml --redact=100 --ignore-gitleaks-allow --no-banner
-          PUBLICATION_TREE=$(mktemp -d "$RUNNER_TEMP/publication-tree.XXXXXX")
-          git archive HEAD | tar -x -C "$PUBLICATION_TREE"
-          gitleaks dir "$PUBLICATION_TREE" --config .gitleaks.toml --redact=100 --ignore-gitleaks-allow --no-banner
-      - run: pnpm build
-      - name: Scan generated website
-        run: gitleaks dir dist --config .gitleaks.toml --redact=100 --ignore-gitleaks-allow --no-banner
+      - name: Build production website and enforce budget
+        run: pnpm test:ci:build
+      - name: Scan publication inputs, history, tree, and output
+        run: pnpm test:publication
 
   result:
     name: CI result
     if: always()
-    needs: [static-checks, unit-tests, backend, build, browser, react-doctor, publication-security]
+    needs: [scope, static-checks, unit-tests, backend, browser, react-doctor, publication-security]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -149,4 +161,5 @@ jobs:
       - name: Require every expected job to pass
         env:
           CI_NEEDS: ${{ toJSON(needs) }}
+          CI_PLAN: ${{ needs.scope.outputs.plan }}
         run: node scripts/ci-result.mjs

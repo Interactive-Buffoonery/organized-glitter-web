@@ -2,12 +2,14 @@ import React from 'react';
 import { PostHogProvider } from '@posthog/react';
 import type { PostHogConfig } from 'posthog-js';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { sanitizeAnalyticsEvent } from '@/utils/analytics/sanitizeEvent';
 
 const posthogKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY as string | undefined;
 const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST?.trim();
 
 const posthogOptions: Partial<PostHogConfig> = {
   api_host: posthogHost,
+  before_send: event => (event ? sanitizeAnalyticsEvent(event) : null),
   ui_host: 'https://us.posthog.com',
   advanced_disable_flags: true,
   advanced_disable_feature_flags: true,

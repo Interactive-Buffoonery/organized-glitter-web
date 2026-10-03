@@ -17,17 +17,7 @@ describe('import/export query invalidation', () => {
     expect(refresh).toHaveBeenCalledOnce();
   });
 
-  it('invalidates coloring mediums after archive imports can create them', async () => {
-    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
-
-    await invalidateImportExportQueries({ invalidateQueries } as unknown as QueryClient);
-
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: queryKeys.coloring.mediums.all,
-    });
-  });
-
-  it('invalidates project detail caches for each imported project id', async () => {
+  it('invalidates every imported cache family and created project detail', async () => {
     const invalidateQueries = vi.fn().mockResolvedValue(undefined);
 
     await invalidateImportExportQueries({ invalidateQueries } as unknown as QueryClient, [
@@ -35,11 +25,24 @@ describe('import/export query invalidation', () => {
       'proj_b',
     ]);
 
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: queryKeys.projects.detail('proj_a'),
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: queryKeys.projects.detail('proj_b'),
-    });
+    const expectedInvalidations = [
+      { queryKey: queryKeys.coloring.colorReferences.all },
+      { queryKey: queryKeys.projects.lists() },
+      { queryKey: queryKeys.projects.detail('proj_a') },
+      { queryKey: queryKeys.projects.detail('proj_b') },
+      { queryKey: queryKeys.progressNotes.all },
+      { queryKey: queryKeys.tags.all },
+      { queryKey: queryKeys.tags.stats() },
+      { queryKey: queryKeys.coloring.books.all },
+      { queryKey: queryKeys.coloring.pages.all },
+      { queryKey: queryKeys.coloring.pageProgressNotes.all },
+      { queryKey: queryKeys.coloring.mediums.all },
+      { queryKey: queryKeys.coloring.tags.all },
+      { queryKey: queryKeys.stats.all },
+    ];
+    const actualInvalidations = invalidateQueries.mock.calls.map(([filters]) => filters);
+
+    expect(actualInvalidations).toHaveLength(expectedInvalidations.length);
+    expect(actualInvalidations).toEqual(expect.arrayContaining(expectedInvalidations));
   });
 });

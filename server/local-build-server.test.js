@@ -677,6 +677,7 @@ describe('Local build server feedback handling', () => {
   });
 
   it('prefers x-real-ip over spoofed forwarded headers', async () => {
+    process.env.FEEDBACK_TRUSTED_PROXY_HOPS = '1';
     process.env.RESEND_API_KEY = 'test_resend_key';
     process.env.FEEDBACK_RATE_LIMIT_MAX = '1';
     process.env.FEEDBACK_RATE_LIMIT_WINDOW_MS = '900000';
@@ -702,6 +703,7 @@ describe('Local build server feedback handling', () => {
   });
 
   it('falls back to trusted forwarded IP when x-real-ip is absent', async () => {
+    process.env.FEEDBACK_TRUSTED_PROXY_HOPS = '1';
     process.env.RESEND_API_KEY = 'test_resend_key';
     process.env.FEEDBACK_RATE_LIMIT_MAX = '1';
     process.env.FEEDBACK_RATE_LIMIT_WINDOW_MS = '900000';
@@ -728,6 +730,7 @@ describe('Local build server feedback handling', () => {
   });
 
   it('attributes a single-entry forwarded header to the client at the trusted depth', async () => {
+    process.env.FEEDBACK_TRUSTED_PROXY_HOPS = '1';
     process.env.RESEND_API_KEY = 'test_resend_key';
     process.env.FEEDBACK_RATE_LIMIT_MAX = '1';
     process.env.FEEDBACK_RATE_LIMIT_WINDOW_MS = '900000';
@@ -756,6 +759,7 @@ describe('Local build server feedback handling', () => {
   });
 
   it('uses the rightmost valid x-real-ip when duplicate values are comma-joined', async () => {
+    process.env.FEEDBACK_TRUSTED_PROXY_HOPS = '1';
     process.env.RESEND_API_KEY = 'test_resend_key';
     process.env.FEEDBACK_RATE_LIMIT_MAX = '1';
     process.env.FEEDBACK_RATE_LIMIT_WINDOW_MS = '900000';
@@ -805,7 +809,34 @@ describe('Local build server feedback handling', () => {
     expect(sendMock).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores forwarded and real IP headers by default', async () => {
+    process.env.RESEND_API_KEY = 'test_resend_key';
+    process.env.FEEDBACK_RATE_LIMIT_MAX = '1';
+    process.env.FEEDBACK_RATE_LIMIT_WINDOW_MS = '900000';
+    sendMock.mockResolvedValue({ error: null });
+    server = http.createServer(createLocalBuildRequestHandler());
+    const port = await listen(server);
+    const body = {
+      feedback: 'This message is long enough to submit.',
+      type: 'general',
+    };
+
+    const firstResponse = await postJson(port, '/api/send-feedback', body, {
+      'x-forwarded-for': '203.0.113.20, 198.51.100.10',
+      'x-real-ip': '198.51.100.30',
+    });
+    const secondResponse = await postJson(port, '/api/send-feedback', body, {
+      'x-forwarded-for': '203.0.113.21, 198.51.100.10',
+      'x-real-ip': '198.51.100.31',
+    });
+
+    expect(firstResponse.statusCode).toBe(200);
+    expect(secondResponse.statusCode).toBe(429);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to trusted forwarded IP when x-real-ip is invalid', async () => {
+    process.env.FEEDBACK_TRUSTED_PROXY_HOPS = '1';
     process.env.RESEND_API_KEY = 'test_resend_key';
     process.env.FEEDBACK_RATE_LIMIT_MAX = '1';
     process.env.FEEDBACK_RATE_LIMIT_WINDOW_MS = '900000';
@@ -831,6 +862,7 @@ describe('Local build server feedback handling', () => {
   });
 
   it('caps active rate-limit windows and evicts the oldest bucket for new IPs', async () => {
+    process.env.FEEDBACK_TRUSTED_PROXY_HOPS = '1';
     process.env.RESEND_API_KEY = 'test_resend_key';
     process.env.FEEDBACK_RATE_LIMIT_MAX = '1';
     process.env.FEEDBACK_RATE_LIMIT_WINDOW_MS = '900000';

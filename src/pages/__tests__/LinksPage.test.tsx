@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { within } from '@testing-library/react';
-import { vi } from 'vitest';
+import { afterAll, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { renderWithProviders, screen, describe, it, expect } from '../../test-utils';
 
@@ -24,7 +24,11 @@ vi.mock('@/utils/logger', () => ({
   }),
 }));
 
-import LinksPage from '../LinksPage';
+const appUrl = 'https://app.example.test';
+vi.stubEnv('VITE_APP_URL', appUrl);
+const { default: LinksPage } = await import('../LinksPage');
+
+afterAll(() => vi.unstubAllEnvs());
 
 describe('LinksPage', () => {
   it('renders link cards as native links instead of mouse-only card containers', () => {
@@ -35,7 +39,7 @@ describe('LinksPage', () => {
     expect(cardActionLinks).toHaveLength(4);
     expect(screen.getByRole('link', { name: /Try Organized Glitter/i })).toHaveAttribute(
       'href',
-      new URL('/', window.location.origin).href
+      new URL('/', appUrl).href
     );
     expect(screen.getByRole('link', { name: /26 for 26/i })).toHaveAttribute(
       'href',
@@ -76,10 +80,10 @@ describe('LinksPage', () => {
     expect(container.innerHTML).not.toMatch(/gradient|glass/i);
     expect(document.title).toBe("Sarah's Links | Organized Glitter");
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
-      new URL('/links', window.location.origin).href
+      new URL('/links', appUrl).href
     );
     expect(document.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
-      new URL('/links', window.location.origin).href
+      new URL('/links', appUrl).href
     );
     expect(
       document.querySelector<HTMLScriptElement>(

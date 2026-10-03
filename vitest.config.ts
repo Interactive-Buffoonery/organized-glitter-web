@@ -2,30 +2,57 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
+const generatedTestArtifacts = [
+  '**/node_modules/**',
+  '**/dist/**',
+  '**/.tmp/**',
+  '**/coverage/**',
+  '**/playwright-report/**',
+  '**/test-results/**',
+  '**/.worktrees/**',
+  '**/cypress/**',
+  '**/.{idea,git,cache,output,temp}/**',
+  '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
+  'e2e/**',
+  'blog/test/**',
+];
+
+const nodeTestFiles = [
+  'api/**/*.{test,spec}.{js,mjs,cjs,ts}',
+  'pb_hooks/**/*.{test,spec}.{js,mjs,cjs,ts}',
+  'scripts/**/*.{test,spec}.{js,mjs,cjs,ts}',
+  'server/**/*.{test,spec}.{js,mjs,cjs,ts}',
+  'spacefast/**/*.{test,spec}.{js,mjs,cjs,ts}',
+  'test/pb-hooks/**/*.test.js',
+  'test/vitest-config.test.ts',
+];
+
+const scriptDomTestFiles = [
+  'scripts/__tests__/app-icon-links.test.mjs',
+  'scripts/__tests__/axe-readiness.test.ts',
+];
+
+const nodeTestsUnderDomRoots = ['test/pb-hooks/**/*.test.js', 'test/vitest-config.test.ts'];
+
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: 'jsdom',
-    setupFiles: ['./test/setup.ts'],
     globals: true,
 
-    // Optimized for speed with test isolation
     pool: 'threads',
-    fileParallelism: false,
-    isolate: true, // Ensure proper test isolation
+    fileParallelism: true,
+    maxWorkers: 4,
+    isolate: true,
 
-    // Fast execution settings
-    testTimeout: 10000, // 10 seconds max per test
-    hookTimeout: 5000, // 5 seconds max for setup/teardown
+    testTimeout: 10000,
+    hookTimeout: 5000,
     teardownTimeout: 1000,
 
-    // Improved error handling
-    bail: 0, // Don't bail on first failure - see all issues
-    retry: 0, // No retries - tests should be deterministic
+    bail: 0,
+    retry: 0,
 
-    // Minimal coverage for essential files only
     coverage: {
-      enabled: false, // Disable by default for speed
+      enabled: false,
       reporter: ['text'],
       include: [
         'src/components/**/*.{ts,tsx}',
@@ -42,18 +69,44 @@ export default defineConfig({
       },
     },
 
-    // Exclude problematic test patterns
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
+      '**/.tmp/**',
+      '**/coverage/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
       '**/.worktrees/**',
       '**/cypress/**',
       '**/.{idea,git,cache,output,temp}/**',
       '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
-      // Playwright specs live in `e2e/` and use a different runtime than
-      // vitest; they are invoked via `npx playwright test`, not `vitest`.
       'e2e/**',
       'blog/test/**',
+    ],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'node',
+          environment: 'node',
+          include: nodeTestFiles,
+          exclude: [...generatedTestArtifacts, ...scriptDomTestFiles],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'dom',
+          environment: 'jsdom',
+          setupFiles: ['./test/setup.ts'],
+          include: [
+            'src/**/*.{test,spec}.{js,jsx,ts,tsx}',
+            'test/**/*.{test,spec}.{js,jsx,ts,tsx}',
+            ...scriptDomTestFiles,
+          ],
+          exclude: [...generatedTestArtifacts, ...nodeTestsUnderDomRoots],
+        },
+      },
     ],
   },
   resolve: {

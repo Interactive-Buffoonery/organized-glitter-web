@@ -10,6 +10,8 @@ const companyName = `E2E Rollback Company ${randomUUID().slice(0, 8)}`;
 const artistName = `E2E Rollback Artist ${randomUUID().slice(0, 8)}`;
 const projectTitle = `E2E Rollback Project ${randomUUID().slice(0, 8)}`;
 
+test.use({ serviceWorkers: 'block' });
+
 test('rolls back a company when artist creation fails during project save', async ({ page }) => {
   assertLocalE2ETargets({ appUrl, pocketBaseUrl, specName: 'Project metadata rollback' });
   const pb = new PocketBase(pocketBaseUrl);
@@ -31,8 +33,10 @@ test('rolls back a company when artist creation fails during project save', asyn
       });
     expect(await getCompanies()).toHaveLength(0);
 
+    let artistCreateAttempts = 0;
     await page.route('**/api/collections/artists/records', async route => {
       if (route.request().method() === 'POST') {
+        artistCreateAttempts += 1;
         await route.fulfill({
           status: 503,
           body: '{"message":"Artist service unavailable"}',
@@ -50,6 +54,7 @@ test('rolls back a company when artist creation fails during project save', asyn
     expect(await getCompanies()).toHaveLength(0);
 
     await page.getByRole('button', { name: 'Create project' }).click();
+    await expect.poll(() => artistCreateAttempts).toBe(1);
     await expect(page.getByRole('alert')).toBeVisible();
 
     await expect.poll(async () => (await getCompanies()).length).toBe(0);

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { assertLocalE2ETargets } from '../fixtures/local-safety';
+import { assertLocalE2ETargets, requireFixtureOrSkip } from '../fixtures/local-safety';
 
 const appUrl = process.env.E2E_APP_URL ?? 'http://localhost:3000';
 const pocketBaseUrl = process.env.VITE_POCKETBASE_URL ?? 'http://localhost:8090';
@@ -8,7 +8,9 @@ const pageId = process.env.E2E_COLORING_PAGE_ID;
 
 test.describe('coloring detail request failures', () => {
   test.use({ serviceWorkers: 'block' });
-  test.skip(!bookId || !pageId, 'Requires disposable coloring detail fixtures.');
+  if (!bookId || !pageId) {
+    requireFixtureOrSkip('Requires disposable coloring detail fixtures.');
+  }
 
   test.beforeAll(() => {
     assertLocalE2ETargets({ appUrl, pocketBaseUrl, specName: 'Coloring detail errors' });

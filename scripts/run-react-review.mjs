@@ -11,6 +11,7 @@ function git(args) {
 }
 
 export function resolveReactReviewBase(base, gitFn = git) {
+  if (!base) throw new Error('React review needs an explicit comparison base.');
   const tree = gitFn(['ls-tree', '--name-only', base]).trim();
   const parents = gitFn(['show', '-s', '--format=%P', base]).trim();
   if (tree || parents) return base;
@@ -19,9 +20,7 @@ export function resolveReactReviewBase(base, gitFn = git) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const base = resolveReactReviewBase(
-    process.env.CI_BASE_SHA || process.env.CI_BASE_REF || 'origin/main'
-  );
+  const base = resolveReactReviewBase(process.env.CI_BASE_SHA || process.env.CI_BASE_REF);
   console.log(`React review base: ${base}`);
   const result = spawnSync(
     'npx',

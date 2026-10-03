@@ -296,6 +296,13 @@ pnpm deadcode:ts-prune
 
 Narrative audits and historical findings: `../audits/README.md` (historical reference outside this extraction).
 
+## Dead-code coverage
+
+`knip.json` includes the blog content build script as an entry point. The
+WordPress and MailPoet helpers remain exported because that script imports
+them. Archive import limits used only within their validation module stay
+private.
+
 ## Related documentation
 
 - Design implementation: [`../design-system/overview.md`](../design-system/overview.md)

@@ -1882,8 +1882,9 @@
     {
       "path": "public/images/home-hero.jpg",
       "sourceRevision": "647ecd9bdbdfffa37c693e914f06a3ba39fead41",
-      "action": "include",
-      "sha256": "9949481210df6cd9889816a1692280857ec01eacb124dd0f44ff4f86c4877875"
+      "action": "remove",
+      "sha256": "9949481210df6cd9889816a1692280857ec01eacb124dd0f44ff4f86c4877875",
+      "reason": "Removed at owner request during public asset review on 2026-10-03."
     },
     {
       "path": "public/images/logo.png",

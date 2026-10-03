@@ -62,3 +62,24 @@ checks, mystery reveal state, and render telemetry need a separate correctness
 review. This baseline does not claim those findings have been fixed.
 
 Follow-up: [INT-1208](https://linear.app/interactive-buffoonery/issue/INT-1208/review-react-lifecycle-findings-from-public-extraction).
+
+## Dependency security reports
+
+The scheduled dependency workflow reports both production and development
+advisories. Do not disable pnpm's release-age or trust-downgrade protections to
+refresh the lockfile. Security refreshes preserve compatible major versions.
+
+On 2026-10-03, the available brace-expansion, fast-uri, serialize-javascript, and
+DOMPurify fixes were applied. The production audit then reported no advisories.
+The full audit retained two high entries with no published upstream fix:
+
+- `http-cache-semantics@4.2.0` is protected by the committed patch. The blog
+  cache-policy tests verify max-stale revalidation, private/cookie responses,
+  Vary handling, and stale-if-error behavior. Keep the patch until an upstream
+  release passes those regressions. The audit checks the version, not the patch.
+- `braces@3.0.3` is used by the development-only ts-prune tool. No deployed
+  request path supplies its glob patterns. The nested-pattern denial of service
+  remains a tooling follow-up until a patched version is published.
+
+These entries remain visible in the audit report. This does not certify provider
+settings or production behavior.

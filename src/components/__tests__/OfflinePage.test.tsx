@@ -222,9 +222,6 @@ describe('OfflinePage', () => {
   );
 
   it('scans for a recovery portal owner at most once per animation frame', async () => {
-    render(<OfflinePage onCheckConnection={vi.fn()} isChecking={false} error={null} />);
-    await screen.findByRole('alertdialog', { name: "You're offline" });
-
     const queuedFrames: FrameRequestCallback[] = [];
     const requestAnimationFrame = vi
       .spyOn(window, 'requestAnimationFrame')
@@ -232,6 +229,9 @@ describe('OfflinePage', () => {
         queuedFrames.push(callback);
         return queuedFrames.length;
       });
+    render(<OfflinePage onCheckConnection={vi.fn()} isChecking={false} error={null} />);
+    await screen.findByRole('alertdialog', { name: "You're offline" });
+
     const querySelectorAll = vi.spyOn(Document.prototype, 'querySelectorAll');
     const extraNodes = Array.from({ length: 12 }, () => document.createElement('div'));
 

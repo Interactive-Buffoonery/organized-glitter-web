@@ -14,8 +14,14 @@ app and PocketBase backend for Organized Glitter.
 
 ```bash
 pnpm install
-VITE_POCKETBASE_URL=http://localhost:8090 pnpm pb:bootstrap:local -- --seed
+pnpm pb:install:test -- --destination=local-pb-db/pocketbase
+LOCAL_POCKETBASE_TEST_USER_EMAIL=local-user@example.test VITE_POCKETBASE_URL=http://localhost:8090 pnpm pb:bootstrap:local -- --seed --no-keepalive
 pnpm pb:local
+```
+
+In a second terminal:
+
+```bash
 pnpm dev:local
 ```
 

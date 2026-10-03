@@ -101,7 +101,7 @@ export function SiteHeader({ currentPage = '' }: SiteHeaderProps) {
                   className={cn(
                     'rounded-lg px-2.5 py-1.5 text-sm font-semibold tracking-tight transition-colors',
                     isActive
-                      ? 'bg-primary/8 text-primary'
+                      ? 'bg-primary/8 text-foreground'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const readBootstrap = (file: string): string => {
   const html = readFileSync(resolve(process.cwd(), file), 'utf8');
@@ -89,11 +89,139 @@ describe.each(['index.html', 'about.html'])('%s theme bootstrap', file => {
   });
 });
 
-describe('pre-React theme colors', () => {
-  it('uses the current Light and Dark page colors', () => {
-    const themeColorScript = readFileSync(resolve(process.cwd(), 'public/theme-color.js'), 'utf8');
+const themeColorScript = readFileSync(resolve(process.cwd(), 'public/theme-color.js'), 'utf8');
 
-    expect(themeColorScript).toContain("const LIGHT_COLOR = '#f8e8f6';");
-    expect(themeColorScript).toContain("const DARK_COLOR = '#151533';");
+interface ThemeColorHarness {
+  document: Document;
+  meta: HTMLMetaElement;
+  setSystemDark: (matches: boolean) => void;
+  triggerMutation: (attributeName: 'class' | 'data-theme') => void;
+  triggerSystemThemeChange: () => void;
+}
+
+const runThemeColorScript = (
+  source = themeColorScript,
+  {
+    dispatchReady = true,
+    prefersDark = false,
+  }: { dispatchReady?: boolean; prefersDark?: boolean } = {}
+): ThemeColorHarness => {
+  const controlledDocument = document.implementation.createHTMLDocument('Theme color test');
+  const meta = controlledDocument.createElement('meta');
+  meta.setAttribute('name', 'theme-color');
+  meta.setAttribute('media', '(prefers-color-scheme: light)');
+  controlledDocument.head.append(meta);
+
+  let systemDark = prefersDark;
+  let mutationCallback: MutationCallback | undefined;
+  let systemThemeListener: (() => void) | undefined;
+  const observedAttributes = new Map<Node, Set<string>>();
+
+  class ControlledMutationObserver {
+    constructor(callback: MutationCallback) {
+      mutationCallback = callback;
+    }
+
+    observe = vi.fn((target: Node, options: MutationObserverInit) => {
+      observedAttributes.set(target, new Set(options.attributeFilter ?? []));
+    });
+    disconnect = vi.fn();
+    takeRecords = vi.fn(() => []);
+  }
+
+  const matchMedia = vi.fn(() => ({
+    get matches() {
+      return systemDark;
+    },
+    addEventListener: vi.fn((event: string, listener: () => void) => {
+      if (event === 'change') systemThemeListener = listener;
+    }),
+  }));
+
+  runInNewContext(source, {
+    document: controlledDocument,
+    window: { matchMedia },
+    MutationObserver: ControlledMutationObserver,
+  });
+  if (dispatchReady) controlledDocument.dispatchEvent(new Event('DOMContentLoaded'));
+
+  return {
+    document: controlledDocument,
+    meta,
+    setSystemDark: matches => {
+      systemDark = matches;
+    },
+    triggerMutation: attributeName => {
+      if (observedAttributes.get(controlledDocument.documentElement)?.has(attributeName)) {
+        mutationCallback?.([{ attributeName } as MutationRecord], {} as MutationObserver);
+      }
+    },
+    triggerSystemThemeChange: () => systemThemeListener?.(),
+  };
+};
+
+describe('pre-React theme colors', () => {
+  it.each([
+    { prefersDark: false, expectedColor: '#f8e8f6' },
+    { prefersDark: true, expectedColor: '#151533' },
+  ])('sets the initial meta color from the system theme', ({ prefersDark, expectedColor }) => {
+    const { meta } = runThemeColorScript(themeColorScript, { dispatchReady: false, prefersDark });
+
+    expect(meta.getAttribute('content')).toBe(expectedColor);
+    expect(meta.hasAttribute('media')).toBe(false);
+  });
+
+  it('updates the meta color when the selected theme changes', () => {
+    const harness = runThemeColorScript();
+
+    harness.document.documentElement.classList.add('dark');
+    harness.triggerMutation('class');
+    expect(harness.meta.getAttribute('content')).toBe('#151533');
+
+    harness.document.documentElement.classList.remove('dark');
+    harness.document.documentElement.setAttribute('data-theme', 'light');
+    harness.triggerMutation('data-theme');
+    expect(harness.meta.getAttribute('content')).toBe('#f8e8f6');
+  });
+
+  it('uses system theme changes when no explicit theme is selected', () => {
+    const harness = runThemeColorScript();
+
+    harness.setSystemDark(true);
+    harness.triggerSystemThemeChange();
+    expect(harness.meta.getAttribute('content')).toBe('#151533');
+
+    harness.setSystemDark(false);
+    harness.triggerSystemThemeChange();
+    expect(harness.meta.getAttribute('content')).toBe('#f8e8f6');
+  });
+
+  it('fails its behavior checks if updates are removed from the source fixture', () => {
+    const withoutInitialUpdate = themeColorScript.replace(
+      '// Run as soon as possible so the status bar matches before first paint.\nupdateThemeColor();',
+      ''
+    );
+    const withoutObserverUpdate = themeColorScript.replace(
+      "if (mutation.attributeName === 'class' || mutation.attributeName === 'data-theme') {\n          updateThemeColor();\n        }",
+      "if (mutation.attributeName === 'class' || mutation.attributeName === 'data-theme') {}"
+    );
+
+    expect(withoutInitialUpdate).not.toBe(themeColorScript);
+    expect(withoutObserverUpdate).not.toBe(themeColorScript);
+
+    expect(() => {
+      const { meta } = runThemeColorScript(withoutInitialUpdate, {
+        dispatchReady: false,
+        prefersDark: true,
+      });
+      expect(meta.getAttribute('content')).toBe('#151533');
+    }).toThrow();
+
+    expect(() => {
+      const harness = runThemeColorScript(withoutObserverUpdate);
+      harness.document.documentElement.classList.add('dark');
+      harness.triggerMutation('class');
+      expect(harness.meta.getAttribute('content')).toBe('#151533');
+    }).toThrow();
   });
 });

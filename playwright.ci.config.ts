@@ -15,18 +15,20 @@ const publicInventory =
 const publicWebkitInventory =
   /[/\\]e2e[/\\](?:(?:home|page-titles)\.spec\.ts|a11y[/\\]public-a11y\.spec\.ts)$/;
 const chromiumSmokeInventory = [
-  /[/\\]e2e[/\\]ci[/\\](?:authenticated-accessibility-smoke|change-password-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|unverified-login-recovery)\.spec\.ts$/,
+  /[/\\]e2e[/\\]ci[/\\](?:authenticated-accessibility-smoke|change-password-accessibility|feedback-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|unverified-login-recovery)\.spec\.ts$/,
   /[/\\]e2e[/\\]authenticated[/\\](?:archive-legacy-project-local|archive-recovery-local|archive-v3-restore-local|coloring-detail-errors-local|coloring-page-detail|diamond-pagination-url|notes-feed-timeline|project-create-cover-local|project-delete-atomic-local|project-field-clearing|project-inline-dates-local)\.spec\.ts$/,
 ];
 const webkitFlowInventory = [
-  /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
+  /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|feedback-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
+  /[/\\]e2e[/\\]a11y[/\\]mobile-state-a11y\.spec\.ts$/,
   /[/\\]e2e[/\\]authenticated[/\\](?:archive-v3-restore-local|avatar-crop-local|coloring-detail-errors-local|coloring-page-detail|notes-feed-timeline|project-create-cover-local|project-field-clearing|project-inline-dates-local|randomizer-interruption-local)\.spec\.ts$/,
   /[/\\]e2e[/\\]authenticated[/\\]int-1093-filter-validation\.spec\.ts$/,
 ];
 const chromiumFullInventory = [
   ...chromiumSmokeInventory,
+  /[/\\]e2e[/\\]ci[/\\]authenticated-contrast\.spec\.ts$/,
   /[/\\]e2e[/\\]a11y[/\\]authenticated-a11y\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\](?:avatar-crop-local|concurrent-edit-local|int-1093-filter-validation|notes-feed-keyset-pagination|route-mount|randomizer-interruption-local)\.spec\.ts$/,
+  /[/\\]e2e[/\\]authenticated[/\\](?:avatar-crop-local|concurrent-edit-local|format-chip-contrast|image-selection-local|import-export-local|int-1093-filter-validation|mobile-touch-targets|notes-feed-keyset-pagination|project-metadata-rollback-local|route-mount|randomizer-interruption-local|session-expiry-local)\.spec\.ts$/,
 ];
 
 const setupProject: Project = {
@@ -54,7 +56,7 @@ const smokeProjects: Project[] = [
   {
     name: 'mobile-webkit-smoke',
     testMatch:
-      /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
+      /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|feedback-accessibility|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
     dependencies: ['setup'],
     use: { ...devices['iPhone 13'], storageState },
   },
@@ -96,6 +98,9 @@ export default defineConfig({
   reporter: [
     ['list'],
     ['html', { outputFolder: process.env.PLAYWRIGHT_HTML_REPORT, open: 'never' }],
+    ...(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE
+      ? ([['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_FILE }]] as const)
+      : []),
   ],
   outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR || 'test-results',
   use: {

@@ -274,6 +274,7 @@ test.describe('local import/export workflows', () => {
   });
 
   test('imports CSV and DAC data, attaches bulk photos, exports and restores an archive', async ({
+    browser,
     page,
   }) => {
     await page.goto('/import');
@@ -326,6 +327,7 @@ test.describe('local import/export workflows', () => {
       timeout: 30_000,
     });
     await expectDownloadedArchiveContents(archivePath);
+    const authenticatedStorageState = await page.context().storageState();
 
     await uploadFile(page, 'Archive ZIP file', archivePath);
     await expect(page.getByText('organized-glitter-export.zip')).toBeVisible();
@@ -337,19 +339,27 @@ test.describe('local import/export workflows', () => {
     await expect(page.getByText('Records skipped', { exact: true })).toBeVisible();
 
     await deleteRunProjectsOnly(pb);
-    await page.reload();
-    await openDataSettings(page);
-    await uploadFile(page, 'Archive ZIP file', archivePath);
-    await page.getByRole('button', { name: /^Import archive$/ }).click();
-    await expect(page.getByRole('heading', { name: 'Archive import summary' })).toBeVisible({
-      timeout: 45_000,
+    const restoreContext = await browser.newContext({
+      baseURL: appUrl,
+      storageState: authenticatedStorageState,
     });
-    await expect(
-      page.getByText(
-        /3 diamond projects, 0 coloring books, 1 progress notes, and 2 photos imported\./
-      )
-    ).toBeVisible();
-    await expectImportExportData(pb);
+    try {
+      const restorePage = await restoreContext.newPage();
+      await openDataSettings(restorePage);
+      await uploadFile(restorePage, 'Archive ZIP file', archivePath);
+      await restorePage.getByRole('button', { name: /^Import archive$/ }).click();
+      await expect(
+        restorePage.getByRole('heading', { name: 'Archive import summary' })
+      ).toBeVisible({ timeout: 45_000 });
+      await expect(
+        restorePage.getByText(
+          /3 diamond projects, 0 coloring books, 1 progress notes, and 2 photos imported\./
+        )
+      ).toBeVisible();
+      await expectImportExportData(pb);
+    } finally {
+      await restoreContext.close();
+    }
   });
 
   test.describe('mobile touch coverage', () => {

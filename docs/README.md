@@ -15,6 +15,7 @@ The public repository contains the complete website and PocketBase source.
 - [Spacefast routing](spacefast-routing.md), [optional analytics proxy](spacefast-posthog.md),
   and [feedback](spacefast-feedback.md).
 - [Newsletter templates](snippets/).
+- [Example image and coloring book sources](test-data/example-image-sources.md).
 
 Production runbooks and service credentials belong in ops. Point-in-time evidence
 is not proof of current deployment behavior.

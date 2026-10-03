@@ -6,12 +6,12 @@ export const MAX_ARCHIVE_ENTRIES = 10_000;
 export const MAX_ARCHIVE_CENTRAL_DIRECTORY_BYTES = 16 * 1024 * 1024;
 export const MAX_ARCHIVE_ENTRY_BYTES = 64 * 1024 * 1024;
 export const MAX_ARCHIVE_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024;
-export const MAX_ARCHIVE_COMPRESSION_RATIO = 1_000;
+const MAX_ARCHIVE_COMPRESSION_RATIO = 1_000;
 export const MAX_ARCHIVE_TOP_LEVEL_RECORDS = 10_000;
-export const MAX_ARCHIVE_PAGES = 100_000;
-export const MAX_ARCHIVE_PAGE_PHOTOS = 99;
-export const MAX_ARCHIVE_NESTED_RECORDS = 10_000;
-export const MAX_ARCHIVE_TOTAL_RECORDS = 100_000;
+const MAX_ARCHIVE_PAGES = 100_000;
+const MAX_ARCHIVE_PAGE_PHOTOS = 99;
+const MAX_ARCHIVE_NESTED_RECORDS = 10_000;
+const MAX_ARCHIVE_TOTAL_RECORDS = 100_000;
 
 type CompressedEntry = JSZip.JSZipObject & {
   _data?: { compressedSize?: number; uncompressedSize?: number };

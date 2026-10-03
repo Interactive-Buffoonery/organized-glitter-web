@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" role="img" aria-labelledby="title desc">
+  <title id="title">So many pages and paintings, so little time</title>
+  <desc id="desc">A soft aurora gradient background with subtle diamond facets and a centered caption that reads: so many pages and paintings, so little time.</desc>
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.28"/>
+      <stop offset="50%" stop-color="#d946ef" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.20"/>
+    </linearGradient>
+    <radialGradient id="g2" cx="15%" cy="10%" r="60%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g3" cx="85%" cy="20%" r="60%">
+      <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#f43f5e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g4" cx="50%" cy="110%" r="70%">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="12" result="blur"/>
+      <feOffset dx="0" dy="8" result="off"/>
+      <feColorMatrix in="off" type="matrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   0 0 0 0.25 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <pattern id="facet" width="80" height="80" patternUnits="userSpaceOnUse" patternTransform="skewX(-10)">
+      <g opacity="0.12">
+        <polygon points="40,0 80,40 40,80 0,40" fill="#ffffff"/>
+        <polygon points="40,0 60,20 40,40 20,20" fill="#ffffff" opacity="0.6"/>
+        <polygon points="80,40 60,60 40,40 60,20" fill="#ffffff" opacity="0.5"/>
+        <polygon points="40,80 20,60 40,40 60,60" fill="#ffffff" opacity="0.5"/>
+        <polygon points="0,40 20,20 40,40 20,60" fill="#ffffff" opacity="0.4"/>
+      </g>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="800" fill="#f8e8f6"/>
+  <rect width="1280" height="800" fill="url(#g2)"/>
+  <rect width="1280" height="800" fill="url(#g3)"/>
+  <rect width="1280" height="800" fill="url(#g4)"/>
+  <rect width="1280" height="800" fill="url(#g1)"/>
+
+  <!-- Subtle facets overlay -->
+  <rect width="1280" height="800" fill="url(#facet)" opacity="0.35"/>
+
+  <!-- Caption card -->
+  <g filter="url(#softShadow)">
+    <rect x="140" y="290" rx="22" ry="22" width="1000" height="220" fill="#ffffff" fill-opacity="0.72"/>
+    <rect x="140" y="290" rx="22" ry="22" width="1000" height="220" fill="#0f172a" fill-opacity="0.04"/>
+  </g>
+
+  <!-- Caption text -->
+  <text x="640" y="405" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-weight="700" font-size="44" fill="#1f2937" letter-spacing="0.3px">
+    so many pages and paintings
+  </text>
+  <text x="640" y="465" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-weight="600" font-size="36" fill="#334155" letter-spacing="0.2px">
+    so little time
+  </text>
+</svg>

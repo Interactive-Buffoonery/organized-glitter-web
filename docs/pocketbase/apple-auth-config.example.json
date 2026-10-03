@@ -1,0 +1,6 @@
+{
+  "teamId": "YOURTEAMID",
+  "keyId": "YOURKEYID0",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nREPLACE_WITH_APPLE_KEY\n-----END PRIVATE KEY-----\n",
+  "grantEncryptionKey": ""
+}

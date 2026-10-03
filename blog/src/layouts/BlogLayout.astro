@@ -1,0 +1,134 @@
+---
+import { readFileSync } from 'node:fs';
+import '../styles/blog.css';
+import { siteOrigin } from '../lib/deployment.mjs';
+import { injectAppIconLinks } from '../../../scripts/app-icon-links.mjs';
+
+const manifestPath = process.env.BLOG_NAVIGATION_MANIFEST;
+let navigationAssets: { entry: string; styles: string[] } | undefined;
+if (manifestPath) {
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const entry = manifest['src/blog-navigation.tsx'];
+  if (!entry?.isEntry) throw new Error('Missing blog navigation entry');
+  const styles = new Set<string>();
+  const visited = new Set<string>();
+  const collectStyles = (key: string) => {
+    if (visited.has(key)) return;
+    visited.add(key);
+    const chunk = manifest[key];
+    for (const dependency of chunk.imports || []) collectStyles(dependency);
+    for (const css of chunk.css || []) styles.add(`/${css}`);
+  };
+  collectStyles('src/blog-navigation.tsx');
+  navigationAssets = { entry: `/${entry.file}`, styles: [...styles] };
+}
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath: string;
+  image?: string | null;
+  publishedAt?: string;
+  modifiedAt?: string;
+  noIndex?: boolean;
+}
+
+const {
+  title,
+  description,
+  canonicalPath,
+  image = new URL('/images/social-preview-2026-09-27.jpg', siteOrigin).href,
+  publishedAt,
+  modifiedAt,
+  noIndex = false,
+} = Astro.props;
+const canonicalUrl = new URL(canonicalPath, siteOrigin).href;
+const pageTitle = title === 'Updates' ? 'Updates | Organized Glitter' : `${title} | Organized Glitter`;
+const year = new Date().getFullYear();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f8e8f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151533" media="(prefers-color-scheme: dark)" />
+    <script is:inline src="/updates/theme.js"></script>
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    {noIndex && <meta name="robots" content="noindex, follow" />}
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" type="application/rss+xml" title="Organized Glitter updates" href="/updates/rss.xml" />
+    <Fragment set:html={injectAppIconLinks('<!-- og-app-icons -->')} />
+    <meta property="og:site_name" content="Organized Glitter" />
+    <meta property="og:type" content={publishedAt ? 'article' : 'website'} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    {image && <meta property="og:image" content={image} />}
+    {publishedAt && <meta property="article:published_time" content={publishedAt} />}
+    {modifiedAt && <meta property="article:modified_time" content={modifiedAt} />}
+    <meta name="twitter:card" content={image ? 'summary_large_image' : 'summary'} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <div id="blog-navigation-root"></div>
+    {navigationAssets && <script is:inline src="/updates/navigation.js" data-entry={navigationAssets.entry} data-styles={JSON.stringify(navigationAssets.styles)} defer></script>}
+    <header id="blog-guest-header" class="site-header" aria-label="Site header">
+      <div class="site-header-inner">
+        <a class="brand" href="/" aria-label="Organized Glitter home">
+          <img src="/images/logo.png" alt="" width="32" height="32" />
+          <span class="brand-name">Organized Glitter</span>
+        </a>
+        <div class="header-actions">
+          <a class="header-login" href="/login">Login</a>
+          <a class="header-start" href="/register">Get Started</a>
+          <div class="theme-control">
+            <button
+              id="theme-toggle"
+              class="theme-toggle"
+              type="button"
+              aria-label="Toggle theme"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="theme-menu"
+            >
+              <svg class="theme-sun" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
+              </svg>
+              <svg class="theme-moon" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z" />
+              </svg>
+            </button>
+            <div id="theme-menu" class="theme-menu" role="menu" aria-label="Theme" hidden>
+              <button type="button" role="menuitem" data-theme-choice="light">Light</button>
+              <button type="button" role="menuitem" data-theme-choice="dark">Dark</button>
+              <button type="button" role="menuitem" data-theme-choice="system">System</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content" class="blog-main" tabindex="-1">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span>&copy; {year} Organized Glitter</span>
+        <div class="footer-links">
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="/about">About</a>
+          <a href="/links">Links</a>
+          <a href="/updates/">Updates</a>
+          <a href="/updates/rss.xml">RSS</a>
+          <a href={process.env.VITE_SOURCE_URL || "https://github.com/Interactive-Buffoonery/organized-glitter-web"}>Source</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

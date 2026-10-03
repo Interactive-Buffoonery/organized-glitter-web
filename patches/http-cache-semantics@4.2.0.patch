@@ -1,0 +1,117 @@
+diff --git a/index.js b/index.js
+index f01e9a16b4781dc24c8f43dc7a4c8e6d1e4ae5eb..0c7af7f06cee3e595a0e551a47e2023ee1b0b6c0 100644
+--- a/index.js
++++ b/index.js
+@@ -395,7 +395,7 @@ module.exports = class CachePolicy {
+         this._assertRequestHasHeaders(req);
+ 
+         // In all circumstances, a cache MUST NOT ignore the must-revalidate directive
+-        if (this._rescc['must-revalidate']) {
++        if (this._rescc['must-revalidate'] || this._requiresRevalidation()) {
+             return this._evaluateRequestMissResult(req);
+         }
+ 
+@@ -485,20 +485,30 @@ module.exports = class CachePolicy {
+         }
+ 
+         // A Vary header field-value of "*" always fails to match
+-        if (this._resHeaders.vary === '*') {
++        if (this._varyFields().includes('*')) {
+             return false;
+         }
+ 
+-        const fields = this._resHeaders.vary
+-            .trim()
+-            .toLowerCase()
+-            .split(/\s*,\s*/);
+-        for (const name of fields) {
+-            if (req.headers[name] !== this._reqHeaders[name]) return false;
++        for (const name of this._varyFields()) {
++            const incoming = Object.prototype.hasOwnProperty.call(req.headers, name)
++                ? req.headers[name]
++                : undefined;
++            const stored = Object.prototype.hasOwnProperty.call(this._reqHeaders, name)
++                ? this._reqHeaders[name]
++                : undefined;
++            if (incoming !== stored) return false;
+         }
+         return true;
+     }
+ 
++    _varyFields() {
++        return (this._resHeaders.vary || '')
++            .toLowerCase()
++            .split(',')
++            .map(name => name.trim())
++            .filter(Boolean);
++    }
++
+     /**
+      * Creates a copy of the given headers without any hop-by-hop headers.
+      * @param {Record<string, string>} inHeaders - old headers from the cached response
+@@ -587,6 +597,18 @@ module.exports = class CachePolicy {
+         return toNumberOrZero(this._resHeaders.age);
+     }
+ 
++    _requiresRevalidation() {
++        return !!(
++            !this.storable() ||
++            this._rescc['no-cache'] ||
++            (this._isShared &&
++                (this._rescc['proxy-revalidate'] ||
++                    (this._resHeaders['set-cookie'] &&
++                        !this._rescc.public &&
++                        !this._rescc.immutable)))
++        );
++    }
++
+     /**
+      * Possibly outdated value of applicable max-age (or heuristic equivalent) in seconds.
+      * This counts since response's `Date`.
+@@ -597,29 +619,15 @@ module.exports = class CachePolicy {
+      * @returns {number} The max-age value in seconds.
+      */
+     maxAge() {
+-        if (!this.storable() || this._rescc['no-cache']) {
++        if (this._requiresRevalidation()) {
+             return 0;
+         }
+ 
+-        // Shared responses with cookies are cacheable according to the RFC, but IMHO it'd be unwise to do so by default
+-        // so this implementation requires explicit opt-in via public header
+-        if (
+-            this._isShared &&
+-            (this._resHeaders['set-cookie'] &&
+-                !this._rescc.public &&
+-                !this._rescc.immutable)
+-        ) {
+-            return 0;
+-        }
+-
+-        if (this._resHeaders.vary === '*') {
++        if (this._varyFields().includes('*')) {
+             return 0;
+         }
+ 
+         if (this._isShared) {
+-            if (this._rescc['proxy-revalidate']) {
+-                return 0;
+-            }
+             // if a response includes the s-maxage directive, a shared cache recipient MUST ignore the Expires field.
+             if (this._rescc['s-maxage']) {
+                 return toNumberOrZero(this._rescc['s-maxage']);
+@@ -832,7 +840,13 @@ module.exports = class CachePolicy {
+     revalidatedPolicy(request, response) {
+         this._assertRequestHasHeaders(request);
+ 
+-        if (this._useStaleIfError() && isErrorResponse(response)) {
++        if (
++            !this._rescc['must-revalidate'] &&
++            !this._requiresRevalidation() &&
++            this._requestMatches(request, false) &&
++            this._useStaleIfError() &&
++            isErrorResponse(response)
++        ) {
+           return {
+               policy: this,
+               modified: false,

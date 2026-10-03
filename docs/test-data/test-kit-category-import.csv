@@ -1,0 +1,18 @@
+Title,Status,Company,Artist,Width,Height,Drill Shape,Total Diamonds,# of Colors,Type of Kit,Source URL,Date Purchased,Date Received,Date Started,Date Completed,Notes,Tags
+Sunset Over Mountains,stash,DAC,Jane Smith,40,50,round,45000,42,full,,,,,,"Basic full kit test",landscape;nature
+Tiny Kitten Portrait,wishlist,Huacan,,30,30,square,20000,24,mini,,,,,,Mini kit test,animals
+Starry Night Replica,progress,Diamond Dotz,,60,80,round,120000,48,Full,,,2025-06-01,,,"Capitalized Full - should normalize",art;classic
+Ocean Waves,purchased,Meian,,40,55,square,50000,36,MINI,,2025-12-01,,,,"ALL CAPS MINI - should normalize",nature
+Flower Garden,completed,Evermoment,,50,70,round,80000,54,full sized,,,2025-03-01,,2025-11-30,"Full sized variant",flowers;garden
+Cherry Blossom Tree,stash,Paint With Diamonds,,35,45,round,35000,40,Full Sized Kit,,2025-09-15,2025-10-01,,,"Full sized kit variant",flowers
+Dragon Fantasy,wishlist,Diamond Art Club,,80,100,square,200000,60,large,,,,,,"Large alias for full",fantasy
+Cute Puppy,wishlist,Huacan,,20,20,round,10000,18,small,,,,,,"Small alias for mini",animals
+Cosmic Galaxy,purchased,Meian,,45,60,round,60000,50,partial,,2026-01-15,,,,"Partial alias for mini",space
+Mountain Lake,stash,DAC,,55,70,square,90000,56,big,,,,,,"Big alias for full",landscape;nature
+Winter Cabin,progress,Evermoment,,40,50,round,45000,38,tiny,,,2026-02-01,,,"Tiny alias for mini",cozy
+Abstract Geometry,wishlist,Diamond Art Club,,30,40,round,28000,32,full-drill,,,,,,"Full-drill alias for full",abstract;modern
+Rose Bouquet,stash,Paint With Diamonds,,35,50,round,40000,44,mini kit,,2026-01-01,,,,"Mini kit alias",flowers
+Lighthouse at Dusk,purchased,Meian,,50,65,square,75000,52,full_sized_kit,,2025-11-01,,,,"Underscore variant",landscape
+Tropical Parrot,wishlist,Huacan,,25,35,round,20000,28,full coverage,,,,,,"Full coverage alias",animals;tropical
+Peaceful Buddha,stash,DAC,,60,80,round,110000,45,,,,,,,No kit category - should default to full,spiritual
+Enchanted Forest,wishlist,Diamond Art Club,,70,90,square,150000,62,gobbledygook,,,,,,"Invalid value - should be ignored/default",fantasy;nature

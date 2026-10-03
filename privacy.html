@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Privacy policy | Organized Glitter</title>
+    <meta
+      name="description"
+      content="Organized Glitter does not sell your data. Learn what information is collected, how it is used, and what controls you have over your crafting project data."
+    />
+    <link rel="canonical" href="https://app.invalid/privacy" />
+    <meta name="author" content="Sarah (Serabi Crafts)" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Privacy policy | Organized Glitter" />
+    <meta
+      property="og:description"
+      content="Organized Glitter does not sell your data. Learn what information is collected, how it is used, and what controls you have over your crafting project data."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://app.invalid/privacy" />
+    <meta property="og:site_name" content="Organized Glitter" />
+    <meta property="og:image" content="https://app.invalid/images/social-preview-2026-09-27.jpg" />
+    <meta
+      property="og:image:alt"
+      content="Organized Glitter: track your coloring books and diamond art, with taped-in photos of a coloring page and a finished diamond painting"
+    />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Privacy policy | Organized Glitter" />
+    <meta
+      name="twitter:description"
+      content="Organized Glitter does not sell your data. Learn what information is collected, how it is used, and what controls you have over your crafting project data."
+    />
+    <meta name="twitter:image" content="https://app.invalid/images/social-preview-2026-09-27.jpg" />
+    <meta
+      name="twitter:image:alt"
+      content="Organized Glitter: track your coloring books and diamond art, with taped-in photos of a coloring page and a finished diamond painting"
+    />
+
+    <!-- Match app CSS/JS bootstrap and set PWA theme colors -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f8e8f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151533" media="(prefers-color-scheme: dark)" />
+    <script src="/theme-color.js?v=8" defer></script>
+    <!-- og-app-icons -->
+
+    <!-- Apply the saved theme before first paint; unset/invalid preference follows System.
+         Must run before loading.css so the .dark variants apply immediately. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          // next-themes uses data-theme; this bridge class supports Tailwind dark variants.
+          // Mirror resolveThemePreference: legacy Catppuccin maps to light/dark; anything
+          // else unrecognized (or empty) follows System like DEFAULT_THEME.
+          var isLegacyDark =
+            stored === 'catppuccin-frappe' ||
+            stored === 'catppuccin-macchiato' ||
+            stored === 'catppuccin-mocha';
+          if (stored === 'catppuccin-latte') {
+            localStorage.setItem('theme', 'light');
+            stored = 'light';
+          } else if (isLegacyDark) {
+            localStorage.setItem('theme', 'dark');
+            stored = 'dark';
+          } else if (stored && stored !== 'light' && stored !== 'dark' && stored !== 'system') {
+            // Unknown non-empty values must become `system` before next-themes
+            // hydrates. Leaving `not-a-theme` in storage makes resolvedTheme
+            // neither light nor dark, and ThemeClassSync would drop `.dark`.
+            localStorage.setItem('theme', 'system');
+            stored = 'system';
+          }
+          var followsSystem = stored !== 'light' && stored !== 'dark';
+          var isDark =
+            stored === 'dark' ||
+            (followsSystem && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', isDark);
+          document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        } catch (e) {
+          // localStorage unavailable (e.g. Safari private mode) — do nothing
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/loading.css?v=8" />
+    <link rel="stylesheet" href="/css/error.css?v=8" />
+    <link rel="stylesheet" href="/css/safe-area.css?v=6" />
+    <!-- og-public-analytics -->
+    <!-- defer so #app-loading exists; keep ahead of Vite type=module bundles -->
+    <script src="/js/bootstrap-analytics.js?v=2" defer></script>
+    <script src="/js/loading.js?v=10" defer></script>
+  </head>
+  <body>
+    <div class="page-atmosphere" aria-hidden="true"></div>
+    <div id="root"></div>
+
+    <!-- Loading State — sibling of #root so React's createRoot() does not remove it -->
+    <div id="app-loading">
+      <div>
+        <div class="loading-logo-container">
+          <svg
+            width="64"
+            height="64"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M12 2L3 7L12 12L21 7L12 2Z" fill="currentColor" />
+            <path
+              d="M3 13L12 18L21 13M12 22V12"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+
+        <div class="spinner"></div>
+
+        <h1>Organized Glitter</h1>
+
+        <p>Loading your craft collection...</p>
+
+        <div id="slow-load-warning">
+          <p>This is taking longer than expected. Please check your internet connection.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error State — sibling of #root so React's createRoot() does not remove it.
+         Static HTML/CSS only: must work when React never mounts. No stack dumps. -->
+    <div id="app-error" role="alert" aria-live="assertive" aria-hidden="true">
+      <div class="error-card">
+        <span class="error-tape error-tape--peach" aria-hidden="true"></span>
+        <span class="error-tape error-tape--lav" aria-hidden="true"></span>
+
+        <div class="error-icon" aria-hidden="true">!</div>
+
+        <h2 tabindex="-1">Something went wrong</h2>
+
+        <p class="error-body">
+          Organized Glitter couldn’t finish loading. This usually clears with a refresh. Don’t
+          worry! Your projects and coloring books are safe.
+        </p>
+
+        <button type="button" id="retry-button">Try again</button>
+
+        <p class="contact-support-text">
+          Still stuck?
+          <a href="mailto:contact@example.invalid?subject=App%20won%27t%20load">Email support</a>
+        </p>
+      </div>
+    </div>
+
+    <script>
+      window.addEventListener('error', function (e) {
+        if (e.message && e.message.includes('ResizeObserver')) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      });
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

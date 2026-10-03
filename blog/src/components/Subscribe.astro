@@ -1,0 +1,32 @@
+---
+import { frameUrl } from '../lib/snapshot.mjs';
+
+import { optionalServiceUrl } from '../lib/deployment.mjs';
+const fallbackUrl = optionalServiceUrl(process.env.NEWSLETTER_SIGNUP_URL);
+---
+
+<section class="subscribe-section" id="subscribe" aria-labelledby="subscribe-heading">
+  <span class="paper-tape paper-tape-left" aria-hidden="true"></span>
+  <span class="paper-tape paper-tape-right" aria-hidden="true"></span>
+  <div class="subscribe-copy">
+    <h2 id="subscribe-heading">Want updates by email?</h2>
+    <p>Subscribe to receive new Organized Glitter release notes by email.</p>
+  </div>
+  <div class="subscribe-form">
+    {frameUrl ? (
+      <>
+        <iframe
+          id="mailpoet-subscribe"
+          title="Subscribe to Organized Glitter updates"
+          src={frameUrl}
+          height="240"
+          loading="lazy"
+          referrerpolicy="strict-origin-when-cross-origin"
+        ></iframe>
+        <script is:inline src="/updates/mailpoet-frame.js" defer></script>
+      </>
+    ) : (
+      fallbackUrl ? <a class="subscribe-link" href={fallbackUrl}>Open email signup</a> : <p>Email signup is not configured for this instance.</p>
+    )}
+  </div>
+</section>

@@ -1,0 +1,223 @@
+/* Bootstrap failure recovery — scrapbook paper card (static shell, pre-React). */
+
+html {
+  background-color: #f8e7f8;
+}
+
+html.dark {
+  background-color: #151533;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+  min-height: 100vh;
+}
+
+/* Match the dark-mode app background early so any browser that samples html
+   for chrome colour (Safari 26+, Android Chrome on overscroll) gets the
+   right value before Tailwind has finished loading. Body stays transparent
+   so the viewport-fixed page atmosphere can show through. */
+html.dark body {
+  background-color: transparent;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  opacity: 0; /* Initial state, JS will change to 1 when app loads */
+  transition: opacity 0.2s ease-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root {
+    transition: none;
+  }
+}
+
+#app-error {
+  --error-stage: #f8e7f8;
+  --error-stage-end: #f3e4f6;
+  --error-card-bg: #fffdf7;
+  --error-ink: #4a3b43;
+  --error-muted: #6b5560;
+  --error-primary: #d63f7f;
+  --error-primary-hover: #c23572;
+  --error-primary-active: #a92e63;
+  --error-icon-bg: #f3b8ce;
+  --error-icon-fg: #fffdf7;
+  --error-tape-peach: #f5c4c0;
+  --error-tape-lav: #c9c4e8;
+  --error-card-shadow: 0 12px 32px rgba(74, 59, 67, 0.14);
+  --error-support: #6b5560;
+  --error-font: 'Karla', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+
+  display: none; /* JS will manage visibility */
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: max(1.5rem, env(safe-area-inset-top, 0px)) max(1.25rem, env(safe-area-inset-right, 0px))
+    max(1.5rem, env(safe-area-inset-bottom, 0px)) max(1.25rem, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+  z-index: 10000;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(180deg, var(--error-stage) 0%, var(--error-stage-end) 100%);
+  font-family: var(--error-font);
+  color: var(--error-ink);
+}
+
+html.dark #app-error {
+  --error-stage: #12122a;
+  --error-stage-end: #1a1a38;
+  --error-card-bg: #2a2a40;
+  --error-ink: #f4f0f2;
+  --error-muted: #c8bcc3;
+  --error-primary: #e85a98;
+  --error-primary-hover: #f06aa3;
+  --error-primary-active: #d63f7f;
+  --error-icon-bg: #d63f7f;
+  --error-icon-fg: #fff8fb;
+  --error-tape-peach: #c4846a;
+  --error-tape-lav: #9b8fc4;
+  --error-card-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  --error-support: #c8bcc3;
+}
+
+#app-error .error-card {
+  position: relative;
+  width: min(100%, 420px);
+  margin: 0;
+  padding: 2rem 1.75rem 1.75rem;
+  border-radius: 1rem;
+  background: var(--error-card-bg);
+  box-shadow: var(--error-card-shadow);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+#app-error .error-tape {
+  position: absolute;
+  top: -10px;
+  width: 72px;
+  height: 22px;
+  border-radius: 2px;
+  opacity: 0.9;
+  pointer-events: none;
+  box-shadow: 0 2px 5px rgba(74, 59, 67, 0.16);
+}
+
+#app-error .error-tape::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      transparent 30%,
+      transparent 70%,
+      rgba(0, 0, 0, 0.1) 100%
+    ),
+    repeating-linear-gradient(115deg, transparent 0 8px, rgba(255, 255, 255, 0.12) 8px 16px);
+}
+
+#app-error .error-tape--peach {
+  left: 14%;
+  background: var(--error-tape-peach);
+  transform: rotate(-8deg);
+}
+
+#app-error .error-tape--lav {
+  right: 14%;
+  background: var(--error-tape-lav);
+  transform: rotate(7deg);
+}
+
+#app-error .error-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0.35rem auto 1.15rem;
+  border-radius: 50%;
+  background: var(--error-icon-bg);
+  color: var(--error-icon-fg);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+#app-error h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--error-ink);
+}
+
+#app-error .error-body {
+  margin: 0 0 1.5rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  font-weight: 500;
+  color: var(--error-muted);
+}
+
+#retry-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 0.625rem;
+  background: var(--error-primary);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+#retry-button:hover {
+  background: var(--error-primary-hover);
+}
+
+#retry-button:active {
+  background: var(--error-primary-active);
+}
+
+#retry-button:focus-visible {
+  outline: 2px solid var(--error-primary);
+  outline-offset: 3px;
+}
+
+#app-error .contact-support-text {
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--error-support);
+}
+
+#app-error .contact-support-text a,
+#app-error .contact-support-text a:link,
+#app-error .contact-support-text a:visited,
+#app-error .contact-support-text a:hover,
+#app-error .contact-support-text a:active {
+  color: var(--error-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+#app-error .contact-support-text a:focus-visible {
+  outline: 2px solid var(--error-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}

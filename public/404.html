@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#f8e8f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151533" media="(prefers-color-scheme: dark)" />
+    <title>Page not found | Organized Glitter</title>
+    <link rel="icon" href="/site-icon.ico" />
+    <script>
+      try {
+        var theme = localStorage.getItem('theme');
+        if (theme === 'light' || theme === 'dark') {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+      } catch {}
+    </script>
+    <script src="/theme-color.js?v=8" defer></script>
+    <link rel="stylesheet" href="/css/not-found.css" />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/" aria-label="Organized Glitter home">
+        <img src="/site-touch-icon.png" width="40" height="40" alt="" />
+        <span>Organized Glitter</span>
+      </a>
+    </header>
+    <main data-error="page-not-found">
+      <div class="recovery">
+        <h1>Page not found</h1>
+        <p class="description">
+          This link may be out of date, or the address may have a typo. Let&#39;s get you back to
+          your projects.
+        </p>
+        <a class="home-link" href="/">Back to home</a>
+        <a class="library-link" href="/dashboard">Open your library</a>
+        <p class="error-code">Error 404</p>
+      </div>
+    </main>
+  </body>
+</html>

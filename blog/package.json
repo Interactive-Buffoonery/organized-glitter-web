@@ -1,0 +1,9 @@
+{
+  "name": "organized-glitter-updates",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-content.mjs && astro build",
+    "test": "node --test test/*.test.mjs"
+  }
+}

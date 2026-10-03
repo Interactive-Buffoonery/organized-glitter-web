@@ -1,0 +1,13 @@
+{
+  "heading": "Page not found",
+  "description": "This link may be out of date, or the address may have a typo. Let's get you back to your projects.",
+  "home": {
+    "href": "/",
+    "label": "Back to home"
+  },
+  "library": {
+    "href": "/dashboard",
+    "label": "Open your library"
+  },
+  "errorCode": "Error 404"
+}

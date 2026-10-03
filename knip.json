@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/knip/schema.json",
+  "ignore": [".worktrees/**", "**/.worktrees/**", ".ds-sync/**", "ds-bundle/**", ".design-sync/**"],
+  "ignoreBinaries": ["gh"],
+  "ignoreDependencies": ["@posthog/cli", "pocketbase-typegen"],
+  "ignoreIssues": {
+    "src/types/pocketbase.types.ts": ["exports"]
+  }
+}

@@ -1,0 +1,23 @@
+overrides:
+  '@typescript/old': npm:typescript@6.0.3
+  rollup: npm:@rollup/wasm-node@^4.55.1
+  esbuild: 0.25.4
+  path-to-regexp: '>=6.2.0'
+  undici: ^6.23.0
+  diff: ^8.0.3
+  postcss: ^8.5.10
+  serialize-javascript: ^7.0.5
+  sourcemap-codec: npm:@jridgewell/sourcemap-codec@^1.4.15
+  smol-toml: 1.7.1
+
+allowBuilds:
+  '@posthog/cli': true
+  better-sqlite3: true
+  core-js: true
+  esbuild: true
+  protobufjs: true
+
+minimumReleaseAge: 4320
+trustPolicy: no-downgrade
+patchedDependencies:
+  http-cache-semantics@4.2.0: patches/http-cache-semantics@4.2.0.patch

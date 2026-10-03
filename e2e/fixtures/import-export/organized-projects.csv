@@ -1,0 +1,2 @@
+"Title","Company","Artist","Width","Height","Source URL","Drill Shape","Total Diamonds","Type of Kit","Status","Date Purchased","Date Received","Date Started","Date Completed","General Notes","Tags"
+"{{RUN_PREFIX}} Organized CSV Project","{{RUN_PREFIX}} Company","{{RUN_PREFIX}} Artist","40","50","https://example.test/{{RUN_SLUG}}/organized","round","12345","full","stash","2026-05-01","2026-05-02","","","Created by the local import/export Playwright spec.","{{RUN_PREFIX}} Tag"

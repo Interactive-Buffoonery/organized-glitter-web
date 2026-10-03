@@ -1,0 +1,48 @@
+---
+import Subscribe from '../components/Subscribe.astro';
+import BlogLayout from '../layouts/BlogLayout.astro';
+import { formatEditorialDate } from '../lib/dates.mjs';
+import { pages, posts } from '../lib/snapshot.mjs';
+
+export function getStaticPaths() {
+  return [...posts, ...pages].map(post => ({ params: { slug: post.slug }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const isSupportPage = !post.publishedAt;
+---
+
+<BlogLayout
+  title={post.title}
+  description={post.excerpt || post.title}
+  canonicalPath={post.url}
+  image={post.featuredMedia?.src}
+  publishedAt={post.publishedAt}
+  modifiedAt={post.modifiedAt}
+  noIndex={post.slug === 'subscription-confirmed'}
+>
+  <div class:list={['post-page', { 'support-page': isSupportPage }]}>
+    <article class:list={['post-paper', { 'support-paper': isSupportPage }]}>
+      <span class="paper-tape paper-tape-left" aria-hidden="true"></span>
+      <span class="paper-tape paper-tape-right" aria-hidden="true"></span>
+      <a class="back-link" href="/updates/">All updates</a>
+      <header class="post-heading">
+        {post.publishedAt && <time datetime={post.publishedAt}>{formatEditorialDate(post.displayDate)}</time>}
+        <h1>{post.title}</h1>
+      </header>
+      {post.featuredMedia && (
+        <figure class="featured-image">
+          <img
+            src={post.featuredMedia.src}
+            alt={post.featuredMedia.alt}
+            width={post.featuredMedia.width || undefined}
+            height={post.featuredMedia.height || undefined}
+          />
+        </figure>
+      )}
+      <div class="post-content" set:html={post.html} />
+      {!isSupportPage && <a class="back-link post-end-link" href="/updates/">All updates</a>}
+    </article>
+    {post.publishedAt && <Subscribe />}
+  </div>
+</BlogLayout>

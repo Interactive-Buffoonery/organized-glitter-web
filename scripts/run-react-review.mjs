@@ -19,7 +19,9 @@ export function resolveReactReviewBase(base, gitFn = git) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const base = resolveReactReviewBase(process.env.CI_BASE_REF || 'origin/main');
+  const base = resolveReactReviewBase(
+    process.env.CI_BASE_SHA || process.env.CI_BASE_REF || 'origin/main'
+  );
   console.log(`React review base: ${base}`);
   const result = spawnSync(
     'npx',

@@ -83,6 +83,16 @@ describe('PocketBase prior-schema upgrade gate', () => {
     );
   });
 
+  it('uses the resolved CI comparison base ahead of raw event fields', () => {
+    expect(
+      resolveBaseRef([], {
+        CI_BASE_SHA: 'resolved-base',
+        GITHUB_BASE_SHA: 'pull-request-base',
+        GITHUB_EVENT_BEFORE: 'push-before',
+      })
+    ).toBe('resolved-base');
+  });
+
   it('strips legacy index terminators when applying the production inventory', () => {
     const schema = applyIndexInventory(
       [

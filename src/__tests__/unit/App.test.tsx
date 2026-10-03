@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import type { FormEvent, ReactNode } from 'react';
-import { vi } from 'vitest';
+import { afterAll, vi } from 'vitest';
 import { act, describe, it, expect, beforeEach, waitFor } from '../../test-utils';
 import { renderWithProviders, screen, userEvent } from '../../test-utils';
 
@@ -51,7 +51,11 @@ vi.mock('virtual:pwa-register', () => ({
   registerSW: mockRegisterSW,
 }));
 
-import App from '../../App';
+const pocketBaseUrl = 'http://pocketbase.example.test';
+vi.stubEnv('VITE_POCKETBASE_URL', pocketBaseUrl);
+const { default: App } = await import('../../App');
+
+afterAll(() => vi.unstubAllEnvs());
 
 const setOnline = (online: boolean) => {
   Object.defineProperty(window.navigator, 'onLine', {
@@ -145,7 +149,7 @@ describe('App', () => {
       expect(input).toHaveValue('unfinished project');
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(fetchMock).toHaveBeenLastCalledWith(
-        'http://localhost:8090/api/health',
+        `${pocketBaseUrl}/api/health`,
         expect.objectContaining({ method: 'GET', cache: 'no-store' })
       );
       expect(reloadSpy).not.toHaveBeenCalled();

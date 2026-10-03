@@ -1,7 +1,7 @@
 const SENSITIVE_AUTH_PATHS = [
-  /^\/auth\/confirm-password-reset\/[^/]+$/,
-  /^\/auth\/verify-email\/[^/]+$/,
-  /^\/auth\/confirm-email-change\/[^/]+$/,
+  /^\/auth\/confirm-password-reset\/[^/]+\/?$/,
+  /^\/auth\/verify-email\/[^/]+\/?$/,
+  /^\/auth\/confirm-email-change\/[^/]+\/?$/,
 ];
 
 export function sanitizeSensitivePath(pathname: string): string {
@@ -9,7 +9,7 @@ export function sanitizeSensitivePath(pathname: string): string {
 
   for (const pattern of SENSITIVE_AUTH_PATHS) {
     if (pattern.test(cleanPath)) {
-      return cleanPath.replace(/\/[^/]+$/, '/[redacted]');
+      return cleanPath.replace(/\/[^/]+\/?$/, '/[redacted]');
     }
   }
 

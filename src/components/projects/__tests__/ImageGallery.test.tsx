@@ -1,10 +1,14 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import ImageGallery from '../ImageGallery';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { PrivateFileTokenContext } from '@/contexts/privateFileTokenState';
 
 const imageUrl = 'https://cdn.organizedglitter.test/project-cover.jpg';
+const pocketBaseUrl = 'http://pocketbase.example.test';
+vi.stubEnv('VITE_POCKETBASE_URL', pocketBaseUrl);
+const { default: ImageGallery } = await import('../ImageGallery');
+
+afterAll(() => vi.unstubAllEnvs());
 
 describe('ImageGallery', () => {
   it('crops preview images by default', () => {
@@ -115,7 +119,7 @@ describe('ImageGallery', () => {
   });
 
   it('keeps the open dialog and focused control mounted when a file token rotates', async () => {
-    const privateUrl = 'http://localhost:8090/api/files/projects/one/cover.jpg';
+    const privateUrl = `${pocketBaseUrl}/api/files/projects/one/cover.jpg`;
     const view = render(
       <PrivateFileTokenContext.Provider value={{ userId: 'owner', value: 'first', issuedAt: 1 }}>
         <ImageGallery imageUrl={privateUrl} alt="Private cover" />

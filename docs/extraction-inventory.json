@@ -647,7 +647,7 @@
       "path": "docs/oss-extraction-manifest.md",
       "sourceRevision": "647ecd9bdbdfffa37c693e914f06a3ba39fead41",
       "action": "rewrite",
-      "sha256": "88989c4f805beca83273c68d1dd3b1c73a4bb04e86a9abcd53384a1352ad9fe1"
+      "sha256": "927ccc03e69fb5da2587a2898c01750d706e1f79e8e9a4bc54fd2cd8f7673099"
     },
     {
       "path": "docs/pocketbase-coloring-medium-ownership-hook.md",
@@ -1882,8 +1882,9 @@
     {
       "path": "public/images/home-hero.jpg",
       "sourceRevision": "647ecd9bdbdfffa37c693e914f06a3ba39fead41",
-      "action": "include",
-      "sha256": "9949481210df6cd9889816a1692280857ec01eacb124dd0f44ff4f86c4877875"
+      "action": "remove",
+      "sha256": "9949481210df6cd9889816a1692280857ec01eacb124dd0f44ff4f86c4877875",
+      "reason": "Removed at owner request during public asset review on 2026-10-03."
     },
     {
       "path": "public/images/logo.png",

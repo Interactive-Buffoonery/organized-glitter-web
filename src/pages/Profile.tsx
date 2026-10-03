@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAvatar } from '@/hooks/useAvatar';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import AccountSettings from '@/components/profile/AccountSettings';
-import DataImportExportSettings from '@/components/profile/DataImportExportSettings';
+import { DataImportExportSections } from '@/features/import-export/components/DataImportExportSections';
 import PayPalSupportSection from '@/components/profile/PayPalSupportSection';
 import { ThemePreferences } from '@/components/profile/ThemePreferences';
 import { TimezonePreferences } from '@/components/profile/TimezonePreferences';
@@ -265,7 +265,7 @@ const Profile = () => {
               </TabsContent>
 
               <TabsContent value="data" className="space-y-6">
-                <DataImportExportSettings profileLoading={profileLoading} />
+                <DataImportExportSections disabled={profileLoading} />
               </TabsContent>
 
               <TabsContent value="support" className="space-y-6">

@@ -32,6 +32,41 @@ describe('package scripts', () => {
     assert.equal(packageJson.scripts['qa:release:local'], 'node scripts/run-local-release-qa.mjs');
   });
 
+  it('exposes complete local CI phases through stable package scripts', () => {
+    assert.equal(
+      packageJson.scripts['test:ci:static'],
+      'node scripts/generate-not-found.mjs --check && pnpm typecheck && pnpm format:check && pnpm lint && pnpm lint:pb-boundary && pnpm lint:workflows && node --test e2e/ci/browser-inventory.test.mjs'
+    );
+    assert.equal(
+      packageJson.scripts['test:ci:backend'],
+      'pnpm pb:validate:schema && pnpm pb:validate:migrations && pnpm pb:validate:upgrade && pnpm pb:test:protected-file-upgrade && pnpm pb:test:auth-verification && pnpm pb:test:feedback && pnpm pb:test:native-oauth-association && pnpm pb:test:auth-step-up && pnpm pb:test:native-apple && pnpm pb:test:archive-restore-v3 && pnpm pb:test:mobile-sync && pnpm pb:test:stats'
+    );
+    assert.equal(packageJson.scripts['test:ci:build'], 'pnpm build && pnpm build:budget');
+    assert.equal(
+      packageJson.scripts['test:publication'],
+      'node scripts/run-publication-validation.mjs'
+    );
+    assert.equal(
+      packageJson.scripts['qa:browser:full:ci'],
+      'node scripts/run-local-release-qa.mjs --suite=full --fixed-ports --run-id=ci-full'
+    );
+  });
+
+  it('routes PR and release gates through the timed local orchestrator', () => {
+    assert.equal(
+      packageJson.scripts['test:pr'],
+      'node scripts/run-local-validation.mjs --profile=pr --base=${VALIDATION_BASE_REF:-origin/bootstrap/public-extraction}'
+    );
+    assert.equal(
+      packageJson.scripts['test:release'],
+      'node scripts/run-local-validation.mjs --profile=release --base=${VALIDATION_BASE_REF:-origin/bootstrap/public-extraction}'
+    );
+  });
+
+  it('exposes the stats PocketBase integration check', () => {
+    assert.equal(packageJson.scripts['pb:test:stats'], 'node scripts/test-stats-pocketbase.mjs');
+  });
+
   it('routes application typechecking through the native TypeScript 7 runner', () => {
     assert.equal(packageJson.scripts['tsc:ts7'], 'node scripts/run-typescript-7.mjs');
     assert.equal(

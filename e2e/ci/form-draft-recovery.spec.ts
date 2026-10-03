@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
+import { libraryPageHeading } from '../libraryPage';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -48,6 +49,7 @@ test('guards Back and discards an unfinished project only when confirmed', async
     page.getByRole('button', { name: 'Back', exact: true }).click(),
   ]);
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/);
+  await expect(libraryPageHeading(page)).toBeVisible();
   await page.goto('/projects/new', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('button', { name: 'Restore draft' })).toHaveCount(0);
   await expect(titleField).toHaveValue('');

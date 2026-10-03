@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/knip/schema.json",
+  "entry": ["blog/scripts/build-content.mjs!"],
   "ignore": [".worktrees/**", "**/.worktrees/**", ".ds-sync/**", "ds-bundle/**", ".design-sync/**"],
   "ignoreBinaries": ["gh"],
   "ignoreDependencies": ["@posthog/cli", "pocketbase-typegen"],

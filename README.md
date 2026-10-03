@@ -45,7 +45,8 @@ pnpm install
 Bootstrap a local PocketBase instance with the committed schema and seed data:
 
 ```bash
-VITE_POCKETBASE_URL=http://localhost:8090 pnpm pb:bootstrap:local -- --seed
+pnpm pb:install:test -- --destination=local-pb-db/pocketbase
+LOCAL_POCKETBASE_TEST_USER_EMAIL=local-user@example.test VITE_POCKETBASE_URL=http://localhost:8090 pnpm pb:bootstrap:local -- --seed --no-keepalive
 ```
 
 Start PocketBase:

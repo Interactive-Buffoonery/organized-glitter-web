@@ -83,7 +83,10 @@ test.describe(`local image selection in ${browserName}`, () => {
 
       const saved = await pb.collection('projects').getOne(project.id);
       expect(saved.image).toBeTruthy();
-      const imageResponse = await page.request.get(pb.files.getURL(saved, saved.image));
+      const fileToken = await pb.files.getToken();
+      const imageResponse = await page.request.get(
+        pb.files.getURL(saved, saved.image, { token: fileToken })
+      );
       expect(imageResponse.ok()).toBe(true);
       const dataUrl = `data:${imageResponse.headers()['content-type']};base64,${(await imageResponse.body()).toString('base64')}`;
       const color = await page.evaluate(async src => {

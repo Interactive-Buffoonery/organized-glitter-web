@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
+
+export { requireFixtureOrSkip } from '../fixtures/local-safety';
 
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] as const;
 
@@ -44,7 +46,7 @@ export async function createAxeBuilder(page: Page, options: AxeScanOptions = {})
   return builder;
 }
 
-async function expectNoAxeViolations(page: Page, options: AxeScanOptions = {}) {
+export async function expectNoAxeViolations(page: Page, options: AxeScanOptions = {}) {
   const builder = await createAxeBuilder(page, options);
   const accessibilityScanResults = await builder.analyze();
 
@@ -86,14 +88,6 @@ export const getFirstHrefMatching = async (page: Page, pattern: RegExp) =>
         .find(path => pattern.test(path)) ?? null
     );
   }, pattern.source);
-
-export const requireFixtureOrSkip = (message: string): never => {
-  if (process.env.CI) {
-    throw new Error(message);
-  }
-
-  test.skip(true, message);
-};
 
 // Seeded coloring fixture (scripts/seed-e2e-coloring-fixture.mjs). Specs target
 // it by id so they resolve a known-good record deterministically instead of

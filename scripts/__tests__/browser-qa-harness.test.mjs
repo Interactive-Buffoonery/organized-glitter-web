@@ -6,9 +6,13 @@ import { describe, expect, it, vi } from 'vitest';
 import ciConfig from '../../playwright.ci.config';
 import {
   parseArgs,
+  parseListedInventory,
   parseListedTestCount,
+  parseRandomizerFixtureIds,
   pocketBaseCachePath,
   resolveQaFixtures,
+  seedRandomizerFixturesForSuite,
+  validateManagedPlaywrightReport,
   waitForHttp,
 } from '../run-local-release-qa.mjs';
 import {
@@ -98,7 +102,7 @@ describe('browser QA harness safeguards', () => {
   });
 
   it('uses the fixed smoke inventory without retries or screen atlas projects', () => {
-    const parsed = parseArgs(['--suite=smoke', '--fixed-ports', '--skip-build']);
+    const parsed = parseArgs(['--suite=smoke', '--fixed-ports']);
     expect(parsed.configPath).toBe('playwright.ci.config.ts');
     expect(parsed.playwrightArgs).toEqual([]);
     expect(ciConfig.retries).toBe(0);
@@ -111,12 +115,166 @@ describe('browser QA harness safeguards', () => {
     ]);
   });
 
-  it('rejects a dynamic-port build artifact because its backend URL cannot be changed', () => {
-    expect(() => parseArgs(['--suite=smoke', '--skip-build'])).toThrow(/requires --fixed-ports/i);
+  it('seeds randomizer fixtures only for the managed full suite', () => {
+    const ids = Array.from(
+      { length: 8 },
+      (_, index) => `fixture${String(index + 1).padStart(8, '0')}`
+    );
+    const runCommand = vi.fn(() => ({
+      stdout: `E2E_RANDOMIZER_PROJECT_IDS=${ids.join(',')}\n`,
+    }));
+    const options = {
+      env: { VITE_POCKETBASE_URL: 'http://127.0.0.1:8090' },
+      logsDir: '/logs',
+      runCommand,
+    };
+
+    expect(seedRandomizerFixturesForSuite({ ...options, suite: 'smoke' })).toEqual([]);
+    expect(runCommand).not.toHaveBeenCalled();
+    expect(seedRandomizerFixturesForSuite({ ...options, suite: 'full' })).toEqual(ids);
+    expect(runCommand).toHaveBeenCalledWith({
+      command: process.execPath,
+      args: ['scripts/seed-e2e-randomizer-fixture.mjs'],
+      env: options.env,
+      logPath: '/logs/randomizer-fixture-seed.log',
+      label: 'Randomizer fixture seed',
+    });
+  });
+
+  it('rejects missing or incomplete randomizer seed output', () => {
+    expect(() => parseRandomizerFixtureIds('seed complete\n')).toThrow(/did not report/i);
+    expect(() =>
+      parseRandomizerFixtureIds('E2E_RANDOMIZER_PROJECT_IDS=fixture00000001,fixture00000002\n')
+    ).toThrow(/expected 8 unique project ids/i);
+  });
+
+  it('rejects build reuse without a matching build receipt', () => {
+    expect(() => parseArgs(['--suite=smoke', '--fixed-ports', '--skip-build'])).toThrow(
+      /not supported/i
+    );
   });
 
   it('fails rather than passing when Playwright discovers no tests', () => {
     expect(() => parseListedTestCount('Total: 0 tests in 0 files')).toThrow(/found no tests/i);
+  });
+
+  it('requires the exact managed inventory for smoke and full suites', () => {
+    expect(parseListedInventory('Total: 63 tests in 22 files', 'smoke')).toEqual({
+      files: 22,
+      tests: 63,
+    });
+    expect(parseListedInventory('Total: 254 tests in 39 files', 'full')).toEqual({
+      files: 39,
+      tests: 254,
+    });
+    expect(() => parseListedInventory('Total: 62 tests in 22 files', 'smoke')).toThrow(
+      /expected 63 tests in 22 files/i
+    );
+  });
+
+  it('accepts a reconciled smoke report with no skipped tests', () => {
+    const tests = Array.from({ length: 63 }, (_, index) => ({
+      projectName: 'authenticated-chromium-smoke',
+      expectedStatus: 'passed',
+      status: 'expected',
+      results: [{ status: 'passed', retry: 0, annotations: [] }],
+      annotations: [],
+      title: `test ${index}`,
+    }));
+    const report = {
+      suites: [
+        {
+          title: 'e2e/example.spec.ts',
+          specs: [{ title: 'generated smoke tests', file: 'e2e/example.spec.ts', tests }],
+        },
+      ],
+      errors: [],
+      stats: { expected: 63, unexpected: 0, flaky: 0, skipped: 0 },
+    };
+
+    expect(validateManagedPlaywrightReport(report, 'smoke')).toEqual({
+      expected: 63,
+      skipped: 0,
+      total: 63,
+    });
+  });
+
+  it('rejects empty, malformed, or unreconciled managed reports', () => {
+    expect(() => validateManagedPlaywrightReport({}, 'smoke')).toThrow(/structured report/i);
+    expect(() =>
+      validateManagedPlaywrightReport(
+        {
+          suites: [
+            {
+              title: 'e2e/example.spec.ts',
+              specs: [{ title: 'empty', file: 'e2e/example.spec.ts', tests: [] }],
+            },
+          ],
+          errors: [],
+          stats: { expected: 63, unexpected: 0, flaky: 0, skipped: 0 },
+        },
+        'smoke'
+      )
+    ).toThrow(/contained no tests/i);
+  });
+
+  it('allows only the exact conditional full-suite skip', () => {
+    const passing = Array.from({ length: 253 }, (_, index) => ({
+      projectName: 'authenticated-chromium-full',
+      expectedStatus: 'passed',
+      status: 'expected',
+      results: [{ status: 'passed', retry: 0, annotations: [] }],
+      annotations: [],
+      title: `test ${index}`,
+    }));
+    const allowedSkip = {
+      projectName: 'authenticated-chromium-full',
+      expectedStatus: 'skipped',
+      status: 'skipped',
+      results: [],
+      annotations: [
+        {
+          type: 'skip',
+          description: 'page too short to verify bottom nav scroll anchoring',
+        },
+      ],
+      title: 'bottom nav remains anchored during scroll',
+    };
+    const report = {
+      suites: [
+        {
+          title: 'e2e/authenticated/mobile-touch-targets.spec.ts',
+          suites: [
+            {
+              title: 'mobile touch targets',
+              specs: [
+                {
+                  title: 'generated passing tests',
+                  file: 'e2e/authenticated/mobile-touch-targets.spec.ts',
+                  tests: passing,
+                },
+                {
+                  title: 'bottom nav remains anchored during scroll',
+                  file: 'e2e/authenticated/mobile-touch-targets.spec.ts',
+                  tests: [allowedSkip],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      errors: [],
+      stats: { expected: 253, unexpected: 0, flaky: 0, skipped: 1 },
+    };
+
+    expect(validateManagedPlaywrightReport(report, 'full')).toEqual({
+      expected: 253,
+      skipped: 1,
+      total: 254,
+    });
+
+    allowedSkip.annotations[0].description = 'different reason';
+    expect(() => validateManagedPlaywrightReport(report, 'full')).toThrow(/unexpected skip/i);
   });
 
   it('reports an early server exit instead of waiting for a startup timeout', async () => {
@@ -145,6 +303,49 @@ describe('browser QA harness safeguards', () => {
           password: 'fixture-password',
         })
       ).rejects.toThrow('required fixture projects/localproject003');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('fails when a seeded randomizer fixture is not an eligible progress project', async () => {
+    const randomizerProjectIds = Array.from(
+      { length: 8 },
+      (_, index) => `fixture${String(index + 1).padStart(8, '0')}`
+    );
+    const fetchFn = vi.fn(async url => {
+      const value = String(url);
+      if (value.endsWith('/auth-with-password')) {
+        return new Response(JSON.stringify({ token: 'fake-token' }), { status: 200 });
+      }
+      const randomizerId = randomizerProjectIds.find(id => value.endsWith(`/records/${id}`));
+      if (randomizerId) {
+        return new Response(
+          JSON.stringify({
+            id: randomizerId,
+            status: randomizerId === randomizerProjectIds[3] ? 'stash' : 'progress',
+          }),
+          { status: 200 }
+        );
+      }
+      if (/\/(projects|coloring_books|coloring_mediums)\/records\//.test(value)) {
+        return new Response(JSON.stringify({ id: value.split('/').at(-1) }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ items: [{ id: 'localpage000001' }] }), {
+        status: 200,
+      });
+    });
+    vi.stubGlobal('fetch', fetchFn);
+
+    try {
+      await expect(
+        resolveQaFixtures({
+          pbUrl: 'http://127.0.0.1:8090',
+          email: 'fixture@example.test',
+          password: 'fixture-password',
+          randomizerProjectIds,
+        })
+      ).rejects.toThrow(`randomizer fixture ${randomizerProjectIds[3]} is not in progress`);
     } finally {
       vi.unstubAllGlobals();
     }

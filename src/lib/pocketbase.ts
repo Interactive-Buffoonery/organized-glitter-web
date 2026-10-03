@@ -37,12 +37,12 @@ export const pb = new PocketBase(POCKETBASE_URL) as TypedPocketBase;
 // sharing the same default requestKey ("GET /api/collections/<name>/records").
 pb.autoCancellation(false);
 
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV || __APP_TEST_ENV__ === 'test') {
   // Make PocketBase client available for debugging
   if (typeof window !== 'undefined') {
     (window as Window & { __pb?: TypedPocketBase; pb?: TypedPocketBase }).__pb = pb;
     (window as Window & { __pb?: TypedPocketBase; pb?: TypedPocketBase }).pb = pb;
-    pbLogger.debug('🛠️  PocketBase client available as window.pb for debugging');
+    pbLogger.debug('PocketBase client available as window.pb for debugging');
   }
 }
 

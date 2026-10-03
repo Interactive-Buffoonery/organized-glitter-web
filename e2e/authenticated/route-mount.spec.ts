@@ -20,19 +20,20 @@
  * real network fetches against prod PocketBase).
  *
  * Routes that need a specific project ID use FIXTURE_PROJECT_ID below.
- * If that project no longer exists in prod, the edit/detail tests will
- * skip with a clear message rather than fail spuriously.
+ * Managed local runs require that fixture; hosted runs skip fixture-specific
+ * checks when it is unavailable.
  *
  * Coloring routes discover a book and page from the E2E account UI. If the
- * E2E account has no coloring data, those fixture-specific routes skip with a
- * clear message rather than mutating the shared backend during a smoke run.
+ * E2E account has no coloring data, managed runs fail while hosted runs skip
+ * rather than mutating the shared backend.
  */
 
 import { test, expect, type ConsoleMessage, type Page } from '@playwright/test';
 import type { Locator } from '@playwright/test';
+import { requireFixtureOrSkip } from '../fixtures/local-safety';
 import { libraryPageHeading } from '../libraryPage';
 
-// Known seed rows in prod. Swap or read from env if these ever rot.
+// Known seed rows, overridden by the disposable harness when it manages fixtures.
 const DEFAULT_FIXTURE_PROJECT_ID = 'n5zfnqdq3zzwso0';
 const FIXTURE_PROJECT_ID = process.env.E2E_FIXTURE_PROJECT_ID?.trim() || DEFAULT_FIXTURE_PROJECT_ID;
 const DEFAULT_FIXTURE_COLORING_BOOK_ID = 'kgs059794affuba';
@@ -172,8 +173,7 @@ const ensureColoringBookPath = async (
   const path = await getFirstHrefMatching(page, /^\/coloring\/(?!new(?:[/?#]|$))[^/?#]+$/);
   if (path) return { bookPath: path };
 
-  test.skip(true, 'No coloring book fixture found for the E2E account.');
-  throw new Error('unreachable: test.skip aborts the test');
+  return requireFixtureOrSkip('No coloring book fixture found for the E2E account.');
 };
 
 const getColoringPagePath = async (page: Page, bookPath: string): Promise<string> => {
@@ -198,14 +198,12 @@ const getColoringPagePath = async (page: Page, bookPath: string): Promise<string
   await expect(page.getByRole('heading', { name: 'Pages' })).toBeVisible({ timeout: 15_000 });
   const pageLink = page.locator('a[href*="/pages/"]').first();
   if (!(await pageLink.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => false))) {
-    test.skip(true, `No coloring page found for ${bookPath}.`);
-    throw new Error('unreachable: test.skip aborts the test');
+    return requireFixtureOrSkip(`No coloring page found for ${bookPath}.`);
   }
 
   const path = await getFirstHrefMatching(page, /^\/coloring\/[^/]+\/pages\/[^/?#]+$/);
   if (!path) {
-    test.skip(true, `No coloring page found for ${bookPath}.`);
-    throw new Error('unreachable: test.skip aborts the test');
+    return requireFixtureOrSkip(`No coloring page found for ${bookPath}.`);
   }
 
   return path;
@@ -303,9 +301,8 @@ test.describe('Authenticated route mount sweep', () => {
       .catch(() => false);
 
     if (!loaded) {
-      test.skip(
-        true,
-        `Fixture project ${FIXTURE_PROJECT_ID} not found in prod; set E2E_FIXTURE_PROJECT_ID.`
+      requireFixtureOrSkip(
+        `Fixture project ${FIXTURE_PROJECT_ID} not found; set E2E_FIXTURE_PROJECT_ID.`
       );
     }
 
@@ -326,9 +323,8 @@ test.describe('Authenticated route mount sweep', () => {
       .catch(() => false);
 
     if (!loaded) {
-      test.skip(
-        true,
-        `Fixture project ${FIXTURE_PROJECT_ID} not found in prod; set E2E_FIXTURE_PROJECT_ID.`
+      requireFixtureOrSkip(
+        `Fixture project ${FIXTURE_PROJECT_ID} not found; set E2E_FIXTURE_PROJECT_ID.`
       );
     }
 

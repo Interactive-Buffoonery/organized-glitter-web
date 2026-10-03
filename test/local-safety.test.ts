@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { getLocalE2ESkipReason, isLocalUrl } from '../e2e/fixtures/local-safety';
+import {
+  getLocalE2ETargetDisposition,
+  getLocalE2ESkipReason,
+  getRequiredFixtureAction,
+  isLocalUrl,
+} from '../e2e/fixtures/local-safety';
 
 describe('local E2E safety helpers', () => {
   it('treats loopback hosts as local and rejects hosted URLs', () => {
@@ -49,5 +54,35 @@ describe('local E2E safety helpers', () => {
         specName: 'Partial hosted',
       })
     ).not.toBeNull();
+  });
+
+  it.each(['smoke', 'full'])('fails missing local targets for managed %s runs', suite => {
+    expect(
+      getLocalE2ETargetDisposition({
+        appUrl: undefined,
+        pocketBaseUrl: undefined,
+        specName: 'Required fixture suite',
+        suite,
+      })
+    ).toMatchObject({ action: 'fail' });
+  });
+
+  it('preserves skips for hosted deployment runs', () => {
+    expect(
+      getLocalE2ETargetDisposition({
+        appUrl: 'https://organized-glitter-preview.up.railway.app',
+        pocketBaseUrl: 'https://data.organizedglitter.app',
+        specName: 'Hosted fixture suite',
+        suite: undefined,
+      })
+    ).toMatchObject({ action: 'skip' });
+  });
+
+  it.each(['smoke', 'full'])('requires fixtures for managed %s runs', suite => {
+    expect(getRequiredFixtureAction({ ci: false, suite })).toBe('fail');
+  });
+
+  it('allows hosted fixture skips outside managed runs', () => {
+    expect(getRequiredFixtureAction({ ci: false, suite: undefined })).toBe('skip');
   });
 });

@@ -115,9 +115,9 @@ primary-tinted lozenge for the active segment.
 />
 ```
 
-The dashboard `ViewToggle` keeps the default `solid` variant because it lives
-on a flat (non-glass) background. Use `glass` only inside a product
-`GlassPanel`.
+Diamond and coloring Library views use the shared `LibraryViewToggle`, which
+selects the `glass` variant. Keep this shared treatment for Library view controls.
+Other grouped controls use `glass` inside a product `GlassPanel`.
 
 ## Layout patterns
 

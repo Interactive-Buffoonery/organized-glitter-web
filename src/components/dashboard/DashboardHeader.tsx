@@ -7,7 +7,7 @@ import SearchProjects from '@/components/dashboard/SearchProjects';
 import SortSheet from '@/components/dashboard/SortSheet';
 import DashboardFilterSheet from '@/components/dashboard/DashboardFilterSheet';
 import DashboardQuickViews from '@/components/dashboard/DashboardQuickViews';
-import ViewToggle from '@/components/dashboard/ViewToggle';
+import LibraryViewToggle from '@/components/shared/LibraryViewToggle';
 import { useFilters, useFilterHelpers } from '@/contexts/FilterContext';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useMobileDevice } from '@/hooks/use-mobile';
@@ -104,7 +104,7 @@ const DashboardHeader = ({
           />
         </div>
         <div className="flex items-center gap-2">
-          <ViewToggle
+          <LibraryViewToggle
             activeView={filters.viewType}
             onViewChange={nextView => {
               updateViewType(nextView);

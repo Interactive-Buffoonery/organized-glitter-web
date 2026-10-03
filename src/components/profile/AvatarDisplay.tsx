@@ -2,6 +2,15 @@ import React, { memo, useMemo } from 'react';
 import { AvatarDisplayProps, AVATAR_COLORS } from '@/types/avatar';
 import { logger } from '@/utils/logger';
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
+import { getContrastRatio } from '@/components/randomizer/randomizerWheelColors';
+
+const AVATAR_DARK_FOREGROUND = '#211827';
+const AVATAR_LIGHT_FOREGROUND = '#ffffff';
+
+const getAvatarForegroundColor = (backgroundColor: string) =>
+  getContrastRatio(AVATAR_DARK_FOREGROUND, backgroundColor) >= 4.5
+    ? AVATAR_DARK_FOREGROUND
+    : AVATAR_LIGHT_FOREGROUND;
 
 const AvatarDisplay: React.FC<AvatarDisplayProps> = memo(
   ({ config, size = 64, className = '', fallbackInitials = 'U' }) => {
@@ -17,6 +26,9 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = memo(
       }),
       [size]
     );
+    const colorIndex = config?.colorIndex ?? 0;
+    const backgroundColor = AVATAR_COLORS[colorIndex] ?? AVATAR_COLORS[0];
+    const foregroundColor = getAvatarForegroundColor(backgroundColor);
 
     // Handle uploaded avatar
     if (config?.type === 'upload' && config.uploadUrl) {
@@ -48,10 +60,11 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = memo(
           />
           {/* Fallback initials (initially hidden) */}
           <div
-            className={`flex items-center justify-center overflow-hidden rounded-full font-semibold text-white ${className}`}
+            className={`flex items-center justify-center overflow-hidden rounded-full font-semibold ${className}`}
             style={{
               ...sizeStyle,
-              backgroundColor: AVATAR_COLORS[config?.colorIndex || 0],
+              backgroundColor,
+              color: foregroundColor,
               fontSize: `${Math.max(12, size * 0.4)}px`,
               position: 'absolute',
               top: 0,
@@ -67,16 +80,15 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = memo(
 
     // Handle initials avatar or fallback
     const initials = config?.initials || fallbackInitials;
-    const colorIndex = config?.colorIndex || 0;
-    const backgroundColor = AVATAR_COLORS[colorIndex];
     const fontSize = Math.max(12, size * 0.4);
 
     return (
       <div
-        className={`flex items-center justify-center overflow-hidden rounded-full font-semibold text-white ${className}`}
+        className={`flex items-center justify-center overflow-hidden rounded-full font-semibold ${className}`}
         style={{
           ...sizeStyle,
           backgroundColor,
+          color: foregroundColor,
           fontSize: `${fontSize}px`,
         }}
       >

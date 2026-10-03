@@ -1,150 +1,151 @@
 {
-  "status": "Rights review remains an owner gate. Preserve existing notices; this inventory establishes hashes, not ownership.",
+  "status": "Owner confirmed the retained brand assets, craft photos, screenshots, previews, and synthetic test fixtures on 2026-10-03. The unconfirmed washi-tape photo was removed. Preserve brand terms and font notices; photo confirmation does not grant rights to third-party artwork depicted in photos.",
   "files": [
     {
       "path": "docs/icons/app-icon-1024.png",
       "sha256": "712278ed0313e7abb40848198146f5b65bcce972e328574f3994929201d37308",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "docs/icons/app-icon-source.png",
       "sha256": "216a63522e73dfe86aef95c72273919a9bf2b5a9768b4282bcf480346480e7d7",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "e2e/fixtures/color-references/orientation-6.jpg",
       "sha256": "60e2d7dbf21c11603200ce620cadf3feab9274817dcdadc218a5b136d1854cca",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain this synthetic test fixture in the public repository on 2026-10-03"
     },
     {
       "path": "e2e/fixtures/portrait-cover.jpg",
       "sha256": "1921f6f64c6508ab0f9687921a5de5e57a775bc7d1cac6e4b6660b06a7011778",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain this synthetic test fixture in the public repository on 2026-10-03"
     },
     {
       "path": "public/android-chrome-192x192.png",
       "sha256": "9885f645ae7cc3d8aa953c86a46eefb9ae2523015bcc007ec3a26c8b3c4febdd",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/android-chrome-512x512.png",
       "sha256": "b7d7d6344700411a1ab8571d348848525800808247f38f7391e4a24668fcde98",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/android-maskable-512x512.png",
       "sha256": "5b3d082a7c20781acde6485ed3f4714fada24b69ef5f613a8d761a7587c0d736",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/apple-touch-icon.png",
       "sha256": "a02e442b209c76d960084fe4470cd4b8707919b170c8e6b5d01d349e6bb10692",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/favicon-16x16.png",
       "sha256": "fb8890f1f5186499aa174c0dd281e8dd328e04be3364dc3349aae37d8f7aa905",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/favicon-32x32.png",
       "sha256": "05177e0890071f29267285c046b06f2348034452aaf8809b0a5493f7b1e34344",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/favicon.ico",
       "sha256": "c65c8f6a309ff9a2cc0ea7f20f8dc4e7626cd3ce814a8a643772f2c66aa83a98",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/fonts/karla-latin-wght-normal.woff2",
       "sha256": "cd614fed3fa0bf1b083d1a127a593081e2a1aa732ad61481eb12baee212c933d",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "SIL Open Font License 1.1; preserve public/fonts/karla-LICENSE.txt"
     },
     {
       "path": "public/images/chibi-wave.png",
       "sha256": "b668c8a4f7d49d2861d6d4739fae2d92a4d099fd1bc4979ab79419f9517d772e",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/hero-quote.svg",
       "sha256": "7b166e7d8be921685d1456be11c18b687308f2541784cb706e7f2aae4584c400",
-      "publicationRights": "owner review required; no new rights clearance claimed"
-    },
-    {
-      "path": "public/images/home-hero.jpg",
-      "sha256": "9949481210df6cd9889816a1692280857ec01eacb124dd0f44ff4f86c4877875",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain the remaining preview assets in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/logo.png",
       "sha256": "b7d7d6344700411a1ab8571d348848525800808247f38f7391e4a24668fcde98",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/marketing/aladdin-coloring-in-progress.webp",
       "sha256": "a0850aa51b64c7e4f2d72685c44624cb062a7ed004c8c32ffcbda356a055469e",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/marketing/coloring-in-progress.webp",
       "sha256": "97b77971d982247a93e3525ae1c3fac88348f179ae94c7e32c10337aaf00086c",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/marketing/diamond-art-finished.webp",
       "sha256": "b0e7d79819ca8e6fa607f8b75e360d1d92a8ef3b65eedf09f53a8623a23440bd",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/marketing/diamond-art-in-progress.webp",
       "sha256": "9f8022936eed5fca39eed89376484a3ef0a2e146124e076497ab929715c9cf1a",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/marketing/randomizer-screenshot.png",
       "sha256": "07efad4cd15ff9e0b71a987f3a3688f5d330fadafd6f7d7866482ab3e3106a98",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/og-image.jpg",
       "sha256": "d822048262080ab78593bb9d75ade6047c8de2c9fc022b3506213dc60ac387d3",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain the remaining preview assets in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/randomizer-wheel-preview.svg",
       "sha256": "26d52688dc3595153db1f965666bf29eae8b4e58251472309d729c1ba50f59ff",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain the remaining preview assets in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/screenshot.jpg",
       "sha256": "20bd9b7dd0c841a9972643e8fb538031397dc21b7186c61b174ab92db1dd9aae",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/images/social-preview-2026-09-27.jpg",
       "sha256": "af18e42fe8201aaf0365ffff05c43829728388b545d0260f659e784f7e6535aa",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain the remaining preview assets in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/site-icon-16x16.png",
       "sha256": "fb8890f1f5186499aa174c0dd281e8dd328e04be3364dc3349aae37d8f7aa905",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/site-icon-32x32.png",
       "sha256": "05177e0890071f29267285c046b06f2348034452aaf8809b0a5493f7b1e34344",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/site-icon.ico",
       "sha256": "c65c8f6a309ff9a2cc0ea7f20f8dc4e7626cd3ce814a8a643772f2c66aa83a98",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
     },
     {
       "path": "public/site-touch-icon.png",
       "sha256": "a02e442b209c76d960084fe4470cd4b8707919b170c8e6b5d01d349e6bb10692",
-      "publicationRights": "owner review required; no new rights clearance claimed"
+      "publicationRights": "owner confirmed permission to retain in the public repository on 2026-10-03; existing brand terms still apply"
+    }
+  ],
+  "removedFiles": [
+    {
+      "path": "public/images/home-hero.jpg",
+      "reason": "Removed at owner request on 2026-10-03; redistribution permission not confirmed."
     }
   ]
 }

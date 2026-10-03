@@ -8,7 +8,9 @@ import {
   existsSync,
   mkdirSync,
   openSync,
+  readFileSync,
   readdirSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import net from 'node:net';
@@ -32,6 +34,7 @@ const defaultTestEmail = 'sarah-local@example.test';
 const defaultTestPassword = 'local-test-password-123';
 const adminEmail = 'admin@localhost.test';
 const adminPassword = 'admin-local-release-qa-123';
+const randomizerFixtureCount = 8;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -142,7 +145,26 @@ const getFixture = async ({ pbUrl, token, collection, id }) => {
   return response.json();
 };
 
-export async function resolveQaFixtures({ pbUrl, email, password }) {
+export function parseRandomizerFixtureIds(output) {
+  const match = output.match(/^E2E_RANDOMIZER_PROJECT_IDS=([^\r\n]+)$/m);
+  if (!match) throw new Error('Randomizer fixture seed did not report project ids.');
+  const ids = match[1]
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean);
+  if (
+    ids.length !== randomizerFixtureCount ||
+    new Set(ids).size !== randomizerFixtureCount ||
+    ids.some(id => !/^[A-Za-z0-9]{15}$/.test(id))
+  ) {
+    throw new Error(
+      `Randomizer fixture seed expected ${randomizerFixtureCount} unique project ids.`
+    );
+  }
+  return ids;
+}
+
+export async function resolveQaFixtures({ pbUrl, email, password, randomizerProjectIds = [] }) {
   const auth = await authenticate({ pbUrl, email, password });
   const required = [
     ['projects', 'localproject003'],
@@ -153,6 +175,19 @@ export async function resolveQaFixtures({ pbUrl, email, password }) {
   for (const [collection, id] of required) {
     if (!(await getFixture({ pbUrl, token: auth.token, collection, id }))) {
       throw new Error(`PocketBase bootstrap did not create required fixture ${collection}/${id}.`);
+    }
+  }
+
+  for (const id of randomizerProjectIds) {
+    const project = await getFixture({
+      pbUrl,
+      token: auth.token,
+      collection: 'projects',
+      id,
+    });
+    if (!project) throw new Error(`PocketBase is missing required randomizer fixture ${id}.`);
+    if (project.status !== 'progress') {
+      throw new Error(`PocketBase randomizer fixture ${id} is not in progress.`);
     }
   }
 
@@ -174,6 +209,7 @@ export async function resolveQaFixtures({ pbUrl, email, password }) {
     coloringMediumId: 'localmedium0001',
     coloringPageId,
     projectId: 'localproject003',
+    randomizerProjectIds,
   };
 }
 
@@ -181,7 +217,6 @@ export function parseArgs(argv) {
   const harness = {
     fixedPorts: false,
     runId: new Date().toISOString().replace(/[:.]/g, '-'),
-    skipBuild: false,
     suite: 'legacy',
   };
   const playwrightArgs = [];
@@ -197,8 +232,7 @@ export function parseArgs(argv) {
       continue;
     }
     if (arg === '--skip-build') {
-      harness.skipBuild = true;
-      continue;
+      throw new Error('--skip-build is not supported without a matching build receipt.');
     }
     if (arg.startsWith('--suite=')) {
       harness.suite = arg.slice('--suite='.length);
@@ -214,12 +248,6 @@ export function parseArgs(argv) {
   if (harness.suite === 'smoke' && playwrightArgs.length > 0) {
     throw new Error('The smoke suite inventory is fixed; remove positional Playwright filters.');
   }
-  if (harness.skipBuild && !harness.fixedPorts) {
-    throw new Error(
-      '--skip-build requires --fixed-ports so the build-time backend URL stays valid.'
-    );
-  }
-
   return {
     harness,
     configPath: harness.suite === 'legacy' ? 'playwright.config.ts' : 'playwright.ci.config.ts',
@@ -279,12 +307,130 @@ const runSync = ({ command, args, env, logPath, label }) => {
   return result;
 };
 
+export function seedRandomizerFixturesForSuite({ suite, env, logsDir, runCommand = runSync }) {
+  if (suite !== 'full') return [];
+  const result = runCommand({
+    command: process.execPath,
+    args: ['scripts/seed-e2e-randomizer-fixture.mjs'],
+    env,
+    logPath: path.join(logsDir, 'randomizer-fixture-seed.log'),
+    label: 'Randomizer fixture seed',
+  });
+  return parseRandomizerFixtureIds(result.stdout);
+}
+
 export function parseListedTestCount(output) {
   const match = output.match(/Total:\s+(\d+)\s+tests?/);
   if (!match) throw new Error('Playwright did not report a test count during inventory preflight.');
   const count = Number(match[1]);
   if (count < 1) throw new Error('Playwright inventory preflight found no tests.');
   return count;
+}
+
+const managedInventory = {
+  smoke: { files: 22, tests: 63 },
+  full: { files: 39, tests: 254 },
+};
+
+export function parseListedInventory(output, suite) {
+  const expected = managedInventory[suite];
+  if (!expected) throw new Error(`Managed inventory is unavailable for ${suite}.`);
+  const match = output.match(/Total:\s+(\d+)\s+tests?\s+in\s+(\d+)\s+files?/);
+  if (!match) throw new Error('Playwright did not report a complete managed test inventory.');
+  const actual = { tests: Number(match[1]), files: Number(match[2]) };
+  if (actual.tests !== expected.tests || actual.files !== expected.files) {
+    throw new Error(
+      `The ${suite} suite expected ${expected.tests} tests in ${expected.files} files, ` +
+        `but Playwright discovered ${actual.tests} tests in ${actual.files} files.`
+    );
+  }
+  return actual;
+}
+
+const collectReportTests = (suites, parents = [], inheritedFile = '') => {
+  const collected = [];
+  for (const suite of suites) {
+    const suiteIsFile = /\.spec\.[cm]?[jt]sx?$/.test(suite.title);
+    const file = suite.file || (suiteIsFile ? suite.title : inheritedFile);
+    const nextParents = suiteIsFile ? parents : [...parents, suite.title];
+    for (const spec of suite.specs || []) {
+      for (const test of spec.tests || []) {
+        collected.push({
+          ...test,
+          file: spec.file || file,
+          title: [...nextParents, spec.title].filter(Boolean).join(' › '),
+        });
+      }
+    }
+    collected.push(...collectReportTests(suite.suites || [], nextParents, file));
+  }
+  return collected;
+};
+
+const allowedFullSkip = test => {
+  const annotations = [...(test.annotations || [])];
+  for (const result of test.results || []) annotations.push(...(result.annotations || []));
+  return (
+    test.projectName === 'authenticated-chromium-full' &&
+    test.file?.replaceAll('\\', '/').endsWith('e2e/authenticated/mobile-touch-targets.spec.ts') &&
+    test.title.endsWith('mobile touch targets › bottom nav remains anchored during scroll') &&
+    annotations.some(
+      annotation =>
+        annotation.type === 'skip' &&
+        annotation.description === 'page too short to verify bottom nav scroll anchoring'
+    )
+  );
+};
+
+export function validateManagedPlaywrightReport(report, suite) {
+  const expected = managedInventory[suite];
+  if (!expected || !report || !Array.isArray(report.suites) || !report.stats) {
+    throw new Error('Playwright structured report is missing or malformed.');
+  }
+  const tests = collectReportTests(report.suites);
+  if (tests.length === 0) throw new Error('Playwright structured report contained no tests.');
+  if (tests.length !== expected.tests) {
+    throw new Error(
+      `Playwright structured report contained ${tests.length} tests; expected ${expected.tests}.`
+    );
+  }
+  if (Array.isArray(report.errors) && report.errors.length > 0) {
+    throw new Error('Playwright structured report contained run errors.');
+  }
+
+  let passed = 0;
+  let skipped = 0;
+  for (const test of tests) {
+    if (test.status === 'skipped') {
+      if (suite !== 'full' || !allowedFullSkip(test)) {
+        throw new Error(`Playwright reported an unexpected skip: ${test.title}.`);
+      }
+      skipped += 1;
+      continue;
+    }
+    const finalResult = test.results?.at(-1);
+    if (
+      test.status !== 'expected' ||
+      test.expectedStatus !== 'passed' ||
+      !finalResult ||
+      finalResult.status !== 'passed'
+    ) {
+      throw new Error(`Playwright reported a non-passing managed test: ${test.title}.`);
+    }
+    passed += 1;
+  }
+
+  const stats = report.stats;
+  if (
+    stats.expected !== passed ||
+    stats.skipped !== skipped ||
+    stats.unexpected !== 0 ||
+    stats.flaky !== 0 ||
+    passed + skipped !== expected.tests
+  ) {
+    throw new Error('Playwright structured report totals do not reconcile.');
+  }
+  return { expected: passed, skipped, total: tests.length };
 }
 
 const stopProcess = async processHandle => {
@@ -306,6 +452,7 @@ const writeReport = ({
   logsDir,
   pbUrl,
   playwrightArgs,
+  results,
   reportPath,
   runDir,
   status,
@@ -320,6 +467,8 @@ const writeReport = ({
     `Status: ${status}`,
     `Suite: ${suite}`,
     `Discovered tests: ${listedTestCount ?? 'not reached'}`,
+    `Passed tests: ${results?.expected ?? 'not reached'}`,
+    `Skipped tests: ${results?.skipped ?? 'not reached'}`,
     `Run directory: ${runDir}`,
     `App URL: ${appUrl}`,
     `PocketBase URL: ${pbUrl}`,
@@ -334,6 +483,7 @@ const writeReport = ({
     'Artifacts:',
     '',
     `- Playwright report: ${path.join(runDir, 'artifacts', 'playwright-report')}`,
+    `- Structured results: ${path.join(runDir, 'artifacts', 'playwright-results.json')}`,
     `- Playwright test results: ${path.join(runDir, 'artifacts', 'test-results')}`,
     `- Logs: ${logsDir}`,
     '',
@@ -384,6 +534,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     LOCAL_POCKETBASE_TEST_USER_PASSWORD: defaultTestPassword,
     LOCAL_POCKETBASE_URL: pbUrl,
     PLAYWRIGHT_HTML_REPORT: path.join(artifactsDir, 'playwright-report'),
+    PLAYWRIGHT_JSON_OUTPUT_FILE: path.join(artifactsDir, 'playwright-results.json'),
     PLAYWRIGHT_OUTPUT_DIR: path.join(artifactsDir, 'test-results'),
     PORT: String(appPort),
     VERCEL_ENV: 'test',
@@ -394,6 +545,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
 
   let appProcess;
   let listedTestCount;
+  let managedResults;
   let pbProcess;
   let exitStatus = 1;
   let failure;
@@ -426,31 +578,34 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
       logPath: path.join(logsDir, 'bootstrap.log'),
       label: 'PocketBase bootstrap',
     });
+    const randomizerProjectIds = seedRandomizerFixturesForSuite({
+      suite: harness.suite,
+      env,
+      logsDir,
+    });
     const fixtures = await resolveQaFixtures({
       pbUrl,
       email: defaultTestEmail,
       password: defaultTestPassword,
+      randomizerProjectIds,
     });
     Object.assign(env, {
       E2E_COLORING_BOOK_ID: fixtures.coloringBookId,
       E2E_COLORING_MEDIUM_ID: fixtures.coloringMediumId,
       E2E_COLORING_PAGE_ID: fixtures.coloringPageId,
+      ...(fixtures.randomizerProjectIds.length > 0
+        ? { E2E_RANDOMIZER_PROJECT_IDS: fixtures.randomizerProjectIds.join(',') }
+        : {}),
     });
 
-    if (harness.skipBuild) {
-      if (!existsSync(path.join(rootDir, 'dist', 'index.html'))) {
-        throw new Error('--skip-build requires an existing dist/index.html build artifact.');
-      }
-    } else {
-      const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-      runSync({
-        command: pnpm,
-        args: ['build'],
-        env,
-        logPath: path.join(logsDir, 'build.log'),
-        label: 'Production build',
-      });
-    }
+    const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+    runSync({
+      command: pnpm,
+      args: ['build'],
+      env,
+      logPath: path.join(logsDir, 'build.log'),
+      label: 'Production build',
+    });
 
     const appStdout = openSync(path.join(logsDir, 'app.stdout.log'), 'a');
     const appStderr = openSync(path.join(logsDir, 'app.stderr.log'), 'a');
@@ -462,7 +617,6 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     });
     await waitForHttp(appUrl, 'local build server', { processHandle: appProcess });
 
-    const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
     const basePlaywrightArgs = ['exec', 'playwright', 'test', '--config', configPath];
     const listResult = runSync({
       command: pnpm,
@@ -471,7 +625,11 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
       logPath: path.join(logsDir, 'playwright-list.log'),
       label: 'Playwright inventory preflight',
     });
-    listedTestCount = parseListedTestCount(`${listResult.stdout}\n${listResult.stderr}`);
+    const listedOutput = `${listResult.stdout}\n${listResult.stderr}`;
+    listedTestCount =
+      harness.suite === 'legacy'
+        ? parseListedTestCount(listedOutput)
+        : parseListedInventory(listedOutput, harness.suite).tests;
 
     const result = spawnSync(pnpm, [...basePlaywrightArgs, ...playwrightArgs, '--retries=0'], {
       cwd: rootDir,
@@ -481,6 +639,21 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     if (result.error) throw result.error;
     exitStatus = result.status ?? 1;
     if (exitStatus !== 0) failure = `Playwright failed with status ${exitStatus}.`;
+    if (harness.suite !== 'legacy') {
+      try {
+        const structuredReportPath = path.join(artifactsDir, 'playwright-results.json');
+        if (!existsSync(structuredReportPath) || statSync(structuredReportPath).size === 0) {
+          throw new Error('Playwright structured report is missing or empty.');
+        }
+        managedResults = validateManagedPlaywrightReport(
+          JSON.parse(readFileSync(structuredReportPath, 'utf8')),
+          harness.suite
+        );
+      } catch (error) {
+        exitStatus = 1;
+        failure = error instanceof Error ? error.message : String(error);
+      }
+    }
 
     console.log('');
     console.log(`Local release QA run: ${runDir}`);
@@ -501,11 +674,16 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
       logsDir,
       pbUrl,
       playwrightArgs,
+      results: managedResults,
       reportPath,
       runDir,
       status: exitStatus === 0 ? 'passed' : `failed with status ${exitStatus}`,
       suite: harness.suite,
     });
+    if (!existsSync(reportPath) || statSync(reportPath).size === 0) {
+      exitStatus = 1;
+      console.error('Local release QA Markdown report is missing or empty.');
+    }
   }
 
   return exitStatus;

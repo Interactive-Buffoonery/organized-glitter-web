@@ -920,8 +920,8 @@ routerAdd(
         p.id,
         p.title,
         p.date_completed AS date,
-        c.name AS company,
-        a.name AS artist
+        COALESCE(c.name, '') AS company,
+        COALESCE(a.name, '') AS artist
       FROM projects p
       LEFT JOIN companies c ON c.id = p.company
       LEFT JOIN artists a ON a.id = p.artist
@@ -968,8 +968,8 @@ routerAdd(
         p.id,
         p.title,
         p.created AS date,
-        c.name AS company,
-        a.name AS artist
+        COALESCE(c.name, '') AS company,
+        COALESCE(a.name, '') AS artist
       FROM projects p
       LEFT JOIN companies c ON c.id = p.company
       LEFT JOIN artists a ON a.id = p.artist

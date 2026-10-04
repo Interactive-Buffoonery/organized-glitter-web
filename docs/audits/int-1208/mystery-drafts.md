@@ -5,12 +5,14 @@ draft when a different page render suspends. Saving through the committed page's
 handler then writes the other page's subject to the visible page.
 
 Keep the synchronous state reset on page-ID changes, but synchronize the draft
-ref in a layout effect after commit. Event handlers still write the ref before
+ref in a layout effect after commit, including when the page ID changes but the
+committed subject stays the same. Event handlers still write the ref before
 setting state, preserving edit-then-save within one event.
 
 Failure modes covered before the fix: suspended page navigation overwrites the
 visible draft; committed page changes submit the old draft; same-tick edit then
-save loses the latest text; cancel and clear leave stale text. Existing tests
+save loses the latest text; batched edits and navigation retain an old draft
+when both pages share a subject; cancel and clear leave stale text. Existing tests
 cover real navigation, same-tick edits, cancel, and clear. A component harness
 publishes handlers only after commit to model the still-visible Save button
 while the replacement page suspends.

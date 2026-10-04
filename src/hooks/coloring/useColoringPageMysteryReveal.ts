@@ -33,7 +33,7 @@ export function useColoringPageMysteryReveal(
 
   useLayoutEffect(() => {
     revealedSubjectRef.current = revealedSubject;
-  }, [revealedSubject]);
+  }, [page?.id, revealedSubject]);
 
   const setRevealedSubjectValue = useCallback((value: string) => {
     revealedSubjectRef.current = value;

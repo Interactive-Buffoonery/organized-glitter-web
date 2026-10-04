@@ -203,6 +203,37 @@ describe('useColoringPageMysteryReveal', () => {
     );
   });
 
+  it('resets the draft when a same-tick page change keeps the committed subject', async () => {
+    const page = makePage({ revealedSubject: 'Castle' });
+    let update!: (value: ColoringPageDTO) => void;
+    let current!: ReturnType<typeof useColoringPageMysteryReveal>;
+    const Harness = () => {
+      const [currentPage, setCurrentPage] = useState(page);
+      update = setCurrentPage;
+      const reveal = useColoringPageMysteryReveal(currentPage, makeCommandExecutor());
+      useLayoutEffect(() => {
+        current = reveal;
+      });
+      return null;
+    };
+    render(<Harness />);
+    act(() => current.startRevealEditing());
+
+    act(() => {
+      current.setRevealedSubject('Uncommitted draft');
+      update(makePage({ id: 'page-2', revealedSubject: 'Castle' }));
+    });
+    expect(current.revealedSubject).toBe('Castle');
+    await act(async () => {
+      await current.submitReveal();
+    });
+    expect(executeMock).toHaveBeenCalledWith(
+      'page-2',
+      expect.objectContaining({ revealedSubject: 'Castle' }),
+      { failureTitle: 'Reveal failed' }
+    );
+  });
+
   it('submits the visible page draft while a different page render is suspended', async () => {
     const pending = new Promise<void>(() => {});
     let update!: (page: ColoringPageDTO) => void;

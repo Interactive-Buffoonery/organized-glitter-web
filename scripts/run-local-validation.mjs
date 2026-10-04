@@ -17,12 +17,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const summaryRoot = path.join(rootDir, '.tmp', 'local-validation');
-const profiles = new Set(['pr', 'release']);
+const profiles = new Set(['pr', 'release', 'backend']);
 
 const sharedPhases = [
+  ['backend', 'test:ci:backend'],
   ['static', 'test:ci:static'],
   ['unit', 'test:ci:unit'],
-  ['backend', 'test:ci:backend'],
   ['react', 'test:ci:react'],
   ['build', 'test:ci:build'],
   ['publication', 'test:publication'],
@@ -37,6 +37,7 @@ const trailingBrowserPhases = [
 
 export function buildPhasePlan(profile) {
   if (!profiles.has(profile)) throw new Error(`Unknown validation profile: ${profile}`);
+  if (profile === 'backend') return [['backend', 'test:ci:backend']];
   return [
     ...sharedPhases,
     profile === 'release' ? ['browser-full', 'qa:browser:full'] : ['browser-smoke', 'qa:browser'],
@@ -196,8 +197,32 @@ const toolIdentity = () => ({
   ),
 });
 
+export function formatValidationReport(summary) {
+  return [
+    '# Local PocketBase and CI results',
+    '',
+    `Result: ${summary.outcome}`,
+    `Computer: ${summary.platform.operatingSystem}/${summary.platform.architecture}`,
+    `Source: ${summary.repository.head?.commit ?? 'unavailable'}`,
+    `Comparison baseline: ${summary.repository.base.sha ?? summary.repository.base.ref}`,
+    ...(summary.failure ? ['', `Failure: ${summary.failure}`] : []),
+    '',
+    '| Phase | Result | Seconds | Exit code |',
+    '| --- | --- | --- | --- |',
+    ...summary.phases.map(
+      phase =>
+        `| ${phase.name} | ${phase.outcome} | ${((phase.durationMs || 0) / 1000).toFixed(1)} | ${phase.exitCode ?? ''} |`
+    ),
+    '',
+    'PocketBase tests boot local checksum-verified binaries with synthetic data.',
+    'This report does not verify hosted hooks or migrations.',
+    '',
+  ].join('\n');
+}
+
 const writeSummary = (summaryPath, summary) => {
   writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
+  writeFileSync(path.join(path.dirname(summaryPath), 'report.md'), formatValidationReport(summary));
 };
 
 export function recordPhaseFailure(phase, error, startedAtMs, finishedAtMs = Date.now()) {
@@ -247,14 +272,6 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
   const runDir = path.join(summaryRoot, runId);
   const summaryPath = path.join(runDir, 'summary.json');
   mkdirSync(runDir, { recursive: true });
-  const nativeSync = runAdvisoryNativeReport(base, runDir);
-  const repository = repositoryIdentity(base);
-  const buildEnvironment = environmentForPhase(
-    'build',
-    repository.base.sha,
-    process.env,
-    repository.head.commit
-  );
 
   const summary = {
     schemaVersion: 1,
@@ -262,24 +279,49 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
     runId,
     startedAt: new Date().toISOString(),
     outcome: 'running',
-    repository,
+    repository: { base: { ref: base }, head: null },
     platform: {
       architecture: process.arch,
       operatingSystem: process.platform,
       release: os.release(),
     },
-    tools: toolIdentity(),
-    inputs: {
-      lockfileSha256: hashFile('pnpm-lock.yaml'),
-      buildConfigSha256: buildConfigDigest(),
-      localBuildEnvironmentFilesSha256: localBuildEnvironmentFilesDigest(),
-      publicBuildEnvironmentSha256: publicBuildEnvironmentDigest(buildEnvironment),
-    },
-    nativeSync,
+    tools: null,
+    inputs: null,
+    nativeSync: { outcome: 'not-run', reason: 'PocketBase validation must pass first.' },
     phases: [],
   };
   writeSummary(summaryPath, summary);
   process.stdout.write(`Local validation summary: ${summaryPath}\n`);
+  process.stdout.write(`Local validation report: ${path.join(runDir, 'report.md')}\n`);
+
+  let initialization = 'repository identity';
+  try {
+    summary.repository = repositoryIdentity(base);
+    initialization = 'tool versions';
+    summary.tools = toolIdentity();
+    initialization = 'validation inputs';
+    const buildEnvironment = environmentForPhase(
+      'build',
+      summary.repository.base.sha,
+      process.env,
+      summary.repository.head.commit
+    );
+    summary.inputs = {
+      lockfileSha256: hashFile('pnpm-lock.yaml'),
+      buildConfigSha256: buildConfigDigest(),
+      localBuildEnvironmentFilesSha256: localBuildEnvironmentFilesDigest(),
+      publicBuildEnvironmentSha256: publicBuildEnvironmentDigest(buildEnvironment),
+    };
+  } catch {
+    summary.outcome = 'failed';
+    summary.failure = `Could not initialize ${initialization}. Check the comparison ref, Git, pnpm, and local inputs before retrying.`;
+    summary.finishedAt = new Date().toISOString();
+    writeSummary(summaryPath, summary);
+    process.stderr.write(`${summary.failure}\n`);
+    return 1;
+  }
+  writeSummary(summaryPath, summary);
+  const repository = summary.repository;
 
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
   for (const [name, script] of buildPhasePlan(profile)) {
@@ -317,6 +359,10 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
       summary.finishedAt = new Date().toISOString();
       writeSummary(summaryPath, summary);
       return result.status ?? 1;
+    }
+    if (name === 'backend' && profile !== 'backend') {
+      summary.nativeSync = runAdvisoryNativeReport(base, runDir);
+      writeSummary(summaryPath, summary);
     }
   }
 

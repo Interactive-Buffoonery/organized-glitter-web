@@ -1,7 +1,7 @@
 # Local native app sync report
 
 Before opening a web PR, use the report to decide whether the native app needs
-companion work. It runs automatically before the required phases of
+companion work. It runs automatically after the required PocketBase phase of
 `pnpm test:pr` and `pnpm test:release`. Findings and report failures are advisory.
 They do not change the web gate's exit status. Existing validation failures still
 fail the gate.

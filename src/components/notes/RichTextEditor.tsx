@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 
 import { cn } from '@/lib/utils';
@@ -34,7 +34,9 @@ const RichTextEditor = ({
   const editorId = id ?? generatedId;
   const lastEmittedValueRef = useRef(value);
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  useLayoutEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
   const [isEmpty, setIsEmpty] = useState(!value.trim());
 
   const editorAttributes: Record<string, string> = {

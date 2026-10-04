@@ -1,3 +1,5 @@
+import { act } from '@testing-library/react';
+import { Suspense, startTransition } from 'react';
 import { createEvent, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Editor } from '@tiptap/core';
@@ -193,5 +195,60 @@ describe('RichTextEditor', () => {
     // If both fired the toggle, the result would un-bold and onChange would
     // emit "Hello world" rather than the bolded form.
     expect(onChange).toHaveBeenLastCalledWith('**Hello world**');
+  });
+
+  it('keeps the committed callback when a replacement render suspends', async () => {
+    const committed = vi.fn();
+    const speculative = vi.fn();
+    const pending = new Promise<void>(() => {});
+    let update!: (suspended: boolean) => void;
+    let attempted = false;
+    const Suspend = ({ active }: { active: boolean }) => {
+      if (active) {
+        attempted = true;
+        throw pending;
+      }
+      return null;
+    };
+    const Harness = () => {
+      const [suspended, setSuspended] = useState(false);
+      update = setSuspended;
+      return (
+        <>
+          <RichTextEditor value="" onChange={suspended ? speculative : committed} />
+          <Suspend active={suspended} />
+        </>
+      );
+    };
+    render(
+      <Suspense fallback="Loading">
+        <Harness />
+      </Suspense>
+    );
+    await act(async () => {
+      startTransition(() => update(true));
+    });
+    expect(attempted).toBe(true);
+    committed.mockClear();
+    speculative.mockClear();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('textbox'));
+    await user.paste('Committed note');
+    expect(committed).toHaveBeenLastCalledWith('Committed note');
+    expect(speculative).not.toHaveBeenCalled();
+    act(() => update(false));
+  });
+
+  it('uses the replacement callback after it commits', async () => {
+    const first = vi.fn();
+    const next = vi.fn();
+    const { rerender } = render(<RichTextEditor value="" onChange={first} />);
+    first.mockClear();
+    rerender(<RichTextEditor value="" onChange={next} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('textbox'));
+    await user.paste('Latest note');
+    expect(next).toHaveBeenLastCalledWith('Latest note');
+    expect(first).not.toHaveBeenCalled();
   });
 });

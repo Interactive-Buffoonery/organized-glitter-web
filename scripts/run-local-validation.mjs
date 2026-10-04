@@ -203,8 +203,9 @@ export function formatValidationReport(summary) {
     '',
     `Result: ${summary.outcome}`,
     `Computer: ${summary.platform.operatingSystem}/${summary.platform.architecture}`,
-    `Source: ${summary.repository.head.commit}`,
-    `Comparison baseline: ${summary.repository.base.sha}`,
+    `Source: ${summary.repository.head?.commit ?? 'unavailable'}`,
+    `Comparison baseline: ${summary.repository.base.sha ?? summary.repository.base.ref}`,
+    ...(summary.failure ? ['', `Failure: ${summary.failure}`] : []),
     '',
     '| Phase | Result | Seconds | Exit code |',
     '| --- | --- | --- | --- |',
@@ -244,13 +245,6 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
   const runDir = path.join(summaryRoot, runId);
   const summaryPath = path.join(runDir, 'summary.json');
   mkdirSync(runDir, { recursive: true });
-  const repository = repositoryIdentity(base);
-  const buildEnvironment = environmentForPhase(
-    'build',
-    repository.base.sha,
-    process.env,
-    repository.head.commit
-  );
 
   const summary = {
     schemaVersion: 1,
@@ -258,24 +252,48 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
     runId,
     startedAt: new Date().toISOString(),
     outcome: 'running',
-    repository,
+    repository: { base: { ref: base }, head: null },
     platform: {
       architecture: process.arch,
       operatingSystem: process.platform,
       release: os.release(),
     },
-    tools: toolIdentity(),
-    inputs: {
-      lockfileSha256: hashFile('pnpm-lock.yaml'),
-      buildConfigSha256: buildConfigDigest(),
-      localBuildEnvironmentFilesSha256: localBuildEnvironmentFilesDigest(),
-      publicBuildEnvironmentSha256: publicBuildEnvironmentDigest(buildEnvironment),
-    },
+    tools: null,
+    inputs: null,
     phases: [],
   };
   writeSummary(summaryPath, summary);
   process.stdout.write(`Local validation summary: ${summaryPath}\n`);
   process.stdout.write(`Local validation report: ${path.join(runDir, 'report.md')}\n`);
+
+  let initialization = 'repository identity';
+  try {
+    summary.repository = repositoryIdentity(base);
+    initialization = 'tool versions';
+    summary.tools = toolIdentity();
+    initialization = 'validation inputs';
+    const buildEnvironment = environmentForPhase(
+      'build',
+      summary.repository.base.sha,
+      process.env,
+      summary.repository.head.commit
+    );
+    summary.inputs = {
+      lockfileSha256: hashFile('pnpm-lock.yaml'),
+      buildConfigSha256: buildConfigDigest(),
+      localBuildEnvironmentFilesSha256: localBuildEnvironmentFilesDigest(),
+      publicBuildEnvironmentSha256: publicBuildEnvironmentDigest(buildEnvironment),
+    };
+  } catch {
+    summary.outcome = 'failed';
+    summary.failure = `Could not initialize ${initialization}. Check the comparison ref, Git, pnpm, and local inputs before retrying.`;
+    summary.finishedAt = new Date().toISOString();
+    writeSummary(summaryPath, summary);
+    process.stderr.write(`${summary.failure}\n`);
+    return 1;
+  }
+  writeSummary(summaryPath, summary);
+  const repository = summary.repository;
 
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
   for (const [name, script] of buildPhasePlan(profile)) {

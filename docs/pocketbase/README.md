@@ -117,7 +117,7 @@ pnpm pb:test:protected-file-upgrade
 pnpm pb:test:protected-file-upgrade -- --rotation-migration=/path/to/1790268636_rotate_users_file_token.js
 ```
 
-The first command is part of `pnpm test:pr` and the backend CI job. It applies
+The first command is part of `pnpm test:pr` and the local backend validation phase. It applies
 the seventh migration automatically once that file is committed in PR 292.
 Until then, the second command is a local combined rehearsal using PR 292's
 migration file from another worktree. It checks that the old owner file token works after the six

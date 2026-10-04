@@ -7,7 +7,6 @@ import { evaluateCiResult, requiredJobs } from '../ci-result.mjs';
 
 const successfulJobs = () =>
   Object.fromEntries(requiredJobs.map(name => [name, { result: 'success' }]));
-const fullPlan = () => ({ backend: true, browser: true });
 
 describe('authoritative CI result', () => {
   it('matches every dependency wired into the workflow result job', () => {
@@ -23,81 +22,49 @@ describe('authoritative CI result', () => {
   });
 
   it('passes only when every required job completed successfully', () => {
-    expect(evaluateCiResult(successfulJobs(), fullPlan()).every(job => job.passed)).toBe(true);
+    expect(evaluateCiResult(successfulJobs()).every(job => job.passed)).toBe(true);
   });
 
   it.each(['failure', 'cancelled', 'skipped', undefined])(
-    'rejects a selected backend job with result %s',
+    'rejects an incomplete required job: %s',
     result => {
       const jobs = successfulJobs();
-      jobs.backend = { result };
-      expect(evaluateCiResult(jobs, fullPlan()).find(job => job.name === 'backend').passed).toBe(
-        false
-      );
+      jobs['static-checks'] = { result };
+      expect(evaluateCiResult(jobs).every(job => job.passed)).toBe(false);
     }
   );
 
-  it('rejects absent jobs even when every supplied result passed', () => {
+  it('rejects missing required jobs', () => {
     const jobs = successfulJobs();
-    delete jobs.backend;
-    expect(evaluateCiResult(jobs, fullPlan()).every(job => job.passed)).toBe(false);
+    delete jobs['unit-tests'];
+    expect(evaluateCiResult(jobs).every(job => job.passed)).toBe(false);
   });
 
-  it('accepts skipped expensive jobs only when the plan did not select them', () => {
-    const jobs = successfulJobs();
-    jobs.backend = { result: 'skipped' };
-    jobs.browser = { result: 'skipped' };
-
-    const results = evaluateCiResult(jobs, { backend: false, browser: false });
-
-    expect(results.find(job => job.name === 'backend')).toMatchObject({
-      passed: true,
-      selected: false,
-    });
-    expect(results.find(job => job.name === 'browser')).toMatchObject({
-      passed: true,
-      selected: false,
-    });
-  });
-
-  it('rejects a job that ran despite being unselected', () => {
-    const jobs = successfulJobs();
-    jobs.backend = { result: 'success' };
-    jobs.browser = { result: 'skipped' };
-
-    expect(
-      evaluateCiResult(jobs, { backend: false, browser: false }).find(job => job.name === 'backend')
-        .passed
-    ).toBe(false);
-  });
-
-  it('rejects an incomplete execution plan', () => {
-    expect(() => evaluateCiResult(successfulJobs(), { backend: true })).toThrow(/execution plan/i);
+  it('keeps PocketBase and dependent browser runtime work off Actions', () => {
+    const workflow = parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
+    expect(workflow.jobs).not.toHaveProperty('backend');
+    expect(workflow.jobs).not.toHaveProperty('browser');
+    expect(requiredJobs).not.toContain('backend');
+    expect(requiredJobs).not.toContain('browser');
   });
 
   it('does not ignore a failed dependency added to the workflow later', () => {
     const jobs = { ...successfulJobs(), 'additional-check': { result: 'failure' } };
-    expect(evaluateCiResult(jobs, fullPlan()).every(job => job.passed)).toBe(false);
+    expect(evaluateCiResult(jobs).every(job => job.passed)).toBe(false);
   });
 
-  it.each([
-    { needs: '', plan: JSON.stringify(fullPlan()) },
-    { needs: 'null', plan: JSON.stringify(fullPlan()) },
-    { needs: '[]', plan: JSON.stringify(fullPlan()) },
-    { needs: '{', plan: JSON.stringify(fullPlan()) },
-    { needs: '{}', plan: JSON.stringify(fullPlan()) },
-    { needs: JSON.stringify(successfulJobs()), plan: '' },
-    { needs: JSON.stringify(successfulJobs()), plan: '{}' },
-  ])('fails closed for incomplete CLI input %#', ({ needs, plan }) => {
-    const result = spawnSync(process.execPath, ['scripts/ci-result.mjs'], {
-      env: {
-        ...process.env,
-        CI_NEEDS: needs,
-        CI_PLAN: plan,
-        GITHUB_STEP_SUMMARY: '',
-      },
-      encoding: 'utf8',
-    });
-    expect(result.status).toBe(1);
-  });
+  it.each([{ needs: '' }, { needs: 'null' }, { needs: '[]' }, { needs: '{' }, { needs: '{}' }])(
+    'fails closed for incomplete CLI input %#',
+    ({ needs }) => {
+      const result = spawnSync(process.execPath, ['scripts/ci-result.mjs'], {
+        env: {
+          ...process.env,
+          CI_NEEDS: needs,
+          GITHUB_STEP_SUMMARY: '',
+        },
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(1);
+    }
+  );
 });

@@ -1,0 +1,42 @@
+name: Request labeled Spacefast preview
+
+on:
+  pull_request:
+    types: [labeled]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  request:
+    if: >-
+      github.event.label.name == 'spacefast-preview' &&
+      github.event.pull_request.head.ref == 'dev' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch checked release preview in ops
+        env:
+          GH_TOKEN: ${{ secrets.OPS_PREVIEW_DISPATCH_TOKEN }}
+        run: |
+          test -n "$GH_TOKEN"
+          jq -e '
+            .number == .pull_request.number and
+            .action == "labeled" and .label.name == "spacefast-preview" and
+            .pull_request.state == "open" and .pull_request.draft == false and
+            .pull_request.head.ref == "dev" and .pull_request.base.ref == "main" and
+            .pull_request.head.repo.full_name == "Interactive-Buffoonery/organized-glitter-web" and
+            .pull_request.base.repo.full_name == "Interactive-Buffoonery/organized-glitter-web" and
+            (.pull_request.head.sha | test("^[0-9a-f]{40}$")) and
+            (.number | type == "number" and . > 0 and floor == .)
+          ' "$GITHUB_EVENT_PATH" > /dev/null
+          jq '{ref: "main", inputs: {
+            pr_number: (.number | tostring), source_commit: .pull_request.head.sha
+          }}' "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/preview-request.json"
+          gh api --method POST \
+            repos/Interactive-Buffoonery/organized-glitter-ops/actions/workflows/spacefast-release-preview.yml/dispatches \
+            --input "$RUNNER_TEMP/preview-request.json"
+          echo 'Preview requested. Follow Build labeled release preview in organized-glitter-ops Actions.' >> "$GITHUB_STEP_SUMMARY"

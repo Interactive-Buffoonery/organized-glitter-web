@@ -14,7 +14,7 @@
 
 ## Validation
 
-<!-- List commands run, manual checks performed, or why validation was not run. -->
+<!-- List commands run and manual checks. For hooks, migrations or schema changes, include the local PocketBase report: machine, baseline, suites, outcome and gaps. Report the result before opening this PR. -->
 
 ## Data / PocketBase / Migration Risk
 
@@ -31,3 +31,4 @@
 - [ ] I ran relevant validation or documented why it was not run
 - [ ] I included screenshots or video for UI changes when applicable
 - [ ] I considered data, PocketBase, migration, and sync risk
+- [ ] For backend changes, I ran and reported local PocketBase validation before opening this PR

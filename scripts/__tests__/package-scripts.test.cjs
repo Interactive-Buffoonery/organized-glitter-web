@@ -55,11 +55,11 @@ describe('package scripts', () => {
   it('routes PR and release gates through the timed local orchestrator', () => {
     assert.equal(
       packageJson.scripts['test:pr'],
-      'node scripts/run-local-validation.mjs --profile=pr --base=${VALIDATION_BASE_REF:-origin/bootstrap/public-extraction}'
+      'node scripts/run-local-validation.mjs --profile=pr --base=${VALIDATION_BASE_REF:-origin/dev}'
     );
     assert.equal(
       packageJson.scripts['test:release'],
-      'node scripts/run-local-validation.mjs --profile=release --base=${VALIDATION_BASE_REF:-origin/bootstrap/public-extraction}'
+      'node scripts/run-local-validation.mjs --profile=release --base=${VALIDATION_BASE_REF:-origin/main}'
     );
   });
 

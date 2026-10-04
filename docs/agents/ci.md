@@ -15,6 +15,10 @@ stats behavior. It also seeds and checks the example library in a local server.
 A failure stops subsequent phases. `pnpm pr:create` only opens the PR after the
 complete local gate succeeds.
 
+After PocketBase passes, the PR and release gates write a local advisory
+[native app sync report](../native-sync-report.md). Its findings do not block
+the web gate, and it is skipped in CI.
+
 For a focused backend run:
 
 ```bash

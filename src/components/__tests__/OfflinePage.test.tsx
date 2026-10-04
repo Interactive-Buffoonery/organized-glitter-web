@@ -1,3 +1,5 @@
+import { act, fireEvent } from '@testing-library/react';
+import { Suspense, startTransition, useState } from 'react';
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -364,5 +366,43 @@ describe('OfflinePage', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Still unable to connect. Please try again.'
     );
+  });
+
+  it('keeps retry focusable when an uncommitted connectivity check suspends', async () => {
+    const pending = new Promise<void>(() => {});
+    let update!: (checking: boolean) => void;
+    let attempted = false;
+    const Suspend = ({ active }: { active: boolean }) => {
+      if (active) {
+        attempted = true;
+        throw pending;
+      }
+      return null;
+    };
+    const Harness = () => {
+      const [checking, setChecking] = useState(false);
+      update = setChecking;
+      return (
+        <>
+          <OfflinePage isChecking={checking} error={null} onCheckConnection={vi.fn()} />
+          <Suspend active={checking} />
+        </>
+      );
+    };
+    render(
+      <Suspense fallback="Loading">
+        <Harness />
+      </Suspense>
+    );
+    const retry = await screen.findByRole('button', { name: 'Check connection' });
+    await waitFor(() => expect(retry).toHaveFocus());
+    await act(async () => {
+      startTransition(() => update(true));
+    });
+    expect(attempted).toBe(true);
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(retry).toHaveFocus();
+    expect(retry).toBeEnabled();
+    act(() => update(false));
   });
 });

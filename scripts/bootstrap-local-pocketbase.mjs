@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import PocketBase from 'pocketbase';
+import { seedExampleLibrary } from './seed-example-library.mjs';
+
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -33,7 +36,8 @@ const defaultPocketBaseOrigins = [
 ];
 
 const args = new Set(process.argv.slice(2));
-const shouldSeed = args.has('--seed');
+const shouldSeedExamples = args.has('--seed-examples');
+const shouldSeed = args.has('--seed') || shouldSeedExamples;
 const shouldKeepAlive = !args.has('--no-keepalive');
 const originalEnvKeys = new Set(Object.keys(process.env));
 
@@ -526,6 +530,14 @@ async function main() {
 
     if (shouldSeed) {
       await seedFakeData(localUrl, token);
+      if (shouldSeedExamples) {
+        const client = new PocketBase(localUrl);
+        client.authStore.save(token);
+        const result = await seedExampleLibrary(client, 'localuser000001');
+        console.log(
+          `Seeded example library: ${result.projects} projects and ${result.books} books.`
+        );
+      }
     }
 
     console.log(`Local PocketBase is ready at ${localUrl}.`);

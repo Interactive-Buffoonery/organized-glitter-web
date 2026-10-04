@@ -105,8 +105,10 @@ export async function verifyNativeIntegration({ root, nativeRoot, simulator, out
     );
   let server;
   let stage = 'prerequisites';
-  const resultPath = path.join(output, 'NativeIntegration.xcresult');
+  let resultPath;
   try {
+    if (!output) return unavailable('Choose a report output directory for isolated integration.');
+    resultPath = path.join(output, 'NativeIntegration.xcresult');
     selectSimulator(
       JSON.parse(
         run('xcrun', ['simctl', 'list', 'devices', 'available', '--json'], { timeout: 30 * 1000 })
@@ -237,7 +239,7 @@ export async function verifyNativeIntegration({ root, nativeRoot, simulator, out
   } catch {
     return {
       outcome: stage === 'prerequisites' ? 'not-run' : 'failed',
-      ...(existsSync(resultPath) ? { resultBundle: resultPath } : {}),
+      ...(resultPath && existsSync(resultPath) ? { resultBundle: resultPath } : {}),
       stage,
       reason: `Native integration did not complete at ${stage}. Inspect the local result bundle when available, check prerequisites, and reproduce before deciding whether the app or backend needs a fix.`,
     };

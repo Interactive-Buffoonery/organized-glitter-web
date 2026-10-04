@@ -9,6 +9,11 @@ import {
 } from '../verify-native-integration.mjs';
 
 describe('isolated native integration', () => {
+  it('returns advisory missing-output evidence without throwing', async () => {
+    expect(await verifyNativeIntegration({ simulator: 'example' })).toMatchObject({
+      outcome: 'not-run',
+    });
+  });
   it('selects only an available iOS 26 iPhone and rejects an unrelated device', () => {
     const devices = {
       devices: {

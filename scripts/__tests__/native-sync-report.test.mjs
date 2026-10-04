@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, symlinkSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -185,6 +185,44 @@ describe('native sync decision', () => {
 });
 
 describe('local report command', () => {
+  it('keeps a required app change when integration observes changed inputs', async () => {
+    const { root, base } = fixture();
+    const nativeRoot = nativeFixture();
+    writeFileSync(
+      path.join(root, 'docs/pocketbase/collections.schema.json'),
+      JSON.stringify(schema([]))
+    );
+    const integration = await import('../verify-native-integration.mjs');
+    const spy = vi.spyOn(integration, 'verifyNativeIntegration').mockImplementation(async () => {
+      writeFileSync(
+        path.join(nativeRoot, nativeFiles[0].path),
+        `${nativeFiles[0].text}\nstruct Changed {}`
+      );
+      return { outcome: 'passed' };
+    });
+    try {
+      const report = await createNativeSyncReport({ root, base, nativeRoot, verifyNative: true });
+      expect(report.outcome).toBe('app-pr-required');
+      expect(report.findings).toContainEqual(expect.objectContaining({ kind: 'inputs-changed' }));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('writes a report when the CLI is invoked through a symlink', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'og-native-report-link-'));
+    const link = path.join(directory, 'native-sync.mjs');
+    symlinkSync(new URL('../native-sync-report.mjs', import.meta.url).pathname, link);
+    const output = path.join(directory, 'report');
+    execFileSync(
+      process.execPath,
+      [link, '--base=HEAD', '--native=/missing-native-repo', `--output=${output}`],
+      {
+        env: { ...process.env, CI: '' },
+      }
+    );
+    expect(existsSync(path.join(output, 'report.json'))).toBe(true);
+  });
   it('defaults to dev and accepts an explicit release target and native checkout', () => {
     expect(parseNativeSyncArgs([], {})).toMatchObject({ base: 'origin/dev', verifyNative: false });
     expect(

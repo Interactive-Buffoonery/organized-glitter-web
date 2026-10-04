@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -421,13 +421,13 @@ export async function createNativeSyncReport({
             'Backend or native source changed during integration. Rerun before relying on this evidence.',
           native: [],
         });
-        report.outcome = 'needs-investigation';
+        if (report.outcome !== 'app-pr-required') report.outcome = 'needs-investigation';
       }
       if (report.integration.outcome !== 'passed' && report.outcome !== 'app-pr-required')
-        report.outcome = 'needs-investigation';
+        if (report.outcome !== 'app-pr-required') report.outcome = 'needs-investigation';
     }
   } catch {
-    report.outcome = 'needs-investigation';
+    if (report.outcome !== 'app-pr-required') report.outcome = 'needs-investigation';
     report.findings.push({
       severity: 'investigate',
       kind: 'missing-evidence',
@@ -513,7 +513,7 @@ export async function runNativeSyncReport(options) {
   return report;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   try {
     await runNativeSyncReport(parseNativeSyncArgs(process.argv.slice(2)));
   } catch {

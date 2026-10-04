@@ -27,10 +27,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       base_sha: ${{ steps.scope.outputs.base_sha }}
-      plan: ${{ steps.scope.outputs.plan }}
-      run_backend: ${{ steps.scope.outputs.run_backend }}
-      run_browser: ${{ steps.scope.outputs.run_browser }}
-      run_full_browser: ${{ steps.scope.outputs.run_full_browser }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

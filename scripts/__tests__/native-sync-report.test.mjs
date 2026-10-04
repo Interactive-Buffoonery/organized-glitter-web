@@ -1,6 +1,13 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync, symlinkSync, existsSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  writeFileSync,
+  symlinkSync,
+  existsSync,
+  renameSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -206,6 +213,30 @@ describe('local report command', () => {
       expect(report.findings).toContainEqual(expect.objectContaining({ kind: 'inputs-changed' }));
       expect(report.integration.outcome).toBe('failed');
     } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('rejects passed integration when source verification becomes unavailable', async () => {
+    const { root, base } = fixture();
+    const nativeRoot = nativeFixture();
+    writeFileSync(
+      path.join(root, 'docs/pocketbase/collections.schema.json'),
+      JSON.stringify(schema([]))
+    );
+    const movedRoot = `${nativeRoot}-moved`;
+    const integration = await import('../verify-native-integration.mjs');
+    const spy = vi.spyOn(integration, 'verifyNativeIntegration').mockImplementation(async () => {
+      renameSync(nativeRoot, movedRoot);
+      return { outcome: 'passed' };
+    });
+    try {
+      const report = await createNativeSyncReport({ root, base, nativeRoot, verifyNative: true });
+      expect(report.outcome).toBe('app-pr-required');
+      expect(report.integration.outcome).toBe('failed');
+      expect(report.findings).toContainEqual(expect.objectContaining({ kind: 'missing-evidence' }));
+    } finally {
+      renameSync(movedRoot, nativeRoot);
       spy.mockRestore();
     }
   });

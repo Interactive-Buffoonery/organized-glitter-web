@@ -431,9 +431,14 @@ export async function createNativeSyncReport({
         if (report.outcome !== 'app-pr-required') report.outcome = 'needs-investigation';
       }
       if (report.integration.outcome !== 'passed' && report.outcome !== 'app-pr-required')
-        if (report.outcome !== 'app-pr-required') report.outcome = 'needs-investigation';
+        report.outcome = 'needs-investigation';
     }
   } catch {
+    if (report.integration.outcome === 'passed') {
+      report.integration.outcome = 'failed';
+      report.integration.reason =
+        'Source verification could not complete after integration. Rerun the report.';
+    }
     if (report.outcome !== 'app-pr-required') report.outcome = 'needs-investigation';
     report.findings.push({
       severity: 'investigate',

@@ -1,5 +1,5 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -12,15 +12,41 @@ import {
   parseArgs,
   publicBuildEnvironmentDigest,
   recordPhaseFailure,
+  formatValidationReport,
   validationEnvironment,
 } from '../run-local-validation.mjs';
 
 describe('local validation orchestrator', () => {
-  it('runs static checks first and preserves every existing PR gate', () => {
+  it('writes a failed run report before exiting when the base cannot resolve', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        new URL('../run-local-validation.mjs', import.meta.url).pathname,
+        '--profile=backend',
+        '--base=refs/heads/missing-validation-regression-base',
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(result.status).toBe(1);
+    const summaryPath = result.stdout.match(/Local validation summary: (.+)/)?.[1];
+    const reportPath = result.stdout.match(/Local validation report: (.+)/)?.[1];
+    expect(summaryPath).toBeDefined();
+    expect(reportPath).toBeDefined();
+    const summary = JSON.parse(readFileSync(summaryPath, 'utf8'));
+    expect(summary.outcome).toBe('failed');
+    expect(summary.phases).toEqual([]);
+    expect(summary.finishedAt).toBeDefined();
+    expect(summary.repository.base.ref).toBe('refs/heads/missing-validation-regression-base');
+    const report = readFileSync(reportPath, 'utf8');
+    expect(report).toContain('Result: failed');
+    expect(report).toContain('Could not initialize repository identity');
+    expect(report).not.toContain('undefined');
+  });
+  it('runs PocketBase first and preserves every existing PR gate', () => {
     expect(buildPhasePlan('pr')).toEqual([
+      ['backend', 'test:ci:backend'],
       ['static', 'test:ci:static'],
       ['unit', 'test:ci:unit'],
-      ['backend', 'test:ci:backend'],
       ['react', 'test:ci:react'],
       ['build', 'test:ci:build'],
       ['publication', 'test:publication'],
@@ -30,6 +56,20 @@ describe('local validation orchestrator', () => {
       ['protected-file-browser', 'test:protected-file-rotation-browser'],
       ['blog-browser', 'qa:blog'],
     ]);
+  });
+
+  it('can run and report only the local PocketBase gate', () => {
+    expect(buildPhasePlan('backend')).toEqual([['backend', 'test:ci:backend']]);
+    const report = formatValidationReport({
+      outcome: 'failed',
+      repository: { head: { commit: 'abc123' }, base: { sha: 'def456' } },
+      platform: { operatingSystem: 'darwin', architecture: 'arm64' },
+      phases: [{ name: 'backend', outcome: 'failed', durationMs: 1000, exitCode: 1 }],
+    });
+    expect(report).toContain('PocketBase');
+    expect(report).toContain('darwin/arm64');
+    expect(report).toContain('failed');
+    expect(report).toContain('abc123');
   });
 
   it('uses the broader browser inventory for a release gate', () => {

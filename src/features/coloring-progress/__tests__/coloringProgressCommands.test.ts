@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ColoringPageDTO } from '@/services/pocketbase/coloring.service';
 import {
@@ -93,10 +93,12 @@ describe('coloring progress commands', () => {
   });
 
   it('rejects lifecycle dates where completion is before start', () => {
-    expect(getColoringPageLifecycleDateRangeError('2026-04-10', '2026-04-01')).toBe(
+    expect(getColoringPageLifecycleDateRangeError('2026-04-10', '2026-04-01', 'completedAt')).toBe(
       'Completed date cannot be before started date.'
     );
-    expect(getColoringPageLifecycleDateRangeError('2026-04-01', '2026-04-10')).toBeNull();
+    expect(
+      getColoringPageLifecycleDateRangeError('2026-04-01', '2026-04-10', 'completedAt')
+    ).toBeNull();
 
     expect(() =>
       assertColoringPageLifecycleDateRange(
@@ -211,11 +213,13 @@ describe('coloring page future lifecycle dates', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 9, 4, 0, 5));
     try {
-      expect(getColoringPageLifecycleDateRangeError('2026-10-04', '2026-10-04')).toBeNull();
-      expect(getColoringPageLifecycleDateRangeError('2026-10-05', undefined)).toBe(
+      expect(
+        getColoringPageLifecycleDateRangeError('2026-10-04', '2026-10-04', 'completedAt')
+      ).toBeNull();
+      expect(getColoringPageLifecycleDateRangeError('2026-10-05', undefined, 'startedAt')).toBe(
         'Started date cannot be in the future.'
       );
-      expect(getColoringPageLifecycleDateRangeError(undefined, '2026-10-05')).toBe(
+      expect(getColoringPageLifecycleDateRangeError(undefined, '2026-10-05', 'completedAt')).toBe(
         'Completed date cannot be in the future.'
       );
       expect(() =>
@@ -224,6 +228,9 @@ describe('coloring page future lifecycle dates', () => {
           undefined
         )
       ).toThrow('Completed date cannot be in the future.');
+      expect(
+        getColoringPageLifecycleDateRangeError('2026-10-01', '2026-10-05', 'startedAt')
+      ).toBeNull();
     } finally {
       vi.useRealTimers();
     }

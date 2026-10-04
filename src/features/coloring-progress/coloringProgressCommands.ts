@@ -124,17 +124,16 @@ export const buildColoringPagePatch = (
 
 export const getColoringPageLifecycleDateRangeError = (
   startedAt: string | undefined,
-  completedAt: string | undefined
+  completedAt: string | undefined,
+  changedField: 'startedAt' | 'completedAt'
 ): string | null => {
-  const today = formatLocalDate(new Date(), 'yyyy-MM-dd');
-  for (const [value, label] of [
-    [startedAt, 'Started'],
-    [completedAt, 'Completed'],
-  ] as const) {
-    const date = value ? parseDateOnlyAsLocalDate(value) : null;
-    if (date && formatLocalDate(date, 'yyyy-MM-dd') > today) {
-      return `${label} date cannot be in the future.`;
-    }
+  const changedValue = changedField === 'startedAt' ? startedAt : completedAt;
+  const changedDate = changedValue ? parseDateOnlyAsLocalDate(changedValue) : null;
+  if (
+    changedDate &&
+    formatLocalDate(changedDate, 'yyyy-MM-dd') > formatLocalDate(new Date(), 'yyyy-MM-dd')
+  ) {
+    return `${changedField === 'startedAt' ? 'Started' : 'Completed'} date cannot be in the future.`;
   }
 
   if (startedAt && completedAt && completedAt < startedAt) {
@@ -155,7 +154,11 @@ export const assertColoringPageLifecycleDateRange = (
   const completedAt =
     command.type === 'set-completed-date' ? command.completedAt : currentPage?.completedAt;
 
-  const rangeError = getColoringPageLifecycleDateRangeError(startedAt, completedAt);
+  const rangeError = getColoringPageLifecycleDateRangeError(
+    startedAt,
+    completedAt,
+    command.type === 'set-started-date' ? 'startedAt' : 'completedAt'
+  );
   if (rangeError) {
     throw new Error(rangeError);
   }

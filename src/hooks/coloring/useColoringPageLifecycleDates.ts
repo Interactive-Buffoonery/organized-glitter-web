@@ -69,7 +69,11 @@ export function useColoringPageLifecycleDates(
 
       const nextStartedAt = field === 'startedAt' ? nextValue : startedAtDraftRef.current;
       const nextCompletedAt = field === 'completedAt' ? nextValue : completedAtDraftRef.current;
-      const rangeError = getColoringPageLifecycleDateRangeError(nextStartedAt, nextCompletedAt);
+      const rangeError = getColoringPageLifecycleDateRangeError(
+        nextStartedAt,
+        nextCompletedAt,
+        field
+      );
       if (rangeError) {
         notify({
           kind: 'error',

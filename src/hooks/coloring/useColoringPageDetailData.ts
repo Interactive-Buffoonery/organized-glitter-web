@@ -61,7 +61,7 @@ export function useColoringPageDetailData({
   );
   const mediumsQuery = useColoringMediums(userId);
 
-  const loadedPage = pageQuery.data;
+  const loadedPage = pageQuery.data ?? undefined;
   const book = bookQuery.data;
   const isPageBookMismatch = Boolean(loadedPage && book && loadedPage.bookId !== book.id);
   const page = isPageBookMismatch ? undefined : loadedPage;

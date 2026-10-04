@@ -1,3 +1,4 @@
+import { formatLocalDate, parseDateOnlyAsLocalDate } from '@/utils/date/timezoneUtils';
 import type {
   ColoringPageDTO,
   UpdateColoringPageInput,
@@ -125,6 +126,17 @@ export const getColoringPageLifecycleDateRangeError = (
   startedAt: string | undefined,
   completedAt: string | undefined
 ): string | null => {
+  const today = formatLocalDate(new Date(), 'yyyy-MM-dd');
+  for (const [value, label] of [
+    [startedAt, 'Started'],
+    [completedAt, 'Completed'],
+  ] as const) {
+    const date = value ? parseDateOnlyAsLocalDate(value) : null;
+    if (date && formatLocalDate(date, 'yyyy-MM-dd') > today) {
+      return `${label} date cannot be in the future.`;
+    }
+  }
+
   if (startedAt && completedAt && completedAt < startedAt) {
     return 'Completed date cannot be before started date.';
   }

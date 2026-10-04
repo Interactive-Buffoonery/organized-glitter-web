@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, vi } from 'vitest';
 
 import type { ColoringPageDTO } from '@/services/pocketbase/coloring.service';
 import {
@@ -203,5 +203,29 @@ describe('coloring progress commands', () => {
         revealedAt: '',
       })
     );
+  });
+});
+
+describe('coloring page future lifecycle dates', () => {
+  it('allows today and rejects tomorrow for both lifecycle dates', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 4, 0, 5));
+    try {
+      expect(getColoringPageLifecycleDateRangeError('2026-10-04', '2026-10-04')).toBeNull();
+      expect(getColoringPageLifecycleDateRangeError('2026-10-05', undefined)).toBe(
+        'Started date cannot be in the future.'
+      );
+      expect(getColoringPageLifecycleDateRangeError(undefined, '2026-10-05')).toBe(
+        'Completed date cannot be in the future.'
+      );
+      expect(() =>
+        assertColoringPageLifecycleDateRange(
+          { type: 'set-completed-date', completedAt: '2026-10-05' },
+          undefined
+        )
+      ).toThrow('Completed date cannot be in the future.');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

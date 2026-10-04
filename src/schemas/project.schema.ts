@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { formatLocalDate, parseDateOnlyAsLocalDate } from '@/utils/date/timezoneUtils';
 import { IMAGE_MAX_FILE_SIZE_BYTES, IMAGE_MIME_TYPES } from '@/utils/image/imagePolicy';
 import type { ProjectFormValues } from '@/types/project';
 
@@ -167,21 +168,43 @@ export const ProjectFormSchema = BaseProjectFormObjectSchema.refine(
     message: 'Start date cannot be before purchase date',
     path: ['dateStarted'],
   }
-).refine(
-  data => {
-    const startedDate = toDateForComparison(data.dateStarted);
-    const completedDate = toDateForComparison(data.dateCompleted);
+)
+  .refine(
+    data => {
+      const startedDate = toDateForComparison(data.dateStarted);
+      const completedDate = toDateForComparison(data.dateCompleted);
 
-    if (startedDate && completedDate && startedDate > completedDate) {
-      return false;
+      if (startedDate && completedDate && startedDate > completedDate) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Completion date cannot be before start date',
+      path: ['dateCompleted'],
     }
-    return true;
-  },
-  {
-    message: 'Completion date cannot be before start date',
-    path: ['dateCompleted'],
-  }
-);
+  )
+  .superRefine((data, ctx) => {
+    const today = formatLocalDate(new Date(), 'yyyy-MM-dd');
+    const dateFields = [
+      ['datePurchased', 'Purchase'],
+      ['dateReceived', 'Received'],
+      ['dateStarted', 'Start'],
+      ['dateCompleted', 'Completion'],
+    ] as const;
+
+    for (const [field, label] of dateFields) {
+      const value = data[field];
+      const date = typeof value === 'string' ? parseDateOnlyAsLocalDate(value) : value;
+      if (date && !Number.isNaN(date.getTime()) && formatLocalDate(date, 'yyyy-MM-dd') > today) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: `${label} date cannot be in the future`,
+        });
+      }
+    }
+  });
 
 export type ProjectFormFieldErrors = Partial<Record<keyof ProjectFormValues, string>>;
 

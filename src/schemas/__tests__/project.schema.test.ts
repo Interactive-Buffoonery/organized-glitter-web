@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   BaseProjectFormObjectSchema,
   ProjectFormSchema,
@@ -310,5 +310,36 @@ describe('mapProjectServerFieldErrors', () => {
       colorCount: 'Must be positive',
       dateStarted: 'Must be after purchase date',
     });
+  });
+});
+
+describe('ProjectFormSchema future date validation', () => {
+  it.each([
+    ['datePurchased', 'Purchase'],
+    ['dateReceived', 'Received'],
+    ['dateStarted', 'Start'],
+    ['dateCompleted', 'Completion'],
+  ])('allows today and rejects tomorrow for %s', (field, label) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 4, 0, 5));
+    try {
+      for (const value of ['2026-10-04', new Date(2026, 9, 4, 23, 59)]) {
+        expect(ProjectFormSchema.safeParse({ ...validBase, [field]: value }).success).toBe(true);
+      }
+      for (const value of ['2026-10-05', new Date(2026, 9, 5)]) {
+        const result = ProjectFormSchema.safeParse({ ...validBase, [field]: value });
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues).toContainEqual(
+            expect.objectContaining({
+              path: [field],
+              message: `${label} date cannot be in the future`,
+            })
+          );
+        }
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

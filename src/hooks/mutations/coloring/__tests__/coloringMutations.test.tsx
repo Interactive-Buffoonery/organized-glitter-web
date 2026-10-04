@@ -451,6 +451,8 @@ describe('coloring mutation hooks', () => {
 
     expect(coloringMock.getBookById).not.toHaveBeenCalled();
     expect(coloringMock.listPages).not.toHaveBeenCalled();
+    expect(result.current.pages.data?.items).toEqual([]);
+    expect(client.getQueryData(queryKeys.coloring.pages.detail(page.id))).toBeUndefined();
     expect(client.getQueryData(queryKeys.coloring.pages.detail(otherPage.id))).toEqual(otherPage);
   });
 

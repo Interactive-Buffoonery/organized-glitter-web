@@ -1,4 +1,5 @@
 import type { QueryClient, QueryFilters } from '@tanstack/react-query';
+import type { ListResult } from 'pocketbase';
 
 import {
   applyColoringPageOptimisticPatch,
@@ -98,6 +99,16 @@ export const clearDeletedColoringBook = async (
   const results = await Promise.allSettled(
     deletedQueries.map(async filters => {
       await queryClient.cancelQueries(filters);
+      if (filters.queryKey === queryKeys.coloring.pages.all) {
+        for (const [key, data] of queryClient.getQueriesData<ListResult<ColoringPageDTO>>({
+          ...filters,
+          type: 'active',
+        })) {
+          if (key[1] === 'list' && data) {
+            queryClient.setQueryData(key, { ...data, items: [], totalItems: 0, totalPages: 0 });
+          }
+        }
+      }
       await queryClient.invalidateQueries({ ...filters, refetchType: 'none' });
       queryClient.removeQueries({ ...filters, type: 'inactive' });
     })

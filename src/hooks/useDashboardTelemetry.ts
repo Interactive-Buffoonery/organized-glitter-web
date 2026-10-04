@@ -36,10 +36,11 @@ export const useDashboardTelemetry = ({
   artistsCount,
   projectsQuery,
 }: UseDashboardTelemetryInput) => {
-  const { renderCount, isExcessive } = useRenderGuard('useDashboardData', 15);
+  const { getRenderStats } = useRenderGuard('useDashboardData', 15);
   const { shouldLog } = useThrottledLogger('useDashboardData', 1000);
 
   useEffect(() => {
+    const { renderCount, isExcessive } = getRenderStats();
     if (!isExcessive) return;
 
     dashboardLogger.logRenderCount('useDashboardData', renderCount, isExcessive);
@@ -60,9 +61,8 @@ export const useDashboardTelemetry = ({
       });
     }
   }, [
-    isExcessive,
+    getRenderStats,
     shouldLog,
-    renderCount,
     userId,
     companiesSignature,
     artistsSignature,

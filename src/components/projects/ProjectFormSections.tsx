@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { notifyError } from '@/lib/notifications';
+import { usePrivateFileUrl } from '@/hooks/usePrivateFileUrl';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useNumberInput } from '@/hooks/useNumberInput';
 import { useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
@@ -50,6 +51,7 @@ const ProjectFormSections = ({
 }: ProjectFormSectionsProps) => {
   const imageUploadHook = useImageUpload('project-images', 'project-image');
   const { preview, applyProcessedImage } = imageUploadHook;
+  const cropSourceUrl = usePrivateFileUrl(preview || formData.imageUrl);
   const [projectTags, setProjectTags] = useState<Tag[]>(formData.tags || []);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
@@ -144,7 +146,7 @@ const ProjectFormSections = ({
       return;
     }
 
-    const url = imageUploadHook.preview || formData.imageUrl;
+    const url = cropSourceUrl;
     if (!url) return;
 
     try {
@@ -163,12 +165,7 @@ const ProjectFormSections = ({
         err instanceof Error ? err.message : 'Try replacing the image and cropping again.'
       );
     }
-  }, [
-    formData.imageFile,
-    formData.imageUrl,
-    imageUploadHook.processedFile,
-    imageUploadHook.preview,
-  ]);
+  }, [formData.imageFile, imageUploadHook.processedFile, cropSourceUrl]);
 
   const handleCropComplete = useCallback(
     (file: File) => {

@@ -39,7 +39,7 @@ describe('package scripts', () => {
     );
     assert.equal(
       packageJson.scripts['test:ci:backend'],
-      'pnpm pb:test:examples && pnpm pb:validate:schema && pnpm pb:validate:migrations && pnpm pb:validate:upgrade && pnpm pb:test:protected-file-upgrade && pnpm pb:test:auth-verification && pnpm pb:test:feedback && pnpm pb:test:native-oauth-association && pnpm pb:test:auth-step-up && pnpm pb:test:native-apple && pnpm pb:test:archive-restore-v3 && pnpm pb:test:mobile-sync && pnpm pb:test:stats'
+      'pnpm pb:test:examples && pnpm pb:validate:schema && pnpm pb:validate:migrations && pnpm pb:validate:upgrade && pnpm pb:test:protected-file-upgrade && pnpm pb:test:auth-verification && pnpm pb:test:feedback && pnpm pb:test:native-oauth-association && pnpm pb:test:auth-step-up && pnpm pb:test:native-apple && pnpm pb:test:archive-restore-v3 && pnpm pb:test:mobile-sync && pnpm pb:test:stats && pnpm pb:test:account-deletion'
     );
     assert.equal(packageJson.scripts['test:ci:build'], 'pnpm build && pnpm build:budget');
     assert.equal(

@@ -1,3 +1,5 @@
+import { act } from '@testing-library/react';
+import { Suspense, startTransition, useState } from 'react';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -192,5 +194,47 @@ describe('AvatarManager', () => {
       },
     ]);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save Avatar' })).toBeEnabled());
+  });
+
+  it('preserves a processed upload after abandoning a suspended avatar reset', async () => {
+    const pending = new Promise<void>(() => {});
+    const source = new File(['source'], 'photo.jpg', { type: 'image/jpeg' });
+    vi.mocked(imageCompression).mockReset().mockResolvedValue(source);
+    let update!: (value: { avatar: string; suspended: boolean }) => void;
+    let attempted = false;
+    const Suspend = ({ active }: { active: boolean }) => {
+      if (active) {
+        attempted = true;
+        throw pending;
+      }
+      return null;
+    };
+    const Harness = () => {
+      const [state, setState] = useState({ avatar: baseProps.currentAvatar!, suspended: false });
+      update = setState;
+      return (
+        <>
+          <AvatarManager {...baseProps} isOpen currentAvatar={state.avatar} />
+          <Suspend active={state.suspended} />
+        </>
+      );
+    };
+    render(
+      <Suspense fallback="Loading">
+        <Harness />
+      </Suspense>
+    );
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [source] },
+    });
+    fireEvent.click(await screen.findByText('Finish crop'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Avatar' })).toBeEnabled());
+    await act(async () => {
+      startTransition(() => update({ avatar: 'https://example.test/new.png', suspended: true }));
+    });
+    expect(attempted).toBe(true);
+    act(() => update({ avatar: baseProps.currentAvatar!, suspended: false }));
+    expect(screen.getByRole('button', { name: 'Save Avatar' })).toBeEnabled();
+    expect(screen.getByAltText('Avatar preview')).toHaveAttribute('src', 'blob:avatar-preview');
   });
 });

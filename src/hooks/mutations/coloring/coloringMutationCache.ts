@@ -1,4 +1,5 @@
-import type { QueryClient } from '@tanstack/react-query';
+import type { QueryClient, QueryFilters } from '@tanstack/react-query';
+import type { ListResult } from 'pocketbase';
 
 import {
   applyColoringPageOptimisticPatch,
@@ -9,6 +10,7 @@ import { queryKeys } from '@/hooks/queries/queryKeys';
 import type {
   ColoringBookDTO,
   ColoringPageDTO,
+  ColoringPagesListOptions,
   UpdateColoringPageInput,
 } from '@/services/pocketbase/coloring.service';
 import { createLogger } from '@/utils/logger';
@@ -76,20 +78,53 @@ export const refreshFailedColoringBookUpdate = (queryClient: QueryClient, bookId
   );
 };
 
-export const clearDeletedColoringBook = (queryClient: QueryClient, bookId: string): void => {
-  runPostWriteEffect(logger, 'Coloring book detail removal failed after delete', () => {
-    queryClient.removeQueries({ queryKey: queryKeys.coloring.books.detail(bookId) });
-  });
-  runPostWriteEffect(logger, 'Coloring page cache removal failed after book delete', () => {
-    queryClient.removeQueries({ queryKey: queryKeys.coloring.pages.all });
+export const clearDeletedColoringBook = async (
+  queryClient: QueryClient,
+  bookId: string
+): Promise<void> => {
+  const deletedQueries: QueryFilters[] = [
+    { queryKey: queryKeys.coloring.books.detail(bookId) },
+    { queryKey: queryKeys.coloring.tags.book(bookId) },
+    {
+      queryKey: queryKeys.coloring.pages.all,
+      predicate: query => {
+        if (query.queryKey[1] === 'list' && typeof query.queryKey[2] === 'string') {
+          const filters = JSON.parse(query.queryKey[2]) as ColoringPagesListOptions;
+          return filters.bookId === bookId;
+        }
+        return (query.state.data as ColoringPageDTO | undefined)?.bookId === bookId;
+      },
+    },
+  ];
+  const results = await Promise.allSettled(
+    deletedQueries.map(async filters => {
+      await queryClient.cancelQueries(filters);
+      if (filters.queryKey === queryKeys.coloring.pages.all) {
+        for (const [key, data] of queryClient.getQueriesData<
+          ListResult<ColoringPageDTO> | ColoringPageDTO
+        >({
+          ...filters,
+          type: 'active',
+        })) {
+          if (key[1] === 'list' && data) {
+            queryClient.setQueryData(key, { ...data, items: [], totalItems: 0, totalPages: 0 });
+          } else if (key[1] === 'detail') {
+            queryClient.setQueryData(key, null);
+          }
+        }
+      }
+      await queryClient.invalidateQueries({ ...filters, refetchType: 'none' });
+      queryClient.removeQueries({ ...filters, type: 'inactive' });
+    })
+  );
+  results.forEach(result => {
+    if (result.status === 'rejected') {
+      logger.error('Deleted coloring book cache cleanup failed', result.reason);
+    }
   });
   void settleInvalidations(
     queryClient,
-    [
-      queryKeys.coloring.books.all,
-      queryKeys.coloring.books.detail(bookId),
-      queryKeys.coloring.pages.all,
-    ],
+    [queryKeys.coloring.books.lists(), queryKeys.coloring.tags.stats()],
     'Coloring book cache refresh failed after delete'
   );
 };

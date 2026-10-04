@@ -4,7 +4,7 @@
  * @created 2025-07-09
  */
 
-import { useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('RenderGuards');
@@ -15,36 +15,39 @@ const logger = createLogger('RenderGuards');
 export const useRenderGuard = (componentName: string, threshold: number = 10) => {
   const renderCountRef = useRef(0);
   const lastWarningTimeRef = useRef(0);
-  const resetTimeRef = useRef(Date.now());
+  const resetTimeRef = useRef(0);
 
-  renderCountRef.current += 1;
+  // This flag belongs to this render's effect closure, so StrictMode replay
+  // does not count a second commit. An abandoned render never runs the effect.
+  const commit = { counted: false };
+  useLayoutEffect(() => {
+    if (commit.counted) return;
+    commit.counted = true;
+    const now = Date.now();
+    if (renderCountRef.current === 0 || now - resetTimeRef.current > 3000) {
+      renderCountRef.current = 1;
+      resetTimeRef.current = now;
+    } else {
+      renderCountRef.current += 1;
+    }
 
-  // Reset counter every 3 seconds so each distinct user interaction is
-  // measured on its own budget. A longer window (the previous 10s) let renders
-  // accumulate across unrelated interactions, initial load + a later tab
-  // click, pushing the counter past its threshold without any real bug.
-  const now = Date.now();
-  if (now - resetTimeRef.current > 3000) {
-    renderCountRef.current = 1;
-    resetTimeRef.current = now;
-  }
-
-  // Only warn once per 5 seconds to avoid spam
-  if (renderCountRef.current > threshold) {
-    const timeSinceLastWarning = now - lastWarningTimeRef.current;
-    if (timeSinceLastWarning > 5000) {
-      logger.warn(`🚨 ${componentName} excessive re-renders detected:`, {
+    if (renderCountRef.current > threshold && now - lastWarningTimeRef.current > 5000) {
+      logger.warn(`${componentName} excessive re-renders detected:`, {
         renderCount: renderCountRef.current,
         threshold,
         timeSinceReset: now - resetTimeRef.current,
       });
       lastWarningTimeRef.current = now;
     }
-  }
+  });
 
+  // Consumers read this from effects, after the commit has been counted.
+  // No state update is needed, which would itself inflate render telemetry.
   return {
-    renderCount: renderCountRef.current,
-    isExcessive: renderCountRef.current > threshold,
+    getRenderStats: () => ({
+      renderCount: renderCountRef.current,
+      isExcessive: renderCountRef.current > threshold,
+    }),
   };
 };
 

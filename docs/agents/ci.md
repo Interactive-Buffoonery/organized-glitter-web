@@ -49,9 +49,9 @@ full suite and compares with the populated public extraction revision
 `04789b9d000e6eb1390ca2a6ae60f855a3b1fca6`. It does not claim that the new
 branch previously deployed that schema.
 
-The scope helper still resolves the event comparison baseline used by React
-review and can describe local runtime coverage. Backend and browser selection
-outputs do not start hosted runtime jobs. Scheduled and manual Actions runs
+The scope job exports only the event comparison baseline used by React review.
+The helper also describes local backend and browser coverage in its plan, but
+those selections do not start hosted runtime jobs. Scheduled and manual Actions runs
 execute the same static/unit/publication jobs as pull requests.
 
 Branch protection and fork execution must be verified separately by an owner.

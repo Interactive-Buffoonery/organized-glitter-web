@@ -41,7 +41,8 @@ export const useRenderGuard = (componentName: string, threshold: number = 10) =>
     }
   });
 
-  // Consumers read this from effects, after the commit has been counted.
+  // A new getter each render makes dependent effects read every counted commit.
+  // Keep it unstable: ref changes alone cannot trigger those effects.
   // No state update is needed, which would itself inflate render telemetry.
   return {
     getRenderStats: () => ({

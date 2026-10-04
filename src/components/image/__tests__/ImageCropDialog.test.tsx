@@ -1,3 +1,5 @@
+import { act } from '@testing-library/react';
+import { Suspense, startTransition, useState } from 'react';
 import '@testing-library/jest-dom/vitest';
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
@@ -410,5 +412,54 @@ describe('ImageCropDialog', () => {
 
     await waitFor(() => expect(createCroppedImageFileMock).toHaveBeenCalledOnce());
     expect(onCropComplete).not.toHaveBeenCalled();
+  });
+
+  it('preserves the selected crop shape after abandoning a suspended preset reset', async () => {
+    const pending = new Promise<void>(() => {});
+    const file = new File(['image'], 'crop.jpg', { type: 'image/jpeg' });
+    let update!: (value: { preset: string; suspended: boolean }) => void;
+    let attempted = false;
+    const Suspend = ({ active }: { active: boolean }) => {
+      if (active) {
+        attempted = true;
+        throw pending;
+      }
+      return null;
+    };
+    const Harness = () => {
+      const [state, setState] = useState({ preset: 'rectangle-4-3', suspended: false });
+      update = setState;
+      return (
+        <>
+          <ImageCropDialog
+            open
+            file={file}
+            title="Crop"
+            description="Crop image"
+            aspect={4 / 3}
+            outputWidth={1200}
+            outputHeight={900}
+            presets={PROJECT_IMAGE_CROP_PRESETS}
+            defaultPresetId={state.preset}
+            onOpenChange={vi.fn()}
+            onCropComplete={vi.fn()}
+            onUseOriginal={vi.fn()}
+          />
+          <Suspend active={state.suspended} />
+        </>
+      );
+    };
+    render(
+      <Suspense fallback="Loading">
+        <Harness />
+      </Suspense>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /portrait crop/i }));
+    await act(async () => {
+      startTransition(() => update({ preset: 'square-1-1', suspended: true }));
+    });
+    expect(attempted).toBe(true);
+    act(() => update({ preset: 'rectangle-4-3', suspended: false }));
+    expect(screen.getByText('900 x 1200')).toBeInTheDocument();
   });
 });

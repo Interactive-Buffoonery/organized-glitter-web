@@ -22,7 +22,7 @@ vi.mock('@/utils/logger', () => ({
 }));
 
 vi.mock('@/utils/query/renderGuards', () => ({
-  useRenderGuard: () => mocks.renderGuardState,
+  useRenderGuard: () => ({ getRenderStats: () => mocks.renderGuardState }),
   useThrottledLogger: () => ({ shouldLog: mocks.shouldLog }),
 }));
 

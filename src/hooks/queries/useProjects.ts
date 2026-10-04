@@ -196,7 +196,7 @@ export const useProjects = (
   // Threshold accounts for React Query lifecycle updates + React 19's slightly
   // higher per-interaction commit count versus React 18 (raised from 8 → 14
   // during the React 19 upgrade; not a real regression).
-  const { renderCount, isExcessive } = useRenderGuard('useProjects', 14);
+  const { getRenderStats } = useRenderGuard('useProjects', 14);
   const { shouldLog } = useThrottledLogger('useProjects', 1000);
 
   // Stabilize metadata signatures for query key
@@ -219,6 +219,7 @@ export const useProjects = (
 
   // Enhanced debug logging with render trigger analysis
   useEffect(() => {
+    const { renderCount, isExcessive } = getRenderStats();
     if (shouldLog() && isExcessive) {
       logger.debug('🔄 useProjects called (modernized)', {
         userId,
@@ -240,9 +241,8 @@ export const useProjects = (
     userId,
     enabled,
     stableFilters.status,
-    isExcessive,
+    getRenderStats,
     shouldLog,
-    renderCount,
     // Use signatures instead of full objects to reduce re-renders
     filtersSignature,
     companiesSignature,

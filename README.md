@@ -86,7 +86,8 @@ The included Node server in `server/local-build-server.js` can serve the built
 app locally or behind your reverse proxy. See [`docs/README.md`](docs/README.md)
 for architecture and contracts.
 
-Spacefast adapter code lives in `spacefast/`, as Organized Glitter is hosted on Spacefast. You can check out Spacefast at [https://spacefast.com](https://spacefast.com)
+Spacefast adapter code lives in `spacefast/`, as Organized Glitter is hosted on
+[Spacefast](https://spacefast.com). The adapter is optional for self-hosting.
 
 ## Common commands
 

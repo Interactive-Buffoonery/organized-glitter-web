@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Cropper from 'react-easy-crop';
 import { Button } from '@/components/ui/button';
 import {
@@ -119,19 +119,18 @@ export function ImageCropDialog({
     onPreviewError: () => onOpenChange(false),
     resetKey: JSON.stringify([activeFileKey, presetsResetKey, defaultPresetId]),
   });
-  const prevResetKeyRef = useRef<CropDialogResetKey>({
+  const [prevResetKey, setPrevResetKey] = useState<CropDialogResetKey>({
     activeFileKey,
     presetsResetKey,
     defaultPresetId,
   });
   const nextResetKey: CropDialogResetKey = { activeFileKey, presetsResetKey, defaultPresetId };
-  const prevResetKey = prevResetKeyRef.current;
   if (
     prevResetKey.activeFileKey !== activeFileKey ||
     prevResetKey.presetsResetKey !== presetsResetKey ||
     prevResetKey.defaultPresetId !== defaultPresetId
   ) {
-    prevResetKeyRef.current = nextResetKey;
+    setPrevResetKey(nextResetKey);
     setSelectedPresetId(defaultPresetId ?? presets?.[0]?.id ?? null);
   }
 

@@ -76,7 +76,9 @@ export const OfflinePage: React.FC<OfflinePageProps> = ({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const isCheckingRef = useRef(isChecking);
-  isCheckingRef.current = isChecking;
+  useLayoutEffect(() => {
+    isCheckingRef.current = isChecking;
+  }, [isChecking]);
   const interruptedFocusRef = useRef(
     document.activeElement instanceof HTMLElement ? document.activeElement : null
   );

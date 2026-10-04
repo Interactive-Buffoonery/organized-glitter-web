@@ -1,0 +1,81 @@
+{
+  "sourceRevision": "8c0556a54abfab8dab112c38d010e7196fdcaa4e",
+  "projects": [
+    {
+      "title": "Summer Garden Blooms",
+      "status": "progress",
+      "image": "design-summer-garden-blooms.jpg",
+      "source_url": "https://unsplash.com/photos/MRjuroFzfQw",
+      "credit": "Annie Spratt"
+    },
+    {
+      "title": "Misty Mount Rainier",
+      "status": "stash",
+      "image": "design-misty-mount-rainier.jpg",
+      "source_url": "https://unsplash.com/photos/UHFQPFt5-WA",
+      "credit": "Dave Hoefler"
+    },
+    {
+      "title": "Monarch in the Garden",
+      "status": "progress",
+      "image": "design-monarch-in-the-garden.jpg",
+      "source_url": "https://unsplash.com/photos/XR3uGa4gXgE",
+      "credit": "Aaron Burden"
+    },
+    {
+      "title": "Golden-Eyed Tabby",
+      "status": "completed",
+      "image": "design-golden-eyed-tabby.jpg",
+      "source_url": "https://unsplash.com/photos/6CwBxiekWcw",
+      "credit": "Borna Bevanda"
+    },
+    {
+      "title": "Mirror Lake Reflections",
+      "status": "purchased",
+      "image": "design-mirror-lake-reflections.jpg",
+      "source_url": "https://unsplash.com/photos/0SzZ5ttDrdE",
+      "credit": "Hayden Walker"
+    },
+    {
+      "title": "San Diego Sunset",
+      "status": "wishlist",
+      "image": "design-san-diego-sunset.jpg",
+      "source_url": "https://unsplash.com/photos/ih5Kq0XowwY",
+      "credit": "Braden Jarvis"
+    }
+  ],
+  "books": [
+    {
+      "title": "Smithsonian Libraries Coloring Pages, Volume 2",
+      "status": "in_progress",
+      "total_pages": 11,
+      "cover": "design-book-0.jpg",
+      "credit": "Smithsonian Libraries",
+      "source_url": "https://library.si.edu/event/coloring-pages-v-2"
+    },
+    {
+      "title": "Exoplanet Travel Bureau Coloring Book",
+      "status": "in_stash",
+      "total_pages": 6,
+      "cover": "design-book-1.jpg",
+      "credit": "NASA/JPL-Caltech",
+      "source_url": "https://science.nasa.gov/resource/exoplanet-travel-bureau-coloring-book/"
+    },
+    {
+      "title": "Our Very Own Star: The Sun",
+      "status": "in_stash",
+      "total_pages": 9,
+      "cover": "design-book-2.jpg",
+      "credit": "NASA Goddard Space Flight Center; Daniel Vong",
+      "source_url": "https://science.nasa.gov/learn/heat/resource/our-very-own-star-the-sun-coloring-book/"
+    },
+    {
+      "title": "NASA's Field Guide to Black Holes Coloring Book",
+      "status": "in_progress",
+      "total_pages": 3,
+      "cover": "design-book-3.jpg",
+      "credit": "NASA",
+      "source_url": "https://science.nasa.gov/universe/fun-exploring-the-universe/universe-coloring-pages/nasas-field-guide-to-black-holes-coloring-pages/"
+    }
+  ]
+}

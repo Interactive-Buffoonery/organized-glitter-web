@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   formatDateInUserTimezone,
   formatDateOnlyForDisplay,
   formatLocalDate,
+  getCurrentDateInUserTimezone,
+  isFutureDateOnly,
   normalizeDateOnlyValue,
   parseTimestamp,
 } from './timezoneUtils';
@@ -85,5 +87,38 @@ describe('parseTimestamp', () => {
     expect(parseTimestamp('2025-08-03T14:30:00.000Z').toISOString()).toBe(
       '2025-08-03T14:30:00.000Z'
     );
+  });
+});
+
+describe('isFutureDateOnly', () => {
+  it.each([
+    ['2026-10-04', false],
+    ['2026-10-05', true],
+    [' 2026-10-05 00:00:00.000Z ', true],
+    ['', false],
+    [null, false],
+    [undefined, false],
+    ['not-a-date', false],
+    ['2026-02-31', false],
+    [new Date(NaN), false],
+    [new Date(2026, 9, 4, 23, 59), false],
+    [new Date(2026, 9, 5), true],
+  ])('checks %s against an explicit today', (value, expected) => {
+    expect(isFutureDateOnly(value, '2026-10-04')).toBe(expected);
+  });
+
+  it('allows today in a user timezone ahead of the browser', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 4, 23, 30));
+    try {
+      const browserToday = formatLocalDate(new Date(), 'yyyy-MM-dd');
+      const userToday = getCurrentDateInUserTimezone('Pacific/Kiritimati');
+      expect(browserToday).toBe('2026-10-04');
+      expect(userToday).toBe('2026-10-05');
+      expect(isFutureDateOnly(userToday, browserToday)).toBe(true);
+      expect(isFutureDateOnly(userToday, userToday)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

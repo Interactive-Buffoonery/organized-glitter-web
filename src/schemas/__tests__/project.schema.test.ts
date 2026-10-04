@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   BaseProjectFormObjectSchema,
   ProjectFormSchema,
@@ -222,30 +222,36 @@ describe('ProjectFormSchema cross-field validation', () => {
 
 describe('validateProjectFormValues', () => {
   it('maps required title errors to the title field', () => {
-    const result = validateProjectFormValues({ ...validBase, title: '' });
+    const result = validateProjectFormValues({ ...validBase, title: '' }, '2026-10-04');
 
     expect(result.isValid).toBe(false);
     expect(result.fieldErrors.title).toBe('Title is required');
   });
 
   it('maps source URL errors to the sourceUrl field', () => {
-    const result = validateProjectFormValues({
-      ...validBase,
-      sourceUrl: 'not-a-url',
-    });
+    const result = validateProjectFormValues(
+      {
+        ...validBase,
+        sourceUrl: 'not-a-url',
+      },
+      '2026-10-04'
+    );
 
     expect(result.isValid).toBe(false);
     expect(result.fieldErrors.sourceUrl).toBe('Source URL must be a valid URL if provided');
   });
 
   it('maps numeric validation errors to their fields', () => {
-    const result = validateProjectFormValues({
-      ...validBase,
-      width: '-10',
-      height: '-20',
-      totalDiamonds: '12.5',
-      colorCount: '12.5',
-    });
+    const result = validateProjectFormValues(
+      {
+        ...validBase,
+        width: '-10',
+        height: '-20',
+        totalDiamonds: '12.5',
+        colorCount: '12.5',
+      },
+      '2026-10-04'
+    );
 
     expect(result.isValid).toBe(false);
     expect(result.fieldErrors.width).toBe('Width must be a positive number');
@@ -255,36 +261,48 @@ describe('validateProjectFormValues', () => {
   });
 
   it('maps non-number color count validation errors to the colorCount field', () => {
-    const result = validateProjectFormValues({
-      ...validBase,
-      colorCount: 'many',
-    });
+    const result = validateProjectFormValues(
+      {
+        ...validBase,
+        colorCount: 'many',
+      },
+      '2026-10-04'
+    );
 
     expect(result.isValid).toBe(false);
     expect(result.fieldErrors.colorCount).toBe('# of colors must be a number');
   });
 
   it('maps non-positive color count validation errors to the colorCount field', () => {
-    const result = validateProjectFormValues({
-      ...validBase,
-      colorCount: '0',
-    });
+    const result = validateProjectFormValues(
+      {
+        ...validBase,
+        colorCount: '0',
+      },
+      '2026-10-04'
+    );
 
     expect(result.isValid).toBe(false);
     expect(result.fieldErrors.colorCount).toBe('# of colors must be positive');
   });
 
   it('maps cross-field date errors to the later date field', () => {
-    const startedBeforePurchased = validateProjectFormValues({
-      ...validBase,
-      datePurchased: '2025-06-01',
-      dateStarted: '2025-01-01',
-    });
-    const completedBeforeStarted = validateProjectFormValues({
-      ...validBase,
-      dateStarted: '2025-06-01',
-      dateCompleted: '2025-01-01',
-    });
+    const startedBeforePurchased = validateProjectFormValues(
+      {
+        ...validBase,
+        datePurchased: '2025-06-01',
+        dateStarted: '2025-01-01',
+      },
+      '2026-10-04'
+    );
+    const completedBeforeStarted = validateProjectFormValues(
+      {
+        ...validBase,
+        dateStarted: '2025-06-01',
+        dateCompleted: '2025-01-01',
+      },
+      '2026-10-04'
+    );
 
     expect(startedBeforePurchased.fieldErrors.dateStarted).toBe(
       'Start date cannot be before purchase date'
@@ -313,33 +331,22 @@ describe('mapProjectServerFieldErrors', () => {
   });
 });
 
-describe('ProjectFormSchema future date validation', () => {
+describe('project form future date validation', () => {
   it.each([
     ['datePurchased', 'Purchase'],
     ['dateReceived', 'Received'],
     ['dateStarted', 'Start'],
     ['dateCompleted', 'Completion'],
   ])('allows today and rejects tomorrow for %s', (field, label) => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 9, 4, 0, 5));
-    try {
-      for (const value of ['2026-10-04', new Date(2026, 9, 4, 23, 59)]) {
-        expect(ProjectFormSchema.safeParse({ ...validBase, [field]: value }).success).toBe(true);
-      }
-      for (const value of ['2026-10-05', new Date(2026, 9, 5)]) {
-        const result = ProjectFormSchema.safeParse({ ...validBase, [field]: value });
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues).toContainEqual(
-            expect.objectContaining({
-              path: [field],
-              message: `${label} date cannot be in the future`,
-            })
-          );
-        }
-      }
-    } finally {
-      vi.useRealTimers();
+    for (const value of ['2026-10-04', new Date(2026, 9, 4, 23, 59)]) {
+      expect(
+        validateProjectFormValues({ ...validBase, [field]: value }, '2026-10-04').isValid
+      ).toBe(true);
+    }
+    for (const value of ['2026-10-05', new Date(2026, 9, 5)]) {
+      const result = validateProjectFormValues({ ...validBase, [field]: value }, '2026-10-04');
+      expect(result.isValid).toBe(false);
+      expect(result.fieldErrors).toEqual({ [field]: `${label} date cannot be in the future` });
     }
   });
 });

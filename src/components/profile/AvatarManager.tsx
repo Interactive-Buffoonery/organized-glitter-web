@@ -72,19 +72,18 @@ export function AvatarManager({
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [finalCompressedFile, setFinalCompressedFile] = useState<File | null>(null);
 
-  const prevResetKeyRef = useRef<AvatarResetKey>({
+  const [prevResetKey, setPrevResetKey] = useState<AvatarResetKey>({
     isOpen,
     currentConfigType,
     currentAvatar,
   });
   const nextResetKey: AvatarResetKey = { isOpen, currentConfigType, currentAvatar };
-  const prevResetKey = prevResetKeyRef.current;
   if (
     prevResetKey.isOpen !== isOpen ||
     prevResetKey.currentConfigType !== currentConfigType ||
     prevResetKey.currentAvatar !== currentAvatar
   ) {
-    prevResetKeyRef.current = nextResetKey;
+    setPrevResetKey(nextResetKey);
     if (isOpen) {
       setUploadState(buildUploadState(isOpen, currentConfigType, currentAvatar));
       setProcessingError(null);

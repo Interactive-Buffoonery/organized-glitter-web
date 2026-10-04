@@ -204,6 +204,27 @@ describe('local report command', () => {
       const report = await createNativeSyncReport({ root, base, nativeRoot, verifyNative: true });
       expect(report.outcome).toBe('app-pr-required');
       expect(report.findings).toContainEqual(expect.objectContaining({ kind: 'inputs-changed' }));
+      expect(report.integration.outcome).toBe('failed');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('rejects integration evidence from a different committed native revision', async () => {
+    const { root, base } = fixture();
+    const nativeRoot = nativeFixture();
+    const integration = await import('../verify-native-integration.mjs');
+    const spy = vi.spyOn(integration, 'verifyNativeIntegration').mockImplementation(async () => {
+      execFileSync('git', ['commit', '--allow-empty', '-qm', 'advance native revision'], {
+        cwd: nativeRoot,
+      });
+      return { outcome: 'passed' };
+    });
+    try {
+      const report = await createNativeSyncReport({ root, base, nativeRoot, verifyNative: true });
+      expect(report.outcome).toBe('needs-investigation');
+      expect(report.integration.outcome).toBe('failed');
+      expect(report.findings).toContainEqual(expect.objectContaining({ kind: 'inputs-changed' }));
     } finally {
       spy.mockRestore();
     }

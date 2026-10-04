@@ -95,6 +95,13 @@ async function runAsync(command, args, options) {
   }
 }
 
+export function nativeSnapshotCommit(nativeRoot, expectedCommit) {
+  const commit = run('git', ['-C', nativeRoot, 'rev-parse', '--verify', 'HEAD^{commit}']).trim();
+  if (expectedCommit && commit !== expectedCommit)
+    throw new Error('Native revision changed during integration.');
+  return commit;
+}
+
 export async function verifyNativeIntegration({ root, nativeRoot, simulator, output }) {
   const unavailable = reason => ({ outcome: 'not-run', reason });
   if (process.platform !== 'darwin')
@@ -125,6 +132,7 @@ export async function verifyNativeIntegration({ root, nativeRoot, simulator, out
         'Commit or stash native tracked changes before integration. Source review uses the working tree; integration runs an isolated committed snapshot.'
       );
     stage = 'native snapshot';
+    const nativeCommit = nativeSnapshotCommit(nativeRoot);
     const nativeDir = path.join(output, 'native-source');
     const dataDir = path.join(output, 'pocketbase-data');
     const hooksDir = path.join(output, 'pocketbase-hooks');
@@ -135,7 +143,7 @@ export async function verifyNativeIntegration({ root, nativeRoot, simulator, out
     mkdirSync(nativeDir, { recursive: true });
     mkdirSync(hooksDir, { recursive: true });
     const archive = path.join(output, 'native-source.tar');
-    run('git', ['-C', nativeRoot, 'archive', '--format=tar', `--output=${archive}`, 'HEAD']);
+    run('git', ['-C', nativeRoot, 'archive', '--format=tar', `--output=${archive}`, nativeCommit]);
     run('tar', ['-xf', archive, '-C', nativeDir]);
     const iosDir = path.join(nativeDir, 'ios');
     const testSource = readFileSync(
@@ -229,8 +237,11 @@ export async function verifyNativeIntegration({ root, nativeRoot, simulator, out
     );
     if (summary.passedTests !== 1 || summary.failedTests !== 0 || summary.skippedTests !== 0)
       throw new Error('Seeded test execution was not confirmed.');
+    stage = 'native revision verification';
+    nativeSnapshotCommit(nativeRoot, nativeCommit);
     return {
       outcome: 'passed',
+      nativeCommit,
       passedTests: summary.passedTests,
       resultBundle: resultPath,
       reason:

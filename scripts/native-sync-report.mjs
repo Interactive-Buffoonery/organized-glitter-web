@@ -411,9 +411,16 @@ export async function createNativeSyncReport({
       const nativeAfter = sourceFiles(nativeRoot);
       if (
         backendSourceDigest(root) !== report.web.backendSourceSha256 ||
+        git(nativeRoot, ['rev-parse', 'HEAD']).trim() !== report.native.commit ||
+        (report.integration.nativeCommit &&
+          report.integration.nativeCommit !== report.native.commit) ||
         digest(nativeAfter.map(file => `${file.path}\0${file.text}`).join('\0')) !==
           report.native.sourceSha256
       ) {
+        if (report.integration.outcome === 'passed') {
+          report.integration.outcome = 'failed';
+          report.integration.reason = 'Source inputs changed during integration. Rerun the report.';
+        }
         report.findings.push({
           severity: 'investigate',
           kind: 'inputs-changed',

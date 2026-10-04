@@ -1,14 +1,33 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   prepareSeededTest,
   nativeTestArguments,
   nativeTestEnvironment,
   selectSimulator,
   verifyNativeIntegration,
+  nativeSnapshotCommit,
 } from '../verify-native-integration.mjs';
 
 describe('isolated native integration', () => {
+  it('rejects a native checkout that advances after its snapshot is pinned', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'og-native-snapshot-'));
+    const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+    git('init', '-q');
+    git('config', 'user.name', 'Test');
+    git('config', 'user.email', 'test@example.test');
+    git('commit', '--allow-empty', '-qm', 'add snapshot');
+    const commit = nativeSnapshotCommit(root);
+    expect(nativeSnapshotCommit(root, commit)).toBe(commit);
+    git('commit', '--allow-empty', '-qm', 'advance native revision');
+    expect(() => nativeSnapshotCommit(root, commit)).toThrow(
+      'Native revision changed during integration.'
+    );
+  });
   it('returns advisory missing-output evidence without throwing', async () => {
     expect(await verifyNativeIntegration({ simulator: 'example' })).toMatchObject({
       outcome: 'not-run',

@@ -14,6 +14,37 @@ from the committed schema and fake records, then keep reusing the same local DB.
 - It does not contain `pb_data`, SQL dumps, uploaded files, backups, or
   production records.
 
+## Pre-PR local backend gate
+
+For hook, migration or schema changes, run the real backend suite locally first:
+
+```bash
+VALIDATION_BASE_REF=origin/dev pnpm pb:validate:local
+```
+
+Read `.tmp/local-validation/<run>/report.md` and report the results before
+opening the PR. The command runs checksum-verified PocketBase binaries on this
+computer, validates upgrades from the selected base, and stops on a failure.
+`pnpm test:pr` runs this same backend phase first, followed by the remaining
+checks. GitHub Actions does not run PocketBase or its browser fixtures.
+
+The instance used for automation may be updated or recreated. Preserve the
+persistent local database for normal app work unless a reset is intentional.
+
+To add the shared starting library to a local install:
+
+```bash
+pnpm pb:bootstrap:local -- --seed-examples
+```
+
+This also creates the ordinary synthetic fixtures, then adds the six example
+diamond projects, four coloring books and eleven Smithsonian page images from
+native fixture PR #54. It uses local credentials and local record IDs, preserves
+credits, refuses a hosted destination and refuses fixture IDs owned by another
+user. Repeating it updates the fixture records rather than adding duplicates.
+It does not export the hosted account or copy its auth state. See
+[fixture provenance](../../scripts/fixtures/example-library/README.md).
+
 ## One-Time Setup
 
 Use the latest tested PocketBase executable for local development. The repository
@@ -130,7 +161,7 @@ uses it to create a fresh disposable PocketBase directory under
 `.tmp/pocketbase-release-qa/<run-id>/pocketbase` without touching the persistent
 `local-pb-db/pb_data` database.
 
-CI migration validation uses a separate disposable directory under
+Local migration validation uses a separate disposable directory under
 `.tmp/pocketbase-upgrade/`. Given a base commit, it imports that commit's
 sanitized schema with the pinned 0.40.1 baseline, applies only new migration
 files added by the change, then compares the result with a PocketBase 0.40.4

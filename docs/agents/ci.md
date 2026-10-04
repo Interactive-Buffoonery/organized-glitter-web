@@ -1,26 +1,36 @@
 # Continuous integration
 
-All pull requests and the weekly Sunday run use the same public CI with read-only
-permissions and public Ubuntu runners. Tests use local services and synthetic
-data, without credentials.
+GitHub Actions runs scope selection, static checks, unit/server tests, React
+review, production build/budget, and publication security. `CI result` requires
+every one of those jobs to succeed. Actions does not install, start or test a
+PocketBase runtime, and does not run the backend-dependent browser suites.
 
-| Job                    | Required checks                                                                                                         |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Select CI scope        | Trusted event base, changed paths, and conservative backend/browser plan                                                |
-| Static checks          | Typecheck, formatting, lint, backend boundary, workflow lint                                                            |
-| Unit and server tests  | Vitest and blog tests                                                                                                   |
-| PocketBase integration | Schema, migrations, comparison-baseline upgrade, protected files, auth, feedback, native Apple, archives, sync, stats   |
-| React review           | Changed source review against the trusted event base                                                                    |
-| Browser validation     | Chromium and WebKit public/PWA/smoke/protected-file/blog flows; broader selection for release, weekly, and manual runs  |
-| Publication security   | Production build and budget; runtime paths, SQLite blobs, complete history, tracked tree, and generated website secrets |
-| CI result              | Selected jobs must pass; jobs omitted by the plan must be skipped; missing, canceled, or inconsistent results fail      |
+## Local runtime validation before PR creation
 
-`pnpm test:pr` runs the complete local PR gate with static checks first. It also
-runs the production build and budget, publication scans, backend integration,
-unit tests, and the PR browser selection. `pnpm test:release` uses the same local
-gate with the broader browser selection. Browser runners print report and trace
-paths. Keep databases, auth state, user files, and credentials out of public
-artifacts. CI does not deploy the website.
+`pnpm test:pr` runs PocketBase first on the computer doing the work, then static,
+unit, React, build, publication and browser checks. The backend suite boots
+checksum-verified binaries, validates the comparison-baseline upgrade and
+exercises protected files, authentication, feedback, Apple, archive, sync and
+stats behavior. It also seeds and checks the example library in a local server.
+A failure stops subsequent phases. `pnpm pr:create` only opens the PR after the
+complete local gate succeeds.
+
+For a focused backend run:
+
+```bash
+VALIDATION_BASE_REF=origin/dev pnpm pb:validate:local
+```
+
+Both commands write `summary.json` and a readable `report.md` under ignored
+`.tmp/local-validation/<run>/`. Report the PocketBase outcome to Sarah before
+opening a backend PR, then include it in the PR validation section. Record the
+machine, baseline, commands, behavior tested, and any failures or coverage gaps.
+The report contains source and phase identity, not credentials or runtime data.
+
+`pnpm test:release` retains the broader local browser selection. Keep databases,
+auth state, images uploaded by users and credentials out of public artifacts.
+Passing Actions verifies the remote static/unit/publication gate only; it does
+not prove local backend or browser acceptance, nor deploy the website.
 
 ## Event comparisons and scope
 
@@ -35,25 +45,10 @@ full suite and compares with the populated public extraction revision
 `04789b9d000e6eb1390ca2a6ae60f855a3b1fca6`. It does not claim that the new
 branch previously deployed that schema.
 
-Scheduled and manual runs also default to that stable populated revision and
-always select backend and full browser validation. A manual dispatch can supply
-an explicit `comparison_base` commit or ref. The populated revision is a broad
-comparison marker until the project records its first release baseline. It is
-not proof of the schema currently deployed anywhere.
-
-Static checks, unit and server tests, React review, and publication security run
-for every change. Backend and browser jobs may both be skipped for ordinary
-Markdown-only documentation changes. Browser validation still runs for narrow
-presentation changes. Backend and browser validation both run for PocketBase,
-server, auth, startup, routing, environment, configuration, lockfile, workflow,
-test, and other shared or unclassified changes. Main-target pull requests, main
-pushes, weekly runs, and manual runs always select both expensive jobs and the
-full browser suite.
-
-The scope job passes its exact plan to `CI result`. A selected job must report
-success. An unselected backend or browser job must report skipped. Missing jobs,
-unexpected skips, failures, cancellations, or an incomplete plan fail the
-aggregate check.
+The scope helper still resolves the event comparison baseline used by React
+review and can describe local runtime coverage. Backend and browser selection
+outputs do not start hosted runtime jobs. Scheduled and manual Actions runs
+execute the same static/unit/publication jobs as pull requests.
 
 Branch protection and fork execution must be verified separately by an owner.
 Passing checks do not prove official provider, mail, backup, or deployment gates.

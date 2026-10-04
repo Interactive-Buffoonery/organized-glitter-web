@@ -30,7 +30,7 @@ export async function seedExampleLibrary(client, userId) {
     } catch (error) {
       if (error.status !== 404) throw error;
     }
-    if (existing?.user && existing.user !== userId) {
+    if (existing && existing.user !== userId) {
       throw new Error('Example fixture ID belongs to another local user.');
     }
     const form = new FormData();

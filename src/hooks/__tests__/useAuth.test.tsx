@@ -374,6 +374,7 @@ describe('useAuth Integration Tests', () => {
       });
       const { result } = renderUseAuthHook();
       await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+      queryClient.setQueryData(['account-cache', account.id], { title: 'Old account data' });
 
       act(() => {
         const authStore = pb.authStore as { token: string; record: PocketBaseUser | null };
@@ -383,6 +384,7 @@ describe('useAuth Integration Tests', () => {
       });
       recordCompletedSessionCreate('mock-token', 'projects', 'project-1');
 
+      expect(queryClient.getQueryData(['account-cache', account.id])).toBeUndefined();
       expect(takeCompletedSessionDestination(account.id)).toBe('/projects/project-1');
     });
 
@@ -395,6 +397,7 @@ describe('useAuth Integration Tests', () => {
       });
       const { result } = renderUseAuthHook();
       await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+      queryClient.setQueryData(['account-cache', account.id], { title: 'Old account data' });
 
       act(() => {
         const next = createMockUser({ id: 'next-account' });
@@ -405,6 +408,7 @@ describe('useAuth Integration Tests', () => {
       });
       recordCompletedSessionCreate('mock-token', 'projects', 'project-2');
 
+      expect(queryClient.getQueryData(['account-cache', account.id])).toBeUndefined();
       expect(takeCompletedSessionDestination(account.id)).toBe('/projects/project-2');
     });
 
@@ -525,13 +529,21 @@ describe('useAuth Integration Tests', () => {
       pocketBaseMock.authStore.clear.mockReset();
     });
 
-    it('should provide working signOut function', async () => {
+    it('clears account cache and local drafts after successful sign-out', async () => {
       const mockUser = createMockUser({
         id: 'signout-user-123',
         email: 'signout@example.com',
       });
 
       setupMockAuthState(true, mockUser);
+      queryClient.setQueryData(['account-cache', mockUser.id], { title: 'Old account data' });
+      const identity = {
+        backendUrl: POCKETBASE_URL,
+        accountId: mockUser.id,
+        kind: 'project-new' as const,
+      };
+      const generation = getDraftGeneration(identity)!;
+      writeFormDraft(identity, generation, { title: 'Unfinished' });
 
       const { result } = renderUseAuthHook();
 
@@ -550,6 +562,12 @@ describe('useAuth Integration Tests', () => {
       expect(signOutResult?.success).toBe(true);
       expect(signOutResult?.error).toBeNull();
       expect(pb.authStore.clear).toHaveBeenCalled();
+      expect(queryClient.getQueryData(['account-cache', mockUser.id])).toBeUndefined();
+      expect(
+        readFormDraft(identity, generation, (value): value is { title: string } =>
+          Boolean(value && typeof value === 'object' && 'title' in value)
+        ).draft
+      ).toBeNull();
     });
 
     it('keeps a late create destination after explicit sign-out', async () => {

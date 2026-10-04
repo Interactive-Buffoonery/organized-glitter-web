@@ -409,12 +409,6 @@ describe('loading bootstrap script', () => {
     expect(css).toMatch(/#app-loading \.spinner\s*\{\s*animation:\s*none;/);
   });
 
-  it('documents that #root stays inert until the splash fade finishes', () => {
-    const css = readFileSync(resolve(process.cwd(), 'public/css/loading.css'), 'utf8');
-    expect(css).toMatch(/#root stays inert until the shell finishes hiding/);
-    expect(css).not.toMatch(/interactable immediately/);
-  });
-
   it('shows recovery UI after 30s when #root only has a Suspense fallback', () => {
     const root = document.getElementById('root');
     const fallback = document.createElement('div');

@@ -50,6 +50,23 @@ React + TypeScript + Vite with a PocketBase backend.
 
 Local PocketBase: [`docs/pocketbase/local-development.md`](./docs/pocketbase/local-development.md).
 
+## PocketBase before a PR
+
+For changes to `pb_hooks/`, `pb_migrations/`, or the canonical schema:
+
+1. Run `VALIDATION_BASE_REF=origin/dev pnpm pb:validate:local` on the computer
+   doing the work. This boots verified PocketBase binaries and runs the real
+   local backend suites before any other validation phase.
+2. Inspect the generated `.tmp/local-validation/<run>/report.md` and report
+   results to Sarah before opening the PR. Include the machine, comparison
+   baseline, changed hook or migration behavior tested, and failures or gaps.
+3. Finish `pnpm test:pr` and include the local PocketBase results in the PR.
+   Never treat hosted Actions as a substitute for this local runtime check.
+
+The local instance may be updated or recreated. The example library can be
+seeded with `pnpm pb:bootstrap:local -- --seed-examples`. Synthetic edge-case
+fixtures remain required in addition to the shared sample projects.
+
 ## Code
 
 Conventions: [`docs/agents/code-conventions.md`](./docs/agents/code-conventions.md).

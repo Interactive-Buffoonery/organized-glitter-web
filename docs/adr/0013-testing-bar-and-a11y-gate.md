@@ -16,7 +16,7 @@ independent of audience analysis or compliance pressure.
 
 ## Decision
 
-The required pre-PR gate is `pnpm test:pr`. It runs static checks first, then
+The required pre-PR gate is `pnpm test:pr`. It runs local PocketBase first, then static checks,
 React Doctor, PocketBase schema and upgrade validation, the full Vitest suite,
 the production build and bundle budget, publication security, and production
 browser smoke with blocking public and authenticated accessibility checks.
@@ -25,13 +25,10 @@ Browser tests use disposable PocketBase data and include mobile WebKit.
 PR gate before opening a PR. Local commands and Actions share the same phase
 commands; see [the CI contract](../agents/ci.md).
 
-Hosted pull-request CI always runs static, unit, React, build, budget, and
-publication checks. It skips backend and browser jobs only for ordinary
-Markdown-only documentation changes. Narrow browser-facing changes retain
-browser coverage, while backend, auth, startup, routing, environment,
-configuration, workflow, dependency, test, shared, and unclassified changes run
-both expensive jobs. Main-target, scheduled, and manual runs select the broader
-browser suite.
+Hosted pull-request CI runs static, unit, React, build, budget, and publication
+checks. PocketBase runtime and backend-dependent browser suites run on the local
+test computer before the PR is opened. Report backend results before opening
+hook, migration or schema PRs. Actions does not repeat those local runtime suites.
 
 Testing stack and rules:
 

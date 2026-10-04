@@ -100,12 +100,16 @@ export const clearDeletedColoringBook = async (
     deletedQueries.map(async filters => {
       await queryClient.cancelQueries(filters);
       if (filters.queryKey === queryKeys.coloring.pages.all) {
-        for (const [key, data] of queryClient.getQueriesData<ListResult<ColoringPageDTO>>({
+        for (const [key, data] of queryClient.getQueriesData<
+          ListResult<ColoringPageDTO> | ColoringPageDTO
+        >({
           ...filters,
           type: 'active',
         })) {
           if (key[1] === 'list' && data) {
             queryClient.setQueryData(key, { ...data, items: [], totalItems: 0, totalPages: 0 });
+          } else if (key[1] === 'detail') {
+            queryClient.setQueryData(key, null);
           }
         }
       }

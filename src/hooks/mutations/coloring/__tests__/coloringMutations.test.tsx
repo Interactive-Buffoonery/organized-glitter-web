@@ -20,6 +20,7 @@ const {
     updateBookWithTags: vi.fn(),
     deleteBook: vi.fn(),
     getBookById: vi.fn(),
+    getPageById: vi.fn(),
     listPages: vi.fn(),
     updatePage: vi.fn(),
     setMainPagePhoto: vi.fn(),
@@ -82,6 +83,7 @@ import { useUpdateColoringBook } from '../useUpdateColoringBook';
 import { useDeleteColoringBook } from '../useDeleteColoringBook';
 import { useColoringBook } from '../../../queries/coloring/useColoringBook';
 import { useColoringPages } from '../../../queries/coloring/useColoringPages';
+import { useColoringPage } from '../../../queries/coloring/useColoringPage';
 import { useUpdateColoringPage } from '../useUpdateColoringPage';
 import { useCreateBookPublisher } from '../useCreateBookPublisher';
 import { useCreateBookIllustrator } from '../useCreateBookIllustrator';
@@ -425,6 +427,7 @@ describe('coloring mutation hooks', () => {
   it('does not refetch deleted books or pages while the detail view is still mounted', async () => {
     const client = makeClient();
     coloringMock.getBookById.mockResolvedValue(book);
+    coloringMock.getPageById.mockResolvedValue(page);
     coloringMock.listPages.mockResolvedValue({ items: [page], totalItems: 1 });
     coloringMock.deleteBook.mockResolvedValue(undefined);
     const otherPage = { ...page, id: 'other-page', bookId: 'other-book' };
@@ -433,6 +436,7 @@ describe('coloring mutation hooks', () => {
       () => ({
         book: useColoringBook(book.id),
         pages: useColoringPages({ bookId: book.id }),
+        page: useColoringPage(page.id),
         deleteBook: useDeleteColoringBook(),
       }),
       { wrapper: makeWrapper(client) }
@@ -440,9 +444,11 @@ describe('coloring mutation hooks', () => {
     await waitFor(() => {
       expect(result.current.book.data).toEqual(book);
       expect(result.current.pages.data?.items).toEqual([page]);
+      expect(result.current.page.data).toEqual(page);
     });
     coloringMock.getBookById.mockClear();
     coloringMock.listPages.mockClear();
+    coloringMock.getPageById.mockClear();
 
     await act(async () => {
       await result.current.deleteBook.mutateAsync(book.id);
@@ -451,8 +457,10 @@ describe('coloring mutation hooks', () => {
 
     expect(coloringMock.getBookById).not.toHaveBeenCalled();
     expect(coloringMock.listPages).not.toHaveBeenCalled();
+    expect(coloringMock.getPageById).not.toHaveBeenCalled();
     expect(result.current.pages.data?.items).toEqual([]);
-    expect(client.getQueryData(queryKeys.coloring.pages.detail(page.id))).toBeUndefined();
+    expect(result.current.page.data).toBeNull();
+    expect(client.getQueryData(queryKeys.coloring.pages.detail(page.id))).toBeNull();
     expect(client.getQueryData(queryKeys.coloring.pages.detail(otherPage.id))).toEqual(otherPage);
   });
 

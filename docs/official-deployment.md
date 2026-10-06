@@ -66,3 +66,25 @@ Fresh-install and protected-file upgrade checks remain separate required gates.
 The protected-file test carries a reviewed schema-only baseline fixture rather
 than depending on a private Git commit. It contains no user records or provider
 credentials.
+
+## Request a release preview
+
+After a same-repository, non-draft `dev` to `main` PR passes CI, add the
+`spacefast-preview` label. This requests one preview build in the private ops
+repository for that exact head commit. It does not publish the official site.
+New pushes do not automatically request another preview. Remove and re-add the
+label after the new CI passes to rebuild.
+
+The relay workflow checks event metadata and dispatches ops `main` without
+checking out or running application code. Ops rechecks the PR, label, commit,
+release CI, and publication checks before building and publishing. Synchronize
+new `main` commits into `dev` first so the preview includes the release baseline.
+
+Provision `OPS_PREVIEW_DISPATCH_TOKEN` as a web repository secret. Use a
+fine-grained token restricted to `organized-glitter-ops`, with Actions read/write
+permission. Spacefast and source-map credentials remain in ops. The relay cannot
+use the web repository's default GitHub token to dispatch a private ops workflow.
+
+Follow `Build labeled release preview` in ops Actions for build results and the
+immutable preview URL. The existing preview Space serves the accepted build at
+`https://organized-glitter-preview.view.fast`. Production promotion is separate.

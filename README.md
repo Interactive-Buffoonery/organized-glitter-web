@@ -4,7 +4,7 @@ Organized Glitter is a coloring book and diamond art tracker. This repository
 contains the complete website, including the tracker, Astro updates blog,
 newsletter templates, and PocketBase backend for self-hosting or local development.
 
-One public deployment example: [organizedglitter.app](https://organizedglitter.app).
+The site is deployed at [organizedglitter.app](https://organizedglitter.app).
 That hosted service is operated separately from this source tree.
 
 ## What it does
@@ -86,8 +86,8 @@ The included Node server in `server/local-build-server.js` can serve the built
 app locally or behind your reverse proxy. See [`docs/README.md`](docs/README.md)
 for architecture and contracts.
 
-Optional Spacefast adapter code lives in `spacefast/` for teams that use that
-hosting platform. It is not required for self-hosting.
+Spacefast adapter code lives in `spacefast/`, as Organized Glitter is hosted on
+[Spacefast](https://spacefast.com). The adapter is optional for self-hosting.
 
 ## Common commands
 

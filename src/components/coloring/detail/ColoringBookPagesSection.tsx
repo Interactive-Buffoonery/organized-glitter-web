@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { PageCard } from '@/components/coloring/PageCard';
+import { ContactSheetCell } from '@/components/coloring/ContactSheetCell';
 import { ColoringDetailRefreshNotice } from '@/components/coloring/detail/ColoringDetailRefreshNotice';
 import { SectionHeading } from '@/components/shared/Section';
 import { Button } from '@/components/ui/button';
@@ -127,7 +127,7 @@ export const ColoringBookPagesSection = ({
       ) : (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 xl:grid-cols-10">
           {pages.map(page => (
-            <PageCard
+            <ContactSheetCell
               key={page.id}
               bookId={book.id}
               page={page}

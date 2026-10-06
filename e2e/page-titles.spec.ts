@@ -74,6 +74,7 @@ test('public navigation updates canonical and social metadata without a page rel
   page,
 }) => {
   await page.goto('/');
+  const metadataOrigin = process.env.VITE_APP_URL?.trim() || new URL(page.url()).origin;
   const routes = [
     { label: 'About', path: '/about', title: 'About | Organized Glitter' },
     { label: 'Privacy', path: '/privacy', title: 'Privacy policy | Organized Glitter' },
@@ -85,7 +86,7 @@ test('public navigation updates canonical and social metadata without a page rel
     await page.locator('footer').getByRole('link', { name: route.label }).click();
     await expect(page).toHaveURL(new RegExp(`${route.path}$`));
     await expect(page).toHaveTitle(route.title);
-    const url = `https://organizedglitter.app${route.path}`;
+    const url = new URL(route.path, metadataOrigin).href;
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', url);
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', url);
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', route.title);

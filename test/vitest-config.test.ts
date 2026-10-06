@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import ts from 'typescript';
@@ -45,5 +46,38 @@ describe('Vitest config', () => {
 
     const testFileExcludes = excludeEntries?.filter(entry => entry.includes('.test.'));
     expect(testFileExcludes).toEqual([]);
+  });
+
+  it('does not discover feedback test copies under .tmp', () => {
+    const excludeEntries = findTestExcludeEntries(sourceFile);
+
+    expect(excludeEntries).toContain('**/.tmp/**');
+
+    const copiedTestDirectory = resolve(process.cwd(), '.tmp/vitest-config-feedback-copy');
+    const copiedTest = resolve(copiedTestDirectory, 'feedback-email-service.test.ts');
+    mkdirSync(copiedTestDirectory, { recursive: true });
+    writeFileSync(
+      copiedTest,
+      "import { it } from 'vitest';\nit('copied feedback test', () => {});\n"
+    );
+
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          resolve(process.cwd(), 'node_modules/vitest/vitest.mjs'),
+          'list',
+          '--filesOnly',
+          copiedTest,
+        ],
+        { cwd: process.cwd(), encoding: 'utf8' }
+      );
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).not.toContain('feedback-email-service.test.ts');
+    } finally {
+      unlinkSync(copiedTest);
+      rmdirSync(copiedTestDirectory);
+    }
   });
 });

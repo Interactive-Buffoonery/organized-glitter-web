@@ -5,7 +5,7 @@ Date: 2026-06-12 (records a bar raised incrementally; written down during the
 
 ## Status
 
-Accepted. Gate implementation refreshed on 2026-09-06.
+Accepted. Gate implementation refreshed on 2026-10-03.
 
 ## Context
 
@@ -16,13 +16,19 @@ independent of audience analysis or compliance pressure.
 
 ## Decision
 
-The required pre-PR gate is `pnpm test:pr`: static checks (including typecheck,
-formatting, lint, boundaries, and workflows), React Doctor, PocketBase schema and
-upgrade validation, the full Vitest suite, and production browser smoke with
-blocking public and authenticated accessibility checks. Browser tests use
-disposable PocketBase data and include mobile WebKit. `pnpm pr:create` runs the
-gate before opening a PR. Local commands and Actions share the same checks; see
-[the CI contract](../agents/ci.md).
+The required pre-PR gate is `pnpm test:pr`. It runs local PocketBase first, then static checks,
+React Doctor, PocketBase schema and upgrade validation, the full Vitest suite,
+the production build and bundle budget, publication security, and production
+browser smoke with blocking public and authenticated accessibility checks.
+Browser tests use disposable PocketBase data and include mobile WebKit.
+`pnpm test:release` uses the broader browser selection. `pnpm pr:create` runs the
+PR gate before opening a PR. Local commands and Actions share the same phase
+commands; see [the CI contract](../agents/ci.md).
+
+Hosted pull-request CI runs static, unit, React, build, budget, and publication
+checks. PocketBase runtime and backend-dependent browser suites run on the local
+test computer before the PR is opened. Report backend results before opening
+hook, migration or schema PRs. Actions does not repeat those local runtime suites.
 
 Testing stack and rules:
 
@@ -47,12 +53,15 @@ PR, and the commitment is that inaccessible UI is a defect, not a backlog item.
 
 Running the whole Playwright matrix per PR would be too slow for solo
 iteration; the gate runs a focused browser and a11y subset. Broader Chromium
-and WebKit suites run for release PRs, on a schedule, and on manual dispatch.
+and WebKit suites run for release PRs, on a schedule, on manual dispatch, and
+through the local release gate.
 
 ## Consequences
 
 - Every PR pays the gate cost (minutes), which buys regression and a11y
   coverage no reviewer headcount provides.
+- Ordinary documentation PRs avoid disposable backend and browser setup while
+  retaining static, unit, React, build, budget, and publication checks.
 - Axe-based checks catch mechanical issues (labels, contrast, roles); they do
   not replace manual checks for flow-level accessibility, which stay part of UI
   review (`AGENTS.md` checklist).

@@ -13,6 +13,8 @@ const coverFixture = path.join(
 const fixtureProjectId = process.env.E2E_FIXTURE_PROJECT_ID ?? 'localproject003';
 const fixtureColoringBookId = 'localcbook00001';
 
+test.use({ serviceWorkers: 'block' });
+
 const expireCurrentToken = async (page: Page) => {
   await page.evaluate(() => {
     const debugWindow = window as Window & {
@@ -31,8 +33,24 @@ const signInAgain = async (page: Page) => {
   await page.getByRole('button', { name: 'Sign In' }).click();
 };
 
-test.beforeEach(() => {
+const keepCurrentSessionDraft = async (page: Page) => {
+  const recovery = page.getByRole('region', { name: 'Unfinished draft' });
+  await expect(recovery).toBeVisible();
+  await recovery.getByRole('button', { name: 'Discard draft' }).click();
+  await expect(recovery).not.toBeVisible();
+};
+
+test.beforeEach(async ({ page }) => {
   assertLocalE2ETargets({ appUrl, pocketBaseUrl, specName: 'Session expiry recovery' });
+  await page.goto('/overview');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const debugWindow = window as Window & { pb?: { authStore?: { record?: unknown } } };
+        return Boolean(debugWindow.pb?.authStore?.record);
+      })
+    )
+    .toBe(true);
 });
 
 test('keeps a project draft when a save discovers an expired session', async ({
@@ -71,6 +89,7 @@ test('keeps a project draft when a save discovers an expired session', async ({
   expect(createAttempts).toBe(1);
 
   await signInAgain(page);
+  await keepCurrentSessionDraft(page);
 
   await expect(page).toHaveURL(/\/projects\/new$/);
   await expect(page.getByLabel('Project title')).toHaveValue('Unsent session recovery project');
@@ -228,6 +247,7 @@ test('offers a confirmed create that finishes after sign-in', async ({ page }) =
   });
 
   await signInAgain(page);
+  await keepCurrentSessionDraft(page);
   await expect(page).toHaveURL(/\/projects\/new$/);
   await page.getByLabel('Project title').fill('Edited after sign-in');
   releaseCreate();

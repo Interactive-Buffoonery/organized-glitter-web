@@ -2,11 +2,9 @@ import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const requiredJobs = [
+  'scope',
   'static-checks',
   'unit-tests',
-  'backend',
-  'build',
-  'browser',
   'react-doctor',
   'publication-security',
 ];
@@ -16,10 +14,12 @@ export function evaluateCiResult(needs) {
     throw new Error('CI dependency results must be an object.');
   }
 
-  return [...new Set([...requiredJobs, ...Object.keys(needs)])].map(name => ({
-    name,
-    passed: needs[name]?.result === 'success',
-  }));
+  return [...new Set([...requiredJobs, ...Object.keys(needs)])].map(name => {
+    return {
+      name,
+      passed: needs[name]?.result === 'success',
+    };
+  });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

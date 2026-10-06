@@ -90,6 +90,44 @@ describe('src/lib/pocketbase', () => {
     });
   });
 
+  describe('debug client exposure', () => {
+    const clearDebugClient = () => {
+      delete (window as Window & { __pb?: PocketBase; pb?: PocketBase }).__pb;
+      delete (window as Window & { __pb?: PocketBase; pb?: PocketBase }).pb;
+    };
+
+    afterEach(() => {
+      clearDebugClient();
+      vi.unstubAllEnvs();
+      vi.stubGlobal('__APP_TEST_ENV__', 'test');
+      vi.resetModules();
+    });
+
+    it('exposes the client in a production-mode fixture build', async () => {
+      clearDebugClient();
+      vi.stubEnv('DEV', '');
+      vi.stubGlobal('__APP_TEST_ENV__', 'test');
+      vi.resetModules();
+
+      const { pb } = await import('@/lib/pocketbase');
+
+      expect(window.pb).toBe(pb);
+      expect(window.__pb).toBe(pb);
+    });
+
+    it('does not expose the client in a normal production build', async () => {
+      clearDebugClient();
+      vi.stubEnv('DEV', '');
+      vi.stubGlobal('__APP_TEST_ENV__', '');
+      vi.resetModules();
+
+      await import('@/lib/pocketbase');
+
+      expect(window.pb).toBeUndefined();
+      expect(window.__pb).toBeUndefined();
+    });
+  });
+
   describe('beforeSend: no custom request-dedup lock (regression for #108 layer 1)', () => {
     let pb: PocketBase;
 

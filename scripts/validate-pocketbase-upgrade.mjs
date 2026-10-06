@@ -39,6 +39,7 @@ const getArgValue = (argv, name) => {
 export function resolveBaseRef(argv, env = process.env) {
   const baseRef =
     getArgValue(argv, '--base-ref') ||
+    env.CI_BASE_SHA ||
     env.GITHUB_BASE_SHA ||
     env.GITHUB_EVENT_BEFORE ||
     'origin/main';

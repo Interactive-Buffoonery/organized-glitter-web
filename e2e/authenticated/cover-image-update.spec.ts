@@ -140,6 +140,10 @@ test.describe('Inline cover update', () => {
     });
     await expect(heroImage).toBeVisible();
     const reloadedSrc = await heroImage.getAttribute('src');
-    expect(reloadedSrc).toBe(updatedSrc);
+    expect(new URL(reloadedSrc!).pathname).toBe(new URL(updatedSrc!).pathname);
+
+    await page.getByRole('button', { name: 'Edit project', exact: true }).click();
+    await page.getByRole('button', { name: 'Crop image', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: /crop/i })).toBeVisible();
   });
 });

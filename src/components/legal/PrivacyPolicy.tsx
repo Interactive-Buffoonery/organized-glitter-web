@@ -1,12 +1,13 @@
-import { getContactEmail } from '@/lib/contactConfig';
+import { getContactEmail, getSupportMailto } from '@/lib/contactConfig';
 
 /** Privacy policy shared by the app route and the static privacy.html. */
 export function PrivacyPolicy() {
+  const underageReportHref = getSupportMailto('Underage account report') || '#privacy-contact';
   return (
     <div className="relative z-10 px-4 pt-6 pb-16 md:pt-10 md:pb-24">
       <div className="mx-auto max-w-2xl">
         <h1 className="text-foreground mb-2 text-3xl font-semibold md:text-4xl">Privacy Policy</h1>
-        <p className="text-muted-foreground mb-10 text-sm">Last updated: June 5, 2026</p>
+        <p className="text-muted-foreground mb-10 text-sm">Last updated: October 6, 2026</p>
 
         <section className="mb-10">
           <h2 className="text-foreground mb-3 text-xl font-semibold">Overview</h2>
@@ -118,8 +119,13 @@ export function PrivacyPolicy() {
         <section className="mb-10">
           <h2 className="text-foreground mb-3 text-xl font-semibold">Children&apos;s Privacy</h2>
           <p className="text-foreground/90 leading-relaxed">
-            Organized Glitter is not directed at children under the age of 13. We do not knowingly
-            collect personal information from children.
+            Organized Glitter is for people age 13 and older. If you believe someone under 13 has an
+            account, please{' '}
+            <a href={underageReportHref} className="text-link underline underline-offset-4">
+              contact us
+            </a>
+            . If we confirm that an account belongs to someone under 13, we&apos;ll close it and
+            delete their personal information.
           </p>
         </section>
 
@@ -141,7 +147,7 @@ export function PrivacyPolicy() {
           </p>
         </section>
 
-        <section>
+        <section id="privacy-contact">
           <h2 className="text-foreground mb-3 text-xl font-semibold">Contact</h2>
           <p className="text-foreground/90 leading-relaxed">
             If you have questions about this privacy policy, contact your administrator

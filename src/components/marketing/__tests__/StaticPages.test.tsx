@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PrivacyPolicy } from '@/components/legal/PrivacyPolicy';
 import { TermsOfService } from '@/components/legal/TermsOfService';
@@ -10,6 +10,29 @@ const renderDocument = (page: string) =>
   new DOMParser().parseFromString(`<body>${renderStaticPage(page)}</body>`, 'text/html');
 
 describe('renderStaticPage', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each(['', 'support@example.com'])('preserves the underage policy with contact %s', email => {
+    vi.stubEnv('VITE_CONTACT_EMAIL', email);
+    const privacy = renderDocument('privacy');
+    const terms = renderDocument('terms');
+    const section = [...privacy.querySelectorAll('section')].find(
+      node => node.querySelector('h2')?.textContent === "Children's Privacy"
+    );
+    expect(section?.querySelector('p')?.textContent).toBe(
+      "Organized Glitter is for people age 13 and older. If you believe someone under 13 has an account, please contact us. If we confirm that an account belongs to someone under 13, we'll close it and delete their personal information."
+    );
+    expect(section?.querySelector('a')?.getAttribute('href')).toBe(
+      email ? 'mailto:support@example.com?subject=Underage%20account%20report' : '#privacy-contact'
+    );
+    expect(privacy.querySelector('#privacy-contact h2')?.textContent).toBe('Contact');
+    expect(terms.querySelector('#user-accounts p')?.textContent).toBe(
+      'You must be at least 13 to create an account.'
+    );
+    for (const document of [privacy, terms]) {
+      expect(document.body.textContent).toContain('Last updated: October 6, 2026');
+    }
+  });
   it('renders the home page content without JavaScript', () => {
     const html = renderStaticPage('landing');
     const document = renderDocument('landing');

@@ -65,6 +65,9 @@ const sections = [
     content: (
       <>
         <p className="text-foreground/90 mb-3 leading-relaxed">
+          You must be at least 13 to create an account.
+        </p>
+        <p className="text-foreground/90 mb-3 leading-relaxed">
           To use certain features of the Service, you must create an account. You are responsible
           for:
         </p>
@@ -285,7 +288,7 @@ const Terms = () => {
           <h1 className="text-foreground mb-2 text-3xl font-semibold md:text-4xl">
             Terms of Service
           </h1>
-          <p className="text-muted-foreground mb-10 text-sm">Last updated: June 5, 2026</p>
+          <p className="text-muted-foreground mb-10 text-sm">Last updated: October 6, 2026</p>
 
           <div>
             {sections.map(({ id, number, title, content }) => (

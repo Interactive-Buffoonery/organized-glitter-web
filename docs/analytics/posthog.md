@@ -337,14 +337,23 @@ a timed-out response stream is closed. This is an app choice, not a PostHog-mand
 
 ## Usage analytics preference
 
-Account settings includes a default-on Usage analytics switch. The app stores its choice in
-`og:analytics:enabled` in this browser, separately from the iOS preference. Changes apply to
-other open tabs. If browser storage is blocked, the choice lasts for the current page session.
+Account settings includes a Usage analytics switch. The source of truth is the user record's
+`analytics_opt_out` boolean. Its default is false, so accounts start with usage analytics enabled.
+The preference is shared by signed-in clients. Do Not Track also prevents web capture.
 
-Turning it off calls PostHog's public `opt_out_capturing()` API and blocks events through
-`before_send`. Lifecycle identify/reset also stops while off, so account changes cannot clear
-the choice. Re-enabling establishes the current account before lifecycle captures resume.
-The pre-React bootstrap beacon checks the same preference. Do Not Track remains respected.
-This does not delete data previously received by PostHog or recall requests already sent.
-Requests queued before opting out may still be delivered by the SDK. No new events are
-captured while off.
+The web client pauses capture until it has read the current account preference from PocketBase.
+It stops capture immediately while saving an opt-out and only enables capture after the server
+confirms an opt-in. Failed saves show an error and reread the server value. Capture stays paused if that read fails.
+
+Open web clients listen for user-record changes, reread the preference on focus, and check every
+30 seconds as a fallback. Failed reads pause capture until the next successful refresh. No local
+browser choice is copied to another account. Signed-out browsing uses anonymous analytics.
+
+The pre-React bootstrap beacon cannot fetch an account preference. It skips capture when a saved
+PocketBase sign-in is present or browser storage cannot be read. It still honors Do Not Track and
+any older browser opt-out. This avoids sending a bootstrap event for an account that opted out.
+
+Turning usage analytics off stops new captures. Previously queued or delivered events may remain;
+this control does not delete historical data. Deploy the additive user-field migration before
+releasing clients that read or update it. Native clients must read and update the same field before
+shipping an account-wide control.

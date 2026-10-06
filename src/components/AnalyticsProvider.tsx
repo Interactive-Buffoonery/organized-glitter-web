@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { PostHogProvider } from '@posthog/react';
 import posthog, { type PostHogConfig } from 'posthog-js';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { sanitizeAnalyticsEvent } from '@/utils/analytics/sanitizeEvent';
 
-import { getAnalyticsEnabled, syncAnalyticsConsent } from '@/services/analytics-preference';
+import {
+  getAnalyticsEnabled,
+  initializeAnalyticsPreference,
+  syncAnalyticsConsent,
+} from '@/services/analytics-preference';
 
 const posthogKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY as string | undefined;
 const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST?.trim();
@@ -58,6 +62,8 @@ const AnalyticsEffects: React.FC = () => {
  * If either the key or host is missing, renders children without PostHog.
  */
 export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  useEffect(() => initializeAnalyticsPreference(), []);
+
   if (!posthogClient) {
     if (import.meta.env.DEV) {
       console.debug('[analytics] PostHog key or host missing, analytics disabled');

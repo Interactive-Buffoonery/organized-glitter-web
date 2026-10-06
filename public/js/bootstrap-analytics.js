@@ -185,11 +185,16 @@
     if (isDoNotTrackEnabled(options.navigator, options.window)) return false;
     try {
       var preferenceStorage = options.storage || global.localStorage;
-      if (preferenceStorage && preferenceStorage.getItem('og:analytics:enabled') === 'false') {
+      if (
+        !preferenceStorage ||
+        preferenceStorage.getItem('pocketbase_auth') ||
+        preferenceStorage.getItem('og:analytics:enabled') === 'false'
+      ) {
         return false;
       }
     } catch (_) {
-      // Storage can be unavailable in private browsing.
+      // The account preference cannot be checked before React starts.
+      return false;
     }
 
     var config = options.config || readPublicConfig(options.root || global);

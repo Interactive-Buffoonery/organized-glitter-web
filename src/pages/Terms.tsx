@@ -53,9 +53,8 @@ const sections = [
     title: 'Free Service',
     content: (
       <p className="text-foreground/90 leading-relaxed">
-        Organized Glitter is currently provided free of charge. There are no subscription fees or
-        payment requirements associated with using the Service at this time. Any future monetization
-        of the site would be to cover the cost of additional, server-heavy features.
+        Organized Glitter is free to use. Voluntary support is accepted only on the website and
+        grants no app features, content, or account privileges.
       </p>
     ),
   },

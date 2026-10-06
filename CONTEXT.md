@@ -236,11 +236,11 @@ Catalog search, scanning, and import are free. The saved project remains
 private and editable; later catalog corrections do not silently replace the
 user's edits. Manual project entry is also free.
 
-## Developer tips
+## Website support
 
-Optional, repeatable one-time "Support Organized Glitter" purchases through
-Apple in-app purchases and RevenueCat. Tips grant no feature access or promise
-of future paid access.
+Voluntary contributions on the website help cover hosting. They grant no app
+features, content, or account privileges. The native app has no payment flow
+or contribution prompts.
 
 ## Curator review
 

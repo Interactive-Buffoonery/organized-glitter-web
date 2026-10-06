@@ -5,6 +5,32 @@ required immutable JavaScript and CSS resources before executing the initial
 ESM entry. It waits for DOM parsing, applies the verified stylesheets, and
 appends exactly one module entry. It does not import application code.
 
+## Production integration
+
+`scripts/bootstrap-build.mjs` runs as a post `generateBundle` hook after
+`scripts/static-landing.mjs`. Landing promotion first copies the original
+hashed app stylesheet into the static page and moves the React shell to
+`app.html`. Recovery then rewrites every remaining React HTML entry. Static
+HTML stays untouched, including its shared stylesheet and page metadata.
+
+The emitted bundle supplies the unique app module, recursive static imports,
+and imported CSS. Every JavaScript chunk also gets its recursive static graph
+as inert metadata. Missing or unsafe assets and ambiguous app entries fail
+the build. No environment values are read by the resource configuration.
+
+React shells inline `loading.css`, `error.css`, `safe-area.css`, theme chrome,
+bootstrap analytics, `loading.js`, and the resource loader. Script closures
+preserve the original file scope. The body and recovery controls are parsed
+before `loading.js` installs listeners, then the loader starts at DOM readiness.
+No external deferred shell script can delay that readiness event. Existing
+analytics configuration and consent checks remain in place; inlining does not
+initialize the React analytics SDK or permit tracking without consent.
+
+The bundle budget reads the inert configuration, cross-checks its complete
+static graph against the Vite manifest, and includes `app.html` so inline
+shell code, CSS, and graph metadata are counted as document transfer. Dynamic
+graph metadata does not turn dynamic resources into eager transfers.
+
 ## Build integration contract
 
 For every React HTML entry, the HTML build transform must:
@@ -91,9 +117,33 @@ disables automatic chunk recovery rather than restoring unbounded reloads.
 initial entry/dependency/CSS failures, readiness, duplicate initialization,
 native graph fallback, cross-document budgets, privacy, and static focus.
 
-The integrated build should also be tested in a real browser with initial
+The integrated build is also tested in a real browser with initial
 entry, dependency, and stylesheet 429/503/network faults, persistent faults,
 and permanent 404s. Check that the module graph is requested only after
 verification, app initialization occurs once, and the recovery UI remains
 usable after exhaustion. HTTP cache warming is an optimization, not proof
 that a second native request cannot fail; keep the native fallback covered.
+
+## PWA startup timing
+
+Service worker registration waits for `#root[data-app-ready="true"]`, not
+splash dismissal. It then waits one second for the route and splash to settle
+and schedules an idle callback with a two-second timeout, falling back to the
+one-second timer when idle callbacks are unavailable. Unmount cancels pending
+registration. Existing controlling workers continue to serve offline routes
+immediately. New installs become offline-ready only after precaching completes.
+
+Vite JavaScript preload hints are suppressed only for the deferred PWA
+registration chunk. Native import reuses already evaluated vendor modules.
+Normal lazy-route preloads and CSS loading are unchanged.
+
+The complete Workbox precache remains intact. Workbox 7.4.1 installs entries
+serially, so adding custom fetch concurrency control would duplicate its
+existing policy. More split chunks still mean more background requests and a
+longer first-install cache fill. Readiness deferral removes that fill from the
+critical startup path; it does not reduce offline coverage or total cache bytes.
+The PWA browser suite checks the full emitted JS/CSS graph in CacheStorage,
+first-install request concurrency and an offline app reload in Chromium.
+Playwright WebKit verifies cache coverage and controlling-worker delivery;
+its offline transport rejects navigation before reaching the service worker.
+A real offline Safari reload remains a device-level validation gap.

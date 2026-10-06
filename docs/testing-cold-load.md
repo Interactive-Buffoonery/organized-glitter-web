@@ -4,7 +4,7 @@ Run this suite when changing public HTML, the app bootstrap, startup recovery,
 or eager module imports:
 
 ```bash
-pnpm exec playwright test --config playwright.cold-load.config.ts
+pnpm test:cold-load
 ```
 
 The config builds the current checkout with Vite and serves `dist/` through
@@ -138,13 +138,26 @@ The spec is classified as affected/release coverage in
 do not select it. Run its dedicated config for the production artifact and
 cache-isolation guarantees.
 
-Proposed parent-owned integration after the suite is green:
+## Validation gate
 
-1. Add `test:cold-load` to `package.json` with
-   `playwright test --config playwright.cold-load.config.ts`.
-2. Add the dedicated command to the affected/release gate for public HTML,
-   bootstrap, and initial graph changes. A normal Vite development-server run
-   does not verify the same contract.
+`pnpm test:cold-load` runs the dedicated production-artifact config. Both
+`pnpm test:pr` and `pnpm test:release` include this phase after PWA navigation.
+Public HTML, bootstrap, and initial graph changes therefore receive this
+coverage independently of the ordinary authenticated/public project filters.
+The full browser inventory retains its separate smoke and release purposes.
 
-Keep hosted capture and provider throttling verification separate from the
-deterministic local fault-injection evidence.
+The suite now also injects one initial 503 or network failure, native entry
+and dependency 429s after successful warm fetches, and a native stylesheet
+503 after warming. Native graph failures must recover in a fresh document,
+preserve the URL, and append exactly one app entry in the recovered document.
+A separate check blocks external shell scripts and CSS while verifying that
+inline recovery remains styled and manual Retry reaches the real login form.
+These additions bring the integration inventory to 54 cases across Chromium
+and mobile WebKit. The original 38 cases and their assertions are retained.
+
+The integration worktree initially has four known no-JavaScript Privacy
+failures while the separately owned static legal follow-up is pending. Keep
+these failures visible; the complete gate is not green until the legal
+changes are integrated and the entire inventory passes. Test runner retries
+remain zero. Keep hosted capture and provider throttling verification separate
+from deterministic local fault-injection evidence.

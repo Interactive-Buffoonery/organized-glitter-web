@@ -36,5 +36,5 @@ Add one when a choice is **stable**, **cross-cutting**, and **costly to reverse*
 | [0018](./0018-tiptap-rich-text-notes.md)                    | Use TipTap for rich text notes, stored as Markdown            | Accepted   |
 | [0019](./0019-client-side-image-pipeline.md)                | Process images client-side before uploading to PocketBase     | Accepted   |
 | [0020](./0020-native-swiftui-app-in-separate-repository.md) | Build the native SwiftUI app in a separate repository         | Accepted   |
-| 0021 (historical reference outside this extraction)         | Fund the diamond catalog through Supporter and tips           | Superseded |
-| [0022](./0022-free-catalog-and-optional-tips.md)            | Keep the catalog free and launch optional tips first          | Accepted   |
+| 0021 (historical reference outside this extraction)         | Retired catalog plan                                          | Superseded |
+| [0022](./0022-free-catalog-and-optional-tips.md)            | Keep the app free with website-only support                   | Accepted   |

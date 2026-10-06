@@ -37,6 +37,7 @@ const TagList = lazy(() => import('@/pages/TagList'));
 const BookPublisherList = lazy(() => import('@/pages/BookPublisherList'));
 const BookIllustratorList = lazy(() => import('@/pages/BookIllustratorList'));
 const ColoringMediumList = lazy(() => import('@/pages/ColoringMediumList'));
+const Support = lazy(() => import('@/pages/Support'));
 const SupportSuccess = lazy(() => import('@/pages/SupportSuccess'));
 const ProjectRandomizer = lazy(() => import('@/pages/ProjectRandomizer'));
 const Stats = lazy(() => import('@/pages/Stats'));
@@ -352,11 +353,21 @@ export const APP_ROUTES: RouteDef[] = [
     protected: true,
   },
   {
+    path: '/support',
+    element: Support,
+    verticalAccess: 'public',
+    metadata: {
+      title: 'Support Organized Glitter',
+      description:
+        'Leave an optional one-time tip to help cover Organized Glitter hosting, database, and domain costs.',
+    },
+    suspense: 'layout',
+  },
+  {
     path: '/support/success',
     element: SupportSuccess,
-    verticalAccess: 'shared',
-    metadata: { title: 'Support success | Organized Glitter' },
-    protected: true,
+    verticalAccess: 'public',
+    metadata: { title: 'Thank you | Organized Glitter' },
     suspense: 'layout',
   },
   {

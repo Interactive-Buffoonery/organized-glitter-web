@@ -1,13 +1,15 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/constants/updates', () => ({ UPDATES_URL: 'https://site.example.test/updates/' }));
 
 import { SiteFooter } from '../SiteFooter';
 
 describe('SiteFooter', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it('links to the public pages with Links after About', () => {
     render(
       <MemoryRouter>
@@ -38,5 +40,16 @@ describe('SiteFooter', () => {
 
     expect(screen.getByText('Links')).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('link', { name: 'Links' })).not.toBeInTheDocument();
+  });
+
+  it('adds an understated Support link only when tips are configured', () => {
+    vi.stubEnv('VITE_STRIPE_TIP_CUSTOM_URL', 'https://buy.stripe.com/test_custom');
+    render(
+      <MemoryRouter>
+        <SiteFooter />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('link', { name: 'Support' })).toHaveAttribute('href', '/support');
   });
 });

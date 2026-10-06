@@ -37,6 +37,7 @@ export const APP_ROUTE_PATHS = [
   '/artists',
   '/tags',
   '/import',
+  '/support',
   '/support/success',
   '/randomizer',
   '/stats',

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 
+import { tipsEnabled } from '@/constants/tips';
 import { UPDATES_URL } from '@/constants/updates';
 
 interface SiteFooterProps {
@@ -13,8 +14,11 @@ const footerLinks = [
   { label: 'Links', page: 'Links', path: '/links' },
 ] as const;
 
+const supportLink = { label: 'Support', page: 'Support', path: '/support' } as const;
+
 export function SiteFooter({ currentPage = '' }: SiteFooterProps) {
   const year = new Date().getFullYear();
+  const links = tipsEnabled() ? [...footerLinks, supportLink] : footerLinks;
   const source =
     import.meta.env.VITE_SOURCE_URL ||
     'https://github.com/Interactive-Buffoonery/organized-glitter-web';
@@ -24,7 +28,7 @@ export function SiteFooter({ currentPage = '' }: SiteFooterProps) {
       <div className="text-muted-foreground container mx-auto flex flex-col items-center justify-between gap-3 px-4 py-8 text-sm md:flex-row">
         <span>&copy; {year} Organized Glitter</span>
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-          {footerLinks.map(({ label, page, path }) =>
+          {links.map(({ label, page, path }) =>
             currentPage === page ? (
               <span key={page} aria-current="page" className="text-foreground pointer-events-none">
                 {label}

@@ -47,7 +47,9 @@ review. Private projects remain separate from published catalog facts.
 
 Voluntary support is website-only and grants no app features, content, or
 account privileges. The native app contains no payment processing,
-contribution prompts, or checkout links.
+contribution prompts, or checkout links. The website's `/support` page offers
+one-time $2, $3, $5, $10, or custom tips through Stripe-hosted Payment Links,
+with no subscriptions or interruptive prompts.
 
 [ADR-0022](./docs/adr/0022-free-catalog-and-optional-tips.md) records the direction.
 

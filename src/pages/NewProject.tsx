@@ -10,6 +10,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { getCurrentDateInUserTimezone } from '@/utils/date/timezoneUtils';
 import { useCompletedSessionCreate } from '@/hooks/useCompletedSessionCreate';
 import {
   acknowledgeCompletedSessionDestination,
@@ -93,6 +95,7 @@ const clearChangedFieldErrors = (
 
 const NewProject = () => {
   useAppReady();
+  const userTimezone = useUserTimezone();
   const { user, isLoading: authLoading } = useAuth();
   const completedCreateDestinations = useCompletedSessionCreate(user?.id, '/projects/');
   const restored = useSessionDraft<NewProjectDraft>(
@@ -232,7 +235,11 @@ const NewProject = () => {
       return;
     }
 
-    const validation = validateProjectFormValues(data, user.id);
+    const validation = validateProjectFormValues(
+      data,
+      getCurrentDateInUserTimezone(userTimezone),
+      user.id
+    );
     setFieldErrors(validation.fieldErrors);
     if (!validation.isValid) {
       return;

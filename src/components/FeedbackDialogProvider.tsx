@@ -20,21 +20,25 @@ function FeedbackDialogProvider() {
   const openDialog = useFeedbackDialog(state => state.openDialog);
   const { user, initialCheckComplete } = useAuth();
   const previousUserId = useRef(user?.id ?? null);
-  const [hasOpened, setHasOpened] = useState(false);
+  const [openedAccountId, setOpenedAccountId] = useState<string | null>(null);
   const canOpen = isOpen && Boolean(user) && previousUserId.current === user?.id;
 
   useEffect(() => {
-    if (canOpen) setHasOpened(true);
-  }, [canOpen]);
+    if (canOpen && user) setOpenedAccountId(user.id);
+  }, [canOpen, user]);
 
   useEffect(() => {
     if (!initialCheckComplete) return;
-    if (user?.id && previousUserId.current && previousUserId.current !== user.id) {
-      previousUserId.current = user.id;
+    const accountId = user?.id ?? null;
+    if (previousUserId.current !== accountId) {
+      previousUserId.current = accountId;
+      setOpenedAccountId(null);
       resetDialog();
+      if (accountId && hasSessionDraft(sessionDraftKeys.feedback, accountId)) {
+        openDialog({});
+      }
       return;
     }
-    if (user?.id) previousUserId.current = user.id;
     if (!user && isOpen) closeDialog();
     if (user && !isOpen && hasSessionDraft(sessionDraftKeys.feedback, user.id)) {
       openDialog(options);
@@ -51,7 +55,7 @@ function FeedbackDialogProvider() {
     [closeDialog]
   );
 
-  if (!hasOpened && !canOpen) return null;
+  if (!user || (openedAccountId !== user.id && !canOpen)) return null;
 
   return (
     <ProtectedLazyRoute suspense="bare" errorBoundary="Feedback">

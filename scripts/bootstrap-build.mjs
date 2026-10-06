@@ -48,6 +48,9 @@ export function rewriteBootstrapHtml(html, bundle, readPublicFile) {
       .filter(file => file.type === 'chunk' && file.fileName.endsWith('.js'))
       .map(file => [`/${file.fileName}`, graphFor(file.fileName)])
   );
+  for (const file of files) {
+    if (!graphs[`/${file}`]) throw new Error(`Missing bootstrap chunk: ${file}`);
+  }
   const entries = files.filter(file =>
     files.every(other => graphs[`/${file}`].includes(`/${other}`))
   );

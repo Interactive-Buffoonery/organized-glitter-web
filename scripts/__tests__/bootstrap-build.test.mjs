@@ -134,6 +134,20 @@ describe('bootstrap build integration', () => {
     );
   });
 
+  it.each(['missing', 'asset'])('rejects an HTML module with a %s bundle chunk', kind => {
+    const bundle = fixture();
+    if (kind === 'asset') {
+      bundle['assets/public.js'] = { type: 'asset', fileName: 'assets/public.js', source: '' };
+    }
+    const input = html.replace(
+      '</head>',
+      '<script type="module" src="/assets/public.js"></script></head>'
+    );
+    expect(() => rewriteBootstrapHtml(input, bundle, sources)).toThrow(
+      'Missing bootstrap chunk: assets/public.js'
+    );
+  });
+
   it('fails closed for missing static dependencies and ambiguous entries', () => {
     const bundle = fixture();
     delete bundle['assets/shared.js'];

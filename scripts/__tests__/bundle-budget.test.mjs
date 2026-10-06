@@ -9,8 +9,9 @@ function fixture({
 } = {}) {
   const dist = mkdtempSync(path.join(tmpdir(), 'og-bundle-budget-'));
   mkdirSync(path.join(dist, 'assets'));
+  writeFileSync(path.join(dist, 'index.html'), '<main>Static landing</main>');
   writeFileSync(
-    path.join(dist, 'index.html'),
+    path.join(dist, 'app.html'),
     '<script src="/js/start.js?v=1"></script><script type="module" src="/assets/main.js"></script><script type="module" src="/assets/main.js"></script><link rel="stylesheet" href="/assets/main.css">'
   );
   mkdirSync(path.join(dist, 'js'));

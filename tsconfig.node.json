@@ -19,6 +19,7 @@
     "vite.config.ts",
     "scripts/app-icon-links.mjs",
     "scripts/ensure-startup-script-order.mjs",
+    "scripts/static-landing.mjs",
     "server/app-route-policy.js",
     "server/deployment-config.js"
   ]

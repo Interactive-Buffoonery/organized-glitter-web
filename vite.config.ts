@@ -14,6 +14,7 @@ import {
 } from './server/deployment-config.js';
 import { injectAppIconLinks } from './scripts/app-icon-links.mjs';
 import { ensureStartupScriptsBeforeAppModules } from './scripts/ensure-startup-script-order.mjs';
+import { staticLanding } from './scripts/static-landing.mjs';
 
 /**
  * Inject the public PostHog key/host into public HTML entries so the
@@ -133,6 +134,7 @@ export default defineConfig(({ mode }) => {
       __APP_TEST_ENV__: JSON.stringify(process.env.APP_TEST_ENV || ''),
     },
     plugins: [
+      staticLanding(),
       deploymentOutput(env),
       { name: 'og-app-icon-links', transformIndexHtml: injectAppIconLinks },
       injectPublicAnalyticsConfig(env, buildId),
@@ -157,7 +159,9 @@ export default defineConfig(({ mode }) => {
           skipWaiting: true,
           clientsClaim: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-          navigateFallbackAllowlist: APP_ROUTE_PATHS.map(
+          // dist/index.html is the static landing; app routes fall back to the SPA shell.
+          navigateFallback: 'app.html',
+          navigateFallbackAllowlist: APP_ROUTE_PATHS.filter(route => route !== '/').map(
             route => new RegExp(`^${route.replace(/:[^/]+/g, '[^/?]+')}/?(?:\\?.*)?$`, 'i')
           ),
           // Public routes need their own initial HTML, including with an active service worker.
@@ -265,6 +269,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           main: fileURLToPath(new URL('./index.html', import.meta.url)),
+          landing: fileURLToPath(new URL('./landing.html', import.meta.url)),
           about: fileURLToPath(new URL('./about.html', import.meta.url)),
           links: fileURLToPath(new URL('./links.html', import.meta.url)),
           privacy: fileURLToPath(new URL('./privacy.html', import.meta.url)),

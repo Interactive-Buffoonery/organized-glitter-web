@@ -1,9 +1,11 @@
 import { sessionDraftKeys } from '@/services/auth/sessionDraftKeys';
-import FeedbackDialog from './FeedbackDialog';
+import { ProtectedLazyRoute } from '@/components/routing/ProtectedLazyRoute';
 import { useFeedbackDialog } from './FeedbackDialogStore';
-import { useCallback, useEffect, useRef } from 'react';
+import { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { hasSessionDraft } from '@/services/auth/sessionRecovery';
+
+const FeedbackDialog = lazy(() => import('./FeedbackDialog'));
 
 /**
  * Provider component that renders the feedback dialog when needed
@@ -18,6 +20,12 @@ function FeedbackDialogProvider() {
   const openDialog = useFeedbackDialog(state => state.openDialog);
   const { user, initialCheckComplete } = useAuth();
   const previousUserId = useRef(user?.id ?? null);
+  const [hasOpened, setHasOpened] = useState(false);
+  const canOpen = isOpen && Boolean(user) && previousUserId.current === user?.id;
+
+  useEffect(() => {
+    if (canOpen) setHasOpened(true);
+  }, [canOpen]);
 
   useEffect(() => {
     if (!initialCheckComplete) return;
@@ -43,21 +51,25 @@ function FeedbackDialogProvider() {
     [closeDialog]
   );
 
+  if (!hasOpened && !canOpen) return null;
+
   return (
-    <FeedbackDialog
-      key={user?.id ?? 'signed-out'}
-      isOpen={isOpen && Boolean(user) && previousUserId.current === user?.id}
-      accountId={user?.id}
-      onOpenChange={handleOpenChange}
-      title={options.title}
-      subtitle={options.subtitle}
-      eventId={options.eventId}
-      name={options.name}
-      email={options.email}
-      submitButtonText={options.submitButtonText}
-      successMessage={options.successMessage}
-      currentPage={options.currentPage}
-    />
+    <ProtectedLazyRoute suspense="bare" errorBoundary="Feedback">
+      <FeedbackDialog
+        key={user?.id ?? 'signed-out'}
+        isOpen={canOpen}
+        accountId={user?.id}
+        onOpenChange={handleOpenChange}
+        title={options.title}
+        subtitle={options.subtitle}
+        eventId={options.eventId}
+        name={options.name}
+        email={options.email}
+        submitButtonText={options.submitButtonText}
+        successMessage={options.successMessage}
+        currentPage={options.currentPage}
+      />
+    </ProtectedLazyRoute>
   );
 }
 

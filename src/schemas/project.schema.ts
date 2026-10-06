@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isFutureDateOnly } from '@/utils/date/timezoneUtils';
 import { IMAGE_MAX_FILE_SIZE_BYTES, IMAGE_MIME_TYPES } from '@/utils/image/imagePolicy';
 import type { ProjectFormValues } from '@/types/project';
 
@@ -253,6 +254,7 @@ export const mapProjectServerFieldErrors = (
 
 export const validateProjectFormValues = (
   formData: ProjectFormValues,
+  today: string,
   userId = formData.userId
 ): { isValid: boolean; fieldErrors: ProjectFormFieldErrors } => {
   const result = ProjectFormSchema.safeParse({
@@ -261,21 +263,33 @@ export const validateProjectFormValues = (
     tagIds: formData.tags?.map(tag => tag.id) ?? formData.tagIds,
   });
 
-  if (result.success) {
-    return { isValid: true, fieldErrors: {} };
+  const fieldErrors = (result.success ? [] : result.error.issues).reduce<ProjectFormFieldErrors>(
+    (errors, issue) => {
+      const field = issue.path[0];
+      if (typeof field !== 'string') return errors;
+
+      const formField = mapProjectValidationField(field);
+      if (formField && !errors[formField]) {
+        errors[formField] = issue.message;
+      }
+
+      return errors;
+    },
+    {}
+  );
+
+  const dateFields = [
+    ['datePurchased', 'Purchase'],
+    ['dateReceived', 'Received'],
+    ['dateStarted', 'Start'],
+    ['dateCompleted', 'Completion'],
+  ] as const;
+
+  for (const [field, label] of dateFields) {
+    if (!fieldErrors[field] && isFutureDateOnly(formData[field], today)) {
+      fieldErrors[field] = `${label} date cannot be in the future`;
+    }
   }
 
-  const fieldErrors = result.error.issues.reduce<ProjectFormFieldErrors>((errors, issue) => {
-    const field = issue.path[0];
-    if (typeof field !== 'string') return errors;
-
-    const formField = mapProjectValidationField(field);
-    if (formField && !errors[formField]) {
-      errors[formField] = issue.message;
-    }
-
-    return errors;
-  }, {});
-
-  return { isValid: false, fieldErrors };
+  return { isValid: result.success && Object.keys(fieldErrors).length === 0, fieldErrors };
 };

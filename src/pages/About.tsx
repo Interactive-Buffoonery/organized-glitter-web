@@ -1,8 +1,10 @@
 import { getSupportUrl, getSupportMailto } from '@/lib/contactConfig';
 import { publicUrl } from '@/lib/publicUrl';
-import { Mail } from 'lucide-react';
+import { Heart, Mail } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import MainLayout from '@/components/layout/MainLayout';
+import { tipsEnabled } from '@/constants/tips';
 import { useAppReady } from '@/hooks/useAppReady';
 import { usePageMetadata } from '@/hooks/usePageMetadata';
 import { publicPageSocialMetadata } from '@/lib/publicPageSocialMetadata';
@@ -80,6 +82,15 @@ const About = () => {
                     <Mail className="text-primary size-4" aria-hidden="true" />
                     Send feedback
                   </a>
+                  {tipsEnabled() && (
+                    <Link
+                      to="/support"
+                      className="text-foreground hover:text-link focus-visible:outline-primary flex min-h-11 items-center gap-3 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+                    >
+                      <Heart className="text-primary size-4" aria-hidden="true" />
+                      Support Organized Glitter
+                    </Link>
+                  )}
                 </div>
                 <section
                   className="border-border/60 border-t pt-6"

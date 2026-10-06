@@ -38,22 +38,20 @@ Warm, organized, considered. The voice is a friend who is genuinely interested i
 4. **Your library, your eyes only.** Privacy is a product principle and should be felt, not just true. No public profiles by default, no "trending in your network," no leaderboards or social comparison surfaces. Per-user data isolation is part of the experience: the app feels like a private library because it is one.
 5. **The list page is the page.** Content lives directly on the surface and chrome serves it. No content-in-card-in-card nesting, no tabs that hide what the user came to see, no marketing chrome on app pages. Default to flat content with hairline dividers; reserve panels for configuration and grouped controls.
 
-## Monetization Direction
+## Free app and website support
 
-Everyday tracking, manual entry, import/export, and work on saved projects
-remain free. The diamond-painting catalog will also be free to search, scan,
-and import from.
-Start with a small curated catalog, then allow voluntary kit-fact submissions
-that are reviewed before publication. A private project never becomes a public
-catalog entry just because its owner adds a kit.
+All app features are free, including tracking, manual entry, import/export,
+and planned diamond-catalog search, scanning, imports, and contributions.
+Start with curated kit metadata, then accept voluntary submissions after
+review. Private projects remain separate from published catalog facts.
 
-Start support with optional, repeatable one-time "Support Organized Glitter"
-tips through Apple in-app purchases and RevenueCat. Tips grant no feature
-access or promise of future paid access. Analytics and purchases do not control
-access to tracking or the catalog. Tip amounts and launch timing remain open.
+Voluntary support is website-only and grants no app features, content, or
+account privileges. The native app contains no payment processing,
+contribution prompts, or checkout links. The website's `/support` page offers
+one-time $2, $3, $5, $10, or custom tips through Stripe-hosted Payment Links,
+with no subscriptions or interruptive prompts.
 
-[ADR-0022](./docs/adr/0022-free-catalog-and-optional-tips.md) records the
-current direction.
+[ADR-0022](./docs/adr/0022-free-catalog-and-optional-tips.md) records the direction.
 
 ## Accessibility & Inclusion
 

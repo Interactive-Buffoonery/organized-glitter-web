@@ -97,6 +97,7 @@ describe('route app-ready coverage', () => {
     'src/pages/BookIllustratorList.tsx',
     'src/pages/BookPublisherList.tsx',
     'src/pages/ColoringMediumList.tsx',
+    'src/pages/Support.tsx',
     'src/pages/SupportSuccess.tsx',
     'src/pages/ProjectRandomizer.tsx',
     'src/pages/Stats.tsx',

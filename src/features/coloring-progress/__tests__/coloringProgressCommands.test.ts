@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { ColoringPageDTO } from '@/services/pocketbase/coloring.service';
 import {
@@ -25,10 +25,6 @@ const page: ColoringPageDTO = {
 };
 
 describe('coloring progress commands', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it('builds PocketBase patches from coloring page commands', () => {
     const file = new File(['after'], 'after.jpg');
 
@@ -93,22 +89,36 @@ describe('coloring progress commands', () => {
   });
 
   it('rejects lifecycle dates where completion is before start', () => {
-    expect(getColoringPageLifecycleDateRangeError('2026-04-10', '2026-04-01')).toBe(
-      'Completed date cannot be before started date.'
-    );
-    expect(getColoringPageLifecycleDateRangeError('2026-04-01', '2026-04-10')).toBeNull();
+    expect(
+      getColoringPageLifecycleDateRangeError(
+        '2026-04-10',
+        '2026-04-01',
+        'completedAt',
+        '2026-10-04'
+      )
+    ).toBe('Completed date cannot be before started date.');
+    expect(
+      getColoringPageLifecycleDateRangeError(
+        '2026-04-01',
+        '2026-04-10',
+        'completedAt',
+        '2026-10-04'
+      )
+    ).toBeNull();
 
     expect(() =>
       assertColoringPageLifecycleDateRange(
         { type: 'set-completed-date', completedAt: '2026-04-01' },
-        page
+        page,
+        '2026-10-04'
       )
     ).toThrow('Completed date cannot be before started date.');
 
     expect(() =>
       assertColoringPageLifecycleDateRange(
         { type: 'set-started-date', startedAt: '2026-04-20' },
-        { ...page, completedAt: '2026-04-18' }
+        { ...page, completedAt: '2026-04-18' },
+        '2026-10-04'
       )
     ).toThrow('Completed date cannot be before started date.');
   });
@@ -203,5 +213,34 @@ describe('coloring progress commands', () => {
         revealedAt: '',
       })
     );
+  });
+});
+
+describe('coloring page future lifecycle dates', () => {
+  it('allows today and rejects tomorrow for both lifecycle dates', () => {
+    expect(
+      getColoringPageLifecycleDateRangeError(
+        '2026-10-04',
+        '2026-10-04',
+        'completedAt',
+        '2026-10-04'
+      )
+    ).toBeNull();
+    expect(
+      getColoringPageLifecycleDateRangeError('2026-10-05', undefined, 'startedAt', '2026-10-04')
+    ).toBe('Started date cannot be in the future.');
+    expect(
+      getColoringPageLifecycleDateRangeError(undefined, '2026-10-05', 'completedAt', '2026-10-04')
+    ).toBe('Completed date cannot be in the future.');
+    expect(() =>
+      assertColoringPageLifecycleDateRange(
+        { type: 'set-completed-date', completedAt: '2026-10-05' },
+        undefined,
+        '2026-10-04'
+      )
+    ).toThrow('Completed date cannot be in the future.');
+    expect(
+      getColoringPageLifecycleDateRangeError('2026-10-01', '2026-10-05', 'startedAt', '2026-10-04')
+    ).toBeNull();
   });
 });

@@ -236,6 +236,19 @@ export function normalizeDateOnlyValue(value: string | null | undefined): string
   return parseDateOnlyAsLocalDate(dateOnly) ? dateOnly : trimmed;
 }
 
+export function isFutureDateOnly(value: string | Date | null | undefined, today: string): boolean {
+  if (!value) return false;
+
+  const dateOnly =
+    typeof value === 'string'
+      ? normalizeDateOnlyValue(value)
+      : Number.isNaN(value.getTime())
+        ? ''
+        : formatLocalDate(value, 'yyyy-MM-dd');
+
+  return !!parseDateOnlyAsLocalDate(dateOnly) && dateOnly > today;
+}
+
 /**
  * Formats a date for display in the user's timezone
  *

@@ -16,6 +16,8 @@ import { AnalyticsEvent } from '@/services/analytics-events';
 import { getColoringPageAnalyticsProperties } from '@/services/coloring-analytics';
 import { trackGrowthFunnelMilestone } from '@/services/growth-funnel-analytics';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { getCurrentDateInUserTimezone } from '@/utils/date/timezoneUtils';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
 import { runPostWriteEffect } from '@/hooks/mutations/runPostWriteEffect';
 import { createLogger } from '@/utils/logger';
@@ -44,11 +46,16 @@ interface UpdateColoringPageVariables {
 
 export function useUpdateColoringPage() {
   const queryClient = useQueryClient();
+  const userTimezone = useUserTimezone();
   const { user } = useAuth();
   return useMutation<ColoringPageDTO, Error, UpdateColoringPageVariables, Context>({
     mutationFn: ({ pageId, command }) => {
       const currentPage = getCachedColoringPage(queryClient, pageId);
-      assertColoringPageLifecycleDateRange(command, currentPage);
+      assertColoringPageLifecycleDateRange(
+        command,
+        currentPage,
+        getCurrentDateInUserTimezone(userTimezone)
+      );
       if (command.type === 'set-main-photo') {
         return ColoringService.setMainPagePhoto(pageId, command.filename);
       }

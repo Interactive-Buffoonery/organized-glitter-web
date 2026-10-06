@@ -1,14 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { usePostHog } from '@posthog/react';
+import { useAnalyticsPreference } from '@/hooks/useAnalyticsPreference';
+import { syncAnalyticsConsent } from '@/services/analytics-preference';
 import { useAuth } from '@/hooks/useAuth';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import { isStandalone, isIOS, isSafari } from '@/utils/ui/deviceDetection';
-import { sanitizeSensitivePath } from '@/utils/auth/sensitivePath';
+import { sanitizeAnalyticsPath } from '@/utils/analytics/sanitizePath';
 
-export function sanitizeAnalyticsPath(pathname: string): string {
-  return sanitizeSensitivePath(pathname);
-}
+export { sanitizeAnalyticsPath } from '@/utils/analytics/sanitizePath';
 
 /**
  * Hook that wires PostHog analytics into the React lifecycle:
@@ -20,14 +20,34 @@ export function sanitizeAnalyticsPath(pathname: string): string {
  */
 export function useAnalytics(): void {
   const posthog = usePostHog();
-  const { user, isAuthenticated } = useAuth();
+  const analyticsEnabled = useAnalyticsPreference();
+  const { user, isAuthenticated, initialCheckComplete } = useAuth();
+  const accountId = isAuthenticated ? user?.id : undefined;
+  const accountCreated = user?.created;
   const location = useLocation();
   const prevPathRef = useRef<string | null>(null);
   const sessionContextFired = useRef(false);
+  const previousAccount = useRef<string | null | undefined>(undefined);
 
-  // 1. Fire session context once
   useEffect(() => {
-    if (sessionContextFired.current) return;
+    if (!analyticsEnabled || !initialCheckComplete) return;
+    const nextAccount = accountId ?? null;
+    if (previousAccount.current === nextAccount) return;
+
+    const existingAccount =
+      previousAccount.current === undefined
+        ? posthog.get_property('$user_id')
+        : previousAccount.current;
+    if (existingAccount && existingAccount !== nextAccount) {
+      posthog.reset();
+      syncAnalyticsConsent();
+    }
+    if (nextAccount) posthog.identify(nextAccount, { created: accountCreated });
+    previousAccount.current = nextAccount;
+  }, [posthog, analyticsEnabled, initialCheckComplete, accountId, accountCreated]);
+
+  useEffect(() => {
+    if (!analyticsEnabled || !initialCheckComplete || sessionContextFired.current) return;
     sessionContextFired.current = true;
 
     posthog.capture(AnalyticsEvent.SESSION_CONTEXT, {
@@ -37,28 +57,17 @@ export function useAnalytics(): void {
       screen_width: window.screen.width,
       screen_height: window.screen.height,
     });
-  }, [posthog]);
+  }, [posthog, analyticsEnabled, initialCheckComplete]);
 
-  // 2. Identify or reset on auth changes
   useEffect(() => {
-    if (isAuthenticated && user) {
-      posthog.identify(user.id, {
-        created: user.created,
-      });
-    } else {
-      posthog.reset();
-    }
-  }, [posthog, isAuthenticated, user]);
-
-  // 3. Track pageviews on route changes
-  useEffect(() => {
+    if (!analyticsEnabled || !initialCheckComplete || prevPathRef.current === location.pathname)
+      return;
     const path = sanitizeAnalyticsPath(location.pathname);
-    if (prevPathRef.current === path) return;
-    prevPathRef.current = path;
+    prevPathRef.current = location.pathname;
 
     posthog.capture(AnalyticsEvent.PAGE_VIEW, {
       $current_url: `${window.location.origin}${path}`,
       path,
     });
-  }, [posthog, location.pathname]);
+  }, [posthog, analyticsEnabled, initialCheckComplete, location.pathname]);
 }

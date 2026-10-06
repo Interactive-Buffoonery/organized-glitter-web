@@ -274,8 +274,8 @@ vi.mock('@/lib/notifications', () => ({
   notifyInfo: notifyMock,
 }));
 
-vi.mock('@/services/analytics-escape-hatch', () => ({
-  capture: captureMock,
+vi.mock('@posthog/react', () => ({
+  usePostHog: () => ({ capture: captureMock }),
 }));
 
 vi.mock('@/services/analytics-events', () => ({

@@ -8,7 +8,6 @@ Status: active guidance for INT-202 and future analytics changes.
 - Lifecycle hook: `src/hooks/useAnalytics.ts`
 - Event registry: `src/services/analytics-events.ts`
 - Escape hatch: `src/services/analytics-escape-hatch.ts`
-- Growth funnel helper: `src/services/growth-funnel-analytics.ts`
 - Coloring property helpers: `src/services/coloring-analytics.ts`
 - Privacy disclosure: `src/pages/Privacy.tsx`
 
@@ -38,7 +37,15 @@ Do not capture:
 ## Route privacy
 
 Route analytics must call `sanitizeAnalyticsPath()` before capture. The helper removes query
-strings and hashes and redacts known auth-token routes.
+strings and hashes, redacts known auth-token routes, and replaces project, book, and page IDs
+with route parameters. The final event sanitizer also applies this to SDK-added URL and path
+properties. Navigating between different records still captures each pageview even when their
+route template is the same.
+
+The provider initializes the shared SDK before React effects run. Lifecycle captures wait for
+the initial auth check, establish the account identity, and then send session context and the
+initial pageview. Restoration is not a sign-out. Component error boundaries send fixed component
+labels instead of project IDs, image URLs, or image alt text.
 
 ## Event naming
 
@@ -100,24 +107,24 @@ only; the recovery UI must not render `#error-details` or raw exception text.
 
 ## Coverage map
 
-| Area               | Current coverage                                                                                                                                          | Notes                                                                                                                                                                                                                                                                                        |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App lifecycle      | `session_context`, `$pageview`, identify/reset, `bootstrap_failure_shown`, `bootstrap_recovered`                                                          | Page paths are sanitized before capture. The static shell captures displayed failures and same-document recovery with the safe diagnostics described above. Both bootstrap events respect DNT. No stacks, full paths, emails, or user text.                                                  |
-| API health         | `api_rate_limited`                                                                                                                                        | Captured on PocketBase 429 responses with route bucket, auth state, and consecutive count bucket only. No full URLs, IPs, record IDs, or request bodies.                                                                                                                                     |
-| Auth               | `registration_started`, `auth_login_succeeded`, `auth_registration_succeeded`                                                                             | Low-cardinality method/provider/entrypoint only. Device, OS, and browser come from PostHog's automatic event properties. Auth tokens, query strings, hashes, emails, and user-entered names must stay out of captured paths and payloads.                                                    |
-| Growth funnel      | `first_project_created`, `first_coloring_book_created`, `first_progress_note_added`, `first_photo_added`, `randomizer_first_spin`, `activation_completed` | First-action events fire once per user, deduped via localStorage in `growth-funnel-analytics.ts`. Payloads carry counts, booleans, and entity/source labels only. Activation fires once a user has created 3 library items and logged at least one progress note, photo, or randomizer spin. |
-| Dashboard          | sort, search, filters, status segments, view mode, project open, load timing                                                                              | Search captures length only.                                                                                                                                                                                                                                                                 |
-| Overview           | craft filter and sort                                                                                                                                     | No card impression tracking.                                                                                                                                                                                                                                                                 |
-| Diamond projects   | create, update, status change, archive, delete, progress note                                                                                             | Payloads avoid names, notes, URLs, images, and record IDs.                                                                                                                                                                                                                                   |
-| Options metadata   | company, artist, tag, publisher, illustrator, and coloring medium create/update/delete                                                                    | Names are not captured.                                                                                                                                                                                                                                                                      |
-| Randomizer         | spin                                                                                                                                                      | Payload stays low-cardinality.                                                                                                                                                                                                                                                               |
-| Import/export      | archive, DAC, bulk photo, and CSV completion events                                                                                                       | Counts, status, duration, file-size buckets, archive schema version, and `settings_data` only. No filenames, record IDs, manifest paths, user-entered names, notes, or URLs.                                                                                                                 |
-| Coloring books     | create/update/delete/status, search/sort/filter/view                                                                                                      | Uses low-cardinality helpers.                                                                                                                                                                                                                                                                |
-| Coloring pages     | status, photos, mystery reveal, progress notes                                                                                                            | No photo URLs or page subjects.                                                                                                                                                                                                                                                              |
-| Profile/settings   | vertical preference updates                                                                                                                               | Theme and account changes are pageview-only unless a product question justifies more.                                                                                                                                                                                                        |
-| Public/legal pages | pageviews only                                                                                                                                            | No explicit action events.                                                                                                                                                                                                                                                                   |
-| Support page       | `tip_link_clicked`, `support_alternative_clicked`, pageviews of `/support` and `/support/success`                                                         | `amount` is the preset (2, 3, 5, 10) or `custom`; `action` is `feedback` or `app_store_review`. Sent by beacon because each link leaves the page. Stripe owns payment amounts and receipts, so no payment details, emails, or Stripe IDs.                                                    |
-| Errors             | `$exception` via app and route error handlers                                                                                                             | Do not include user-entered content in error properties.                                                                                                                                                                                                                                     |
+| Area               | Current coverage                                                                                  | Notes                                                                                                                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App lifecycle      | `session_context`, `$pageview`, identify/reset, `bootstrap_failure_shown`, `bootstrap_recovered`  | Page paths are sanitized before capture. The static shell captures displayed failures and same-document recovery with the safe diagnostics described above. Both bootstrap events respect DNT. No stacks, full paths, emails, or user text. |
+| API health         | `api_rate_limited`                                                                                | Captured on PocketBase 429 responses with route bucket, auth state, and consecutive count bucket only. No full URLs, IPs, record IDs, or request bodies.                                                                                    |
+| Auth               | `registration_started`, `auth_login_succeeded`, `auth_registration_succeeded`                     | Low-cardinality method/provider/entrypoint only. Device, OS, and browser come from PostHog's automatic event properties. Auth tokens, query strings, hashes, emails, and user-entered names must stay out of captured paths and payloads.   |
+| Growth reporting   | Successful creation, progress-note, photo, spin, and import events                                | Derive first recorded use per account in PostHog. Browser-local milestone and activation flags are retired.                                                                                                                                 |
+| Dashboard          | sort, search, filters, status segments, view mode, project open, load timing                      | Search captures length only.                                                                                                                                                                                                                |
+| Overview           | craft filter and sort                                                                             | No card impression tracking.                                                                                                                                                                                                                |
+| Diamond projects   | create, update, status change, archive, delete, progress note                                     | Payloads avoid names, notes, URLs, images, and record IDs.                                                                                                                                                                                  |
+| Options metadata   | company, artist, tag, publisher, illustrator, and coloring medium create/update/delete            | Names are not captured.                                                                                                                                                                                                                     |
+| Randomizer         | spin                                                                                              | Payload stays low-cardinality.                                                                                                                                                                                                              |
+| Import/export      | archive, DAC, bulk photo, and CSV completion events                                               | Counts, status, duration, file-size buckets, archive schema version, and `settings_data` only. No filenames, record IDs, manifest paths, user-entered names, notes, or URLs.                                                                |
+| Coloring books     | create/update/delete/status, search/sort/filter/view                                              | Uses low-cardinality helpers.                                                                                                                                                                                                               |
+| Coloring pages     | status, photos, mystery reveal, progress notes                                                    | No photo URLs or page subjects.                                                                                                                                                                                                             |
+| Profile/settings   | vertical preference updates                                                                       | Theme and account changes are pageview-only unless a product question justifies more.                                                                                                                                                       |
+| Public/legal pages | pageviews only                                                                                    | No explicit action events.                                                                                                                                                                                                                  |
+| Support page       | `tip_link_clicked`, `support_alternative_clicked`, pageviews of `/support` and `/support/success` | `amount` is the preset (2, 3, 5, 10) or `custom`; `action` is `feedback` or `app_store_review`. Sent by beacon because each link leaves the page. Stripe owns payment amounts and receipts, so no payment details, emails, or Stripe IDs.   |
+| Errors             | `$exception` via app and route error handlers                                                     | Do not include user-entered content in error properties.                                                                                                                                                                                    |
 
 ## Adding or changing events
 
@@ -133,6 +140,9 @@ only; the recovery UI must not render `#error-details` or raw exception text.
 Import/export telemetry is intentionally narrow because uploaded files and archives can contain
 user-entered names, filenames, notes, URLs, and record references. Use
 `src/features/import-export/importExportTelemetry.ts` for event and exception payloads.
+
+For bulk photo imports, the start event's `records` is the selected count. The completion
+event's `records` and `imported_photos` are the successfully imported count.
 
 Current import/export events:
 
@@ -197,35 +207,38 @@ OAuth buttons on the Register page still emit `auth_login_succeeded` with
 `auth_entrypoint: register` because PocketBase may be signing in an existing
 OAuth account rather than creating a new one.
 
-## Growth funnel events
+## Growth reporting
 
-These events track how new users sign up and reach their first real use of the app, without
-recording anything they type. Call `trackGrowthFunnelMilestone()` from
-`src/services/growth-funnel-analytics.ts` after a successful write to record a first-action
-milestone. Pass its `activationSignal` option when the write also contributes to activation.
+Capture ordinary successful actions on every use. Derive the earliest recorded action per
+account in PostHog, so a new browser does not manufacture a new first-use event. This means
+first recorded use, not proof of the user's first-ever action: opt-outs, blocked requests,
+and activity before instrumentation leave gaps.
 
-Each milestone fires at most once per user:
+Use `project_created`, `coloring_book_created`, `progress_note_added`,
+`coloring_page_progress_note_added`, `coloring_page_photo_added`, and `randomizer_spin`.
+Progress-note events include `has_photo`; randomizer events include `mode`.
+Registration events remain separate from successful product use.
 
-- `registration_started`: signup begins on the register page, via password or OAuth.
-- `auth_registration_succeeded`: a password account is created.
-- `first_project_created`: their first diamond project.
-- `first_coloring_book_created`: their first coloring book.
-- `first_progress_note_added`: their first progress note, on a diamond or coloring project.
-- `first_photo_added`: their first progress-note image or coloring page photo.
-- `randomizer_first_spin`: their first randomizer spin.
-- `activation_completed`: they've created 3 library items and logged at least one progress note,
-  photo, or randomizer spin.
+Archive completion counts separate `records` (new logical records), `existing_records`
+(already present), `prepared_records` (v3 parent scaffolds), and `skipped`. Status describes the whole restore attempt: `partial` can mean an existing
+record was handled successfully while another failed, even when `records` is zero. Do not count
+existing records as growth or add prepared parents to new logical records. Imports contribute to first recorded use through their successful completion events.
+`created_library_items` counts new diamond projects and coloring books only, excluding notes,
+assets, existing records, and prepared parents. Use that property for the library-item
+threshold, rather than the general record count.
 
-To do this the helper keeps a little state in localStorage: which events have already fired, the
-created-item count, and whether the user has added a progress note, a photo, or used the
-randomizer.
-
-Never put titles, notes, names, URLs, filenames, emails, PocketBase record IDs, or any free text
-into that state or into funnel event properties.
+The legacy `first_*`, `randomizer_first_spin`, and `activation_completed` events are no longer
+emitted. Historical events remain in PostHog. Existing browser milestone storage is inert.
+Do not combine legacy activation counts with ordinary action counts as if they were the same
+metric. For the activation definition, sum ordinary project/book creation events and
+`created_library_items` on archive imports (or `records` on project CSV imports), then require
+at least one progress-note, photo, or spin event. Calculate this per identified account in
+PostHog. These reports still depend on received events, not the current full library.
 
 ## Local verification
 
-Analytics is disabled when `VITE_PUBLIC_POSTHOG_KEY` is not set. For local manual testing, use a
+Analytics is disabled unless both `VITE_PUBLIC_POSTHOG_KEY` and
+`VITE_PUBLIC_POSTHOG_HOST` are set. For local manual testing, use a
 development PostHog project key and host:
 
 ```bash
@@ -247,6 +260,8 @@ PostHog keys.
 - `capture_exceptions` is not enabled for automatic exception capture. Use manual
   `captureException()` calls with redacted properties.
 - `respect_dnt: true`.
+- `save_campaign_params: false`; the event sanitizer also removes stored `utm_*` and
+  `$initial_utm_*` properties from older sessions. Campaign query values can contain free text.
 - `advanced_disable_flags: true` and `advanced_disable_feature_flags: true`, because this app does
   not currently use PostHog feature flags.
 - `mask_all_element_attributes: true`, `mask_all_text: true`, and
@@ -262,6 +277,7 @@ builds emit hidden Vite source maps, so bundles do not link to `.map` files. Aft
 The uploader:
 
 - injects PostHog chunk IDs and uploads source maps when both the CLI token and project ID are present
+- bounds each CLI call to two minutes, then continues the build and strips maps on failure
 - ties uploads to the build release from `GITHUB_SHA`, `RAILWAY_GIT_COMMIT_SHA`, or
   `VITE_APP_VERSION`
 - deletes local `.map` files whether upload succeeds, fails, or is skipped, so source maps do not
@@ -311,3 +327,24 @@ health check may remain active briefly while cached browser bundles age out.
 Dependabot groups these three packages into one weekly update so compatibility
 and source-map behavior are reviewed together. The repository's
 `minimumReleaseAge` policy still applies to automated updates.
+
+## Local proxy deadline
+
+The local build server bounds the full upstream exchange, including response streaming, to
+10 seconds by default (`GLIMMER_PROXY_REQUEST_TIMEOUT_MS`). Request uploads retain their
+separate body deadline. Upstream failures return the existing controlled empty response;
+a timed-out response stream is closed. This is an app choice, not a PostHog-mandated deadline.
+
+## Usage analytics preference
+
+Account settings includes a default-on Usage analytics switch. The app stores its choice in
+`og:analytics:enabled` in this browser, separately from the iOS preference. Changes apply to
+other open tabs. If browser storage is blocked, the choice lasts for the current page session.
+
+Turning it off calls PostHog's public `opt_out_capturing()` API and blocks events through
+`before_send`. Lifecycle identify/reset also stops while off, so account changes cannot clear
+the choice. Re-enabling establishes the current account before lifecycle captures resume.
+The pre-React bootstrap beacon checks the same preference. Do Not Track remains respected.
+This does not delete data previously received by PostHog or recall requests already sent.
+Requests queued before opting out may still be delivered by the SDK. No new events are
+captured while off.

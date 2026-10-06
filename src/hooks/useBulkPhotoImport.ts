@@ -284,7 +284,7 @@ export function useBulkPhotoImport() {
           records: result.importedCount,
           errors: result.failedCount,
         }),
-        records: selectedCount,
+        records: result.importedCount,
         skipped: result.skippedCount,
         errors: result.failedCount,
         imported_photos: result.importedCount,

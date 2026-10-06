@@ -63,6 +63,22 @@ describe('bootstrap-analytics beacon helper', () => {
     vi.restoreAllMocks();
   });
 
+  it.each(['captureBootstrapFailureShown', 'captureBootstrapRecovery'] as const)(
+    'respects browser opt-out for %s',
+    method => {
+      const api = loadAnalytics();
+      const sendBeacon = vi.fn();
+      expect(
+        api[method]('startup_timeout', {
+          config: { key: 'phc_test', host: '/glimmer' },
+          storage: { getItem: (key: string) => (key === 'og:analytics:enabled' ? 'false' : null) },
+          sendBeacon,
+        })
+      ).toBe(false);
+      expect(sendBeacon).not.toHaveBeenCalled();
+    }
+  );
+
   it('allows only the registered low-cardinality reasons', () => {
     const api = loadAnalytics();
     expect(api.isAllowedReason('module_resource')).toBe(true);

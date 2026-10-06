@@ -183,6 +183,14 @@
     var options = deps || {};
     if (!isAllowedReason(reason)) return false;
     if (isDoNotTrackEnabled(options.navigator, options.window)) return false;
+    try {
+      var preferenceStorage = options.storage || global.localStorage;
+      if (preferenceStorage && preferenceStorage.getItem('og:analytics:enabled') === 'false') {
+        return false;
+      }
+    } catch (_) {
+      // Storage can be unavailable in private browsing.
+    }
 
     var config = options.config || readPublicConfig(options.root || global);
     if (!config.key || !config.host) return false;

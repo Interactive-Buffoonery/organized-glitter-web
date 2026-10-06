@@ -80,9 +80,9 @@ const Privacy = () => {
                 settings stored locally in your browser.
               </li>
               <li className="text-foreground/90 leading-relaxed">
-                <strong className="text-foreground">Product analytics:</strong> anonymous page view,
-                feature usage, and error data collected through PostHog so we can improve and debug
-                the app.
+                <strong className="text-foreground">Product analytics:</strong> page view, feature
+                usage, and error data collected through PostHog so we can improve and debug the app.
+                Signed-in activity is linked to your account through an internal account ID.
               </li>
             </ul>
           </section>
@@ -104,11 +104,15 @@ const Privacy = () => {
           <section className="mb-10">
             <h2 className="text-foreground mb-3 text-xl font-semibold">Third-Party Services</h2>
             <p className="text-foreground/90 mb-3 leading-relaxed">
-              <strong>PostHog Analytics.</strong> We use PostHog to collect anonymous usage data,
-              such as page views and feature usage, to help us improve the app. PostHog respects the
-              Do Not Track browser setting. We do not use PostHog for advertising, session
-              recording, or automatic click tracking. We only send specific product events we have
-              chosen to measure, such as page views and feature usage.
+              <strong>PostHog Analytics.</strong> We use PostHog to collect usage data, such as page
+              views and feature usage, to help us improve the app. When you sign in, an internal
+              account ID links activity across your devices. We do not send your name, email
+              address, craft titles, notes, or photos as product analytics. PostHog respects the Do
+              Not Track browser setting. We do not use PostHog for advertising, session recording,
+              or automatic click tracking. We only send specific product events we have chosen to
+              measure, such as page views and feature usage. You can turn off usage analytics and
+              error reports in Account settings under Privacy. This choice is saved in this browser
+              and is separate from your iOS app preference.
             </p>
             <p className="text-foreground/90 leading-relaxed">
               <strong>Error Tracking.</strong> We collect technical information about errors (such

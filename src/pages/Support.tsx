@@ -21,9 +21,9 @@ const Support = () => {
   const feedbackHref = getSupportUrl() || getSupportMailto() || '/profile?tab=support';
   const appStoreUrl = import.meta.env.VITE_APP_STORE_URL?.trim();
   const trackTip = (amount: number | 'custom') =>
-    posthog.capture(AnalyticsEvent.TIP_LINK_CLICKED, { amount }, BEACON);
+    posthog?.capture(AnalyticsEvent.TIP_LINK_CLICKED, { amount }, BEACON);
   const trackAlternative = (action: 'feedback' | 'app_store_review') =>
-    posthog.capture(AnalyticsEvent.SUPPORT_ALTERNATIVE_CLICKED, { action }, BEACON);
+    posthog?.capture(AnalyticsEvent.SUPPORT_ALTERNATIVE_CLICKED, { action }, BEACON);
 
   return (
     <MainLayout currentPage="Support">

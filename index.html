@@ -207,6 +207,28 @@
     <div class="safari-edge-tint safari-edge-tint--top" aria-hidden="true"></div>
     <div class="safari-edge-tint safari-edge-tint--bottom" aria-hidden="true"></div>
 
+    <noscript>
+      <style>
+        #app-loading,
+        #app-error,
+        #root {
+          display: none !important;
+        }
+        .no-script-message {
+          max-width: 36rem;
+          margin: 4rem auto;
+          padding: 1.5rem;
+          font-family: system-ui, sans-serif;
+          line-height: 1.6;
+        }
+      </style>
+      <main class="no-script-message">
+        <h1>JavaScript is needed to open your library</h1>
+        <p>Enable JavaScript in your browser, then reload to sign in and use Organized Glitter.</p>
+        <a href="/">Back to home</a>
+      </main>
+    </noscript>
+
     <div id="root"></div>
 
     <!-- Loading State — sibling of #root so React's createRoot() does not remove it -->

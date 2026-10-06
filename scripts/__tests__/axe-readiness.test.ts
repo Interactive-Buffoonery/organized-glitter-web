@@ -15,6 +15,21 @@ describe('axe scan readiness', () => {
     expect(isAppRootOpaque()).toBe(true);
   });
 
+  it('accepts an explicit opaque static page without manufacturing React readiness', () => {
+    document.body.innerHTML =
+      '<div data-static-landing style="opacity: 1"><main id="main-content">Home</main></div>';
+    expect(isAppRootOpaque()).toBe(true);
+    expect(document.querySelector('[data-app-ready]')).toBeNull();
+    document.querySelector('[data-static-landing]')?.setAttribute('style', 'opacity: 0.5');
+    expect(isAppRootOpaque()).toBe(false);
+  });
+
+  it('rejects absent roots and incomplete static markup', () => {
+    expect(isAppRootOpaque()).toBe(false);
+    document.body.innerHTML = '<div data-static-landing style="opacity: 1"></div>';
+    expect(isAppRootOpaque()).toBe(false);
+  });
+
   it('does not settle fonts and layout until both startup transitions finish', async () => {
     let finishSplash: () => void = () => undefined;
     let finishRootFade: () => void = () => undefined;

@@ -55,6 +55,22 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test.describe('signed out', () => {
       test.use({ storageState: { cookies: [], origins: [] } });
 
+      test('static home dismissal persists to app login and supports keyboard', async ({
+        page,
+      }) => {
+        await page.goto('/');
+        await expect(page.locator('[data-static-landing] main#main-content')).toBeVisible();
+        const notice = page.locator('[data-notice-id="weekend-hosting"]');
+        const close = notice.getByRole('button', { name: 'Close hosting notice' });
+        await close.focus();
+        await page.keyboard.press('Enter');
+        await expect(notice).toHaveCount(0);
+        await expect(page.locator('#main-content')).toBeFocused();
+        await page.goto('/login');
+        await expect(page.getByRole('textbox', { name: 'Email', exact: true })).toBeVisible();
+        await expect(notice).toHaveCount(0);
+      });
+
       test('appears on home, auth, and public pages', async ({ page }) => {
         for (const route of [
           '/',
@@ -67,7 +83,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
         ]) {
           await page.goto(route);
           await expect(page.locator('#app-loading')).toHaveCount(0);
-          await expect(page.locator('#root')).toHaveCSS('opacity', '1');
+          if (route === '/') {
+            await expect(page.locator('[data-static-landing] main#main-content')).toBeVisible();
+            await expect(page.locator('#root')).toHaveCount(0);
+          } else {
+            await expect(page.locator('#root')).toHaveCSS('opacity', '1');
+          }
           const notice = page
             .getByRole('region')
             .and(page.locator('[data-notice-id="weekend-hosting"]'));

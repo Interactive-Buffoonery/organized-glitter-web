@@ -22,6 +22,7 @@
     "scripts/static-landing.mjs",
     "scripts/bootstrap-build.mjs",
     "scripts/pwa-module-preloads.mjs",
+    "scripts/static-notice.mjs",
     "server/app-route-policy.js",
     "server/deployment-config.js"
   ]

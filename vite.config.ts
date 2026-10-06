@@ -17,6 +17,7 @@ import { ensureStartupScriptsBeforeAppModules } from './scripts/ensure-startup-s
 import { staticLanding } from './scripts/static-landing.mjs';
 import { bootstrapResources } from './scripts/bootstrap-build.mjs';
 import { pwaModulePreloads } from './scripts/pwa-module-preloads.mjs';
+import { staticHostingNotice } from './scripts/static-notice.mjs';
 
 /**
  * Inject the public PostHog key/host into public HTML entries so the
@@ -236,6 +237,7 @@ export default defineConfig(({ mode }) => {
         },
       }),
       preserveStartupScriptOrder(),
+      staticHostingNotice(),
       bootstrapResources(),
     ],
 

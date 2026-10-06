@@ -1,9 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Link, MemoryRouter } from 'react-router-dom';
+import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { SiteFooter } from '@/components/layout/SiteFooter';
+import { HostingNoticeContent } from '@/components/layout/HostingNotice';
 import { HomeHero } from './HomeHero';
 import { SarahSignature } from './SarahSignature';
 import { ScrapbookFeatures } from './ScrapbookFeatures';
@@ -60,6 +62,18 @@ function StaticLanding() {
           Skip to content
         </a>
         <StaticSiteHeader />
+        <HostingNoticeContent>
+          <template data-notice-dismiss>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-touch"
+              aria-label="Close hosting notice"
+            >
+              <X aria-hidden="true" />
+            </Button>
+          </template>
+        </HostingNoticeContent>
         <main id="main-content" tabIndex={-1} className="flex-grow">
           <HomeHero />
           <TwoCraftsSplit />

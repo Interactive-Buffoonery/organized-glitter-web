@@ -35,6 +35,20 @@ describe('renderStaticLanding', () => {
     expect(link('Get Started')?.getAttribute('href')).toBe('/register');
   });
 
+  it('preserves the hosting notice without nonfunctional no-JavaScript controls', () => {
+    const document = renderDocument();
+    const notice = document.querySelector('[data-notice-id="weekend-hosting"]');
+    expect(notice).not.toBeNull();
+    expect(notice?.textContent).toContain('Hosting update this weekend');
+    expect(notice?.querySelector('strong')?.textContent).toBe(
+      "If you don't see your projects, sign out and back in."
+    );
+    expect(notice?.querySelector('button')).toBeNull();
+    expect(notice?.compareDocumentPosition(document.querySelector('#main-content')!)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
   it('links to app and public routes with plain anchors', () => {
     const hrefs = [...renderDocument().querySelectorAll('a')].map(anchor =>
       anchor.getAttribute('href')

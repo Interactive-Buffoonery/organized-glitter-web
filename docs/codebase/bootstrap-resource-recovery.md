@@ -147,3 +147,19 @@ first-install request concurrency and an offline app reload in Chromium.
 Playwright WebKit verifies cache coverage and controlling-worker delivery;
 its offline transport rejects navigation before reaching the service worker.
 A real offline Safari reload remains a device-level validation gap.
+
+## Static public controls
+
+The static home retains the existing hosting notice using shared notice
+markup. Its close button lives in an inert template until an inline classic
+script installs the control. Without JavaScript, the notice remains readable
+and has no unusable button. With JavaScript, dismissal uses the app's existing
+session key and returns focus to the main landmark. This script does not read
+authentication, initialize analytics, register a worker, or load React.
+
+Accessibility scan readiness accepts the explicit static landing wrapper and
+main landmark when no React root exists. It still waits for full opacity and
+settled fonts; static content never receives the app readiness marker. The
+smoke inventory includes four new checks for keyboard dismissal followed by
+app navigation, bringing smoke coverage to 67 cases and release inventory to
+258 cases. Original notice and accessibility assertions remain in place.

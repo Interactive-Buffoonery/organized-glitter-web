@@ -12,7 +12,15 @@ interface AxeScanOptions {
 
 export const isAppRootOpaque = () => {
   const root = document.getElementById('root');
-  return root !== null && Number.parseFloat(getComputedStyle(root).opacity) >= 0.999;
+  if (root) return Number.parseFloat(getComputedStyle(root).opacity) >= 0.999;
+  const staticPage = document.querySelector<HTMLElement>('[data-static-landing]');
+  if (!staticPage?.querySelector('main#main-content')) return false;
+  const style = getComputedStyle(staticPage);
+  return (
+    style.display !== 'none' &&
+    style.visibility !== 'hidden' &&
+    Number.parseFloat(style.opacity || '1') >= 0.999
+  );
 };
 
 export async function waitForAccessibilityScanReady(page: Page) {

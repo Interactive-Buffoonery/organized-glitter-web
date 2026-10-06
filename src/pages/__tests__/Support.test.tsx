@@ -3,8 +3,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockCapture } = vi.hoisted(() => ({ mockCapture: vi.fn() }));
-vi.mock('@posthog/react', () => ({ usePostHog: () => ({ capture: mockCapture }) }));
+const { mockCapture, mockUsePostHog } = vi.hoisted(() => ({
+  mockCapture: vi.fn(),
+  mockUsePostHog: vi.fn(),
+}));
+vi.mock('@posthog/react', () => ({ usePostHog: mockUsePostHog }));
 vi.mock('@/hooks/useAppReady', () => ({ useAppReady: vi.fn() }));
 vi.mock('@/components/layout/MainLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
@@ -23,7 +26,10 @@ const renderPage = () =>
   );
 
 describe('Support page', () => {
-  beforeEach(() => document.addEventListener('click', preventNavigation));
+  beforeEach(() => {
+    document.addEventListener('click', preventNavigation);
+    mockUsePostHog.mockReturnValue({ capture: mockCapture });
+  });
   afterEach(() => {
     document.removeEventListener('click', preventNavigation);
     vi.unstubAllEnvs();
@@ -117,6 +123,35 @@ describe('Support page', () => {
       { action: 'app_store_review' },
       beacon
     );
+  });
+
+  it('keeps support links usable when analytics are unavailable', () => {
+    mockUsePostHog.mockReturnValue(undefined);
+    vi.stubEnv('VITE_STRIPE_TIP_5_URL', 'https://buy.stripe.com/test_5');
+    vi.stubEnv('VITE_STRIPE_TIP_CUSTOM_URL', 'https://buy.stripe.com/test_custom');
+    vi.stubEnv('VITE_APP_STORE_URL', 'https://apps.apple.com/app/id123');
+    renderPage();
+
+    const errors: unknown[] = [];
+    const recordError = (event: ErrorEvent) => {
+      errors.push(event.error);
+      event.preventDefault();
+    };
+    window.addEventListener('error', recordError);
+    try {
+      for (const name of [
+        'Tip $5 (most popular)',
+        'Choose your own amount',
+        'Send feedback',
+        'Leave a review on the App Store',
+      ]) {
+        fireEvent.click(screen.getByRole('link', { name }));
+      }
+      expect(errors).toEqual([]);
+      expect(mockCapture).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('error', recordError);
+    }
   });
 
   it('hides the App Store review when no App Store link is configured', () => {

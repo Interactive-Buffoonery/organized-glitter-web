@@ -98,6 +98,34 @@ export function measureBuild(dist) {
     const key = byFile.get(file.path);
     if (key) includeManifestEntry(key);
   }
+  const bootstrap = html.match(
+    /<script\b[^>]*id=["']app-bootstrap-resources["'][^>]*>([\s\S]*?)<\/script>/i
+  );
+  if (bootstrap) {
+    const config = JSON.parse(bootstrap[1]);
+    const safeAsset = url =>
+      typeof url === 'string' && /^\/assets\/[a-zA-Z0-9_./-]+\.(?:js|css)$/.test(url);
+    if (
+      !safeAsset(config.entry) ||
+      !config.entry.endsWith('.js') ||
+      !Array.isArray(config.resources) ||
+      !config.resources.every(safeAsset)
+    ) {
+      throw new Error('Invalid bootstrap resource graph');
+    }
+    const key = byFile.get(config.entry.slice(1));
+    if (!key) throw new Error('Bootstrap entry is missing from the build manifest');
+    const configured = new Set([...config.resources, config.entry].map(url => url.slice(1)));
+    includeManifestEntry(key);
+    for (const file of eager) {
+      if (file.startsWith('assets/') && !configured.has(file)) {
+        throw new Error(`Bootstrap resource graph omits static dependency: ${file}`);
+      }
+    }
+    for (const file of configured) eager.add(file);
+    // Inline recovery code and CSS are transferred with the document.
+    eager.add('app.html');
+  }
   if (![...eager].some(file => file.endsWith('.js'))) {
     throw new Error('No eager JavaScript found in generated app.html');
   }

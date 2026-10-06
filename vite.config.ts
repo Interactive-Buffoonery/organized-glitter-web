@@ -15,6 +15,7 @@ import {
 import { injectAppIconLinks } from './scripts/app-icon-links.mjs';
 import { ensureStartupScriptsBeforeAppModules } from './scripts/ensure-startup-script-order.mjs';
 import { staticLanding } from './scripts/static-landing.mjs';
+import { bootstrapResources } from './scripts/bootstrap-build.mjs';
 
 /**
  * Inject the public PostHog key/host into public HTML entries so the
@@ -234,6 +235,7 @@ export default defineConfig(({ mode }) => {
         },
       }),
       preserveStartupScriptOrder(),
+      bootstrapResources(),
     ],
 
     resolve: {

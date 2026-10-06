@@ -348,3 +348,87 @@ for (const path of ['/dashboard', '/projects/new', '/coloring', '/profile']) {
     ).toHaveCount(0);
   });
 }
+
+for (const target of ['entry', 'dependency'] as const) {
+  for (const status of [503, 'network'] as const) {
+    test(`one initial ${target} ${status} recovers before ESM execution`, async ({
+      page,
+      coldLoad,
+    }) => {
+      const path = coldLoad.assets[target];
+      coldLoad.fault = { path, status, failures: 1, requestType: 'fetch' };
+      await page.goto('/login?cold_load=transient');
+      await expectLogin(page);
+      expect(coldLoad.documents).toHaveLength(1);
+      expect(
+        coldLoad.requestsFor(path).filter(request => request.injectedStatus === status)
+      ).toHaveLength(1);
+      expect(coldLoad.requestsFor(path).find(request => request.type === 'script')?.status).toBe(
+        200
+      );
+      expect(await page.locator('script[data-og-bootstrap]').count()).toBe(1);
+    });
+  }
+
+  test(`native ${target} failure after cache warming recovers in a fresh ESM document`, async ({
+    page,
+    coldLoad,
+  }) => {
+    const path = coldLoad.assets[target];
+    coldLoad.fault = { path, status: 429, failures: 1, requestType: 'script', retryAfter: '1' };
+    await page.goto(`/login?cold_load=native-${target}#preserve`);
+    await expectLogin(page);
+    expect(coldLoad.documents).toHaveLength(2);
+    const requests = coldLoad.requestsFor(path);
+    const failure = requests.findIndex(request => request.injectedStatus === 429);
+    expect(failure).toBeGreaterThan(0);
+    expect(
+      requests.slice(0, failure).some(request => request.type === 'fetch' && request.status === 200)
+    ).toBe(true);
+    expect(
+      requests
+        .slice(failure + 1)
+        .some(request => request.type === 'script' && request.status === 200)
+    ).toBe(true);
+    expect(await page.locator('script[data-og-bootstrap]').count()).toBe(1);
+    await expect(page).toHaveURL(new RegExp(`/login\\?cold_load=native-${target}#preserve$`));
+  });
+}
+
+test('native stylesheet failure after cache warming recovers in a fresh document', async ({
+  page,
+  coldLoad,
+}) => {
+  coldLoad.fault = {
+    path: coldLoad.assets.css[0],
+    status: 503,
+    failures: 1,
+    requestType: 'stylesheet',
+  };
+  await page.goto('/login?cold_load=native-css');
+  await expectLogin(page);
+  expect(coldLoad.documents).toHaveLength(2);
+  expect(
+    coldLoad
+      .requestsFor(coldLoad.assets.css[0])
+      .filter(request => request.type === 'stylesheet' && request.status === 200).length
+  ).toBeGreaterThan(0);
+});
+
+test('inline critical shell keeps manual Retry usable when external shell assets fail', async ({
+  page,
+  context,
+  coldLoad,
+}) => {
+  await context.route(
+    /\/(?:js\/(?:loading|bootstrap-analytics|bootstrap-resources)\.js|theme-color\.js|css\/(?:error|loading|safe-area)\.css)(?:\?|$)/,
+    route => route.abort('failed')
+  );
+  coldLoad.fault = { path: coldLoad.assets.entry, status: 404 };
+  await page.goto('/login?cold_load=shell');
+  const retry = await expectRecovery(page);
+  expect(await page.locator('style[data-og-shell="css/error.css"]').count()).toBe(1);
+  coldLoad.fault = undefined;
+  await retry.click();
+  await expectLogin(page);
+});

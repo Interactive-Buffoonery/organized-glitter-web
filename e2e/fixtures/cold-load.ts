@@ -15,13 +15,14 @@ type ResourceRequest = {
   method: string;
   type: string;
   at: number;
-  injectedStatus?: number;
+  injectedStatus?: number | 'network';
   status?: number;
 };
 
 type ResourceFault = {
   path: string;
-  status: 429 | 404;
+  status: 429 | 503 | 404 | 'network';
+  requestType?: string;
   failures?: number;
   retryAfter?: string;
   blockedUntil?: number;
@@ -117,15 +118,22 @@ export class ColdLoad {
       }
       const shouldFault =
         fault?.path === url.pathname &&
+        (!fault.requestType || request.resourceType() === fault.requestType) &&
         (fault.blockedUntil !== undefined
           ? Date.now() < fault.blockedUntil
-          : this.requestsFor(fault.path).length <= (fault.failures ?? Infinity));
+          : this.requestsFor(fault.path).filter(
+              record => !fault.requestType || record.type === fault.requestType
+            ).length <= (fault.failures ?? Infinity));
       const appModuleBlocked =
         this.blockAppModules &&
         [this.assets.entry, ...this.assets.dependencies].includes(url.pathname);
       if (shouldFault || appModuleBlocked) {
         const status = shouldFault ? fault!.status : 429;
         recorded.injectedStatus = status;
+        if (status === 'network') {
+          await route.abort('failed');
+          return;
+        }
         await route.fulfill({
           status,
           contentType: 'text/plain; charset=utf-8',

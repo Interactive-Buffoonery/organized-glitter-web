@@ -784,7 +784,7 @@ export function createLocalBuildRequestHandler({
 
       await serveFile(req, res, {
         createFileStream,
-        filePath: path.join(staticDir, 'index.html'),
+        filePath: path.join(staticDir, 'app.html'),
         staticDir,
       });
     } catch (error) {

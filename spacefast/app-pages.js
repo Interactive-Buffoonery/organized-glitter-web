@@ -1,5 +1,7 @@
 // Test-only defaults. stage-spacefast.mjs replaces this module with built HTML.
 export const APP_SHELL_HTML = '<!doctype html><html><body><div id="root"></div></body></html>';
+export const LANDING_HTML =
+  '<!doctype html><html><body><div data-static-landing><h1>Organized Glitter</h1></div></body></html>';
 export const NOT_FOUND_HTML =
   '<!doctype html><html><body><main data-error="page-not-found"><h1>Page not found</h1><a href="/">Back to Home</a></main></body></html>';
 export const HTML_SECURITY_HEADERS = {

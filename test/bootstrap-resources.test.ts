@@ -302,6 +302,45 @@ describe('early resource recovery', () => {
     expect(fetchResource).toHaveBeenCalledTimes(1);
   });
 
+  it('retries a different resource after a settled permanent failure', async () => {
+    fetchResource.mockResolvedValueOnce(response(404));
+    boot();
+    const permanent = new Error('Unable to preload CSS for /assets/missing.css');
+    const failed = recovery.recoverChunk(permanent);
+    expect(await failed).toBe(false);
+    expect(recovery.recoverChunk(permanent)).toBe(failed);
+    expect(fetchResource).toHaveBeenCalledTimes(1);
+
+    fetchResource.mockResolvedValueOnce(response(429, '2'));
+    const transient = new Error('Unable to preload CSS for /assets/later.css');
+    const retry = recovery.recoverChunk(transient);
+    expect(recovery.recoverChunk(transient)).toBe(retry);
+    await finish();
+    expect(fetchResource).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(await retry).toBe(true);
+    expect(fetchResource).toHaveBeenCalledTimes(3);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers concurrent distinct resources with one shared reload budget', async () => {
+    fetchResource.mockImplementation((url: string) =>
+      Promise.resolve(response(200, undefined, url.endsWith('.css') ? 'text/css' : undefined))
+    );
+    boot();
+    const errors = ['first', 'second', 'third'].map(
+      name => new Error(`Unable to preload CSS for /assets/${name}.css`)
+    );
+    const first = recovery.recoverChunk(errors[0]);
+    const second = recovery.recoverChunk(errors[1]);
+    expect(recovery.recoverChunk(errors[0])).toBe(first);
+    expect(recovery.recoverChunk(errors[1])).toBe(second);
+    expect(await Promise.all([first, second])).toEqual([true, true]);
+    expect(await recovery.recoverChunk(errors[2])).toBe(false);
+    expect(fetchResource).toHaveBeenCalledTimes(3);
+    expect(reload).toHaveBeenCalledTimes(2);
+  });
+
   it('does not assume a healthy dynamic entry means its unknown graph is healthy', async () => {
     boot();
     const error = new Error('Failed to fetch dynamically imported module: /assets/page-example.js');

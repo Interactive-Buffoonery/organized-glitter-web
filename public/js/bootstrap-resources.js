@@ -8,7 +8,7 @@
   const cancelled = Symbol('ready');
   let state = 'idle';
   let startup = null;
-  let chunkRecovery = null;
+  const chunkRecoveries = new Map();
   let graphRecovery = null;
   const chunkGraphs = new Map();
 
@@ -240,8 +240,8 @@
     );
     const url = assetPath(match?.[1]);
     if (!url) return Promise.resolve(false);
-    if (chunkRecovery) return chunkRecovery;
-    chunkRecovery = (async () => {
+    if (chunkRecoveries.has(url)) return chunkRecoveries.get(url);
+    const chunkRecovery = (async () => {
       try {
         const deadline = Date.now() + recoveryWindowMs;
         const graph = chunkGraphs.get(url);
@@ -258,6 +258,7 @@
         return false;
       }
     })();
+    chunkRecoveries.set(url, chunkRecovery);
     return chunkRecovery;
   };
 

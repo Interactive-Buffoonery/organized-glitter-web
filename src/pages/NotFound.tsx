@@ -27,7 +27,7 @@ const NotFound = () => {
   return (
     <MainLayout currentPage="Not Found">
       <div className="container mx-auto flex min-h-[60svh] items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md text-center">
           <h1 className="font-handwritten text-4xl leading-tight font-semibold sm:text-5xl">
             {recovery.heading}
           </h1>
@@ -37,7 +37,7 @@ const NotFound = () => {
           </Button>
           <Link
             to={recovery.library.href}
-            className="decoration-primary hover:decoration-accent focus-visible:ring-ring mt-3 block min-h-11 w-fit rounded-sm py-2.5 underline decoration-2 underline-offset-4 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            className="decoration-primary hover:decoration-accent focus-visible:ring-ring mx-auto mt-3 block min-h-11 w-fit rounded-sm py-2.5 underline decoration-2 underline-offset-4 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
           >
             {recovery.library.label}
           </Link>

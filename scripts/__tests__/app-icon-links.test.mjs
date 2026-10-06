@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { APP_ICON_VERSION, injectAppIconLinks } from '../app-icon-links.mjs';
 
 // Direct visits to every HTML entry must use the same current icon URLs.
-const pages = ['index.html', 'about.html', 'links.html', 'privacy.html', 'terms.html'];
+const pages = [
+  'index.html',
+  'landing.html',
+  'about.html',
+  'links.html',
+  'privacy.html',
+  'terms.html',
+];
 
 describe('shared app icon links', () => {
   it.each(pages)('%s serves the current favicon and touch icon', file => {

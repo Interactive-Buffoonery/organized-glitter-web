@@ -52,6 +52,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
+    "test:cold-load": "playwright test --config playwright.cold-load.config.ts",
     "test:pwa:navigation": "playwright test --config=playwright.pwa.config.ts",
     "test:pr": "node scripts/run-local-validation.mjs --profile=pr --base=${VALIDATION_BASE_REF:-origin/dev}",
     "native:sync": "node scripts/native-sync-report.mjs",

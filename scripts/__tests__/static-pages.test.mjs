@@ -1,7 +1,12 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { preview } from 'vite';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
-import { promoteStaticPages } from '../static-pages.mjs';
+import { promoteStaticPages, staticPages } from '../static-pages.mjs';
 
 const appHtml =
   '<head><link rel="stylesheet" crossorigin href="/assets/main-abc.css"></head><body><script type="module" src="/assets/main.js"></script></body>';
@@ -105,4 +110,41 @@ describe('static page templates', () => {
       expect(document.querySelector('meta[name="theme-color"]')).not.toBeNull();
     }
   );
+});
+
+describe('built preview routing', () => {
+  it('preserves static pages, serves known app routes, and returns unknown 404s', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'og-static-preview-'));
+    await Promise.all(
+      ['index', 'privacy', 'terms', 'app', '404'].map(name =>
+        writeFile(path.join(directory, `${name}.html`), `<main>${name}</main>`)
+      )
+    );
+    const server = await preview({
+      configFile: false,
+      root: directory,
+      build: { outDir: directory },
+      plugins: staticPages(),
+      preview: { host: '127.0.0.1', port: 0 },
+    });
+    try {
+      const port = server.httpServer.address().port;
+      for (const [route, body, status] of [
+        ['/', 'index', 200],
+        ['/privacy', 'privacy', 200],
+        ['/terms/', 'terms', 200],
+        ['/login?next=/overview', 'app', 200],
+        ['/overview', 'app', 200],
+        ['/coloring/book/pages/page', 'app', 200],
+        ['/unknown-route', '404', 404],
+      ]) {
+        const response = await fetch(`http://127.0.0.1:${port}${route}`);
+        expect(response.status, route).toBe(status);
+        expect(await response.text(), route).toBe(`<main>${body}</main>`);
+      }
+    } finally {
+      await server.close();
+      execFileSync('trash', [directory]);
+    }
+  });
 });

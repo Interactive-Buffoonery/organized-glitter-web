@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { runnerImport } from 'vite';
+import { createLocalBuildRequestHandler } from '../server/local-build-server.js';
 
 const STYLESHEET = /<link rel="stylesheet" crossorigin href="\/assets\/[^"]+\.css">/g;
 const STYLESHEET_MARKER = '<!-- og-app-stylesheet -->';
@@ -34,6 +35,13 @@ function serveSpaInDev() {
   return {
     name: 'og-static-pages-dev',
     apply: 'serve',
+    configurePreviewServer(server) {
+      server.middlewares.use(
+        createLocalBuildRequestHandler({
+          staticDir: path.resolve(server.config.root, server.config.build.outDir),
+        })
+      );
+    },
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
         const pathname = req.url?.split('?')[0].replace(/\/$/, '') ?? '';

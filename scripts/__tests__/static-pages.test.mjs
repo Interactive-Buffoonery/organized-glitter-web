@@ -1,6 +1,5 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { preview } from 'vite';
@@ -144,7 +143,7 @@ describe('built preview routing', () => {
       }
     } finally {
       await server.close();
-      execFileSync('trash', [directory]);
+      await rm(directory, { recursive: true, force: true });
     }
   });
 });

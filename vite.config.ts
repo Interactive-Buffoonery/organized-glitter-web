@@ -14,7 +14,7 @@ import {
 } from './server/deployment-config.js';
 import { injectAppIconLinks } from './scripts/app-icon-links.mjs';
 import { ensureStartupScriptsBeforeAppModules } from './scripts/ensure-startup-script-order.mjs';
-import { staticLanding } from './scripts/static-landing.mjs';
+import { staticPages } from './scripts/static-pages.mjs';
 import { bootstrapResources } from './scripts/bootstrap-build.mjs';
 import { pwaModulePreloads } from './scripts/pwa-module-preloads.mjs';
 import { staticHostingNotice } from './scripts/static-notice.mjs';
@@ -137,7 +137,7 @@ export default defineConfig(({ mode }) => {
       __APP_TEST_ENV__: JSON.stringify(process.env.APP_TEST_ENV || ''),
     },
     plugins: [
-      staticLanding(),
+      staticPages(),
       deploymentOutput(env),
       { name: 'og-app-icon-links', transformIndexHtml: injectAppIconLinks },
       injectPublicAnalyticsConfig(env, buildId),

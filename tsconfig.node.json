@@ -19,7 +19,7 @@
     "vite.config.ts",
     "scripts/app-icon-links.mjs",
     "scripts/ensure-startup-script-order.mjs",
-    "scripts/static-landing.mjs",
+    "scripts/static-pages.mjs",
     "scripts/bootstrap-build.mjs",
     "scripts/pwa-module-preloads.mjs",
     "scripts/static-notice.mjs",

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { rewriteBootstrapHtml } from '../bootstrap-build.mjs';
-import { promoteStaticLanding } from '../static-landing.mjs';
+import { promoteStaticPages } from '../static-pages.mjs';
 
 const chunk = (fileName, imports = [], css = []) => ({
   type: 'chunk',
@@ -103,9 +103,13 @@ describe('bootstrap build integration', () => {
         source: '<head><!-- og-app-stylesheet --></head><main>Landing</main>',
       },
     };
-    promoteStaticLanding(bundle, file => {
-      bundle[file.fileName] = file;
-    });
+    promoteStaticPages(
+      bundle,
+      file => {
+        bundle[file.fileName] = file;
+      },
+      'html { color: black; }'
+    );
     bundle['app.html'].source = rewriteBootstrapHtml(bundle['app.html'].source, bundle, sources);
     expect(bundle['index.html'].source).toContain('href="/assets/main.css"');
     expect(config(parse(bundle['app.html'].source)).resources).toContain('/assets/main.css');
@@ -155,7 +159,7 @@ describe('bootstrap build integration', () => {
   it('registers recovery after static landing in the actual build plugin list', () => {
     const configSource = readFileSync('vite.config.ts', 'utf8');
     expect(configSource.indexOf('bootstrapResources(),')).toBeGreaterThan(
-      configSource.indexOf('staticLanding(),')
+      configSource.indexOf('staticPages(),')
     );
   });
 });

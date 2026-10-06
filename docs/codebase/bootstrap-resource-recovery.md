@@ -8,7 +8,7 @@ appends exactly one module entry. It does not import application code.
 ## Production integration
 
 `scripts/bootstrap-build.mjs` runs as a post `generateBundle` hook after
-`scripts/static-landing.mjs`. Landing promotion first copies the original
+`scripts/static-pages.mjs`. Landing promotion first copies the original
 hashed app stylesheet into the static page and moves the React shell to
 `app.html`. Recovery then rewrites every remaining React HTML entry. Static
 HTML stays untouched, including its shared stylesheet and page metadata.

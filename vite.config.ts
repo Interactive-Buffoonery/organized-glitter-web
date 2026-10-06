@@ -16,6 +16,7 @@ import { injectAppIconLinks } from './scripts/app-icon-links.mjs';
 import { ensureStartupScriptsBeforeAppModules } from './scripts/ensure-startup-script-order.mjs';
 import { staticLanding } from './scripts/static-landing.mjs';
 import { bootstrapResources } from './scripts/bootstrap-build.mjs';
+import { pwaModulePreloads } from './scripts/pwa-module-preloads.mjs';
 
 /**
  * Inject the public PostHog key/host into public HTML entries so the
@@ -252,6 +253,7 @@ export default defineConfig(({ mode }) => {
       // publicly linked from the shipped JS. They are uploaded to PostHog and
       // deleted post-build by scripts/upload-sourcemaps.mjs.
       sourcemap: isProduction ? 'hidden' : false,
+      modulePreload: { resolveDependencies: pwaModulePreloads },
       manifest: 'manifest.json', // Enable manifest generation as manifest.json
       target: 'es2020',
       minify: 'terser',

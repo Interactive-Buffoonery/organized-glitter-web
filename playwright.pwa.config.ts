@@ -5,7 +5,11 @@ export default defineConfig({
   testMatch: 'pwa-navigation.spec.ts',
   workers: 1,
   retries: 0,
-  reporter: [['list'], ['html', { outputFolder: '.tmp/pwa-navigation/report', open: 'never' }]],
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: '.tmp/pwa-navigation/report', open: 'never' }],
+    ['json', { outputFile: '.tmp/pwa-navigation/results.json' }],
+  ],
   outputDir: '.tmp/pwa-navigation/artifacts',
   use: { baseURL: 'http://localhost:4183', trace: 'retain-on-failure' },
   projects: [

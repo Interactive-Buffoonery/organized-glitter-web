@@ -21,6 +21,7 @@
     "scripts/ensure-startup-script-order.mjs",
     "scripts/static-landing.mjs",
     "scripts/bootstrap-build.mjs",
+    "scripts/pwa-module-preloads.mjs",
     "server/app-route-policy.js",
     "server/deployment-config.js"
   ]

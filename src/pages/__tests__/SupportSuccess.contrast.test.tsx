@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { contrast, themeColor } from '@/test-utils/contrast';
 
 vi.mock('@/hooks/useAppReady', () => ({ useAppReady: vi.fn() }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: null }) }));
 vi.mock('@/components/layout/MainLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
 }));

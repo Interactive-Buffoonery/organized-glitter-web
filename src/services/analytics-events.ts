@@ -98,6 +98,10 @@ export const AnalyticsEvent = {
   OVERVIEW_SORT_CHANGED: 'overview_sort_changed',
   VERTICAL_PREFERENCES_UPDATED: 'vertical_preferences_updated',
 
+  // Support page
+  TIP_LINK_CLICKED: 'tip_link_clicked',
+  SUPPORT_ALTERNATIVE_CLICKED: 'support_alternative_clicked',
+
   // Import / Export
   IMPORT_COMPLETED: 'import_completed',
   EXPORT_COMPLETED: 'export_completed',

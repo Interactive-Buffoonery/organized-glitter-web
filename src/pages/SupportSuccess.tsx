@@ -1,70 +1,65 @@
 import React from 'react';
-import { CheckCircle, Heart, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
+import { GlassPanel } from '@/components/ui/glass-panel';
 import { getContactEmail } from '@/lib/contactConfig';
 import { useAppReady } from '@/hooks/useAppReady';
+import { useAuth } from '@/hooks/useAuth';
 
+// ponytail: static thank-you, Stripe owns payment confirmation and the receipt email.
 const SupportSuccess: React.FC = () => {
   useAppReady();
+  const { user } = useAuth();
+  const contactEmail = getContactEmail();
+
   return (
-    <MainLayout>
-      <div className="container mx-auto max-w-2xl px-4 py-8">
-        <div className="space-y-6 text-center">
-          {/* Success Icon */}
-          <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-            <CheckCircle className="size-12 text-green-700 dark:text-green-300" />
-          </div>
-
-          {/* Success Message */}
+    <MainLayout currentPage="Support">
+      <div className="container mx-auto max-w-2xl px-4 py-8 md:py-12">
+        <GlassPanel className="space-y-6 p-6 text-center md:p-10">
+          <img
+            src="/images/chibi-wave.png"
+            alt=""
+            className="bg-primary/15 border-card mx-auto size-20 rounded-2xl border-[3px] object-cover object-top shadow-md"
+          />
           <div className="space-y-3">
-            <h1 className="text-3xl font-semibold text-green-800 dark:text-green-300">
-              Thank You for Your Support!
+            <h1 className="font-handwritten text-foreground text-4xl leading-tight tracking-tight md:text-5xl">
+              You made my day!
             </h1>
-            <p className="text-muted-foreground text-lg">
-              Your contribution helps keep Organized Glitter running and accessible to everyone.
+            <p className="text-muted-foreground leading-relaxed">
+              Thank you so much for your generous tip! Stripe will email you your receipt.
+            </p>
+            <p className="font-handwritten text-primary text-2xl leading-tight">
+              with love,
+              <br />
+              sarah
             </p>
           </div>
 
-          {/* Details Card */}
-          <div className="bg-card space-y-4 rounded-lg border border-green-200 p-6 dark:border-green-900/50">
-            <div className="flex items-center justify-center gap-2 text-green-800 dark:text-green-300">
-              <Heart className="size-5" />
-              <span className="font-medium">Payment Successful</span>
-            </div>
-            <p className="text-muted-foreground text-sm">
-              You should receive a confirmation email from PayPal shortly. Your support makes a real
-              difference in keeping this platform free and improving.
-            </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-col justify-center gap-4 sm:flex-row">
-            <Button asChild>
-              <Link to="/dashboard" className="flex items-center gap-2">
-                <ArrowLeft className="size-4" />
+          <Button asChild variant="glass" size="touch">
+            {user ? (
+              <Link to="/dashboard">
+                <ArrowLeft className="size-4" aria-hidden />
                 Back to Library
               </Link>
-            </Button>
-
-            <Button asChild variant="outline">
-              <Link to="/profile" className="flex items-center gap-2">
-                View Settings
+            ) : (
+              <Link to="/">
+                <ArrowLeft className="size-4" aria-hidden />
+                Back to Organized Glitter
               </Link>
-            </Button>
-          </div>
+            )}
+          </Button>
 
-          {/* Additional Message */}
-          <div className="bg-card mt-8 rounded-lg p-4">
+          <div className="bg-card rounded-lg p-4">
             <p className="text-muted-foreground text-sm">
-              Have questions or feedback?
-              {getContactEmail() ? (
+              Questions about your tip?
+              {contactEmail ? (
                 <>
                   {' '}
                   Feel free to{' '}
                   <a
-                    href={`mailto:${getContactEmail()}`}
+                    href={`mailto:${contactEmail}`}
                     className="text-link underline hover:decoration-2"
                   >
                     reach out
@@ -76,7 +71,7 @@ const SupportSuccess: React.FC = () => {
               )}
             </p>
           </div>
-        </div>
+        </GlassPanel>
       </div>
     </MainLayout>
   );

@@ -240,7 +240,8 @@ user's edits. Manual project entry is also free.
 
 Voluntary contributions on the website help cover hosting. They grant no app
 features, content, or account privileges. The native app has no payment flow
-or contribution prompts.
+or contribution prompts. On the web, `/support` offers one-time tips through
+Stripe-hosted Payment Links. Call them tips, never donations.
 
 ## Curator review
 

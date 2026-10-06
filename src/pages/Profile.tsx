@@ -11,7 +11,6 @@ import { useAvatar } from '@/hooks/useAvatar';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import AccountSettings from '@/components/profile/AccountSettings';
 import { DataImportExportSections } from '@/features/import-export/components/DataImportExportSections';
-import PayPalSupportSection from '@/components/profile/PayPalSupportSection';
 import { ThemePreferences } from '@/components/profile/ThemePreferences';
 import { TimezonePreferences } from '@/components/profile/TimezonePreferences';
 import { VerticalToggles } from '@/components/profile/VerticalToggles';
@@ -34,7 +33,7 @@ const Profile = () => {
   //  - 'account' is identity + auth: avatar, username, email, password,
   //    danger zone.
   //  - 'data' is import/export.
-  //  - 'support' bundles feedback, install, donate, and other meta.
+  //  - 'support' bundles feedback, install, tips, and other meta.
   //  - older bookmarks at `?tab=profile` are forwarded to 'account' so
   //    saved links land near the personal info they expect.
   const location = useLocation();
@@ -270,8 +269,6 @@ const Profile = () => {
 
               <TabsContent value="support" className="space-y-6">
                 <ProfileHelpAndAppSettings currentPage="Profile" />
-
-                <PayPalSupportSection />
               </TabsContent>
             </div>
           </Tabs>

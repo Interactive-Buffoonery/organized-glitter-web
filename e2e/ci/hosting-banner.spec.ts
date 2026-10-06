@@ -71,7 +71,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         await expect(notice).toHaveCount(0);
       });
 
-      test('appears on home, auth, and public pages', async ({ page }) => {
+      test('appears on home and app pages while legal pages stay static', async ({ page }) => {
         for (const route of [
           '/',
           '/login',
@@ -83,6 +83,17 @@ for (const colorScheme of ['light', 'dark'] as const) {
         ]) {
           await page.goto(route);
           await expect(page.locator('#app-loading')).toHaveCount(0);
+          if (route === '/privacy' || route === '/terms') {
+            await expect(page.locator('[data-static-page] main#main-content')).toBeVisible();
+            await expect(
+              page.getByRole('heading', {
+                name: route === '/privacy' ? 'Privacy Policy' : 'Terms of Service',
+                exact: true,
+              })
+            ).toBeVisible();
+            await expect(page.locator('#root, [data-notice-id="weekend-hosting"]')).toHaveCount(0);
+            continue;
+          }
           if (route === '/') {
             await expect(page.locator('[data-static-landing] main#main-content')).toBeVisible();
             await expect(page.locator('#root')).toHaveCount(0);
@@ -110,7 +121,11 @@ for (const colorScheme of ['light', 'dark'] as const) {
           }
         }
 
-        await page.locator('[data-notice-id="weekend-hosting"]').getByRole('button').click();
+        await page.goto('/');
+        await page
+          .locator('[data-notice-id="weekend-hosting"]')
+          .getByRole('button', { name: 'Close hosting notice' })
+          .click();
         await page.goto('/login');
         await page.getByLabel('Email').fill(process.env.E2E_TEST_EMAIL!);
         await page.getByLabel('Password').fill(process.env.E2E_TEST_PASSWORD!);

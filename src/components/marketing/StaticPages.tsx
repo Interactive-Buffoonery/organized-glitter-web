@@ -66,6 +66,7 @@ function StaticPage({ children, currentPage, className }: StaticPageProps) {
   return (
     <div
       className="mobile-app-container text-foreground"
+      data-static-page
       data-static-landing={currentPage === 'Home' ? true : undefined}
     >
       <div className={cn('aurora-bg flex min-h-full flex-col', className)}>

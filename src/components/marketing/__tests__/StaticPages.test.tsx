@@ -28,6 +28,8 @@ describe('renderStaticPage', () => {
     'keeps the signed-out header, skip link, and main landmark on %s',
     page => {
       const document = renderDocument(page);
+      expect(document.querySelector('[data-static-page] main#main-content')).not.toBeNull();
+      expect(document.querySelector('[data-static-landing]') !== null).toBe(page === 'landing');
       const header = document.querySelector('header[aria-label="Site header"]');
       const link = (name: string) =>
         [...(header?.querySelectorAll('a') ?? [])].find(anchor => anchor.textContent === name);

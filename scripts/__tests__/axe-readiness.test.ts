@@ -24,6 +24,18 @@ describe('axe scan readiness', () => {
     expect(isAppRootOpaque()).toBe(false);
   });
 
+  it('accepts visible static legal pages and rejects hidden content', () => {
+    document.body.innerHTML =
+      '<div data-static-page><main id="main-content">Privacy policy</main></div>';
+    expect(isAppRootOpaque()).toBe(true);
+    const page = document.querySelector<HTMLElement>('[data-static-page]')!;
+    page.style.visibility = 'hidden';
+    expect(isAppRootOpaque()).toBe(false);
+    page.style.visibility = 'visible';
+    page.style.display = 'none';
+    expect(isAppRootOpaque()).toBe(false);
+  });
+
   it('rejects absent roots and incomplete static markup', () => {
     expect(isAppRootOpaque()).toBe(false);
     document.body.innerHTML = '<div data-static-landing style="opacity: 1"></div>';

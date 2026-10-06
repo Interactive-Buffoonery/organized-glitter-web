@@ -13,7 +13,9 @@ interface AxeScanOptions {
 export const isAppRootOpaque = () => {
   const root = document.getElementById('root');
   if (root) return Number.parseFloat(getComputedStyle(root).opacity) >= 0.999;
-  const staticPage = document.querySelector<HTMLElement>('[data-static-landing]');
+  const staticPage = document.querySelector<HTMLElement>(
+    '[data-static-page], [data-static-landing]'
+  );
   if (!staticPage?.querySelector('main#main-content')) return false;
   const style = getComputedStyle(staticPage);
   return (

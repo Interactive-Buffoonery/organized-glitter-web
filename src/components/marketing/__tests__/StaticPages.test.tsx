@@ -33,6 +33,22 @@ describe('renderStaticPage', () => {
       expect(document.body.textContent).toContain('Last updated: October 6, 2026');
     }
   });
+  it('preserves the account-linked analytics policy', () => {
+    const document = renderDocument('privacy');
+    const analytics = [...document.querySelectorAll('li')].find(
+      node => node.querySelector('strong')?.textContent === 'Product analytics:'
+    );
+    expect(analytics?.textContent).toBe(
+      "Product analytics: page views, feature usage, and error data collected through PostHog. When you're signed in, this activity is linked to your account ID."
+    );
+    const services = [...document.querySelectorAll('section')].find(
+      node => node.querySelector('h2')?.textContent === 'Third-Party Services'
+    );
+    expect(services?.querySelector('p')?.textContent).toBe(
+      "PostHog Analytics. We use PostHog to see which parts of Organized Glitter are used and to help find problems. When you're signed in, this activity is linked to your account ID. PostHog respects the Do Not Track browser setting. We do not use PostHog for advertising, session recording, or automatic click tracking. We only send specific product events we have chosen to measure, such as page views and feature usage."
+    );
+  });
+
   it('renders the home page content without JavaScript', () => {
     const html = renderStaticPage('landing');
     const document = renderDocument('landing');

@@ -18,9 +18,14 @@ build commands, MailPoet checks, and the separate production cutover.
 The build writes two HTML documents for the root app:
 
 - `dist/index.html` is the static landing for `/`. `landing.html` supplies
-  its head, and `scripts/static-landing.mjs` renders
-  `src/components/marketing/StaticLanding.tsx` into it. It loads the app
+  its head, and `scripts/static-pages.mjs` renders
+  `src/components/marketing/StaticPages.tsx` into it. It loads the app
   stylesheet but no app JavaScript, so it stays usable when bundles fail.
+- `dist/privacy.html` and `dist/terms.html` render the shared policy
+  components from `src/components/legal` the same way. The in-app Privacy
+  and Terms routes use those components too, so the copy lives in one place.
+  Each static page inlines `src/styles/static-critical.css` ahead of the app
+  stylesheet so it stays readable if that stylesheet fails.
 - `dist/app.html` is the SPA shell built from `index.html`. Known app routes
   such as `/login`, `/register`, `/overview`, and deep links receive it.
 
@@ -28,7 +33,8 @@ Every host must follow that split. The local build server serves `app.html`
 for app routes. The Spacefast Function embeds both documents and answers `/`
 with the landing. The service worker falls back to `app.html` and leaves `/`
 to the precached landing. Returning members use Login, which forwards an
-existing session to `/overview`. `pnpm dev` still serves the SPA at `/`.
+existing session to `/overview`. `pnpm dev` still serves the SPA at `/`,
+`/privacy`, and `/terms`.
 
 Run `pnpm spacefast:stage` after building. It copies the Function and shared
 route policy into `dist` and embeds the built app shell, landing, 404 page, and HTML

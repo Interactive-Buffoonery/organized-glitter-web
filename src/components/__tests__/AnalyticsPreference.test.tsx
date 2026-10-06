@@ -83,6 +83,19 @@ describe('account analytics preference', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('clears the save warning when a later refresh confirms the requested choice', async () => {
+    const control = await renderPreference();
+    mocks.update.mockRejectedValue(new Error('response lost'));
+    mocks.get.mockRejectedValueOnce(new Error('offline'));
+    fireEvent.click(control);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save');
+    mocks.get.mockResolvedValue(true);
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(control).toBeEnabled());
+    expect(control).not.toBeChecked();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('applies an opt-out received from another device', async () => {
     const control = await renderPreference();
     act(() => mocks.remoteCallback?.(true));

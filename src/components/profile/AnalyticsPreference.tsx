@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -9,13 +9,25 @@ import {
 
 export function AnalyticsPreference() {
   const preference = useSyncExternalStore(subscribeAnalyticsPreference, getAnalyticsPreference);
-  const [error, setError] = useState<string | null>(null);
+  const [failedSave, setFailedSave] = useState<{
+    accountId: string | null;
+    enabled: boolean;
+  } | null>(null);
+  useEffect(() => {
+    if (
+      failedSave &&
+      (failedSave.accountId !== preference.accountId ||
+        (preference.ready && preference.enabled === failedSave.enabled))
+    ) {
+      setFailedSave(null);
+    }
+  }, [failedSave, preference.accountId, preference.ready, preference.enabled]);
   const save = async (enabled: boolean) => {
-    setError(null);
+    setFailedSave(null);
     try {
       await setAnalyticsEnabled(enabled);
     } catch {
-      setError('Could not save your analytics choice. Please try again.');
+      setFailedSave({ accountId: preference.accountId, enabled });
     }
   };
   return (
@@ -33,9 +45,9 @@ export function AnalyticsPreference() {
               : 'Loading your choice. Analytics are paused.'}
           </p>
         )}
-        {error && (
+        {failedSave && (
           <p role="alert" className="text-foreground text-sm">
-            {error}
+            Could not save your analytics choice. Please try again.
           </p>
         )}
       </div>

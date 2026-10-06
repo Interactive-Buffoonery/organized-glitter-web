@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -63,6 +63,7 @@ describe('AuthMenu', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+  afterEach(() => vi.unstubAllEnvs());
 
   it('renders avatar trigger with user identity in dropdown', async () => {
     const user = userEvent.setup();
@@ -86,6 +87,24 @@ describe('AuthMenu', () => {
       'https://site.example.test/updates/#subscribe'
     );
     expect(screen.queryByText('Navigation')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /support/i })).not.toBeInTheDocument();
     expect(screen.getByText('Logout')).toBeInTheDocument();
+  });
+
+  it('links to the support page when tips are configured', async () => {
+    vi.stubEnv('VITE_STRIPE_TIP_5_URL', 'https://buy.stripe.com/test_5');
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <AuthMenu avatarConfig={testAvatarConfig} />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: /account menu/i }));
+
+    expect(screen.getByRole('menuitem', { name: 'Support Organized Glitter' })).toHaveAttribute(
+      'href',
+      '/support'
+    );
   });
 });

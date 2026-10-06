@@ -1,9 +1,11 @@
-import { Download, Mail } from 'lucide-react';
+import { Download, Heart, Mail } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { InstallAppDialog } from '@/components/layout/InstallAppDialog';
 import { useAccountMenuActions } from '@/components/layout/useAccountMenuActions';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/glass-panel';
+import { tipsEnabled } from '@/constants/tips';
 
 interface ProfileHelpAndAppSettingsProps {
   currentPage?: string;
@@ -47,6 +49,23 @@ export function ProfileHelpAndAppSettings({
               Send feedback
             </Button>
           </div>
+
+          {tipsEnabled() && (
+            <div className="flex flex-col gap-3 py-4 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="flex items-center gap-2 font-medium">
+                  <Heart className="text-primary size-4" aria-hidden />
+                  Support Organized Glitter
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Optional one-time tips help cover hosting costs. The app stays free.
+                </p>
+              </div>
+              <Button asChild variant="glass" className="sm:shrink-0">
+                <Link to="/support">Support Organized Glitter</Link>
+              </Button>
+            </div>
+          )}
 
           {showInstallOption && (
             <div className="flex flex-col gap-3 py-4 last:pb-0 sm:flex-row sm:items-center sm:justify-between">

@@ -57,7 +57,6 @@ describe('AppRoutes vertical-access contract', () => {
       '/delete-account',
       '/options',
       '/import',
-      '/support/success',
       '/randomizer',
       '/stats',
       '/notes',

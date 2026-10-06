@@ -5,10 +5,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Bell, LogOut, Download, Mail } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Bell, LogOut, Download, Heart, Mail } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import AvatarDisplay from '@/components/profile/AvatarDisplay';
 import type { AvatarConfig } from '@/types/avatar';
+import { tipsEnabled } from '@/constants/tips';
 import { SUBSCRIBE_TO_UPDATES_URL } from '@/constants/updates';
 import { InstallAppDialog } from './InstallAppDialog';
 import { useAccountMenuActions } from './useAccountMenuActions';
@@ -78,6 +80,14 @@ export function AuthMenu({
                 <Bell className="mr-2 size-4" aria-hidden />
                 Subscribe to Updates
               </a>
+            </DropdownMenuItem>
+          )}
+          {tipsEnabled() && (
+            <DropdownMenuItem asChild>
+              <Link to="/support">
+                <Heart className="mr-2 size-4" aria-hidden />
+                Support Organized Glitter
+              </Link>
             </DropdownMenuItem>
           )}
           {showInstallOption && (

@@ -7,6 +7,7 @@ import {
   ChartColumn,
   Check,
   Download,
+  Heart,
   LogOut,
   Mail,
   Menu,
@@ -15,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { tipsEnabled } from '@/constants/tips';
 import { SUBSCRIBE_TO_UPDATES_URL } from '@/constants/updates';
 
 import AvatarDisplay from '@/components/profile/AvatarDisplay';
@@ -227,6 +229,12 @@ export function MobileAccountMenu({
                   <Mail className="text-primary size-4" aria-hidden />
                   Send feedback
                 </button>
+                {tipsEnabled() && (
+                  <MenuLink to="/support" onSelect={closeDrawer}>
+                    <Heart className="text-primary size-4" aria-hidden />
+                    Support Organized Glitter
+                  </MenuLink>
+                )}
                 {showInstallOption && (
                   <button
                     type="button"

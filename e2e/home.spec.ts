@@ -9,8 +9,11 @@
 
 import { test, expect, type ConsoleMessage } from '@playwright/test';
 
+import { expectNoAxeViolations, waitForAccessibilityScanReady } from './a11y/axe-test';
+
 test.describe('Home page', () => {
   test('loads with the expected title and no console errors', async ({ page }) => {
+    test.setTimeout(90_000);
     const consoleErrors: string[] = [];
 
     page.on('console', (msg: ConsoleMessage) => {
@@ -46,6 +49,50 @@ test.describe('Home page', () => {
       realErrors,
       `Unexpected console errors on home page load:\n${realErrors.join('\n')}`
     ).toHaveLength(0);
+
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await page.getByRole('menuitem', { name: 'System', exact: true }).click();
+
+    for (const theme of ['light', 'dark'] as const) {
+      for (const width of [320, 390, 800, 1280]) {
+        await test.step(`marketing cards in ${theme} at ${width}px`, async () => {
+          await page.setViewportSize({ width, height: 900 });
+          await page.emulateMedia({ colorScheme: theme });
+          await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+          await waitForAccessibilityScanReady(page);
+
+          for (const selector of ['.features-sheet', '.sig-panel']) {
+            const card = page.locator(selector);
+            await card.scrollIntoViewIfNeeded();
+            await expect(card.locator('xpath=../../..')).toHaveCSS('opacity', '1');
+            const surface = await card.evaluate(element => {
+              const color = getComputedStyle(element).backgroundColor;
+              const channels = color
+                .match(/[\d.]+/g)!
+                .slice(0, 3)
+                .map(Number);
+              const linear = channels.map(channel => {
+                const value = channel / 255;
+                return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+              });
+              const bounds = element.getBoundingClientRect();
+              return {
+                luminance: linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722,
+                left: bounds.left,
+                right: bounds.right,
+                clipped: element.scrollWidth > element.clientWidth,
+              };
+            });
+            if (theme === 'dark') expect(surface.luminance).toBeLessThan(0.15);
+            else expect(surface.luminance).toBeGreaterThan(0.8);
+            expect(surface.left).toBeGreaterThanOrEqual(0);
+            expect(surface.right).toBeLessThanOrEqual(width);
+            expect(surface.clipped).toBe(false);
+            await expectNoAxeViolations(page, { include: selector });
+          }
+        });
+      }
+    }
   });
 });
 

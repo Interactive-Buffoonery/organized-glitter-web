@@ -238,21 +238,21 @@ describe('browser QA harness safeguards', () => {
   });
 
   it('requires the exact managed inventory for smoke and full suites', () => {
-    expect(parseListedInventory('Total: 63 tests in 22 files', 'smoke')).toEqual({
-      files: 22,
-      tests: 63,
+    expect(parseListedInventory('Total: 75 tests in 23 files', 'smoke')).toEqual({
+      files: 23,
+      tests: 75,
     });
-    expect(parseListedInventory('Total: 254 tests in 39 files', 'full')).toEqual({
-      files: 39,
-      tests: 254,
+    expect(parseListedInventory('Total: 266 tests in 40 files', 'full')).toEqual({
+      files: 40,
+      tests: 266,
     });
-    expect(() => parseListedInventory('Total: 62 tests in 22 files', 'smoke')).toThrow(
-      /expected 63 tests in 22 files/i
+    expect(() => parseListedInventory('Total: 74 tests in 23 files', 'smoke')).toThrow(
+      /expected 75 tests in 23 files/i
     );
   });
 
   it('accepts a reconciled smoke report with no skipped tests', () => {
-    const tests = Array.from({ length: 63 }, (_, index) => ({
+    const tests = Array.from({ length: 75 }, (_, index) => ({
       projectName: 'authenticated-chromium-smoke',
       expectedStatus: 'passed',
       status: 'expected',
@@ -268,13 +268,13 @@ describe('browser QA harness safeguards', () => {
         },
       ],
       errors: [],
-      stats: { expected: 63, unexpected: 0, flaky: 0, skipped: 0 },
+      stats: { expected: 75, unexpected: 0, flaky: 0, skipped: 0 },
     };
 
     expect(validateManagedPlaywrightReport(report, 'smoke')).toEqual({
-      expected: 63,
+      expected: 75,
       skipped: 0,
-      total: 63,
+      total: 75,
     });
   });
 
@@ -290,7 +290,7 @@ describe('browser QA harness safeguards', () => {
             },
           ],
           errors: [],
-          stats: { expected: 63, unexpected: 0, flaky: 0, skipped: 0 },
+          stats: { expected: 75, unexpected: 0, flaky: 0, skipped: 0 },
         },
         'smoke'
       )
@@ -298,7 +298,7 @@ describe('browser QA harness safeguards', () => {
   });
 
   it('allows only the exact conditional full-suite skip', () => {
-    const passing = Array.from({ length: 253 }, (_, index) => ({
+    const passing = Array.from({ length: 265 }, (_, index) => ({
       projectName: 'authenticated-chromium-full',
       expectedStatus: 'passed',
       status: 'expected',
@@ -343,13 +343,13 @@ describe('browser QA harness safeguards', () => {
         },
       ],
       errors: [],
-      stats: { expected: 253, unexpected: 0, flaky: 0, skipped: 1 },
+      stats: { expected: 265, unexpected: 0, flaky: 0, skipped: 1 },
     };
 
     expect(validateManagedPlaywrightReport(report, 'full')).toEqual({
-      expected: 253,
+      expected: 265,
       skipped: 1,
-      total: 254,
+      total: 266,
     });
 
     allowedSkip.annotations[0].description = 'different reason';

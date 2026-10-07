@@ -79,18 +79,23 @@ test.describe('private app startup', () => {
         await expect(libraryPageHeading(page)).toBeVisible();
       }
       let release!: () => void;
+      let chunkHeld = false;
       const pending = new Promise<void>(resolve => {
         release = resolve;
       });
       const chunk =
         entry === 'reload' ? /\/assets\/Dashboard-[^/]+\.js/ : /\/assets\/ProjectDetail-[^/]+\.js/;
       await page.route(chunk, async route => {
+        chunkHeld = true;
         await pending;
         await route.continue();
       });
       try {
         if (entry === 'reload') await page.reload({ waitUntil: 'commit' });
         else await page.goto(path, { waitUntil: 'commit' });
+        await expect
+          .poll(() => chunkHeld, { message: 'The lazy route request must be held' })
+          .toBe(true);
         // Auth can commit its spinner before the lazy page starts downloading.
         // Either the static shell or the in-app fallback must own loading.
         await expect
@@ -102,7 +107,7 @@ test.describe('private app startup', () => {
             ) {
               return (await page.locator('#root').getAttribute('inert')) === '';
             }
-            return page.locator('#root [role="status"]').isVisible();
+            return page.locator('#root [role="status"]:visible').first().isVisible();
           })
           .toBe(true);
         await expect(page.locator('#root')).not.toHaveAttribute('data-app-ready', 'true');
@@ -134,6 +139,43 @@ test.describe('private app startup', () => {
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByText('Local Active Kit', { exact: true })).toHaveCount(0);
     await expect(page.locator('#app-loading')).toHaveCount(0);
+  });
+
+  test('slow project data shows recovery without flashing private content', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.clock.install();
+    let requestHeld = false;
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    await page.route(
+      /\/api\/collections\/projects\/records\/localproject003(?:\?|$)/,
+      async route => {
+        requestHeld = true;
+        await pending;
+        await route.continue();
+      }
+    );
+    try {
+      await page.goto('/projects/localproject003');
+      await expect.poll(() => requestHeld).toBe(true);
+      await expect(page.getByRole('status', { name: 'Loading page content' })).toBeVisible();
+      await expect(page.getByText('Local Active Kit', { exact: true })).toHaveCount(0);
+      await expect(page.locator('#app-loading')).toHaveCount(0);
+      await page.clock.fastForward(5_500);
+      await expect(page.getByRole('status', { name: 'Slow page loading' })).toContainText(
+        'You can wait or reload'
+      );
+      await page.screenshot({ path: testInfo.outputPath('slow-project-data.png') });
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await page.getByRole('button', { name: 'Reload', exact: true }).click();
+      await expect(page.getByRole('heading', { level: 1, name: 'Local Active Kit' })).toBeVisible();
+    } finally {
+      release();
+    }
   });
 
   test('hung startup stays private and retry can finish startup', async ({ page }) => {

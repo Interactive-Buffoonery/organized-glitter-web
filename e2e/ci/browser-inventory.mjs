@@ -48,6 +48,7 @@ export const browserSpecInventory = {
     'authenticated/react-doctor-fixes.spec.ts',
     'authenticated/route-mount.spec.ts',
     'authenticated/session-expiry-local.spec.ts',
+    'authenticated/stats-counts-local.spec.ts',
     'authenticated/tag-keyboard-selection.spec.ts',
     'authenticated/theme-preferences.spec.ts',
     'blog.spec.ts',

@@ -1,3 +1,4 @@
+import { isFutureDateOnly } from '@/utils/date/timezoneUtils';
 import type {
   ColoringPageDTO,
   UpdateColoringPageInput,
@@ -123,8 +124,15 @@ export const buildColoringPagePatch = (
 
 export const getColoringPageLifecycleDateRangeError = (
   startedAt: string | undefined,
-  completedAt: string | undefined
+  completedAt: string | undefined,
+  changedField: 'startedAt' | 'completedAt',
+  today: string
 ): string | null => {
+  const changedValue = changedField === 'startedAt' ? startedAt : completedAt;
+  if (isFutureDateOnly(changedValue, today)) {
+    return `${changedField === 'startedAt' ? 'Started' : 'Completed'} date cannot be in the future.`;
+  }
+
   if (startedAt && completedAt && completedAt < startedAt) {
     return 'Completed date cannot be before started date.';
   }
@@ -134,7 +142,8 @@ export const getColoringPageLifecycleDateRangeError = (
 
 export const assertColoringPageLifecycleDateRange = (
   command: ColoringPageCommand,
-  currentPage: Pick<ColoringPageDTO, 'startedAt' | 'completedAt'> | undefined
+  currentPage: Pick<ColoringPageDTO, 'startedAt' | 'completedAt'> | undefined,
+  today: string
 ) => {
   if (command.type !== 'set-started-date' && command.type !== 'set-completed-date') return;
 
@@ -143,7 +152,12 @@ export const assertColoringPageLifecycleDateRange = (
   const completedAt =
     command.type === 'set-completed-date' ? command.completedAt : currentPage?.completedAt;
 
-  const rangeError = getColoringPageLifecycleDateRangeError(startedAt, completedAt);
+  const rangeError = getColoringPageLifecycleDateRangeError(
+    startedAt,
+    completedAt,
+    command.type === 'set-started-date' ? 'startedAt' : 'completedAt',
+    today
+  );
   if (rangeError) {
     throw new Error(rangeError);
   }

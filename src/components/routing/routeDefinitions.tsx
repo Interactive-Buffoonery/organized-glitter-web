@@ -1,25 +1,28 @@
 import { lazy, type ComponentType } from 'react';
 import { Navigate } from 'react-router-dom';
 
-import { RootRoute } from '@/components/auth/RootRoute';
 import type { SuspenseKind } from '@/components/routing/ProtectedLazyRoute';
 import {
   ImportRedirect,
   LegacyNewColoringBookRedirect,
   ProfileListRedirect,
 } from '@/components/routing/routeRedirects';
-import About from '@/pages/About';
-import ConfirmPasswordReset from '@/pages/ConfirmPasswordReset.tsx';
-import EmailConfirmation from '@/pages/EmailConfirmation';
-import ForgotPassword from '@/pages/ForgotPassword.tsx';
-import LinksPage from '@/pages/LinksPage';
 import Login from '@/pages/Login';
 import NotFound from '@/pages/NotFound';
-import Privacy from '@/pages/Privacy';
-import Register from '@/pages/Register';
-import ResetPassword from '@/pages/ResetPassword.tsx';
-import Terms from '@/pages/Terms';
-import VerifyEmail from '@/pages/VerifyEmail';
+
+const RootRoute = lazy(() =>
+  import('@/components/auth/RootRoute').then(module => ({ default: module.RootRoute }))
+);
+const About = lazy(() => import('@/pages/About'));
+const ConfirmPasswordReset = lazy(() => import('@/pages/ConfirmPasswordReset'));
+const EmailConfirmation = lazy(() => import('@/pages/EmailConfirmation'));
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
+const LinksPage = lazy(() => import('@/pages/LinksPage'));
+const Privacy = lazy(() => import('@/pages/Privacy'));
+const Register = lazy(() => import('@/pages/Register'));
+const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
+const Terms = lazy(() => import('@/pages/Terms'));
+const VerifyEmail = lazy(() => import('@/pages/VerifyEmail'));
 
 const Overview = lazy(() => import('@/pages/Overview'));
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -37,6 +40,7 @@ const TagList = lazy(() => import('@/pages/TagList'));
 const BookPublisherList = lazy(() => import('@/pages/BookPublisherList'));
 const BookIllustratorList = lazy(() => import('@/pages/BookIllustratorList'));
 const ColoringMediumList = lazy(() => import('@/pages/ColoringMediumList'));
+const Support = lazy(() => import('@/pages/Support'));
 const SupportSuccess = lazy(() => import('@/pages/SupportSuccess'));
 const ProjectRandomizer = lazy(() => import('@/pages/ProjectRandomizer'));
 const Stats = lazy(() => import('@/pages/Stats'));
@@ -69,6 +73,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/',
     element: RootRoute,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: {
       title: 'Organized Glitter | Coloring Book & Diamond Art Tracker',
@@ -88,6 +93,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/register',
     element: Register,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'Create account | Organized Glitter' },
     pageOwnsMetadata: true,
@@ -95,6 +101,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/forgot-password',
     element: ForgotPassword,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'Reset password | Organized Glitter' },
     pageOwnsMetadata: true,
@@ -102,6 +109,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/reset-password',
     element: ResetPassword,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'Reset password | Organized Glitter' },
     pageOwnsMetadata: true,
@@ -109,6 +117,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/auth/confirm-password-reset',
     element: ConfirmPasswordReset,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'Confirm password reset | Organized Glitter' },
     pageOwnsMetadata: true,
@@ -116,6 +125,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/auth/confirm-password-reset/:token',
     element: ConfirmPasswordReset,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'Confirm password reset | Organized Glitter' },
     pageOwnsMetadata: true,
@@ -123,6 +133,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/auth/verify-email/:token',
     element: VerifyEmail,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'Verify email | Organized Glitter' },
     pageOwnsMetadata: true,
@@ -130,6 +141,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/email-confirmation',
     element: EmailConfirmation,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'Email confirmation | Organized Glitter' },
     pageOwnsMetadata: true,
@@ -352,11 +364,21 @@ export const APP_ROUTES: RouteDef[] = [
     protected: true,
   },
   {
+    path: '/support',
+    element: Support,
+    verticalAccess: 'public',
+    metadata: {
+      title: 'Support Organized Glitter',
+      description:
+        'Leave an optional one-time tip to help cover Organized Glitter hosting, database, and domain costs.',
+    },
+    suspense: 'layout',
+  },
+  {
     path: '/support/success',
     element: SupportSuccess,
-    verticalAccess: 'shared',
-    metadata: { title: 'Support success | Organized Glitter' },
-    protected: true,
+    verticalAccess: 'public',
+    metadata: { title: 'Thank you | Organized Glitter' },
     suspense: 'layout',
   },
   {
@@ -387,6 +409,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/about',
     element: About,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'About | Organized Glitter' },
     pageOwnsMetadata: true,
@@ -394,6 +417,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/privacy',
     element: Privacy,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'Privacy policy | Organized Glitter' },
     pageOwnsMetadata: true,
@@ -401,6 +425,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/terms',
     element: Terms,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'Terms of service | Organized Glitter' },
     pageOwnsMetadata: true,
@@ -408,6 +433,7 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/links',
     element: LinksPage,
+    suspense: 'bare',
     verticalAccess: 'public',
     metadata: { title: 'Links | Organized Glitter' },
     pageOwnsMetadata: true,

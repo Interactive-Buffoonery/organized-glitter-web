@@ -52,6 +52,7 @@ export const browserSpecInventory = {
     'authenticated/theme-preferences.spec.ts',
     'blog.spec.ts',
     'ci/authenticated-contrast.spec.ts',
+    'cold-load.spec.ts',
     'links-accessibility.spec.ts',
     'not-found.spec.ts',
     'page-titles.spec.ts',

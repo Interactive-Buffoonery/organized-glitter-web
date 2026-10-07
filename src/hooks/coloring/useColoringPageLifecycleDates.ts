@@ -6,7 +6,7 @@ import {
 import type { UseColoringPageCommandExecutorResult } from '@/hooks/coloring/useColoringPageCommandExecutor';
 import { notify } from '@/lib/notifications';
 import type { ColoringPageDTO } from '@/services/pocketbase/coloring.service';
-import { formatDateInUserTimezone } from '@/utils/date/timezoneUtils';
+import { formatDateInUserTimezone, getCurrentDateInUserTimezone } from '@/utils/date/timezoneUtils';
 
 type LifecycleDateField = 'startedAt' | 'completedAt';
 
@@ -69,7 +69,12 @@ export function useColoringPageLifecycleDates(
 
       const nextStartedAt = field === 'startedAt' ? nextValue : startedAtDraftRef.current;
       const nextCompletedAt = field === 'completedAt' ? nextValue : completedAtDraftRef.current;
-      const rangeError = getColoringPageLifecycleDateRangeError(nextStartedAt, nextCompletedAt);
+      const rangeError = getColoringPageLifecycleDateRangeError(
+        nextStartedAt,
+        nextCompletedAt,
+        field,
+        getCurrentDateInUserTimezone(userTimezone)
+      );
       if (rangeError) {
         notify({
           kind: 'error',
@@ -86,7 +91,7 @@ export function useColoringPageLifecycleDates(
 
       return commandExecutor.execute(page.id, command, { failureTitle: 'Date did not save' });
     },
-    [commandExecutor, page]
+    [commandExecutor, page, userTimezone]
   );
 
   const saveStartedAt = useCallback(

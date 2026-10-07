@@ -138,6 +138,7 @@ describe('MobileAccountMenu', () => {
       'https://site.example.test/updates/#subscribe'
     );
     expect(screen.getByRole('button', { name: 'Install Web App' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /support/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'About' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Privacy' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Terms' })).not.toBeInTheDocument();
@@ -198,5 +199,23 @@ describe('MobileAccountMenu', () => {
       expect(signOutMock).toHaveBeenCalled();
       expect(navigateMock).toHaveBeenCalledWith('/login', { replace: true });
     });
+  });
+
+  it('links to the support page when tips are configured', async () => {
+    vi.stubEnv('VITE_STRIPE_TIP_2_URL', 'https://buy.stripe.com/test_2');
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <MobileAccountMenu avatarConfig={testAvatarConfig} />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open account menu' }));
+
+    expect(screen.getByRole('link', { name: 'Support Organized Glitter' })).toHaveAttribute(
+      'href',
+      '/support'
+    );
+    vi.unstubAllEnvs();
   });
 });

@@ -25,38 +25,16 @@ export function buildContentSecurityPolicy(env = {}) {
   const wordpress = configuredOrigin(env.WORDPRESS_API_URL);
   const contact = configuredOrigin(env.WORDPRESS_CONTACT_URL);
   const newsletter = configuredOrigin(env.MAILPOET_IFRAME_URL);
-  const paypal = env.VITE_PAYPAL_BUTTON_ID ? 'https://www.paypalobjects.com' : null;
   const images = (env.PUBLIC_IMAGE_ORIGINS || '').split(',').map(value => configuredOrigin(value));
   const directives = {
     'default-src': ["'self'"],
-    'script-src': ["'self'", "'unsafe-inline'", 'https://accounts.google.com', assets, paypal],
-    'connect-src': [
-      "'self'",
-      backend,
-      analytics,
-      'https://accounts.google.com',
-      env.VITE_PAYPAL_BUTTON_ID ? 'https://www.paypal.com' : null,
-    ],
+    'script-src': ["'self'", "'unsafe-inline'", 'https://accounts.google.com', assets],
+    'connect-src': ["'self'", backend, analytics, 'https://accounts.google.com'],
     'style-src': ["'self'", "'unsafe-inline'"],
-    'img-src': [
-      "'self'",
-      backend,
-      wordpress,
-      paypal,
-      ...images,
-      'https://i.ytimg.com',
-      'data:',
-      'blob:',
-    ],
+    'img-src': ["'self'", backend, wordpress, ...images, 'https://i.ytimg.com', 'data:', 'blob:'],
     'font-src': ["'self'", 'data:'],
     'worker-src': ["'self'", 'blob:'],
-    'frame-src': [
-      "'self'",
-      'https://accounts.google.com',
-      newsletter,
-      contact,
-      env.VITE_PAYPAL_BUTTON_ID ? 'https://www.paypal.com' : null,
-    ],
+    'frame-src': ["'self'", 'https://accounts.google.com', newsletter, contact],
     'object-src': ["'none'"],
     'base-uri': ["'self'"],
     'frame-ancestors': ["'none'"],

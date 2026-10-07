@@ -188,22 +188,32 @@ describe('App', () => {
   });
 
   describe('PWA registration', () => {
-    it('registers the service worker with immediate update checks', async () => {
+    it('registers after readiness and retains immediate update checks', async () => {
       Object.defineProperty(window.navigator, 'serviceWorker', {
         value: {},
         writable: true,
         configurable: true,
       });
+      const root = document.createElement('div');
+      root.id = 'root';
+      document.body.appendChild(root);
       renderWithProviders(<App />);
+      expect(mockRegisterSW).not.toHaveBeenCalled();
+      root.setAttribute('data-app-ready', 'true');
+      window.dispatchEvent(new Event('app-loaded'));
 
-      await waitFor(() => {
-        expect(mockRegisterSW).toHaveBeenCalledWith(
-          expect.objectContaining({
-            immediate: true,
-            onRegisteredSW: expect.any(Function),
-          })
-        );
-      });
+      await waitFor(
+        () => {
+          expect(mockRegisterSW).toHaveBeenCalledWith(
+            expect.objectContaining({
+              immediate: true,
+              onRegisteredSW: expect.any(Function),
+            })
+          );
+        },
+        { timeout: 3000 }
+      );
+      root.remove();
     });
   });
 

@@ -19,6 +19,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectType, ProjectFormValues } from '@/types/project';
 import { useAuth } from '@/hooks/useAuth';
+import { getCurrentDateInUserTimezone } from '@/utils/date/timezoneUtils';
 import { useDirtyFormGuard } from '@/hooks/useDirtyFormGuard';
 import { sessionDraftKeys } from '@/services/auth/sessionDraftKeys';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
@@ -409,7 +410,11 @@ export const useEditProject = (
         return false;
       }
 
-      const validation = validateProjectFormValues(data, data.userId || project.userId);
+      const validation = validateProjectFormValues(
+        data,
+        getCurrentDateInUserTimezone(userTimezone),
+        data.userId || project.userId
+      );
       setFieldErrors(validation.fieldErrors);
       if (!validation.isValid) {
         const firstError = Object.values(validation.fieldErrors)[0];
@@ -531,6 +536,7 @@ export const useEditProject = (
       }
     },
     [
+      userTimezone,
       project,
       updateProjectMutation,
       navigateToProject,

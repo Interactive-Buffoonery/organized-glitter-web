@@ -35,7 +35,9 @@ remain external services. Subscriber data, delivery credentials, and WordPress
 administration belong to ops. Public source preserves their website integration.
 
 Optional services are disabled by default: analytics needs both a project key and
-host, donations need a PayPal button ID, and feedback needs operator mail settings.
+host, tips need at least one `VITE_STRIPE_TIP_*_URL` Stripe Payment Link, and
+feedback needs operator mail settings. Payment Links are plain outbound links,
+so they need no Content Security Policy exception.
 The Apple association endpoint defaults to an empty app list. Configure
 `APPLE_APP_IDS` on PocketBase and `nativeClientId` in the existing private Apple
 configuration alongside its signing and grant encryption keys. The official

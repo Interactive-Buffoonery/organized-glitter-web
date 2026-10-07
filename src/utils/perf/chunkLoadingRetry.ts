@@ -1,37 +1,35 @@
-import { logger } from '@/utils/logger';
+declare global {
+  interface Window {
+    __OG_RESOURCE_RECOVERY__?: {
+      start: (config: {
+        entry: string;
+        resources: string[];
+        graphs?: Record<string, string[]>;
+      }) => Promise<void>;
+      recoverChunk: (error: unknown) => Promise<boolean>;
+      resetReloadBudget: () => void;
+      readonly state: 'idle' | 'loading' | 'started' | 'failed';
+    };
+  }
+}
 
-/**
- * Chunk Loading Error Handler
- * Uses Vite's official error handling with minimal fallback
- */
+let initialized = false;
 
-/**
- * Initialize chunk loading error handling
- * Uses Vite's official vite:preloadError handler as the primary solution
- */
+const recoverChunk = (error: unknown): void => {
+  // The pre-React loader owns status checks and the budget across documents.
+  // Keep Vite's rejection intact so the route boundary remains usable.
+  void window.__OG_RESOURCE_RECOVERY__?.recoverChunk(error).catch(() => {});
+};
+
 export const initializeChunkLoadingRetry = (): void => {
-  // Official Vite preload error handler (recommended approach)
-  // This handles the vast majority of chunk loading failures
-  window.addEventListener('vite:preloadError', () => {
-    logger.warn('🔄 Vite chunk loading failed, reloading page...');
-    window.location.reload();
+  if (initialized) return;
+  initialized = true;
+
+  window.addEventListener('vite:preloadError', event => {
+    recoverChunk((event as Event & { payload?: unknown }).payload);
   });
 
-  // Fallback for edge cases where vite:preloadError doesn't fire
   window.addEventListener('unhandledrejection', event => {
-    const error = event.reason;
-
-    if (
-      error instanceof Error &&
-      (error.message.includes('Loading chunk') ||
-        error.message.includes('Loading failed for') ||
-        error.message.includes('assets/'))
-    ) {
-      logger.warn('🔄 Chunk loading error detected, reloading page...', error.message);
-      event.preventDefault();
-      window.location.reload();
-    }
+    recoverChunk(event.reason);
   });
-
-  logger.log('🛠️ Chunk loading error handler initialized');
 };

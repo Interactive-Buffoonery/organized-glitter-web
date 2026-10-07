@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PrivateFileTokenContext } from '@/contexts/privateFileTokenState';
 import ProjectFormSections from '../ProjectFormSections';
 import { buildUpdateProjectFormData } from '@/hooks/mutations/projectMutationAdapters';
 import { toUpdateProjectInput } from '@/hooks/mutations/projectCommands';
@@ -32,6 +33,13 @@ const {
 
 vi.mock('@/utils/project/field-mapping', () => ({
   resolveCompanyAndArtistIds: resolveCompanyAndArtistIdsMock,
+}));
+
+vi.mock('@/services/pocketbase/privateFiles.service', () => ({
+  PrivateFilesService: {
+    getBaseUrl: () => 'https://backend.example.test',
+    getCurrentUserId: () => 'test-user',
+  },
 }));
 
 vi.mock('@/hooks/useImageUpload', () => ({
@@ -184,6 +192,32 @@ describe('ProjectFormSections project image cropping', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('loads a protected existing cover with the current file token before cropping', async () => {
+    const url = 'https://backend.example.test/api/files/projects/example/cover.jpg';
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['image'], { type: 'image/jpeg' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <PrivateFileTokenContext.Provider
+        value={{ userId: 'test-user', value: 'synthetic-file-token', issuedAt: 1 }}
+      >
+        <ProjectFormSections
+          formData={{ ...baseFormData, imageUrl: url }}
+          companies={[]}
+          artists={[]}
+          isSubmitting={false}
+          onChange={onChangeMock}
+        />
+      </PrivateFileTokenContext.Provider>
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Crop image' }));
+    await screen.findByRole('dialog', { name: 'Crop project image' });
+    expect(fetchMock).toHaveBeenCalledWith(`${url}?token=synthetic-file-token`);
+    expect(onChangeMock).not.toHaveBeenCalled();
   });
 
   it('marks an active project completed when its completion date is entered', () => {

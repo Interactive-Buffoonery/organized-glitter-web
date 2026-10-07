@@ -1,10 +1,6 @@
 /**
- * Step-1 smoke test: prove the Playwright test runner works end-to-end.
- *
- * Navigates to the public home page (no login required), asserts the page
- * title contains "Organized Glitter", and fails the test if any
- * console.error fires during load. This is the minimum viable test; step 2
- * adds authenticated route-mount sweeps.
+ * Public homepage coverage: loading, runtime errors, and readable marketing
+ * cards across both themes and phone, tablet, and desktop widths.
  */
 
 import { test, expect, type ConsoleMessage } from '@playwright/test';
@@ -12,7 +8,9 @@ import { test, expect, type ConsoleMessage } from '@playwright/test';
 import { expectNoAxeViolations, waitForAccessibilityScanReady } from './a11y/axe-test';
 
 test.describe('Home page', () => {
-  test('loads with the expected title and no console errors', async ({ page }) => {
+  test('loads without errors and keeps marketing cards readable across themes and widths', async ({
+    page,
+  }) => {
     test.setTimeout(90_000);
     const consoleErrors: string[] = [];
 
@@ -41,15 +39,6 @@ test.describe('Home page', () => {
       /Failed to load resource.*posthog/i,
       /Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
     ];
-    const realErrors = consoleErrors.filter(
-      text => !ignorablePatterns.some(pattern => pattern.test(text))
-    );
-
-    expect(
-      realErrors,
-      `Unexpected console errors on home page load:\n${realErrors.join('\n')}`
-    ).toHaveLength(0);
-
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await page.getByRole('menuitem', { name: 'System', exact: true }).click();
 
@@ -93,6 +82,14 @@ test.describe('Home page', () => {
         });
       }
     }
+
+    const realErrors = consoleErrors.filter(
+      text => !ignorablePatterns.some(pattern => pattern.test(text))
+    );
+    expect(
+      realErrors,
+      `Unexpected console errors on home page:\n${realErrors.join('\n')}`
+    ).toHaveLength(0);
   });
 });
 

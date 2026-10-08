@@ -86,6 +86,24 @@ vi.mock('@/components/image/ImageCropDialog', () => ({
     ) : null,
 }));
 
+vi.mock('@/components/notes/RichTextEditor.lazy', () => ({
+  default: ({
+    value,
+    onChange,
+    ariaLabel,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+    ariaLabel?: string;
+  }) => (
+    <textarea
+      aria-label={ariaLabel}
+      value={value}
+      onChange={event => onChange(event.target.value)}
+    />
+  ),
+}));
+
 vi.mock('@/components/tags/InlineTagManager', () => ({
   InlineTagManager: () => <div data-testid="inline-tag-manager" />,
 }));

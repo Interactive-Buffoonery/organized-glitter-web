@@ -10,7 +10,7 @@ import { expectNoAxeViolations, waitForAccessibilityScanReady } from './a11y/axe
 test.describe('Home page', () => {
   test('loads without errors and keeps marketing cards readable across themes and widths', async ({
     page,
-  }) => {
+  }, testInfo) => {
     test.setTimeout(90_000);
     const consoleErrors: string[] = [];
 
@@ -39,14 +39,14 @@ test.describe('Home page', () => {
       /Failed to load resource.*posthog/i,
       /Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
     ];
-    await page.getByRole('button', { name: 'Toggle theme' }).click();
-    await page.getByRole('menuitem', { name: 'System', exact: true }).click();
+    await page.addInitScript(() => localStorage.setItem('theme', 'system'));
 
     for (const theme of ['light', 'dark'] as const) {
       for (const width of [320, 390, 800, 1280]) {
         await test.step(`marketing cards in ${theme} at ${width}px`, async () => {
           await page.setViewportSize({ width, height: 900 });
           await page.emulateMedia({ colorScheme: theme });
+          await page.goto('/');
           await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
           await waitForAccessibilityScanReady(page);
 
@@ -78,6 +78,14 @@ test.describe('Home page', () => {
             expect(surface.right).toBeLessThanOrEqual(width);
             expect(surface.clipped).toBe(false);
             await expectNoAxeViolations(page, { include: selector });
+          }
+          if (width === 320 || width === 1280) {
+            const screenshot = testInfo.outputPath(`home-${theme}-${width}.png`);
+            await page.screenshot({ path: screenshot, fullPage: true, animations: 'disabled' });
+            await testInfo.attach(`home-${theme}-${width}`, {
+              path: screenshot,
+              contentType: 'image/png',
+            });
           }
         });
       }

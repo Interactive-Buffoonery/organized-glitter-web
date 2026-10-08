@@ -88,3 +88,15 @@ https://linear.app/interactive-buffoonery/issue/INT-1135/match-frontend-routing-
 https://linear.app/interactive-buffoonery/issue/INT-1136/keep-feedback-working-without-railway
 
 https://linear.app/interactive-buffoonery/issue/INT-1137/preserve-the-posthog-proxy-on-spacefast
+
+## Automatic dev preview
+
+A separate workflow starts after a push to `dev`, waits for that commit's CI
+to pass, then requests a build in the private ops repository. Ops builds the checked commit and publishes it to
+`https://organized-glitter-dev.view.fast`. It checks the current `dev` SHA again
+before publishing. If a newer merge arrives, the older build cannot publish.
+The publish queue shares the existing release-preview lock.
+
+The `spacefast-dev-preview.yml` workflow must merge into ops `main` before the
+web relay merges. The relay uses the existing `OPS_PREVIEW_DISPATCH_TOKEN`.
+Spacefast credentials stay in ops. Feature PRs do not publish this preview.

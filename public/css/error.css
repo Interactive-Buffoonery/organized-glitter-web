@@ -42,7 +42,8 @@ html.dark body {
   --error-card-bg: #fffdf7;
   --error-ink: #4a3b43;
   --error-muted: #6b5560;
-  --error-primary: #d63f7f;
+  --error-primary: #d13d78;
+  --error-primary-foreground: #ffffff;
   --error-primary-hover: #c23572;
   --error-primary-active: #a92e63;
   --error-icon-bg: #f3b8ce;
@@ -77,7 +78,8 @@ html.dark #app-error {
   --error-muted: #c8bcc3;
   --error-primary: #e85a98;
   --error-primary-hover: #f06aa3;
-  --error-primary-active: #d63f7f;
+  --error-primary-active: #e85a98;
+  --error-primary-foreground: #151533;
   --error-icon-bg: #d63f7f;
   --error-icon-fg: #fff8fb;
   --error-tape-peach: #c4846a;
@@ -177,7 +179,7 @@ html.dark #app-error {
   border: none;
   border-radius: 0.625rem;
   background: var(--error-primary);
-  color: #ffffff;
+  color: var(--error-primary-foreground);
   font-family: inherit;
   font-size: 1rem;
   font-weight: 700;

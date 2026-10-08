@@ -116,7 +116,8 @@ describe('Local build server static files', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     staticDir = await fs.mkdtemp(path.join(os.tmpdir(), 'organized-glitter-static-'));
-    await fs.writeFile(path.join(staticDir, 'index.html'), '<main>SPA shell</main>');
+    await fs.writeFile(path.join(staticDir, 'index.html'), '<main>Static landing</main>');
+    await fs.writeFile(path.join(staticDir, 'app.html'), '<main>SPA shell</main>');
   });
 
   afterEach(async () => {
@@ -306,14 +307,14 @@ describe('Local build server static files', () => {
   ])(
     'serves route-specific metadata for %s before JavaScript runs',
     async (requestPath, fileName, title, canonical) => {
-      for (const entry of [
-        'index.html',
-        'about.html',
-        'links.html',
-        'privacy.html',
-        'terms.html',
+      for (const [source, entry] of [
+        ['landing.html', 'index.html'],
+        ['about.html', 'about.html'],
+        ['links.html', 'links.html'],
+        ['privacy.html', 'privacy.html'],
+        ['terms.html', 'terms.html'],
       ]) {
-        await fs.copyFile(path.join(process.cwd(), entry), path.join(staticDir, entry));
+        await fs.copyFile(path.join(process.cwd(), source), path.join(staticDir, entry));
       }
       server = http.createServer(createLocalBuildRequestHandler({ staticDir }));
       const port = await listen(server);
@@ -333,6 +334,21 @@ describe('Local build server static files', () => {
       expect(response.body).toBe(await fs.readFile(path.join(staticDir, fileName), 'utf8'));
     }
   );
+
+  it.each([
+    ['/', 'Static landing'],
+    ['/index.html', 'Static landing'],
+    ['/login', 'SPA shell'],
+    ['/overview', 'SPA shell'],
+  ])('serves %s from the matching HTML document', async (requestPath, body) => {
+    server = http.createServer(createLocalBuildRequestHandler({ staticDir }));
+    const port = await listen(server);
+
+    const response = await request(port, requestPath);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toBe(`<main>${body}</main>`);
+  });
 
   it('keeps extensionless application routes on the SPA shell', async () => {
     server = http.createServer(createLocalBuildRequestHandler({ staticDir }));

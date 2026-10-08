@@ -51,3 +51,13 @@ routerAdd(
   },
   $apis.requireSuperuserAuth()
 );
+
+routerAdd(
+  'POST',
+  '/api/test/apple/deletion-retention',
+  e => {
+    require(`${__hooks}/account_deletion.js`).maintainRetention(e.app);
+    return e.noContent(200);
+  },
+  $apis.requireSuperuserAuth()
+);

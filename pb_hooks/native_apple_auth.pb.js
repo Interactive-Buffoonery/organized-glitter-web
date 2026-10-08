@@ -36,7 +36,9 @@ routerAdd(
     const data = e.requestInfo().body;
     const keys = Object.keys(data);
     if (
-      keys.some(key => !['code', 'nonce', 'name'].includes(key)) ||
+      keys.some(
+        key => !['code', 'nonce', 'name', 'deletionProof', 'deletionUserId'].includes(key)
+      ) ||
       typeof data.code !== 'string' ||
       data.code.length < 1 ||
       data.code.length > 2048 ||
@@ -46,6 +48,16 @@ routerAdd(
       !/^[A-Za-z0-9_-]+$/.test(data.nonce)
     ) {
       throw new BadRequestError('Invalid Apple sign-in request.');
+    }
+    const deletionRequested = data.deletionProof !== undefined || data.deletionUserId !== undefined;
+    if (
+      deletionRequested &&
+      (typeof data.deletionProof !== 'string' ||
+        !/^[A-Za-z0-9_-]{43}$/.test(data.deletionProof) ||
+        typeof data.deletionUserId !== 'string' ||
+        !/^[a-z0-9]{15}$/.test(data.deletionUserId))
+    ) {
+      throw new BadRequestError('Invalid deletion verification request.');
     }
     if (
       data.name !== undefined &&
@@ -132,8 +144,17 @@ routerAdd(
         0,
         { collection: users.id, subject }
       );
+      if (
+        deletionRequested &&
+        (links.length === 0 || links[0].getString('recordRef') !== data.deletionUserId)
+      ) {
+        throw new ForbiddenError('Apple cannot verify the account being deleted.');
+      }
       if (links.length > 0) {
         record = txApp.findRecordById('users', links[0].getString('recordRef'));
+        if (deletionRequested && !record.getBool('verified')) {
+          throw new ForbiddenError('Apple cannot verify the account being deleted.');
+        }
         if (!record.getBool('verified')) {
           const storedEmail = record.getString('email');
           if (!email || (storedEmail && storedEmail.toLowerCase() !== email.toLowerCase())) {
@@ -190,6 +211,16 @@ routerAdd(
         isNew = true;
       }
 
+      if (deletionRequested) {
+        require(`${__hooks}/account_deletion.js`).issueProof(
+          txApp,
+          record.id,
+          data.deletionProof,
+          'oauth',
+          'apple',
+          identityHash
+        );
+      }
       require(`${__hooks}/apple_grant_store.js`).upsert(txApp, {
         userId: record.id,
         identityHash,

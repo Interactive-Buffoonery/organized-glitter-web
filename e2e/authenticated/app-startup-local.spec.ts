@@ -59,6 +59,7 @@ test.describe('private app startup', () => {
         if (theme === 'light') {
           await button.click({ noWaitAfter: true });
           await page.unrouteAll({ behavior: 'ignoreErrors' });
+          release();
           await expect(libraryPageHeading(page)).toBeVisible();
           await expect(page.locator('#app-loading')).toHaveCount(0);
         }
@@ -68,33 +69,35 @@ test.describe('private app startup', () => {
     });
   }
 
-  for (const entry of ['reload', 'deep link'] as const) {
+  for (const entry of ['cold reload', 'deep link'] as const) {
     test(`${entry} keeps private content hidden until the route mounts`, async ({
       page,
     }, testInfo) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      const path = entry === 'reload' ? '/dashboard' : '/projects/localproject003';
-      let holdChunk = false;
+      const path = entry === 'cold reload' ? '/dashboard' : '/projects/localproject003';
       let release!: () => void;
       let chunkHeld = false;
       const pending = new Promise<void>(resolve => {
         release = resolve;
       });
       const chunk =
-        entry === 'reload' ? /\/assets\/Dashboard-[^/]+\.js/ : /\/assets\/ProjectDetail-[^/]+\.js/;
+        entry === 'cold reload'
+          ? /\/assets\/Dashboard-[^/]+\.js/
+          : /\/assets\/ProjectDetail-[^/]+\.js/;
       await page.route(chunk, async route => {
-        if (!holdChunk) return route.continue();
         chunkHeld = true;
         await pending;
         await route.continue();
       });
-      if (entry === 'reload') {
-        await page.goto(path);
-        await expect(libraryPageHeading(page)).toBeVisible();
+      if (entry === 'cold reload') {
+        await page.goto('/options');
+        await expect(
+          page.getByRole('heading', { name: 'Manage Lists', exact: true })
+        ).toBeVisible();
+        await page.evaluate(value => history.replaceState(null, '', value), path);
       }
-      holdChunk = true;
       try {
-        if (entry === 'reload') await page.reload({ waitUntil: 'commit' });
+        if (entry === 'cold reload') await page.reload({ waitUntil: 'commit' });
         else await page.goto(path, { waitUntil: 'commit' });
         await expect
           .poll(() => chunkHeld, { message: 'The lazy route request must be held' })
@@ -124,7 +127,7 @@ test.describe('private app startup', () => {
       await expect(page.locator('#app-loading')).toHaveCount(0);
       await expect(page.locator('#root')).toHaveAttribute('data-app-ready', 'true');
       await expect(page.locator('#root')).not.toHaveAttribute('inert', '');
-      if (entry === 'reload') await expect(libraryPageHeading(page)).toBeVisible();
+      if (entry === 'cold reload') await expect(libraryPageHeading(page)).toBeVisible();
       else
         await expect(
           page.getByRole('heading', { level: 1, name: 'Local Active Kit' })

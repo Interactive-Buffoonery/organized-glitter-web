@@ -98,7 +98,7 @@ test.describe('local legacy archive project restore', () => {
 
   test('round trips stored diamond fields through browser archive export and restore', async ({
     page,
-  }) => {
+  }, testInfo) => {
     test.setTimeout(120_000);
     assertLocalE2ETargets({ appUrl, pocketBaseUrl, specName: 'Project archive round trip' });
     const email = process.env.E2E_TEST_EMAIL;
@@ -175,8 +175,8 @@ test.describe('local legacy archive project restore', () => {
       const downloadPromise = page.waitForEvent('download');
       await page.getByRole('button', { name: 'Export full archive' }).click();
       const download = await downloadPromise;
-      const archivePath = await download.path();
-      if (!archivePath) throw new Error('Archive download has no local path.');
+      const archivePath = testInfo.outputPath('organized-glitter-export.zip');
+      await download.saveAs(archivePath);
       const zip = await JSZip.loadAsync(await readFile(archivePath));
       const manifest = JSON.parse(await zip.file('manifest.json')!.async('string')) as {
         diamondProjects: Array<{ title: string; colorCount?: number }>;

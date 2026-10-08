@@ -1,6 +1,10 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import {
+  ImageErrorBoundary,
+  ProjectContentErrorBoundary,
+} from '@/components/error/ComponentErrorBoundaries';
 
 const mockCaptureException = vi.fn();
 
@@ -67,6 +71,33 @@ describe('ErrorBoundary', () => {
       $exception_source: 'react_error_boundary',
       errorContext: { component: 'TestWidget', userId: 42 },
     });
+  });
+
+  it('keeps private image context out of exception properties', () => {
+    render(
+      <ImageErrorBoundary
+        alt="Private project title"
+        originalUrl="https://example.test/private.jpg"
+      >
+        <ThrowError message="image rendering failed" />
+      </ImageErrorBoundary>
+    );
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const properties = mockCaptureException.mock.calls[0][1];
+    expect(properties.errorContext).toEqual({ component: 'Image' });
+    expect(JSON.stringify(properties)).not.toMatch(/Private project title|private\.jpg/);
+  });
+
+  it('keeps private project IDs out of exception properties', () => {
+    render(
+      <ProjectContentErrorBoundary projectId="private-project-id">
+        <ThrowError message="project rendering failed" />
+      </ProjectContentErrorBoundary>
+    );
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const properties = mockCaptureException.mock.calls[0][1];
+    expect(properties.errorContext).toEqual({ component: 'ProjectContent' });
+    expect(JSON.stringify(properties)).not.toContain('private-project-id');
   });
 
   it('uses a fallback error id when crypto.randomUUID is unavailable', () => {

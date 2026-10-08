@@ -93,7 +93,12 @@ export const runSourcemapUpload = ({
   /** Run a posthog-cli subcommand, throwing on non-zero exit. */
   const run = args => {
     logger.log(`[sourcemaps] posthog-cli ${args.join(' ')}`);
-    const result = spawnSyncFn(cliBin, args, { stdio: 'inherit', cwd: projectRoot });
+    const result = spawnSyncFn(cliBin, args, {
+      stdio: 'inherit',
+      cwd: projectRoot,
+      timeout: 120_000,
+      killSignal: 'SIGKILL',
+    });
     if (result.error) throw result.error;
     if (result.status !== 0) {
       throw new Error(`posthog-cli ${args[0]} exited ${result.status}`);

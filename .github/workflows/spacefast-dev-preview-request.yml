@@ -1,0 +1,58 @@
+name: Request dev preview after CI
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: dev-preview-request
+  cancel-in-progress: true
+
+jobs:
+  checked-ci:
+    name: Wait for checked dev commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - id: ci
+        name: Find this commit's push CI run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: node scripts/dev-preview-ci.mjs
+      - name: Wait for successful CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ steps.ci.outputs.run_id }}
+        run: gh run watch "$CI_RUN_ID" --repo Interactive-Buffoonery/organized-glitter-web --exit-status --interval 15
+
+  request:
+    name: Request checked dev preview
+    needs: checked-ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch checked dev commit to ops
+        env:
+          GH_TOKEN: ${{ secrets.OPS_PREVIEW_DISPATCH_TOKEN }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          test -n "$GH_TOKEN"
+          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          jq -n --arg commit "$SOURCE_COMMIT" '{ref: "main", inputs: {
+            source_commit: $commit
+          }}' > "$RUNNER_TEMP/dev-preview-request.json"
+          gh api --method POST \
+            repos/Interactive-Buffoonery/organized-glitter-ops/actions/workflows/spacefast-dev-preview.yml/dispatches \
+            --input "$RUNNER_TEMP/dev-preview-request.json"
+          echo 'Dev preview requested. Follow Update dev preview after CI in organized-glitter-ops Actions.' >> "$GITHUB_STEP_SUMMARY"

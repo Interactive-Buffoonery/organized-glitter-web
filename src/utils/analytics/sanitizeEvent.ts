@@ -1,24 +1,26 @@
 import type { CaptureResult } from 'posthog-js';
-import { sanitizeSensitivePath } from '@/utils/auth/sensitivePath';
+import { sanitizeAnalyticsPath } from './sanitizePath';
 
 function sanitizeProperty(value: unknown): unknown {
   if (typeof value === 'string') {
     if (/^https?:\/\//i.test(value)) {
       try {
         const url = new URL(value);
-        return `${url.origin}${sanitizeSensitivePath(url.pathname)}`;
+        return `${url.origin}${sanitizeAnalyticsPath(url.pathname)}`;
       } catch {
         return '[redacted]';
       }
     }
-    return value.startsWith('/') ? sanitizeSensitivePath(value) : value;
+    return value.startsWith('/') ? sanitizeAnalyticsPath(value) : value;
   }
   if (Array.isArray(value)) {
     return value.map(sanitizeProperty);
   }
   if (value && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value).map(([key, property]) => [key, sanitizeProperty(property)])
+      Object.entries(value)
+        .filter(([key]) => !/^(?:\$initial_)?utm_/i.test(key))
+        .map(([key, property]) => [key, sanitizeProperty(property)])
     );
   }
   return value;

@@ -110,9 +110,6 @@ describe('useCreateSpin hook', () => {
     );
     expect(result.current.data).toEqual(mockResponse);
     expect(mockCapture).toHaveBeenCalledWith('randomizer_spin', {
-      selected_count: 2,
-    });
-    expect(mockCapture).toHaveBeenCalledWith('randomizer_first_spin', {
       source_surface: 'randomizer',
       selected_count: 2,
       mode: 'diamond',

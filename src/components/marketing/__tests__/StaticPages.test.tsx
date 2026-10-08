@@ -45,7 +45,7 @@ describe('renderStaticPage', () => {
       node => node.querySelector('h2')?.textContent === 'Third-Party Services'
     );
     expect(services?.querySelector('p')?.textContent).toBe(
-      "PostHog Analytics. We use PostHog to see which parts of Organized Glitter are used and to help find problems. When you're signed in, this activity is linked to your account ID. PostHog respects the Do Not Track browser setting. We do not use PostHog for advertising, session recording, or automatic click tracking. We only send specific product events we have chosen to measure, such as page views and feature usage."
+      "PostHog Analytics. We use PostHog to see which parts of Organized Glitter are used and to help find problems. When you're signed in, this activity is linked to your account ID. PostHog respects the Do Not Track browser setting. We do not use PostHog for advertising, session recording, or automatic click tracking. We only send specific product events we have chosen to measure, such as page views and feature usage. We do not send your name, email address, craft titles, notes, or photos as product analytics. You can turn off usage analytics and error reports in Account settings under Privacy. This choice is saved to your account and applies across signed-in devices."
     );
   });
 

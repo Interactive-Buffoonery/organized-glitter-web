@@ -212,7 +212,9 @@ Glass surfaces use HSL-with-alpha tokens that layer over whatever sits behind th
 
 ### Paper Register (marketing surfaces only)
 
-A deliberately non-themed sub-palette used by the home page scrapbook surfaces (`HomeHero` subtree: `TwoCraftsSplit`, `ScrapbookFeatures`, `SarahSignature`). Real paper and washi tape do not recolor into dark surfaces when a user flips dark mode; against the navy stage the paper shifts to a warmer toasted cream so it sits calmly instead of glowing pink.
+A material sub-palette used by the home page scrapbook surfaces (`HomeHero` subtree: `TwoCraftsSplit`, `ScrapbookFeatures`, `SarahSignature`). The photo frame, craft sheet, and washi tape retain their paper identity; against the navy stage the paper shifts to a warmer toasted cream.
+
+The features sheet and Sarah signature card preserve the scrapbook typography, layout, and tape while adapting their surfaces and ink to the selected theme. In Dark, these two cards locally map `--paper-bg` and `--paper-bg-warm` to `--card`, `--paper-edge` to `--border`, `--paper-fg` to `--card-foreground`, and `--paper-muted` to `--muted-foreground`. Sarah's heading and link use `--accent` in Dark. Light retains the paper colors below. These overrides stay in `src/styles/scrapbook.css` and do not change other paper consumers.
 
 **Paper surfaces and ink (light, with dark-mode cream softening):**
 

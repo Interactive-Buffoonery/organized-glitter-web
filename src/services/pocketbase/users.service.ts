@@ -3,7 +3,7 @@
  * @author @serabi
  */
 
-import PocketBase, { BaseAuthStore, type RecordModel } from 'pocketbase';
+import PocketBase, { BaseAuthStore, type RecordModel, type UnsubscribeFunc } from 'pocketbase';
 import { pb } from '@/lib/pocketbase';
 import { Collections, UsersResponse } from '@/types/pocketbase.types';
 import { UserDTO } from '@/services/types';
@@ -36,6 +36,14 @@ function verifyOwnership(targetUserId: string): void {
       false
     );
   }
+}
+
+function requireAnalyticsOptOut(record: { analytics_opt_out?: unknown }): boolean {
+  if (typeof record.analytics_opt_out !== 'boolean') {
+    throw new Error('The account analytics preference is unavailable');
+  }
+
+  return record.analytics_opt_out;
 }
 
 /** Transform PocketBase record to domain DTO */
@@ -81,6 +89,7 @@ export class UsersService {
       timezone: string;
       theme_preference: AppTheme;
       beta_tester: boolean;
+      analytics_opt_out: boolean;
     }>
   ): Promise<UserDTO> {
     verifyOwnership(userId);
@@ -88,6 +97,53 @@ export class UsersService {
       const record = await pb.collection(Collections.Users).update(userId, data);
       return toUserDTO(record);
     }, 'Users.update');
+  }
+
+  /** Read the current account's analytics opt-out value. Verifies ownership. */
+  static async getAnalyticsOptOut(userId: string): Promise<boolean> {
+    verifyOwnership(userId);
+    return ErrorHandler.handleAsync(async () => {
+      const record = await pb.collection(Collections.Users).getOne(userId, {
+        fields: 'analytics_opt_out',
+      });
+      return requireAnalyticsOptOut(record);
+    }, 'Users.getAnalyticsOptOut');
+  }
+
+  /** Update the current account's analytics opt-out value. Verifies ownership. */
+  static async updateAnalyticsOptOut(userId: string, optOut: boolean): Promise<boolean> {
+    verifyOwnership(userId);
+    return ErrorHandler.handleAsync(async () => {
+      const record = await pb.collection(Collections.Users).update(userId, {
+        analytics_opt_out: optOut,
+      });
+      return requireAnalyticsOptOut(record);
+    }, 'Users.updateAnalyticsOptOut');
+  }
+
+  /** Subscribe to analytics preference changes for the current account. */
+  static async subscribeAnalyticsPreference(
+    userId: string,
+    callback: (optOut: boolean) => void
+  ): Promise<UnsubscribeFunc> {
+    verifyOwnership(userId);
+    return ErrorHandler.handleAsync(
+      () =>
+        pb.collection(Collections.Users).subscribe(
+          userId,
+          event => {
+            if (event.action === 'delete') {
+              callback(true);
+              return;
+            }
+
+            const value = event.record.analytics_opt_out;
+            callback(typeof value === 'boolean' ? value : true);
+          },
+          { fields: 'analytics_opt_out' }
+        ),
+      'Users.subscribeAnalyticsPreference'
+    );
   }
 
   /** Mark the coloring walkthrough as seen. Verifies ownership. */

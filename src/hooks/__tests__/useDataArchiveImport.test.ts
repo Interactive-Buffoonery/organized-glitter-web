@@ -52,6 +52,7 @@ const v3 = {
   totalPartCount: 2,
   selectedLogicalItemCount: 2,
   createdItemCount: 1,
+  createdLibraryItemCount: 1,
   alreadyAppliedItemCount: 0,
   restoredAssetCount: 1,
   alreadyAppliedAssetCount: 0,
@@ -91,6 +92,7 @@ describe('useDataArchiveImport', () => {
     });
     expect(result.current.v3Result).toMatchObject({
       createdItemCount: 1,
+      createdLibraryItemCount: 1,
       success: false,
     });
     expect(m.invalidate).toHaveBeenCalledTimes(1);

@@ -16,7 +16,7 @@ describe('sanitizeAnalyticsPath', () => {
 
   it('strips query strings and hashes from analytics paths', () => {
     expect(sanitizeAnalyticsPath('/dashboard?token=secret#section')).toBe('/dashboard');
-    expect(sanitizeAnalyticsPath('/projects/abc123?tab=notes')).toBe('/projects/abc123');
+    expect(sanitizeAnalyticsPath('/projects/abc123?tab=notes')).toBe('/projects/:id');
   });
 
   it('redacts auth tokens before returning a clean path', () => {
@@ -27,6 +27,17 @@ describe('sanitizeAnalyticsPath', () => {
 
   it('keeps ordinary app paths intact', () => {
     expect(sanitizeAnalyticsPath('/dashboard')).toBe('/dashboard');
-    expect(sanitizeAnalyticsPath('/projects/abc123def456ghi')).toBe('/projects/abc123def456ghi');
+    expect(sanitizeAnalyticsPath('/projects/new')).toBe('/projects/new');
+  });
+
+  it.each([
+    ['/projects/private-project', '/projects/:id'],
+    ['/projects/private-project/edit', '/projects/:id/edit'],
+    ['/coloring/private-book', '/coloring/:id'],
+    ['/coloring/private-book/edit', '/coloring/:id/edit'],
+    ['/coloring/private-book/pages/private-page', '/coloring/:bookId/pages/:pageId'],
+    ['/coloring/new', '/coloring/new'],
+  ])('uses a route template for %s', (path, template) => {
+    expect(sanitizeAnalyticsPath(path)).toBe(template);
   });
 });

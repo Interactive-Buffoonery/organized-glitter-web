@@ -3,6 +3,28 @@ import type { CaptureResult } from 'posthog-js';
 import { sanitizeAnalyticsEvent } from '../sanitizeEvent';
 
 describe('sanitizeAnalyticsEvent', () => {
+  it('removes record IDs from SDK URLs, paths and person properties', () => {
+    const path = '/coloring/private-book/pages/private-page';
+    const url = `https://example.test${path}?q=private-search`;
+    const event: CaptureResult = {
+      uuid: 'event-id',
+      event: '$pageview',
+      properties: {
+        path,
+        $current_url: url,
+        $session_entry_url: url,
+        $referrer: 'https://example.test/projects/private-project/edit',
+        $set_once: { $initial_pathname: path },
+      },
+      $set: { $initial_current_url: url },
+    };
+
+    const result = sanitizeAnalyticsEvent(event);
+    expect(result.properties.path).toBe('/coloring/:bookId/pages/:pageId');
+    expect(result.properties.$referrer).toBe('https://example.test/projects/:id/edit');
+    expect(JSON.stringify(result)).not.toMatch(/private-(book|page|project|search)/);
+  });
+
   it.each(['confirm-password-reset', 'verify-email', 'confirm-email-change'])(
     'removes bearer tokens from the complete %s payload',
     route => {
@@ -32,6 +54,23 @@ describe('sanitizeAnalyticsEvent', () => {
       expect(event.properties.$pathname).toBe(path);
     }
   );
+
+  it('removes campaign query values from events and initial person properties', () => {
+    const event: CaptureResult = {
+      uuid: 'event-id',
+      event: '$pageview',
+      properties: {
+        utm_content: 'private-campaign',
+        count: 2,
+        $set: { $initial_utm_term: 'private-search' },
+      },
+      $set_once: { $initial_utm_source: 'private-source' },
+    };
+    const result = sanitizeAnalyticsEvent(event);
+    expect(result.properties).toEqual({ count: 2, $set: {} });
+    expect(result.$set_once).toEqual({});
+    expect(JSON.stringify(result)).not.toContain('private-');
+  });
 
   it('preserves ordinary properties and event metadata', () => {
     const timestamp = new Date('2026-10-03T00:00:00Z');

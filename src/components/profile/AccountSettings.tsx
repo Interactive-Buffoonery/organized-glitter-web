@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AnalyticsPreference } from '@/components/profile/AnalyticsPreference';
 import { SettingsSection } from '@/components/profile/SettingsSection';
 import { SignInMethods } from '@/components/profile/SignInMethods';
 import AvatarDisplay from '@/components/profile/AvatarDisplay';
@@ -316,6 +317,10 @@ const AccountSettings = ({
             </div>
           )}
         </div>
+      </SettingsSection>
+
+      <SettingsSection title="Privacy">
+        <AnalyticsPreference />
       </SettingsSection>
 
       <SettingsSection title="Danger zone" tone="danger" collapsible>

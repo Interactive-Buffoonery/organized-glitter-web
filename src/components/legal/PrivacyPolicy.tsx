@@ -88,7 +88,10 @@ export function PrivacyPolicy() {
             linked to your account ID. PostHog respects the Do Not Track browser setting. We do not
             use PostHog for advertising, session recording, or automatic click tracking. We only
             send specific product events we have chosen to measure, such as page views and feature
-            usage.
+            usage. We do not send your name, email address, craft titles, notes, or photos as
+            product analytics. You can turn off usage analytics and error reports in Account
+            settings under Privacy. This choice is saved to your account and applies across
+            signed-in devices.
           </p>
           <p className="text-foreground/90 leading-relaxed">
             <strong>Error Tracking.</strong> We collect technical information about errors (such as

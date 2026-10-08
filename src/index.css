@@ -263,6 +263,8 @@
  * SarahSignature). Real paper and washi tape don't recolor when a user
  * flips dark mode, so these tokens are defined once on :root and only
  * lightly softened under .dark to keep them comfortable in low light.
+ * The feature and signature cards override these roles locally with themed
+ * surface and ink tokens in scrapbook.css.
  *
  * The paper register stays paper in both themes: light keeps the blush
  * sheet, dark shifts to a warmer toasted cream against the navy stage.

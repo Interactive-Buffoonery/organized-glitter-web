@@ -49,7 +49,7 @@ const dispatchAppReady = () => {
 const createShellDom = () => {
   document.body.innerHTML = `
     <div id="root" style="opacity: 0;"></div>
-    <div id="app-loading">
+    <div id="app-loading" style="opacity: 1;">
       <div></div>
     </div>
     <div id="app-error" role="alert" aria-hidden="true">
@@ -66,7 +66,7 @@ const createShellDom = () => {
         </p>
       </div>
     </div>
-    <div id="slow-load-warning"></div>
+    <div id="slow-load-warning" style="display: none;"></div>
   `;
 };
 
@@ -176,6 +176,26 @@ describe('loading bootstrap script', () => {
     dispatchAppReady();
     expect(recovered).toHaveBeenCalledTimes(1);
     expect(recovered).toHaveBeenCalledWith('startup_timeout');
+  });
+
+  it('offers slow-start guidance at five seconds without marking private content ready', () => {
+    bootstrapLoadingScript();
+    vi.advanceTimersByTime(4999);
+    expect(document.getElementById('slow-load-warning')?.style.display).toBe('none');
+    vi.advanceTimersByTime(1);
+    expect(document.getElementById('slow-load-warning')?.style.display).toBe('block');
+    expect(document.getElementById('root')?.hasAttribute('inert')).toBe(true);
+    expect(document.getElementById('root')?.getAttribute('data-app-ready')).not.toBe('true');
+    vi.advanceTimersByTime(25300);
+    expect(document.getElementById('slow-load-warning')?.style.display).toBe('none');
+    expect(document.getElementById('app-error')?.style.display).toBe('flex');
+  });
+
+  it('does not add slow-start guidance after a completed startup', () => {
+    bootstrapLoadingScript();
+    dispatchAppReady();
+    vi.advanceTimersByTime(5500);
+    expect(document.getElementById('slow-load-warning')?.style.display).toBe('none');
   });
 
   it('makes the splash non-interactive immediately and removes it after fade completes', () => {

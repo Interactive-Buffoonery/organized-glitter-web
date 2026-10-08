@@ -107,7 +107,7 @@ const BottomNavigation = memo(() => {
     <>
       <nav
         aria-label="Bottom navigation"
-        className="border-border bg-background/90 fixed right-0 bottom-0 left-0 z-50 border-t backdrop-blur-md"
+        className="border-border bg-background/90 fixed right-0 bottom-0 left-0 z-50 border-t-[length:var(--bottom-nav-border-width)] backdrop-blur-md"
       >
         <div className="flex h-[var(--bottom-nav-content-height)] items-center justify-around px-2">
           {NAVIGATION_ITEMS.slice(0, 2).map(({ label, icon: Icon, path, ariaLabel }) => {

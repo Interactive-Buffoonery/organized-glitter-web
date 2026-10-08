@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Info, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -30,12 +30,31 @@ export function HostingNotice() {
   if (isDismissed) return null;
 
   return (
+    <HostingNoticeContent>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-touch"
+        aria-label="Close hosting notice"
+        onClick={dismiss}
+      >
+        <X aria-hidden="true" />
+      </Button>
+    </HostingNoticeContent>
+  );
+}
+
+export function HostingNoticeContent({ children }: { children?: ReactNode }) {
+  return (
     <section
       data-notice-id="weekend-hosting"
       aria-labelledby="hosting-notice-title"
       className="border-border bg-card text-foreground border-y"
     >
-      <div className="container mx-auto flex items-start gap-3 px-4 py-3 text-sm leading-relaxed">
+      <div
+        data-notice-content
+        className="container mx-auto flex items-start gap-3 px-4 py-3 text-sm leading-relaxed"
+      >
         <Info aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
         <div className="min-w-0 flex-1">
           <p id="hosting-notice-title" className="font-semibold">
@@ -50,15 +69,7 @@ export function HostingNotice() {
             </strong>
           </p>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-touch"
-          aria-label="Close hosting notice"
-          onClick={dismiss}
-        >
-          <X aria-hidden="true" />
-        </Button>
+        {children}
       </div>
     </section>
   );

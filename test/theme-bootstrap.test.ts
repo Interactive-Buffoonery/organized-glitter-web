@@ -45,7 +45,7 @@ const runBootstrap = (
 const resolvesDark = (script: string, stored: string | null, prefersDark: boolean): boolean =>
   runBootstrap(script, stored, prefersDark).isDark;
 
-describe.each(['index.html', 'about.html'])('%s theme bootstrap', file => {
+describe.each(['index.html', 'landing.html', 'about.html'])('%s theme bootstrap', file => {
   const script = readBootstrap(file);
 
   it('defaults first visits to System and honors explicit System', () => {

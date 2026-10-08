@@ -2,6 +2,7 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 import { waitForAccessibilityScanReady } from '../a11y/axe-test';
 import { assertLocalE2ETargets } from '../fixtures/local-safety';
+import { measureScreenshotPaint } from '../fixtures/screenshot-paint';
 
 const viewports = [
   { width: 320, height: 900, hasTouch: true },
@@ -16,57 +17,6 @@ const capture = async (page: Page, testInfo: TestInfo, name: string) => {
   await page.screenshot({ path, animations: 'disabled' });
   await testInfo.attach(name, { path, contentType: 'image/png' });
 };
-
-const largestPaintStep = async (page: Page, screenshot: Buffer) =>
-  page.evaluate(async base64 => {
-    const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
-    const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = bitmap.width;
-      canvas.height = bitmap.height;
-      const context = canvas.getContext('2d')!;
-      context.drawImage(bitmap, 0, 0);
-      const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
-      const stride = bitmap.width * 4;
-      let largestStep = 0;
-      for (let offset = stride; offset < pixels.length; offset += 4) {
-        for (let channel = 0; channel < 3; channel++) {
-          largestStep = Math.max(
-            largestStep,
-            Math.abs(pixels[offset + channel] - pixels[offset - stride + channel])
-          );
-        }
-      }
-      return largestStep;
-    } finally {
-      bitmap.close();
-    }
-  }, screenshot.toString('base64'));
-
-const largestPaintDifference = async (page: Page, first: Buffer, second: Buffer) =>
-  page.evaluate(
-    async images => {
-      const pixels = await Promise.all(
-        images.map(async base64 => {
-          const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
-          const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
-          const canvas = document.createElement('canvas');
-          canvas.width = bitmap.width;
-          canvas.height = bitmap.height;
-          const context = canvas.getContext('2d')!;
-          context.drawImage(bitmap, 0, 0);
-          bitmap.close();
-          return context.getImageData(0, 0, canvas.width, canvas.height).data;
-        })
-      );
-      return pixels[0].reduce(
-        (largest, value, index) => Math.max(largest, Math.abs(value - pixels[1][index])),
-        0
-      );
-    },
-    [first.toString('base64'), second.toString('base64')]
-  );
 
 const selectTheme = async (page: Page, label: string) => {
   await page.goto('/profile?tab=preferences');
@@ -183,16 +133,16 @@ for (const viewport of viewports) {
           const initialPaint = await page.screenshot({ clip, animations: 'disabled' });
           // A fixed layer can still contain a hard shade cutoff. Adjacent rows
           // should change smoothly throughout the unobstructed gutter.
-          expect(await largestPaintStep(page, initialPaint)).toBeLessThanOrEqual(3);
           await capture(page, testInfo, 'long-page-top');
           await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
           await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
           expect(await atmosphere.boundingBox()).toEqual(initialBounds);
           const scrolledPaint = await page.screenshot({ clip, animations: 'disabled' });
-          expect(await largestPaintStep(page, scrolledPaint)).toBeLessThanOrEqual(3);
-          expect(
-            await largestPaintDifference(page, initialPaint, scrolledPaint)
-          ).toBeLessThanOrEqual(1);
+          const paint = await measureScreenshotPaint(page, initialPaint, scrolledPaint);
+          expect(paint.firstLargestRowStep).toBeLessThanOrEqual(3);
+          expect(paint.secondLargestRowStep).toBeLessThanOrEqual(3);
+          // PNG decoding can vary by one channel value between browser engines.
+          expect(paint.largestDifference).toBeLessThanOrEqual(1);
           expect(
             await page.evaluate(() => document.documentElement.scrollWidth)
           ).toBeLessThanOrEqual(viewport.width);

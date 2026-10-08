@@ -46,6 +46,7 @@ export const browserSpecInventory = {
     'authenticated/protected-file-rotation-local.spec.ts',
     'authenticated/randomizer-flow.spec.ts',
     'authenticated/randomizer-interruption-local.spec.ts',
+    'authenticated/randomizer-single-project-local.spec.ts',
     'authenticated/react-doctor-fixes.spec.ts',
     'authenticated/route-mount.spec.ts',
     'authenticated/session-expiry-local.spec.ts',

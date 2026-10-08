@@ -6,6 +6,7 @@ import type PocketBase from 'pocketbase'
 import type { RecordService } from 'pocketbase'
 
 export const Collections = {
+	AccountDeletionJobs: "account_deletion_jobs",
 	Authorigins: "_authOrigins",
 	Externalauths: "_externalAuths",
 	Mfas: "_mfas",
@@ -195,12 +196,14 @@ export type AuthStepUpAttemptsRecord = {
 }
 
 export const AuthStepUpProofsActionOptions = {
+	"delete_account": "delete_account",
 	"link": "link",
 	"unlink": "unlink",
 } as const
 export type AuthStepUpProofsActionOptions = typeof AuthStepUpProofsActionOptions[keyof typeof AuthStepUpProofsActionOptions]
 
 export const AuthStepUpProofsTargetProviderOptions = {
+	"account": "account",
 	"apple": "apple",
 	"google": "google",
 	"discord": "discord",
@@ -635,7 +638,20 @@ export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSyste
 
 // Types containing all Records and Responses, useful for creating typing helper functions
 
+export type AccountDeletionJobsRecord = {
+	id: string
+	user_id: string
+	proof_hash: string
+	posthog_status: "pending" | "completed"
+	revenuecat_status: "pending" | "completed"
+	cleanup_completed?: IsoDateString
+	created?: IsoDateString
+	updated?: IsoDateString
+}
+export type AccountDeletionJobsResponse<Texpand = unknown> = Required<AccountDeletionJobsRecord> & BaseSystemFields<Texpand>
+
 export type CollectionRecords = {
+	account_deletion_jobs: AccountDeletionJobsRecord
 	_authOrigins: AuthoriginsRecord
 	_externalAuths: ExternalauthsRecord
 	_mfas: MfasRecord
@@ -670,6 +686,7 @@ export type CollectionRecords = {
 }
 
 export type CollectionResponses = {
+	account_deletion_jobs: AccountDeletionJobsResponse
 	_authOrigins: AuthoriginsResponse
 	_externalAuths: ExternalauthsResponse
 	_mfas: MfasResponse

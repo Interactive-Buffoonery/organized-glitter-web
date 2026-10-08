@@ -187,6 +187,7 @@ describe('loading bootstrap script', () => {
     expect(document.getElementById('root')?.hasAttribute('inert')).toBe(true);
     expect(document.getElementById('root')?.getAttribute('data-app-ready')).not.toBe('true');
     vi.advanceTimersByTime(25300);
+    expect(document.getElementById('slow-load-warning')?.style.display).toBe('none');
     expect(document.getElementById('app-error')?.style.display).toBe('flex');
   });
 

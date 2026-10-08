@@ -234,6 +234,7 @@ const showError = reason => {
 
   hasError = true;
   clearTimeout(slowLoadTimeout);
+  if (slowLoadWarning) slowLoadWarning.style.display = 'none';
 
   console.error('Showing bootstrap failure:', reason);
 

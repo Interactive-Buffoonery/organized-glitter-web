@@ -38,6 +38,7 @@ export const browserSpecInventory = {
     'authenticated/image-selection-local.spec.ts',
     'authenticated/import-export-local.spec.ts',
     'authenticated/int-1093-filter-validation.spec.ts',
+    'authenticated/layout-continuity.spec.ts',
     'authenticated/mobile-touch-targets.spec.ts',
     'authenticated/notes-feed-keyset-pagination.spec.ts',
     'authenticated/page-titles.spec.ts',

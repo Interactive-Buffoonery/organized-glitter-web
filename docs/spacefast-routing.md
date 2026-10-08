@@ -91,8 +91,8 @@ https://linear.app/interactive-buffoonery/issue/INT-1137/preserve-the-posthog-pr
 
 ## Automatic dev preview
 
-A successful CI run for a push to `dev` requests a build in the private ops
-repository. Ops builds the checked commit and publishes it to
+A separate workflow starts after a push to `dev`, waits for that commit's CI
+to pass, then requests a build in the private ops repository. Ops builds the checked commit and publishes it to
 `https://organized-glitter-dev.view.fast`. It checks the current `dev` SHA again
 before publishing. If a newer merge arrives, the older build cannot publish.
 The publish queue shares the existing release-preview lock.

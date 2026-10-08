@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..');
 const output = resolve(root, 'dist');
 
-if (!existsSync(resolve(output, 'index.html'))) {
+if (!existsSync(resolve(output, 'app.html'))) {
   throw new Error('Build the app before staging Spacefast files');
 }
 
@@ -16,7 +16,8 @@ mkdirSync(resolve(output, 'server'), { recursive: true });
 for (const file of ['app-route-policy.js', 'deployment-config.js']) {
   cpSync(resolve(root, 'server', file), resolve(output, 'server', file));
 }
-const shell = readFileSync(resolve(output, 'index.html'), 'utf8');
+const shell = readFileSync(resolve(output, 'app.html'), 'utf8');
+const landing = readFileSync(resolve(output, 'index.html'), 'utf8');
 const notFound = readFileSync(resolve(output, '404.html'), 'utf8');
 const headerRules = readFileSync(resolve(output, '_headers'), 'utf8');
 const securityHeaders = Object.fromEntries(
@@ -42,6 +43,6 @@ for (const name of [
 }
 writeFileSync(
   resolve(output, 'spacefast/app-pages.js'),
-  `export const APP_SHELL_HTML = ${JSON.stringify(shell)};\nexport const NOT_FOUND_HTML = ${JSON.stringify(notFound)};\nexport const HTML_SECURITY_HEADERS = ${JSON.stringify(securityHeaders)};\n`
+  `export const APP_SHELL_HTML = ${JSON.stringify(shell)};\nexport const LANDING_HTML = ${JSON.stringify(landing)};\nexport const NOT_FOUND_HTML = ${JSON.stringify(notFound)};\nexport const HTML_SECURITY_HEADERS = ${JSON.stringify(securityHeaders)};\n`
 );
 cpSync(resolve(root, 'spacefast/sf.jsonc'), resolve(output, 'sf.jsonc'));

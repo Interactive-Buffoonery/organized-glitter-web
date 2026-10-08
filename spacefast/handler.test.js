@@ -18,6 +18,17 @@ describe('Spacefast app routes', () => {
     expect(await response.text()).toContain('id="root"');
   });
 
+  it('serves the static landing, not the app shell, at the root', async () => {
+    const response = await handler.fetch(new Request('https://example.com/'), {});
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    expect(response.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate');
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
+    const body = await response.text();
+    expect(body).toContain('data-static-landing');
+    expect(body).not.toContain('id="root"');
+  });
+
   it('returns a useful HTML 404 for an unknown public path', async () => {
     const response = await handler.fetch(new Request('https://example.com/no-such-page-xyz'), {});
     expect(response.status).toBe(404);

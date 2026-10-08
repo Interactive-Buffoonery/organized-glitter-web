@@ -1,6 +1,11 @@
 import { proxyPosthog } from './posthog.js';
 import { isKnownAppRoute, isStaticFileRequest } from '../server/app-route-policy.js';
-import { APP_SHELL_HTML, HTML_SECURITY_HEADERS, NOT_FOUND_HTML } from './app-pages.js';
+import {
+  APP_SHELL_HTML,
+  HTML_SECURITY_HEADERS,
+  LANDING_HTML,
+  NOT_FOUND_HTML,
+} from './app-pages.js';
 
 const htmlHeaders = {
   'Content-Type': 'text/html; charset=utf-8',
@@ -18,7 +23,8 @@ export default {
     }
 
     if (isKnownAppRoute(url.pathname)) {
-      return new Response(request.method === 'HEAD' ? null : APP_SHELL_HTML, {
+      const html = url.pathname === '/' ? LANDING_HTML : APP_SHELL_HTML;
+      return new Response(request.method === 'HEAD' ? null : html, {
         headers: { ...htmlHeaders, 'Cache-Control': 'public, max-age=0, must-revalidate' },
       });
     }

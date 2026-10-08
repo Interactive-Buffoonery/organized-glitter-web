@@ -4,6 +4,7 @@ import {
   optionLabel,
 } from '@/constants/coloringBookMetadata';
 import { formatDateOnlyForDisplay } from '@/utils/date/timezoneUtils';
+import { countUnit } from '@/utils/countUnit';
 import type { ColoringBookCardData } from './coloringBookCardTypes';
 
 export const formatColoringCompletionPercent = (book: ColoringBookCardData): string =>
@@ -13,7 +14,7 @@ const getColoringCompletedPages = (book: ColoringBookCardData): number =>
   Math.max(0, Math.min(book.completedPages ?? 0, book.totalPages));
 
 export const getColoringProgressLabel = (book: ColoringBookCardData): string =>
-  `${getColoringCompletedPages(book)} of ${book.totalPages} pages`;
+  `${getColoringCompletedPages(book)} of ${book.totalPages} ${countUnit(book.totalPages, 'page')}`;
 
 export const getColoringPublisherLabel = (book: ColoringBookCardData): string =>
   book.publisherName || book.series || 'No publisher';

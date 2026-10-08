@@ -10,6 +10,39 @@ const book = {
 } as ColoringBookDTO;
 
 describe('ColoringBookPagesSection', () => {
+  it.each([
+    [1, '1 page'],
+    [2, '2 pages'],
+  ] as const)('uses the right unit for %s listed pages', (totalItems, expected) => {
+    renderWithProviders(
+      <ColoringBookPagesSection
+        book={book}
+        pages={
+          Array.from({ length: totalItems }, (_, index) => ({
+            id: `page-${index + 1}`,
+            pageNumber: index + 1,
+            bookId: 'book-123',
+            status: 'not_started',
+            photos: [],
+          })) as ColoringPageDTO[]
+        }
+        isLoading={false}
+        error={null}
+        hasLoadedData={true}
+        isFetching={false}
+        isRetrying={false}
+        onRetry={() => undefined}
+        page={1}
+        perPage={500}
+        totalItems={totalItems}
+        returnTo="/dashboard"
+        onPageChange={() => undefined}
+      />
+    );
+
+    expect(screen.getByText(expected, { exact: true })).toBeVisible();
+  });
+
   it('names batch controls with the configured page size', () => {
     renderWithProviders(
       <ColoringBookPagesSection

@@ -309,6 +309,45 @@ describe('Stats page', () => {
     expect(screen.getAllByText('Cumulative completed')).toHaveLength(2);
   });
 
+  it.each([
+    ['year', undefined],
+    ['year', 0],
+    ['year', 1],
+    ['year', 3],
+    ['all-time', undefined],
+    ['all-time', 0],
+    ['all-time', 1],
+    ['all-time', 3],
+  ] as const)('uses count-aware units in %s for %s completions', async (scope, count) => {
+    const user = userEvent.setup();
+    statsState.diamondSummary = query({
+      ...diamondSummary,
+      metrics: { ...diamondSummary.metrics, completedThisYear: scope === 'year' ? count : 12 },
+    });
+    statsState.coloringSummary = query({
+      ...coloringSummary,
+      metrics: {
+        ...coloringSummary.metrics,
+        completedPagesThisYear: scope === 'year' ? count : 12,
+      },
+    });
+    statsState.diamondYearly = query({ ...yearly, total: scope === 'all-time' ? count : 12 });
+    statsState.coloringYearly = query({ ...yearly, total: scope === 'all-time' ? count : 12 });
+    render(<Stats />);
+    if (scope === 'all-time') await user.click(screen.getByRole('button', { name: 'All time' }));
+
+    for (const [regionId, singular, plural] of [
+      ['diamond-stats-region', 'painting', 'paintings'],
+      ['coloring-stats-region', 'page', 'pages'],
+    ]) {
+      const region = document.getElementById(regionId)!.closest('section')!;
+      const unit = within(region).getByText(count === 1 ? singular : plural, { exact: true });
+      expect(unit.closest('p')).toHaveTextContent(
+        new RegExp(`^${count ?? 0}\\s*${count === 1 ? singular : plural}$`)
+      );
+    }
+  });
+
   it('renders hidden chart and top-list tables with exact values', () => {
     render(<Stats />);
 

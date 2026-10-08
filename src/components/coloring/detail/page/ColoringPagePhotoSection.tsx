@@ -100,7 +100,7 @@ export function ColoringPagePhotoSection({
             <PrivateFileImage
               src={leadPhotoUrl}
               alt={`Page ${page.pageNumber} lead artwork`}
-              className="mx-auto aspect-[3/4] max-h-[72vh] w-full max-w-3xl object-cover"
+              className="mx-auto aspect-[3/4] max-h-[72vh] w-full max-w-3xl object-contain"
             />
           ) : (
             <div className="feat-paper flex aspect-[3/4] max-h-[72vh] min-h-[24rem] w-full flex-col items-center justify-center gap-4 text-center">

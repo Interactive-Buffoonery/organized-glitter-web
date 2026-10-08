@@ -74,10 +74,7 @@ test.describe('private app startup', () => {
     }, testInfo) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
       const path = entry === 'reload' ? '/dashboard' : '/projects/localproject003';
-      if (entry === 'reload') {
-        await page.goto(path);
-        await expect(libraryPageHeading(page)).toBeVisible();
-      }
+      let holdChunk = false;
       let release!: () => void;
       let chunkHeld = false;
       const pending = new Promise<void>(resolve => {
@@ -86,10 +83,16 @@ test.describe('private app startup', () => {
       const chunk =
         entry === 'reload' ? /\/assets\/Dashboard-[^/]+\.js/ : /\/assets\/ProjectDetail-[^/]+\.js/;
       await page.route(chunk, async route => {
+        if (!holdChunk) return route.continue();
         chunkHeld = true;
         await pending;
         await route.continue();
       });
+      if (entry === 'reload') {
+        await page.goto(path);
+        await expect(libraryPageHeading(page)).toBeVisible();
+      }
+      holdChunk = true;
       try {
         if (entry === 'reload') await page.reload({ waitUntil: 'commit' });
         else await page.goto(path, { waitUntil: 'commit' });

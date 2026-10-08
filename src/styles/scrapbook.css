@@ -2,7 +2,8 @@
  * Scrapbook primitives for the home page marketing register.
  *
  * Colors come from the Paper register tokens in index.css. The paper and tape
- * surfaces intentionally keep their own identity across app themes.
+ * surfaces keep their material identity; the feature and signature cards
+ * adapt their surface and ink to the selected theme.
  */
 
 @layer components {
@@ -86,6 +87,19 @@
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.5),
       0 10px 28px hsl(324 17% 24% / 0.13);
+  }
+
+  .dark .features-sheet,
+  .dark .sig-panel {
+    --paper-bg: var(--card);
+    --paper-bg-warm: var(--card);
+    --paper-edge: var(--border);
+    --paper-fg: var(--card-foreground);
+    --paper-muted: var(--muted-foreground);
+    --signature-ink: var(--accent);
+    box-shadow:
+      inset 0 1px 0 hsl(var(--foreground) / 0.08),
+      0 10px 28px hsl(0 0% 0% / 0.2);
   }
 
   .tape {
@@ -410,6 +424,7 @@
   }
 
   .sig-panel {
+    --signature-ink: 270 65% 45%;
     position: relative;
     display: flex;
     align-items: center;
@@ -449,7 +464,7 @@
     border: 3px solid hsl(var(--paper-bg-warm));
     border-radius: 50%;
     background: hsl(var(--primary) / 0.18);
-    color: hsl(270 65% 45%);
+    color: hsl(var(--signature-ink));
     font-family: var(--font-handwritten);
     font-size: 26px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
@@ -457,7 +472,7 @@
 
   .sig-name {
     margin-bottom: 4px;
-    color: hsl(270 65% 45%);
+    color: hsl(var(--signature-ink));
     font-family: var(--font-handwritten);
     font-size: 24px;
     font-weight: 600;
@@ -476,7 +491,7 @@
     gap: 4px;
     min-height: 44px;
     padding: 8px 0;
-    color: hsl(270 65% 45%);
+    color: hsl(var(--signature-ink));
     font-size: 14px;
     font-weight: 600;
     text-decoration: none;

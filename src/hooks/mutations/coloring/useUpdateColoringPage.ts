@@ -14,8 +14,6 @@ import {
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import { getColoringPageAnalyticsProperties } from '@/services/coloring-analytics';
-import { trackGrowthFunnelMilestone } from '@/services/growth-funnel-analytics';
-import { useAuth } from '@/hooks/useAuth';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { getCurrentDateInUserTimezone } from '@/utils/date/timezoneUtils';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
@@ -47,7 +45,6 @@ interface UpdateColoringPageVariables {
 export function useUpdateColoringPage() {
   const queryClient = useQueryClient();
   const userTimezone = useUserTimezone();
-  const { user } = useAuth();
   return useMutation<ColoringPageDTO, Error, UpdateColoringPageVariables, Context>({
     mutationFn: ({ pageId, command }) => {
       const currentPage = getCachedColoringPage(queryClient, pageId);
@@ -96,17 +93,6 @@ export function useUpdateColoringPage() {
               photo_delta: delta,
             })
           );
-          trackGrowthFunnelMilestone({
-            userId: user?.id,
-            event: AnalyticsEvent.FIRST_PHOTO_ADDED,
-            properties: {
-              craft: 'coloring',
-              entity_type: 'coloring_page_photo',
-              source_surface: 'coloring_page_detail',
-              photo_delta: delta,
-            },
-            activationSignal: 'photo_added',
-          });
         } else if (delta < 0) {
           capture(
             AnalyticsEvent.COLORING_PAGE_PHOTO_DELETED,

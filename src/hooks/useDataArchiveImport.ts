@@ -30,19 +30,18 @@ const logger = createLogger('useDataArchiveImport');
 
 function legacyProperties(result: ArchiveImportResult) {
   const successful =
-    result.createdProjectCount +
-    result.createdColoringBookCount +
-    result.createdProgressNoteCount +
-    result.matchedExistingRecordCount;
+    result.createdProjectCount + result.createdColoringBookCount + result.createdProgressNoteCount;
   return {
     source: 'archive' as const,
     status: getImportExportStatus({
       success: result.success,
-      records: successful,
+      records: successful + result.matchedExistingRecordCount,
       errors: result.errors.length,
       warnings: result.warnings.length,
     }),
     records: successful,
+    existing_records: result.matchedExistingRecordCount,
+    created_library_items: result.createdProjectCount + result.createdColoringBookCount,
     errors: result.errors.length,
     skipped: result.skippedRecordCount,
     warnings: result.warnings.length,
@@ -169,8 +168,10 @@ export function useDataArchiveImport() {
                     errors: v3!.errors.length + v3!.conflicts.length,
                     warnings: v3!.missingPartNumbers.length,
                   }),
-                  records:
-                    v3!.createdItemCount + v3!.scaffoldedItemCount + v3!.alreadyAppliedItemCount,
+                  records: v3!.createdItemCount,
+                  created_library_items: v3!.createdLibraryItemCount,
+                  existing_records: v3!.alreadyAppliedItemCount,
+                  prepared_records: v3!.scaffoldedItemCount,
                   errors: v3!.errors.length + v3!.conflicts.length,
                   skipped: 0,
                   warnings: v3!.missingPartNumbers.length,

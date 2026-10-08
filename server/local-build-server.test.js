@@ -62,6 +62,7 @@ function request(port, path, options = {}) {
       res => {
         const chunks = [];
 
+        res.on('error', reject);
         res.on('data', chunk => chunks.push(chunk));
         res.on('end', () => {
           resolve({
@@ -1044,6 +1045,47 @@ describe('Local build server PostHog proxy', () => {
       })
     );
     expect(console.error).not.toHaveBeenCalledWith('Local build server error:', expect.anything());
+  });
+
+  it.each(['GET', 'POST'])('bounds a stalled upstream %s request', async method => {
+    vi.stubEnv('GLIMMER_PROXY_REQUEST_TIMEOUT_MS', '30');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
+      if (options.body) {
+        for await (const _chunk of options.body) {
+          /* Drain the upload. */
+        }
+      }
+      return new Promise((_, reject) => {
+        options.signal.addEventListener('abort', () => reject(options.signal.reason), {
+          once: true,
+        });
+      });
+    });
+    server = http.createServer(createLocalBuildRequestHandler());
+    const port = await listen(server);
+    const response = await request(port, '/glimmer/capture/', {
+      method,
+      body: method === 'POST' ? '{}' : undefined,
+    });
+    expect(response.statusCode).toBe(204);
+    expect(console.warn).toHaveBeenCalledWith(
+      'PostHog proxy request failed:',
+      expect.objectContaining({ error: 'PostHog upstream request timed out' })
+    );
+  });
+
+  it('bounds a stalled upstream response stream', async () => {
+    vi.stubEnv('GLIMMER_PROXY_REQUEST_TIMEOUT_MS', '30');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new ReadableStream({ start() {} }))
+    );
+    server = http.createServer(createLocalBuildRequestHandler());
+    const port = await listen(server);
+    await expect(request(port, '/glimmer/static/array.js')).rejects.toThrow();
+    expect(console.warn).toHaveBeenCalledWith(
+      'PostHog proxy response stream failed:',
+      expect.objectContaining({ error: 'PostHog upstream request timed out' })
+    );
   });
 
   it('returns 413 for declared oversized glimmer bodies without calling fetch', async () => {

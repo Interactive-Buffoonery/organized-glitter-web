@@ -1,6 +1,6 @@
+import { captureAccountAnalyticsEvent } from '@/services/analytics-preference';
 import { notify } from '@/lib/notifications';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { usePostHog } from '@posthog/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
@@ -26,7 +26,6 @@ const Login = () => {
   const [verificationEmail, setVerificationEmail] = useState<string | undefined>();
   const navigate = useNavigate();
   const location = useLocation();
-  const posthog = usePostHog();
   const { isAuthenticated, isLoading, initialCheckComplete } = useAuth();
   const redirectTo = resolveAuthRedirectDestination(location.state);
   const authRedirectState = extractAuthRedirectState(location.state);
@@ -103,7 +102,7 @@ const Login = () => {
       }
 
       loginLogger.debug('Login successful, preparing navigation');
-      posthog.capture(
+      captureAccountAnalyticsEvent(
         AnalyticsEvent.AUTH_LOGIN_SUCCEEDED,
         getAuthSuccessAnalyticsProperties({
           method: 'password',
@@ -160,7 +159,7 @@ const Login = () => {
       }
 
       loginLogger.debug('OAuth login successful', { provider });
-      posthog.capture(
+      captureAccountAnalyticsEvent(
         AnalyticsEvent.AUTH_LOGIN_SUCCEEDED,
         getAuthSuccessAnalyticsProperties({
           method: 'oauth',

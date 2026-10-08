@@ -1,4 +1,4 @@
-import { sanitizeSensitivePath } from '@/utils/auth/sensitivePath';
+import { sanitizeAnalyticsPath } from '@/utils/analytics/sanitizePath';
 
 /**
  * Diagnostic context for captured exceptions.
@@ -51,7 +51,7 @@ export const buildExceptionContext = (
 
     if (typeof window !== 'undefined' && window.location) {
       // Path and host only. Sensitive path segments are redacted as well.
-      context.route = sanitizeSensitivePath(window.location.pathname);
+      context.route = sanitizeAnalyticsPath(window.location.pathname);
       context.host = window.location.host;
     }
 

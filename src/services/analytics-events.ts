@@ -29,7 +29,6 @@ export const AnalyticsEvent = {
 
   // Randomizer
   RANDOMIZER_SPIN: 'randomizer_spin',
-  RANDOMIZER_FIRST_SPIN: 'randomizer_first_spin',
 
   // Session context
   SESSION_CONTEXT: 'session_context',
@@ -47,11 +46,6 @@ export const AnalyticsEvent = {
   AUTH_REGISTRATION_SUCCEEDED: 'auth_registration_succeeded',
 
   // Growth funnel
-  FIRST_PROJECT_CREATED: 'first_project_created',
-  FIRST_COLORING_BOOK_CREATED: 'first_coloring_book_created',
-  FIRST_PROGRESS_NOTE_ADDED: 'first_progress_note_added',
-  FIRST_PHOTO_ADDED: 'first_photo_added',
-  ACTIVATION_COMPLETED: 'activation_completed',
 
   // Dashboard
   DASHBOARD_SORT_CHANGED: 'dashboard_sort_changed',

@@ -294,6 +294,9 @@ const assertUpgradeSentinel = async (url, token) => {
   if (sentinel.email !== 'upgrade-sentinel@example.test') {
     throw new Error('PocketBase migration did not preserve the prior-schema sentinel user.');
   }
+  if (sentinel.analytics_opt_out !== false) {
+    throw new Error('Upgraded accounts must default to analytics enabled.');
+  }
 };
 
 const readCanonicalCollections = async (url, token) => {

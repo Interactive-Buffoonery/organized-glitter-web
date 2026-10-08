@@ -63,6 +63,41 @@ describe('bootstrap-analytics beacon helper', () => {
     vi.restoreAllMocks();
   });
 
+  it.each(['captureBootstrapFailureShown', 'captureBootstrapRecovery'] as const)(
+    'respects browser opt-out for %s',
+    method => {
+      const api = loadAnalytics();
+      const sendBeacon = vi.fn();
+      expect(
+        api[method]('startup_timeout', {
+          config: { key: 'phc_test', host: '/glimmer' },
+          storage: { getItem: (key: string) => (key === 'og:analytics:enabled' ? 'false' : null) },
+          sendBeacon,
+        })
+      ).toBe(false);
+      expect(sendBeacon).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['pocketbase_auth', 'blocked storage'])('suppresses early beacons for %s', key => {
+    const api = loadAnalytics();
+    const sendBeacon = vi.fn();
+    const storage = {
+      getItem: (name: string) => {
+        if (key === 'blocked storage') throw new Error('blocked');
+        return name === key ? 'saved-session' : null;
+      },
+    };
+    expect(
+      api.captureBootstrapFailureShown('startup_timeout', {
+        config: { key: 'phc_test', host: '/glimmer' },
+        storage,
+        sendBeacon,
+      })
+    ).toBe(false);
+    expect(sendBeacon).not.toHaveBeenCalled();
+  });
+
   it('allows only the registered low-cardinality reasons', () => {
     const api = loadAnalytics();
     expect(api.isAllowedReason('module_resource')).toBe(true);
@@ -146,7 +181,7 @@ describe('bootstrap-analytics beacon helper', () => {
     const sendBeacon = vi.fn(() => false);
     const fetchFn = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
     const storage = {
-      getItem: vi.fn(() => 'existing-anon'),
+      getItem: vi.fn((key: string) => (key === 'og_bootstrap_anon_id' ? 'existing-anon' : null)),
       setItem: vi.fn(),
     };
 

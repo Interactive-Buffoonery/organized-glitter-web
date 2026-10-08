@@ -1,8 +1,6 @@
 import type {
   ColoringBookDTO,
   ColoringPageDTO,
-  CreateColoringBookInput,
-  UpdateColoringBookInput,
   UpdateColoringPageInput,
 } from '@/services/pocketbase/coloring.service';
 
@@ -34,31 +32,24 @@ export const getSearchAnalyticsProperties = (
 });
 
 export const getColoringBookAnalyticsProperties = (
-  book: ColoringBookDTO | CreateColoringBookInput | UpdateColoringBookInput,
+  book: ColoringBookDTO,
   properties: AnalyticsProperties = {}
 ): AnalyticsProperties => {
-  const dto = book as ColoringBookDTO;
-  const input = book as CreateColoringBookInput;
-  const totalPages = dto.totalPages ?? input.total_pages;
-  const coverImage = dto.coverImage ?? input.cover_image;
-  const publisher = dto.publisherId ?? input.publisher;
-  const illustrator = dto.illustratorId ?? input.illustrator;
-  const notes = dto.notes ?? input.notes ?? '';
-  const tags = dto.tags ?? [];
+  const notes = book.notes ?? '';
 
   return {
     craft: 'coloring',
-    status: dto.status ?? input.status,
-    total_pages_bucket: pageCountBucket(totalPages),
-    has_cover_image: Boolean(coverImage),
-    has_publisher: Boolean(publisher),
-    has_illustrator: Boolean(illustrator),
-    has_series: Boolean(dto.series ?? input.series),
-    has_theme: Boolean(dto.theme ?? input.theme),
+    status: book.status,
+    total_pages_bucket: pageCountBucket(book.totalPages),
+    has_cover_image: Boolean(book.coverImage),
+    has_publisher: Boolean(book.publisherId),
+    has_illustrator: Boolean(book.illustratorId),
+    has_series: Boolean(book.series),
+    has_theme: Boolean(book.theme),
     has_notes: notes.trim().length > 0,
     note_length_bucket: lengthBucket(notes.trim().length),
-    is_mystery: Boolean(dto.isMystery ?? input.is_mystery),
-    tag_count: tags.length,
+    is_mystery: Boolean(book.isMystery),
+    tag_count: book.tags?.length ?? 0,
     ...properties,
   };
 };

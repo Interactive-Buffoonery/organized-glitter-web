@@ -116,8 +116,6 @@ export const ProjectContentErrorBoundary: React.FC<ProjectContentErrorBoundaryPr
       }
       errorContext={{
         component: 'ProjectContent',
-        projectId,
-        location: window.location.pathname,
       }}
       fallback={({ resetErrorBoundary, errorId }) => (
         <div className="border-border bg-muted/50 mx-auto max-w-2xl rounded-lg border p-6 shadow-sm">
@@ -216,9 +214,6 @@ export const ImageErrorBoundary: React.FC<ImageErrorBoundaryProps> = ({
       }
       errorContext={{
         component: 'Image',
-        alt,
-        originalUrl: activeUrl,
-        location: window.location.pathname,
       }}
       fallback={({ resetErrorBoundary }) => (
         <div className={`group relative ${className}`}>
@@ -282,7 +277,6 @@ export const OverviewErrorBoundary: React.FC<OverviewErrorBoundaryProps> = ({
       errorContext={{
         component: 'Overview',
         hasInfrastructureError,
-        location: window.location.pathname,
       }}
       fallback={({ resetErrorBoundary, errorId, errorTime }) => (
         <div className="container mx-auto px-4 py-8">

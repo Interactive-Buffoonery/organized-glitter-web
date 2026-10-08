@@ -476,7 +476,7 @@ export function LeadCompletionChart({
             <span
               key={point.key}
               className={cn(
-                'absolute top-0 -translate-x-1/2 whitespace-normal',
+                'absolute top-0 -translate-x-1/2 whitespace-nowrap',
                 scope.kind === 'year' && index % 2 === 1 && 'max-[540px]:hidden'
               )}
               style={{ left: `${leftPercent}%` }}

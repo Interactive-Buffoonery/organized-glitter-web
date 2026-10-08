@@ -75,8 +75,10 @@ onRecordAuthWithOAuth2Request(e => {
   } else if (isStepUpRequest) {
     if (
       !/^[A-Za-z0-9_-]{43}$/.test(stepUpProof) ||
-      (stepUpAction !== 'link' && stepUpAction !== 'unlink') ||
-      supportedProviders.indexOf(stepUpTargetProvider) === -1 ||
+      !['link', 'unlink', 'delete_account'].includes(stepUpAction) ||
+      (stepUpAction === 'delete_account'
+        ? stepUpTargetProvider !== 'account'
+        : supportedProviders.indexOf(stepUpTargetProvider) === -1) ||
       !/^[a-z0-9]{15}$/.test(stepUpUserId) ||
       !isSupportedProvider ||
       !e.record ||
@@ -172,8 +174,10 @@ routerAdd(
       typeof body.targetProvider === 'string' ? body.targetProvider.toLowerCase() : '';
 
     if (
-      (action !== 'link' && action !== 'unlink') ||
-      ['apple', 'google', 'discord'].indexOf(targetProvider) === -1 ||
+      !['link', 'unlink', 'delete_account'].includes(action) ||
+      (action === 'delete_account'
+        ? targetProvider !== 'account'
+        : ['apple', 'google', 'discord'].indexOf(targetProvider) === -1) ||
       !/^[A-Za-z0-9_-]{43}$/.test(proofValue) ||
       password === ''
     ) {

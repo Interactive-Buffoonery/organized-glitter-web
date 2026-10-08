@@ -13,8 +13,31 @@ post 404s; it must not fall through to the React app shell or the service
 worker's navigation fallback. See the [website configuration](./official-deployment.md) for
 build commands, MailPoet checks, and the separate production cutover.
 
+## Static landing and app shell
+
+The build writes two HTML documents for the root app:
+
+- `dist/index.html` is the static landing for `/`. `landing.html` supplies
+  its head, and `scripts/static-pages.mjs` renders
+  `src/components/marketing/StaticPages.tsx` into it. It loads the app
+  stylesheet but no app JavaScript, so it stays usable when bundles fail.
+- `dist/privacy.html` and `dist/terms.html` render the shared policy
+  components from `src/components/legal` the same way. The in-app Privacy
+  and Terms routes use those components too, so the copy lives in one place.
+  Each static page inlines `src/styles/static-critical.css` ahead of the app
+  stylesheet so it stays readable if that stylesheet fails.
+- `dist/app.html` is the SPA shell built from `index.html`. Known app routes
+  such as `/login`, `/register`, `/overview`, and deep links receive it.
+
+Every host must follow that split. The local build server serves `app.html`
+for app routes. The Spacefast Function embeds both documents and answers `/`
+with the landing. The service worker falls back to `app.html` and leaves `/`
+to the precached landing. Returning members use Login, which forwards an
+existing session to `/overview`. `pnpm dev` still serves the SPA at `/`,
+`/privacy`, and `/terms`.
+
 Run `pnpm spacefast:stage` after building. It copies the Function and shared
-route policy into `dist` and embeds the built app shell, 404 page, and HTML
+route policy into `dist` and embeds the built app shell, landing, 404 page, and HTML
 security headers in the Function bundle. `server/app-route-policy.test.js`
 checks that the server policy stays aligned with the React route definitions.
 The app's HTML responses declare `frame-ancestors 'none'` and
@@ -23,7 +46,7 @@ Unknown public paths receive the dedicated HTML 404 page. Missing static
 files and unknown API paths keep HTTP 404 responses.
 
 The existing `organized-glitter-preview` space has an older SPA fallback to
-`/index.html`. Verify on a staged, unpromoted version that this space setting
+`/index.html`, which now serves the static landing. Verify on a staged, unpromoted version that this space setting
 does not intercept unknown routes before the Function. Remove the fallback on
 the production space before cutover if it would turn unknown paths into 200s.
 

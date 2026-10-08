@@ -25,6 +25,19 @@ not require E2E repository secrets.
 This local server does not run Spacefast Functions. Use
 `pnpm test:e2e:spacefast` against the hosted preview to verify Spacefast behavior.
 
+For built-artifact cold-load recovery without accounts or a backend process:
+
+```bash
+pnpm exec playwright test --config playwright.cold-load.config.ts
+```
+
+This dedicated Chromium and mobile WebKit suite injects resource 429s and 404s
+in fresh contexts with service workers and HTTP caching disabled. It checks
+bounded recovery, Retry-After, static public content, and protected-route
+delivery. See [Cold-load regression tests](./testing-cold-load.md) for its
+integration contract, local port override, and artifacts. It runs separately
+from the normal public project and disposable PocketBase smoke inventory.
+
 The smoke inventory covers public startup and login accessibility, real UI
 login, project create and edit persistence, coloring book creation through the
 UI and generated page editing, archive recovery, the notes timeline, structural

@@ -204,18 +204,20 @@ function WheelSegment({
         strokeDasharray={index % 2 === 0 ? '5,5' : 'none'}
         opacity="0.18"
       />
-      <WheelSegmentLabel
-        labelLines={labelLines}
-        textColor={textColor}
-        outlineColor={outlineColor}
-        outlineOpacity={outlineOpacity}
-        textProps={textProps}
-        textX={textX}
-        textY={textY}
-        textRotation={textRotation}
-        lineHeight={lineHeight}
-        firstLineOffset={firstLineOffset}
-      />
+      {segmentAngle !== 360 && (
+        <WheelSegmentLabel
+          labelLines={labelLines}
+          textColor={textColor}
+          outlineColor={outlineColor}
+          outlineOpacity={outlineOpacity}
+          textProps={textProps}
+          textX={textX}
+          textY={textY}
+          textRotation={textRotation}
+          lineHeight={lineHeight}
+          firstLineOffset={firstLineOffset}
+        />
+      )}
     </g>
   );
 }
@@ -348,6 +350,16 @@ export function WheelGraphic({
           ))}
         </svg>
       </div>
+      {targets.length === 1 && (
+        <div
+          data-testid="randomizer-single-target"
+          aria-hidden="true"
+          className="border-border bg-card pointer-events-none absolute inset-[12.5%] flex flex-col items-center justify-center gap-2 rounded-full border px-5 text-center"
+        >
+          <p className="text-accent text-6xl leading-none font-semibold tabular-nums">1</p>
+          <p className="text-muted-foreground text-sm">1 item selected</p>
+        </div>
+      )}
     </>
   );
 }

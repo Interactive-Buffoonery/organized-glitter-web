@@ -8,8 +8,6 @@ import { cacheCreatedColoringBook } from '@/hooks/mutations/coloring/coloringMut
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import { getColoringBookAnalyticsProperties } from '@/services/coloring-analytics';
-import { trackGrowthFunnelMilestone } from '@/services/growth-funnel-analytics';
-import { useAuth } from '@/hooks/useAuth';
 import { createLogger } from '@/utils/logger';
 import { runPostWriteEffect } from '@/hooks/mutations/runPostWriteEffect';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
@@ -24,7 +22,6 @@ export interface CreateColoringBookVariables {
 
 export function useCreateColoringBook() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   return useMutation<SaveBookWithTagsResult, Error, CreateColoringBookVariables>({
     mutationFn: ({ input, tagIds, onConfirmedSave }) =>
       onConfirmedSave
@@ -41,20 +38,6 @@ export function useCreateColoringBook() {
           AnalyticsEvent.COLORING_BOOK_CREATED,
           getColoringBookAnalyticsProperties(book, { surface: 'new_coloring_book' })
         );
-      });
-      runPostWriteEffect(logger, 'Coloring book growth analytics failed after creation', () => {
-        trackGrowthFunnelMilestone({
-          userId: user?.id ?? book.userId,
-          event: AnalyticsEvent.FIRST_COLORING_BOOK_CREATED,
-          properties: {
-            craft: 'coloring',
-            entity_type: 'coloring_book',
-            source_surface: 'new_coloring_book',
-            total_pages_bucket: getColoringBookAnalyticsProperties(book).total_pages_bucket,
-            is_mystery: book.isMystery,
-          },
-          activationSignal: 'item_created',
-        });
       });
     },
   });

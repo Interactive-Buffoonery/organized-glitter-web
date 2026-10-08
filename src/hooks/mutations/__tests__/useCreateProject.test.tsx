@@ -95,7 +95,7 @@ describe('useCreateProject', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockAddTagToProject).toHaveBeenCalledTimes(2);
     expect(mockCapture).toHaveBeenCalledWith(
-      'first_project_created',
+      'project_created',
       expect.objectContaining({
         craft: 'diamond',
         entity_type: 'project',

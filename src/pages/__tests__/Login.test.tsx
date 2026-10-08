@@ -39,6 +39,10 @@ const {
   authFormPropsMock: vi.fn(),
 }));
 
+vi.mock('@/services/analytics-preference', () => ({
+  captureAccountAnalyticsEvent: posthogCaptureMock,
+}));
+
 const authState = {
   isAuthenticated: false,
   isLoading: false,

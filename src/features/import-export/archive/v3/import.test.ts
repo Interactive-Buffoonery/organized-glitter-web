@@ -355,7 +355,34 @@ describe('v3 archive restore accounting', () => {
 
     expect(result.selectedLogicalItemCount).toBe(1);
     expect(result.createdItemCount).toBe(1);
+    expect(result.createdLibraryItemCount).toBe(1);
     expect(result.alreadyAppliedItemCount).toBe(1);
+  });
+
+  it('excludes assets and prepared parents from new library item counts', async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const item = assetItem(bytes);
+    const file = await archivePart({
+      partNumber: 1,
+      partCount: 1,
+      items: [item],
+      assetBytes: bytes,
+    });
+    const restoreItem = vi.fn().mockResolvedValue({
+      outcome: 'created',
+      itemId: item.itemId,
+      targetRecordId: 'asset-target',
+      scaffoldedParentCount: 2,
+      assetOutcomes: [],
+    });
+    const result = await importArchiveV3Parts([file], {
+      capabilities,
+      adapter: { restoreItem },
+      session: session(),
+    });
+    expect(result.createdItemCount).toBe(1);
+    expect(result.scaffoldedItemCount).toBe(2);
+    expect(result.createdLibraryItemCount).toBe(0);
   });
 
   it('counts parent scaffolds created by a child restore response', async () => {

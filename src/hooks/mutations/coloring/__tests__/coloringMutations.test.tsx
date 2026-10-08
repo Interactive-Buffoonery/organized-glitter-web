@@ -183,16 +183,7 @@ describe('coloring mutation hooks', () => {
         has_notes: false,
       })
     );
-    expect(captureMock).toHaveBeenCalledWith(
-      'first_coloring_book_created',
-      expect.objectContaining({
-        craft: 'coloring',
-        entity_type: 'coloring_book',
-        source_surface: 'new_coloring_book',
-        total_pages_bucket: '1-25',
-        is_mystery: false,
-      })
-    );
+    expect(captureMock.mock.calls.some(([event]) => event.startsWith('first_'))).toBe(false);
   });
 
   it('refreshes every cached coloring Stats projection after creating a book', async () => {
@@ -750,15 +741,7 @@ describe('coloring mutation hooks', () => {
         photo_delta: 1,
       })
     );
-    expect(captureMock).toHaveBeenCalledWith(
-      'first_photo_added',
-      expect.objectContaining({
-        craft: 'coloring',
-        entity_type: 'coloring_page_photo',
-        source_surface: 'coloring_page_detail',
-        photo_delta: 1,
-      })
-    );
+    expect(captureMock.mock.calls.some(([event]) => event.startsWith('first_'))).toBe(false);
   });
 
   it('sets the main photo through the server-side reorder command', async () => {
@@ -824,9 +807,8 @@ describe('coloring mutation hooks', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.notesFeed.all,
     });
-    expect(captureMock).toHaveBeenCalledWith('coloring_page_progress_note_added');
     expect(captureMock).toHaveBeenCalledWith(
-      'first_progress_note_added',
+      'coloring_page_progress_note_added',
       expect.objectContaining({
         craft: 'coloring',
         entity_type: 'coloring_page_progress_note',

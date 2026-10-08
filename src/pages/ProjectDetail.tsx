@@ -32,6 +32,7 @@
 
 import { sessionDraftKeys } from '@/services/auth/sessionDraftKeys';
 import { useState } from 'react';
+import { usePostHog } from '@posthog/react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
@@ -56,7 +57,6 @@ import {
 } from '@/hooks/mutations/useProjectDetailMutations';
 import { useUpdateProjectStatus } from '@/hooks/mutations/useUpdateProjectStatus';
 import { notify } from '@/lib/notifications';
-import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
 
 /**
@@ -76,6 +76,7 @@ import { AnalyticsEvent } from '@/services/analytics-events';
  * @returns JSX.Element The complete project detail page
  */
 const ProjectDetail = () => {
+  const posthog = usePostHog();
   useAppReady();
   const { id } = useParams<{ id: string }>();
   const projectId = id || '';
@@ -134,7 +135,7 @@ const ProjectDetail = () => {
         nextStatus: newStatus,
         currentStatus: project.status,
       });
-      capture(AnalyticsEvent.PROJECT_STATUS_CHANGED, { new_status: newStatus });
+      posthog.capture(AnalyticsEvent.PROJECT_STATUS_CHANGED, { new_status: newStatus });
       notify({
         kind: 'info',
         title: 'Status Updated',
@@ -161,7 +162,7 @@ const ProjectDetail = () => {
 
     try {
       await archiveProjectMutation.mutateAsync({ projectId });
-      capture(AnalyticsEvent.PROJECT_ARCHIVED);
+      posthog.capture(AnalyticsEvent.PROJECT_ARCHIVED);
       notify({
         kind: 'info',
         title: 'Project Archived',
@@ -184,7 +185,7 @@ const ProjectDetail = () => {
 
     try {
       await deleteProjectMutation.mutateAsync({ projectId, title: project?.title });
-      capture(AnalyticsEvent.PROJECT_DELETED);
+      posthog.capture(AnalyticsEvent.PROJECT_DELETED);
       notify({
         kind: 'info',
         title: 'Project Deleted',

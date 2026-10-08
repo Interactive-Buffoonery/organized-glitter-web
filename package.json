@@ -35,8 +35,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "sh -c 'export VITE_APP_VERSION=${VITE_APP_VERSION:-local-build}; vite build' && node scripts/build-blog.mjs",
-    "build:with-sitemap": "sh -c 'export VITE_APP_VERSION=${VITE_APP_VERSION:-local-build}; vite build' && node scripts/build-blog.mjs",
+    "build": "sh -c 'export VITE_APP_VERSION=${VITE_APP_VERSION:-local-build}; vite build && node scripts/upload-sourcemaps.mjs' && node scripts/build-blog.mjs",
+    "build:with-sitemap": "sh -c 'export VITE_APP_VERSION=${VITE_APP_VERSION:-local-build}; vite build && node scripts/upload-sourcemaps.mjs' && node scripts/build-blog.mjs",
     "build:budget": "node scripts/bundle-budget.mjs",
     "spacefast:stage": "node scripts/stage-spacefast.mjs",
     "start": "node server/local-build-server.js",

@@ -111,6 +111,26 @@ try {
     passwordConfirm: password,
     verified: true,
   });
+  assert.equal(user.analytics_opt_out, false, 'New accounts default to analytics enabled');
+  const owner = new PocketBase(url);
+  await owner.collection('users').authWithPassword(user.email, password);
+  const optedOut = await owner.collection('users').update(user.id, { analytics_opt_out: true });
+  assert.equal(optedOut.analytics_opt_out, true);
+  const secondDevice = new PocketBase(url);
+  await secondDevice.collection('users').authWithPassword(user.email, password);
+  assert.equal(secondDevice.authStore.record.analytics_opt_out, true);
+  const otherAccount = new PocketBase(url);
+  await otherAccount.collection('users').authWithPassword(other.email, password);
+  await assert.rejects(
+    otherAccount.collection('users').update(user.id, { analytics_opt_out: false }),
+    error => error.status === 404 || error.status === 403
+  );
+  await owner.collection('users').update(user.id, { analytics_opt_out: false });
+  const refreshed = await secondDevice.collection('users').authRefresh();
+  assert.equal(refreshed.record.analytics_opt_out, false);
+  console.log(
+    'Account analytics preference: default, save, second-device refresh and ownership checks passed.'
+  );
   await assert.rejects(seedExampleLibrary(admin, other.id), /another local user/);
   console.log(
     'Local PocketBase example library: six projects, four books, 29 pages, eleven page images; repeat seeding and ownership checks passed.'

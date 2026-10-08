@@ -18,8 +18,8 @@ type AnalyticsEventName = (typeof AnalyticsEvent)[keyof typeof AnalyticsEvent];
 
 /**
  * Fire-and-forget event capture.
- * Safe to call even if PostHog hasn't fully initialised yet;
- * events are queued internally by posthog-js.
+ * Safe to call before initialization, but the SDK drops those events.
+ * Lifecycle captures must wait for the provider to be ready.
  */
 export function capture(event: AnalyticsEventName, properties?: Record<string, unknown>): void {
   posthog.capture(event, properties);

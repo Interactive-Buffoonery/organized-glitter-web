@@ -43,6 +43,9 @@ export interface ImportExportEventProperties {
   source: ImportExportSource;
   status?: ImportExportStatus;
   records?: number;
+  existing_records?: number;
+  created_library_items?: number;
+  prepared_records?: number;
   warnings?: number;
   errors?: number;
   skipped?: number;

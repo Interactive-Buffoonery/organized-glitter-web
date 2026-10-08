@@ -586,6 +586,7 @@ export const UsersThemePaletteOptions = {
 export type UsersThemePaletteOptions = typeof UsersThemePaletteOptions[keyof typeof UsersThemePaletteOptions]
 export type UsersThemePreferenceOptions = typeof UsersThemePreferenceOptions[keyof typeof UsersThemePreferenceOptions]
 export type UsersRecord = {
+	analytics_opt_out?: boolean
 	avatar?: FileNameString
 	beta_tester?: boolean
 	coloring_walkthrough_seen?: boolean

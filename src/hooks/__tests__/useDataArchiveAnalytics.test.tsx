@@ -85,7 +85,7 @@ describe('archive import/export analytics', () => {
         importedPhotoCount: 3,
         skippedRecordCount: 1,
         skippedPagePhotoCount: 1,
-        matchedExistingRecordCount: 0,
+        matchedExistingRecordCount: 3,
         archiveSchemaVersion: 1,
         refMap: {
           'project:old-project': 'current-project',
@@ -117,6 +117,8 @@ describe('archive import/export analytics', () => {
       source: 'archive',
       status: 'partial',
       records: 7,
+      existing_records: 3,
+      created_library_items: 3,
       errors: 0,
       skipped: 1,
       warnings: 1,
@@ -133,6 +135,80 @@ describe('archive import/export analytics', () => {
       queryKey: expect.arrayContaining(['projects', 'detail', 'current-project']),
     });
     expectCapturedPropertiesToExclude(['organized-glitter-archive.zip']);
+  });
+
+  it('separates new, existing, and prepared v3 records', async () => {
+    mockImportArchive.mockResolvedValue({
+      schemaVersion: 3,
+      result: {
+        success: true,
+        backupId: 'private-backup',
+        selectedPartNumbers: [1],
+        missingPartNumbers: [],
+        selectedPartCount: 1,
+        totalPartCount: 1,
+        selectedLogicalItemCount: 6,
+        createdItemCount: 2,
+        createdLibraryItemCount: 1,
+        scaffoldedItemCount: 1,
+        alreadyAppliedItemCount: 3,
+        restoredAssetCount: 0,
+        alreadyAppliedAssetCount: 0,
+        conflicts: [],
+        errors: [],
+        itemResults: [],
+      },
+    });
+    const { result } = renderHookWithProviders(() => useDataArchiveImport());
+    await act(async () => {
+      await result.current.importArchive(new File(['zip'], 'archive.zip'));
+    });
+    expect(mockCapture).toHaveBeenCalledWith(
+      AnalyticsEvent.ARCHIVE_IMPORT_COMPLETED,
+      expect.objectContaining({
+        records: 2,
+        existing_records: 3,
+        prepared_records: 1,
+        created_library_items: 1,
+        skipped: 0,
+        status: 'success',
+      })
+    );
+    expectCapturedPropertiesToExclude(['private-backup', 'archive.zip']);
+  });
+
+  it('reports a partial attempt when existing records are handled but another record fails', async () => {
+    mockImportArchive.mockResolvedValue({
+      schemaVersion: 1,
+      result: {
+        success: false,
+        createdProjectCount: 0,
+        createdColoringBookCount: 0,
+        createdProgressNoteCount: 0,
+        matchedExistingRecordCount: 2,
+        importedPhotoCount: 0,
+        skippedRecordCount: 0,
+        skippedPagePhotoCount: 0,
+        archiveSchemaVersion: 1,
+        refMap: {},
+        warnings: [],
+        errors: [{ message: 'restore failed' }],
+      },
+    });
+    const { result } = renderHookWithProviders(() => useDataArchiveImport());
+    await act(async () => {
+      await result.current.importArchive(new File(['zip'], 'archive.zip'));
+    });
+    expect(mockCapture).toHaveBeenCalledWith(
+      AnalyticsEvent.ARCHIVE_IMPORT_COMPLETED,
+      expect.objectContaining({
+        records: 0,
+        existing_records: 2,
+        created_library_items: 0,
+        errors: 1,
+        status: 'partial',
+      })
+    );
   });
 
   it('captures archive export start and completion metadata', async () => {

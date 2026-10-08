@@ -2,6 +2,7 @@
 const loadingEl = document.getElementById('app-loading');
 const errorEl = document.getElementById('app-error');
 const retryButton = document.getElementById('retry-button');
+const slowLoadRetryButton = document.getElementById('slow-load-retry');
 const slowLoadWarning = document.getElementById('slow-load-warning');
 const bootstrapAnalytics = typeof window !== 'undefined' ? window.__OG_BOOTSTRAP_ANALYTICS__ : null;
 
@@ -181,7 +182,8 @@ if (loadingEl && loadingEl.isConnected && !isRootReady()) {
   setRootInert(true);
 }
 
-// Show slow load warning after 10 seconds
+// Offer recovery while resources are still loading. Elapsed time never marks
+// authentication or a private route ready.
 const slowLoadTimeout = setTimeout(() => {
   if (
     !isAppLoaded &&
@@ -195,11 +197,12 @@ const slowLoadTimeout = setTimeout(() => {
       console.log('Slow load warning displayed');
     }
   }
-}, 10000);
+}, 5000);
 
 // Handle retry button click
-if (retryButton) {
-  retryButton.addEventListener('click', () => {
+for (const button of [retryButton, slowLoadRetryButton]) {
+  if (!button) continue;
+  button.addEventListener('click', () => {
     console.log('Retry button clicked');
     if (errorEl) {
       errorEl.style.display = 'none';
@@ -231,6 +234,7 @@ const showError = reason => {
 
   hasError = true;
   clearTimeout(slowLoadTimeout);
+  if (slowLoadWarning) slowLoadWarning.style.display = 'none';
 
   console.error('Showing bootstrap failure:', reason);
 

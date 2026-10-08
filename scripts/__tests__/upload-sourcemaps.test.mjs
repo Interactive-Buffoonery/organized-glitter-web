@@ -139,6 +139,40 @@ describe('upload-sourcemaps script', () => {
     }
   });
 
+  it('bounds a stalled CLI and still strips maps without failing the build', () => {
+    const fsApi = {
+      existsSync: () => true,
+      readdirSync: () => ['main.js.map'],
+      statSync: () => ({ isDirectory: () => false }),
+      rmSync: vi.fn(),
+    };
+    const spawnSyncFn = vi
+      .fn()
+      .mockReturnValue({ error: Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' }) });
+    const logger = makeLogger();
+    expect(
+      runSourcemapUpload({
+        projectRoot: '/synthetic-build',
+        distDir: '/synthetic-build/dist',
+        env: {
+          POSTHOG_CLI_TOKEN: 'synthetic-token',
+          POSTHOG_CLI_PROJECT_ID: '1',
+          VITE_APP_VERSION: 'test',
+        },
+        spawnSyncFn,
+        logger,
+        fsApi,
+      })
+    ).toBe(0);
+    expect(spawnSyncFn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ timeout: 120_000, killSignal: 'SIGKILL' })
+    );
+    expect(fsApi.rmSync).toHaveBeenCalledWith('/synthetic-build/dist/main.js.map');
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('timed out'));
+  });
+
   it('keeps the installed PostHog CLI sourcemap contract executable', () => {
     const rootDir = makeTempDir();
     const cliBin = path.resolve('node_modules/.bin/posthog-cli');

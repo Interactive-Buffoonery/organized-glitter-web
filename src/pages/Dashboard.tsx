@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
 import { usePostHog } from '@posthog/react';
 
 import { ColoringDashboardPane } from '@/components/coloring/ColoringDashboardPane';
@@ -11,6 +10,7 @@ import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import { DashboardShell, type DashboardMode } from '@/components/dashboard/DashboardShell';
 import ProjectsSection from '@/components/dashboard/ProjectsSection';
 import MainLayout from '@/components/layout/MainLayout';
+import LoadingState from '@/components/projects/LoadingState';
 import {
   ColoringFilterProvider,
   getInitialColoringFiltersFromUrl,
@@ -256,11 +256,7 @@ function DiamondDashboardRoute({
   // Brief loading state only while waiting on the cold-mount DB fetch. Other
   // hydration paths (URL or location-state) render the dashboard immediately.
   if (shouldFetchSavedContext && savedContextQuery.isLoading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="text-muted-foreground size-6 animate-spin" />
-      </div>
-    );
+    return <LoadingState message="Getting your collection ready..." />;
   }
 
   return (
@@ -272,7 +268,7 @@ function DiamondDashboardRoute({
 }
 
 const Dashboard: React.FC = () => {
-  // Dismiss splash on page mount; verticals/saved-context still use in-app spinners.
+  // Dismiss splash on page mount; verticals/saved-context use in-app loading feedback.
   useAppReady();
   const { user } = useAuth();
   const posthog = usePostHog();
@@ -319,9 +315,7 @@ const Dashboard: React.FC = () => {
         onModeChange={handleModeChange}
       >
         {isLoadingVerticals && activeMode !== 'diamond' ? (
-          <div className="flex min-h-[40vh] items-center justify-center">
-            <Loader2 className="text-muted-foreground size-6 animate-spin" />
-          </div>
+          <LoadingState message="Getting your collection ready..." />
         ) : activeMode === 'coloring-books' ? (
           <ColoringDashboardWithProvider user={user} />
         ) : (

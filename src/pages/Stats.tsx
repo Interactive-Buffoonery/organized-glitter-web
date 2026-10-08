@@ -47,6 +47,7 @@ import type {
   StatsTopListGroup,
   StatsTopListItem,
 } from '@/types/stats';
+import { countUnit, type CountUnit } from '@/utils/countUnit';
 import {
   monthlyCompletionsToChartPoints,
   normalizeTopListGroup,
@@ -156,7 +157,7 @@ function LeadReport({
   emptyDescription,
 }: {
   title: string;
-  unit: 'painting' | 'page';
+  unit: CountUnit;
   timeScope: StatsTimeScope;
   queries: DiamondQueries | ColoringQueries;
   total: number | undefined;
@@ -181,7 +182,7 @@ function LeadReport({
           <p className="text-foreground mt-1 flex flex-wrap items-baseline gap-2 text-4xl font-semibold tracking-tight tabular-nums">
             {formatStatsNumber(leadTotal)}
             <span className="text-muted-foreground text-base font-medium tracking-normal">
-              {leadTotal === 1 ? unit : `${unit}s`}
+              {countUnit(leadTotal, unit)}
             </span>
           </p>
         )}

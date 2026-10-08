@@ -12,6 +12,7 @@ import {
   type ColoringBooksStatusOptions as ColoringBookStatus,
 } from '@/types/pocketbase.types';
 import type { Tag } from '@/types/tag';
+import { countUnit } from '@/utils/countUnit';
 import { getColoringBookStatusColor, getColoringBookStatusLabel } from '@/utils/statusColors';
 
 interface ColoringBookHeroProps {
@@ -111,7 +112,10 @@ export const ColoringBookHero = ({
 
           <div className="text-sm">
             <span className="font-medium tabular-nums">{safeCompletedPages}</span>
-            <span className="text-muted-foreground"> of {book.totalPages} pages completed</span>
+            <span className="text-muted-foreground">
+              {' '}
+              of {book.totalPages} {countUnit(book.totalPages, 'page')} completed
+            </span>
           </div>
           <span className="text-muted-foreground text-sm tabular-nums">
             {Math.round(safeCompletionPct)}%

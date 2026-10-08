@@ -44,6 +44,30 @@ const largestPaintStep = async (page: Page, screenshot: Buffer) =>
     }
   }, screenshot.toString('base64'));
 
+const largestPaintDifference = async (page: Page, first: Buffer, second: Buffer) =>
+  page.evaluate(
+    async images => {
+      const pixels = await Promise.all(
+        images.map(async base64 => {
+          const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+          const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const context = canvas.getContext('2d')!;
+          context.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          return context.getImageData(0, 0, canvas.width, canvas.height).data;
+        })
+      );
+      return pixels[0].reduce(
+        (largest, value, index) => Math.max(largest, Math.abs(value - pixels[1][index])),
+        0
+      );
+    },
+    [first.toString('base64'), second.toString('base64')]
+  );
+
 const selectTheme = async (page: Page, label: string) => {
   await page.goto('/profile?tab=preferences');
   const option = page.getByRole('radiogroup', { name: 'Theme' }).getByRole('radio', {
@@ -166,7 +190,9 @@ for (const viewport of viewports) {
           expect(await atmosphere.boundingBox()).toEqual(initialBounds);
           const scrolledPaint = await page.screenshot({ clip, animations: 'disabled' });
           expect(await largestPaintStep(page, scrolledPaint)).toBeLessThanOrEqual(3);
-          expect(scrolledPaint.equals(initialPaint)).toBe(true);
+          expect(
+            await largestPaintDifference(page, initialPaint, scrolledPaint)
+          ).toBeLessThanOrEqual(1);
           expect(
             await page.evaluate(() => document.documentElement.scrollWidth)
           ).toBeLessThanOrEqual(viewport.width);

@@ -121,7 +121,9 @@
   :root {
     --bottom-nav-content-height: 4rem;
     --bottom-nav-safe-area: env(safe-area-inset-bottom, 0px);
-    --bottom-nav-total-height: calc(var(--bottom-nav-content-height) + var(--bottom-nav-safe-area));
+    --bottom-nav-total-height: calc(
+      var(--bottom-nav-content-height) + var(--bottom-nav-safe-area) + 1px
+    );
   }
 
   /* Berry Cream */

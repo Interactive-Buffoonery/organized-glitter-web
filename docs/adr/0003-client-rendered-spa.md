@@ -22,7 +22,9 @@ built with Vite, routed with React Router, and installable as a PWA via
 rendering. SEO for public pages is handled explicitly: static HTML entries for `/`,
 `/about`, `/links`, `/privacy`, and `/terms` carry route-specific metadata in
 the initial response. Spacefast serves the built public HTML entries and uses
-its Function for app deep links. React updates metadata
+its Function for app deep links. The home page at `/` is
+prerendered at build time from the React marketing components, so it loads no
+app JavaScript. React updates metadata
 during client-side navigation. Sitemap generation and the client-rendered app
 shell remain in place without an SSR framework.
 

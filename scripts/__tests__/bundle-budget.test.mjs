@@ -9,8 +9,9 @@ function fixture({
 } = {}) {
   const dist = mkdtempSync(path.join(tmpdir(), 'og-bundle-budget-'));
   mkdirSync(path.join(dist, 'assets'));
+  writeFileSync(path.join(dist, 'index.html'), '<main>Static landing</main>');
   writeFileSync(
-    path.join(dist, 'index.html'),
+    path.join(dist, 'app.html'),
     '<script src="/js/start.js?v=1"></script><script type="module" src="/assets/main.js"></script><script type="module" src="/assets/main.js"></script><link rel="stylesheet" href="/assets/main.css">'
   );
   mkdirSync(path.join(dist, 'js'));
@@ -47,6 +48,37 @@ describe('bundle budget measurement', () => {
     ]);
     expect(report.precache.files.map(file => file.path)).toEqual(['index.html', 'assets/main.js']);
     expect(report.precache.rawBytes).toBeGreaterThan(0);
+  });
+
+  it('measures the config graph after executable module tags are removed', () => {
+    const dist = fixture();
+    writeFileSync(
+      path.join(dist, 'app.html'),
+      `<script type="application/json" id="app-bootstrap-resources">${JSON.stringify({
+        entry: '/assets/main.js',
+        resources: ['/assets/main.css', '/assets/shared.js'],
+        graphs: { '/assets/lazy.js': ['/assets/lazy.js'] },
+      })}</script><script>window.inlineShell = true;</script>`
+    );
+    const report = measureBuild(dist);
+    expect(report.shell.files.map(file => file.path).sort()).toEqual([
+      'app.html',
+      'assets/main.css',
+      'assets/main.js',
+      'assets/shared.js',
+    ]);
+    expect(report.shell.files).not.toContainEqual(
+      expect.objectContaining({ path: 'assets/lazy.js' })
+    );
+  });
+
+  it('rejects an incomplete config graph instead of undercounting the shell', () => {
+    const dist = fixture();
+    writeFileSync(
+      path.join(dist, 'app.html'),
+      '<script type="application/json" id="app-bootstrap-resources">{"entry":"/assets/main.js","resources":[]}</script>'
+    );
+    expect(() => measureBuild(dist)).toThrow(/graph/i);
   });
 
   it('fails closed when the generated Workbox list is absent', () => {

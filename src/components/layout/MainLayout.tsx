@@ -32,7 +32,7 @@ const MainLayout = memo(
     const isLoggedIn = !!user;
     const showBottomNav = isLoggedIn && (isMobile || isTablet);
     const rootLayoutClassName = cn(
-      'aurora-bg flex min-h-full flex-col',
+      'aurora-bg flex flex-1 flex-col',
       hideNav && 'site-header-safe-area',
       rootClassName
     );

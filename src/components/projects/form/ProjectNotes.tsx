@@ -152,7 +152,8 @@ const ProjectNotes = ({
     // Pencil top-right. Hover-revealed when notes exist (markdown is the
     // primary content); always visible when empty (the affordance IS the
     // primary content, since the placeholder copy points at it).
-    const hasNotes = !!notes;
+    const hasNotes = !!notes.trim();
+    const hasLegacyHtml = /^<(?:p|div|ul|ol|h[1-6]|blockquote|span|br)\b/i.test(notes.trim());
     const emptyEditButtonClass =
       'text-muted-foreground hover:bg-muted/60 hover:text-foreground grid size-7 shrink-0 place-items-center rounded-md transition-colors pointer-coarse:size-11';
 
@@ -181,13 +182,18 @@ const ProjectNotes = ({
           onClick={handleEdit}
           aria-label="Edit notes"
           className={
-            hasNotes
+            hasNotes && !hasLegacyHtml
               ? 'text-muted-foreground hover:bg-muted/60 hover:text-foreground absolute top-0 right-0 grid size-7 place-items-center rounded-md opacity-0 transition-opacity group-hover/notes:opacity-100 focus-visible:opacity-100 pointer-coarse:size-11 pointer-coarse:opacity-100'
               : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground absolute top-0 right-0 grid size-7 place-items-center rounded-md transition-colors pointer-coarse:size-11'
           }
         >
           <Pencil className="size-3.5" />
         </button>
+        {hasLegacyHtml && (
+          <p className="text-muted-foreground pr-10 text-sm pointer-coarse:pr-14">
+            This note uses an older format. Edit it to view or update its contents.
+          </p>
+        )}
         <MarkdownContent content={notes} className="pr-10 pointer-coarse:pr-14" />
       </div>
     );

@@ -80,6 +80,18 @@ describe('ProjectNotes rich text', () => {
     expect(hasSessionDraft(key, 'account-a')).toBe(false);
   });
 
+  it('keeps an editing path when an older HTML note has no rendered content', async () => {
+    const user = userEvent.setup();
+    render(<ProjectNotes notes="<p>Saved kit details</p>" onSave={vi.fn()} variant="inline" />);
+    expect(
+      screen.getByText('This note uses an older format. Edit it to view or update its contents.')
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit notes' }));
+    expect(screen.getByRole('textbox', { name: 'Project notes' })).toHaveValue(
+      '<p>Saved kit details</p>'
+    );
+  });
+
   it('renders Markdown project notes', () => {
     render(<ProjectNotes notes="Kit has **square drills**" readOnly />);
 

@@ -23,7 +23,7 @@ All endpoints require an authenticated PocketBase user. The server derives the u
 | ------------ | ------------------------------------------------------------------------------------------------------ |
 | Wishlist     | `wishlist`                                                                                             |
 | In progress  | `progress`                                                                                             |
-| In stash     | `purchased`, `stash`, `kitted`                                                                         |
+| In stash     | `stash`                                                                                                |
 | All statuses | `wishlist`, `purchased`, `stash`, `kitted`, `progress`, `onhold`, `completed`, `archived`, `destashed` |
 
 ## Metrics Catalog
@@ -33,7 +33,7 @@ All endpoints require an authenticated PocketBase user. The server derives the u
 | Total kits               | Count of all projects owned by the authenticated user.                                                                     | `projects.user`                                            |
 | Completed this year      | Count of projects with `date_completed` in the current calendar year.                                                      | `projects.date_completed`                                  |
 | In progress              | Count of projects whose current status is `progress`.                                                                      | `projects.status`                                          |
-| In stash                 | Count of projects whose current status is `purchased`, `stash`, or `kitted`.                                               | `projects.status`                                          |
+| In stash                 | Count of projects whose current status is `stash`.                                                                         | `projects.status`                                          |
 | All-time completed       | Count of projects with a non-empty `date_completed`.                                                                       | `projects.date_completed`                                  |
 | Wishlist size            | Count of projects whose current status is `wishlist`.                                                                      | `projects.status`                                          |
 | Monthly completions      | Count of projects completed in each month of the requested year, with previous-year count, delta, and average finish time. | `projects.date_completed`, `projects.date_started`         |
@@ -50,7 +50,7 @@ All endpoints require an authenticated PocketBase user. The server derives the u
 | Total books                  | Count of all coloring books owned by the authenticated user.                                                                     | `coloring_books.user`                                                                          |
 | Completed pages this year    | Count of coloring pages with `completed_at` in the requested calendar year.                                                      | `coloring_pages.completed_at`, joined through `coloring_books.user`                            |
 | Active pages                 | Count of coloring pages whose current status is `in_progress`.                                                                   | `coloring_pages.status`                                                                        |
-| In stash                     | Count of coloring books whose current status is `purchased` or `in_stash`.                                                       | `coloring_books.status`                                                                        |
+| In stash                     | Count of coloring books whose current status is `in_stash`.                                                                      | `coloring_books.status`                                                                        |
 | All-time completed pages     | Count of coloring pages with a non-empty `completed_at`.                                                                         | `coloring_pages.completed_at`                                                                  |
 | Wishlist size                | Count of coloring books whose current status is `wishlist`.                                                                      | `coloring_books.status`                                                                        |
 | Monthly page completions     | Count of coloring pages completed in each month of the requested year, with previous-year count, delta, and average finish time. | `coloring_pages.completed_at`, `coloring_pages.started_at`                                     |
@@ -94,7 +94,7 @@ Returns the top-level stats summary for the authenticated user.
     "totalKits": 42,
     "completedThisYear": 6,
     "inProgress": 2,
-    "inStash": 21,
+    "inStash": 16,
     "allTimeCompleted": 18,
     "wishlistSize": 9
   },
@@ -366,7 +366,7 @@ Returns the top-level coloring stats summary for the authenticated user. All boo
     "totalBooks": 18,
     "completedPagesThisYear": 42,
     "activePages": 5,
-    "inStash": 10,
+    "inStash": 6,
     "allTimeCompletedPages": 120,
     "wishlistSize": 3
   },

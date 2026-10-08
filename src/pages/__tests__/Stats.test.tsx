@@ -272,6 +272,16 @@ describe('Stats page', () => {
     expect(screen.getByText('Total books')).toBeInTheDocument();
   });
 
+  it('shows the same exact in-stash count as the Library status filter', () => {
+    render(<Stats />);
+
+    const inStashRow = screen.getByText('In stash').closest('div');
+
+    expect(inStashRow).not.toBeNull();
+    expect(within(inStashRow as HTMLElement).getByText('3')).toBeInTheDocument();
+    expect(within(inStashRow as HTMLElement).queryByText('5')).not.toBeInTheDocument();
+  });
+
   it('changes craft scope without merging all-craft sections', async () => {
     const user = userEvent.setup();
     render(<Stats />);

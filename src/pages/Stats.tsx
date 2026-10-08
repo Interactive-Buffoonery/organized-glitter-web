@@ -323,7 +323,7 @@ function DiamondRegion({
               <StatsKeyValueRow
                 label="In stash"
                 hint="arrived but not yet started"
-                value={formatStatsNumber(summary?.metrics.inStash)}
+                value={formatStatsNumber(summary?.statusBreakdown.stash)}
               />
               <StatsKeyValueRow
                 label={

@@ -27,6 +27,15 @@ for (const width of [320, 768, 1440]) {
       true
     );
     await page.screenshot({ path: testInfo.outputPath('stats.png'), fullPage: true });
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = '200%';
+    });
+    expect(await diamond.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(
+      true
+    );
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = '';
+    });
 
     await page.goto('/notes');
     await expect(page.getByRole('tab', { name: 'Diamond paintings', exact: true })).toBeVisible();

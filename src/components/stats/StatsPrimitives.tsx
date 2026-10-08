@@ -57,7 +57,7 @@ export function StatsScopeControl({
       value={value}
       onValueChange={onValueChange}
       className="w-full flex-wrap gap-1 sm:w-auto sm:min-w-[420px]"
-      buttonClassName="flex-auto whitespace-nowrap"
+      buttonClassName="flex-auto whitespace-normal"
       options={options}
     />
   );
@@ -476,7 +476,7 @@ export function LeadCompletionChart({
             <span
               key={point.key}
               className={cn(
-                'absolute top-0 -translate-x-1/2 whitespace-nowrap',
+                'absolute top-0 -translate-x-1/2 whitespace-normal',
                 scope.kind === 'year' && index % 2 === 1 && 'max-[540px]:hidden'
               )}
               style={{ left: `${leftPercent}%` }}

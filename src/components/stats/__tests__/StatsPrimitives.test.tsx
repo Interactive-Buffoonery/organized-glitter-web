@@ -262,7 +262,7 @@ describe('StatsScopeControl', () => {
     const group = screen.getByRole('group', { name: 'Craft scope' });
     expect(group).toHaveClass('flex-wrap');
     const diamond = within(group).getByRole('button', { name: 'Diamond paintings' });
-    expect(diamond).toHaveClass('flex-auto', 'whitespace-nowrap');
+    expect(diamond).toHaveClass('flex-auto', 'whitespace-normal');
     expect(diamond).not.toHaveClass('truncate');
   });
 });

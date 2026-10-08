@@ -102,18 +102,10 @@ export function OverviewRightRail({
             className="text-muted-foreground mt-0.5 size-4 shrink-0"
             strokeWidth={1.75}
           />
-          <div className="space-y-1.5">
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Thank you for being part of
-            </p>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Organized Glitter, I am SO glad
-            </p>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              to have you here. If you have any
-            </p>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              feedback or bug reports to share,
+          <div className="max-w-prose min-w-0 space-y-1.5">
+            <p className="text-muted-foreground text-sm leading-relaxed text-pretty">
+              Thank you for being part of Organized Glitter, I am SO glad to have you here. If you
+              have any feedback or bug reports to share,
             </p>
             <button
               type="button"

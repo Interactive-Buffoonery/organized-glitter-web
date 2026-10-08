@@ -56,7 +56,8 @@ export function StatsScopeControl({
       ariaLabel="Craft scope"
       value={value}
       onValueChange={onValueChange}
-      className="w-full sm:w-auto sm:min-w-[420px]"
+      className="w-full flex-wrap gap-1 sm:w-auto sm:min-w-[420px]"
+      buttonClassName="flex-auto whitespace-nowrap"
       options={options}
     />
   );

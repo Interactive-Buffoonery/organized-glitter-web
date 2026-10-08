@@ -2,7 +2,11 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, vi } from 'vitest';
 import { axe } from 'vitest-axe';
-import { LeadCompletionChart, MostRepresentedList } from '@/components/stats/StatsPrimitives';
+import {
+  LeadCompletionChart,
+  MostRepresentedList,
+  StatsScopeControl,
+} from '@/components/stats/StatsPrimitives';
 
 function mockResizeObserverWidth(width: number) {
   vi.stubGlobal(
@@ -249,5 +253,16 @@ describe('MostRepresentedList', () => {
     expect(rowHeaders[1]).toHaveAttribute('scope', 'row');
     expect(within(table).getByRole('cell', { name: 'Diamond Art Club' })).toBeInTheDocument();
     expect(within(table).getByRole('cell', { name: 'Other' })).toBeInTheDocument();
+  });
+});
+
+describe('StatsScopeControl', () => {
+  it('keeps full craft labels in flexible wrapping controls', () => {
+    render(<StatsScopeControl value="all" onValueChange={vi.fn()} canUseDiamond canUseColoring />);
+    const group = screen.getByRole('group', { name: 'Craft scope' });
+    expect(group).toHaveClass('flex-wrap');
+    const diamond = within(group).getByRole('button', { name: 'Diamond paintings' });
+    expect(diamond).toHaveClass('flex-auto', 'whitespace-nowrap');
+    expect(diamond).not.toHaveClass('truncate');
   });
 });

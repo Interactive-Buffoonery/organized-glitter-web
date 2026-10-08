@@ -365,6 +365,15 @@ const RandomizerWheelSession: React.FC<RandomizerWheelProps> = ({
         </div>
       </RippleEffect>
 
+      {itemCount === 1 && (
+        <p
+          data-testid="randomizer-single-title"
+          className="text-foreground w-full max-w-80 text-center text-base leading-snug font-semibold break-words"
+        >
+          {targets[0].title}
+        </p>
+      )}
+
       <WheelActionRow
         targets={targets}
         labelMode={labelMode}

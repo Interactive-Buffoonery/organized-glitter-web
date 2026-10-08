@@ -163,6 +163,7 @@ describe('bulk photo import analytics', () => {
     await act(async () => {
       await result.current.analyzeFileList([
         fileWithPath('secret-cover.jpg', 'Starry Fox/secret-cover.jpg'),
+        fileWithPath('second-photo.jpg', 'Starry Fox/second-photo.jpg'),
       ]);
     });
     await act(async () => {
@@ -172,7 +173,7 @@ describe('bulk photo import analytics', () => {
     expect(mockCapture).toHaveBeenCalledWith(AnalyticsEvent.BULK_PHOTO_IMPORT_STARTED, {
       surface: 'settings_data',
       source: 'bulk_photos',
-      records: 1,
+      records: 2,
     });
     expect(mockCapture).toHaveBeenCalledWith(AnalyticsEvent.BULK_PHOTO_IMPORT_COMPLETED, {
       surface: 'settings_data',

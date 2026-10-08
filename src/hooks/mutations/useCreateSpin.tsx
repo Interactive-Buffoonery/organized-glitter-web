@@ -21,7 +21,6 @@ import type { RandomizerSpinsResponse, IsoAutoDateString } from '@/types/pocketb
 import { Collections } from '@/types/pocketbase.types';
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
-import { trackGrowthFunnelMilestone } from '@/services/growth-funnel-analytics';
 import type { RandomizerSpinMetadata } from '@/types/randomizer';
 
 const logger = createLogger('useCreateSpin');
@@ -256,16 +255,8 @@ export const useCreateSpin = () => {
     onSuccess: (data, variables, context) => {
       capture(AnalyticsEvent.RANDOMIZER_SPIN, {
         selected_count: variables.selected_projects.length,
-      });
-      trackGrowthFunnelMilestone({
-        userId: variables.user,
-        event: AnalyticsEvent.RANDOMIZER_FIRST_SPIN,
-        properties: {
-          source_surface: 'randomizer',
-          selected_count: variables.selected_projects.length,
-          mode: variables.metadata?.mode ?? 'diamond',
-        },
-        activationSignal: 'randomizer_used',
+        source_surface: 'randomizer',
+        mode: variables.metadata?.mode ?? 'diamond',
       });
       logger.info('Enhanced spin record created successfully', {
         spinId: data.id,

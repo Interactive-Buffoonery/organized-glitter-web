@@ -12,7 +12,6 @@ import { toUserDateString } from '@/utils/date/timezoneUtils';
 import type { MarkdownString } from '@/types/markdown';
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
-import { trackGrowthFunnelMilestone } from '@/services/growth-funnel-analytics';
 import {
   invalidateProjectDetailAndProgressNotes,
   patchProjectInLists,
@@ -136,7 +135,6 @@ export const useUpdateProjectNotesSectionMutation = () =>
 export const useAddProgressNoteMutation = () => {
   const queryClient = useQueryClient();
   const userTimezone = useUserTimezone();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({
@@ -162,30 +160,12 @@ export const useAddProgressNoteMutation = () => {
     },
     onSuccess: async (_, { projectId, noteData }) => {
       invalidateStatsQueries(queryClient, 'overview');
-      capture(AnalyticsEvent.PROGRESS_NOTE_ADDED);
-      trackGrowthFunnelMilestone({
-        userId: user?.id,
-        event: AnalyticsEvent.FIRST_PROGRESS_NOTE_ADDED,
-        properties: {
-          craft: 'diamond',
-          entity_type: 'project_progress_note',
-          source_surface: 'project_detail',
-          has_photo: Boolean(noteData.imageFile),
-        },
-        activationSignal: 'progress_note_added',
+      capture(AnalyticsEvent.PROGRESS_NOTE_ADDED, {
+        craft: 'diamond',
+        entity_type: 'project_progress_note',
+        source_surface: 'project_detail',
+        has_photo: Boolean(noteData.imageFile),
       });
-      if (noteData.imageFile) {
-        trackGrowthFunnelMilestone({
-          userId: user?.id,
-          event: AnalyticsEvent.FIRST_PHOTO_ADDED,
-          properties: {
-            craft: 'diamond',
-            entity_type: 'project_progress_note',
-            source_surface: 'project_detail',
-          },
-          activationSignal: 'photo_added',
-        });
-      }
       const refreshes = await invalidateProjectDetailAndProgressNotes(queryClient, projectId);
       for (const refresh of refreshes) {
         if (refresh.status === 'rejected') {

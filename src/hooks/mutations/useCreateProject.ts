@@ -14,8 +14,6 @@ import { ProjectDTO } from '@/services/types';
 import { createLogger } from '@/utils/logger';
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
-import { trackGrowthFunnelMilestone } from '@/services/growth-funnel-analytics';
-import { useAuth } from '@/hooks/useAuth';
 import { useNavigateToProject } from '@/hooks/useNavigateToProject';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { invalidateStatsQueries } from './statsInvalidation';
@@ -115,7 +113,6 @@ export const useCreateProject = ({
   onConfirmedSave,
 }: UseCreateProjectOptions = {}) => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const navigateToProject = useNavigateToProject();
 
   return useMutation<ProjectCreationResult, Error, CreateProjectInput>({
@@ -124,17 +121,12 @@ export const useCreateProject = ({
       runPostWriteEffect(logger, 'Project Stats refresh failed after creation', () => {
         invalidateStatsQueries(queryClient, 'diamond');
       });
-      runPostWriteEffect(logger, 'Project growth analytics failed after creation', () => {
-        trackGrowthFunnelMilestone({
-          userId: user?.id,
-          event: AnalyticsEvent.FIRST_PROJECT_CREATED,
-          properties: {
-            craft: 'diamond',
-            entity_type: 'project',
-            source_surface: redirect ? 'new_project' : 'project_create_mutation',
-            has_cover_image: Boolean(data.image),
-          },
-          activationSignal: 'item_created',
+      runPostWriteEffect(logger, 'Project create analytics failed after creation', () => {
+        capture(AnalyticsEvent.PROJECT_CREATED, {
+          craft: 'diamond',
+          entity_type: 'project',
+          source_surface: redirect ? 'new_project' : 'project_create_mutation',
+          has_cover_image: Boolean(data.image),
         });
       });
 
@@ -144,10 +136,6 @@ export const useCreateProject = ({
           .catch(error => logger.warn('Could not mark project lists stale after creation', error));
         return;
       }
-
-      runPostWriteEffect(logger, 'Project create analytics failed after creation', () => {
-        capture(AnalyticsEvent.PROJECT_CREATED);
-      });
 
       try {
         if (failedTagIds.length > 0) {

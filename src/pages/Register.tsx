@@ -1,3 +1,4 @@
+import { captureAccountAnalyticsEvent } from '@/services/analytics-preference';
 import { notify } from '@/lib/notifications';
 import { useState, useEffect } from 'react';
 import { usePostHog } from '@posthog/react';
@@ -154,7 +155,7 @@ const Register = () => {
         return;
       }
 
-      posthog.capture(
+      captureAccountAnalyticsEvent(
         AnalyticsEvent.AUTH_LOGIN_SUCCEEDED,
         getAuthSuccessAnalyticsProperties({
           method: 'oauth',

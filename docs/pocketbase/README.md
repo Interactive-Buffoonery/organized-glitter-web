@@ -208,3 +208,8 @@ PocketBase thumbnails only JPEG, PNG, GIF (first frame), and WebP, so HEIC and
 HEIF uploads keep returning the original at these sizes. The rollback deletes
 no originals: removed sizes fall back to the original file like any unlisted
 size.
+
+## Account deletion
+
+See [the account deletion contract](account-deletion.md) for fresh authentication,
+retry behavior, vendor cleanup and release gates.

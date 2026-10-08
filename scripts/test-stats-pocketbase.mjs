@@ -342,6 +342,36 @@ try {
     { key: 'completed', label: 'Completed', count: 0 },
   ]);
 
+  const usedArtist = await admin
+    .collection('artists')
+    .create({ user: firstUser.id, name: 'Counted artist' });
+  const unusedArtist = await admin
+    .collection('artists')
+    .create({ user: firstUser.id, name: 'Unused artist' });
+  const otherUserArtist = await admin
+    .collection('artists')
+    .create({ user: secondUser.id, name: 'Other user artist' });
+  for (const title of ['Artist kit one', 'Artist kit two']) {
+    const project = await createProject(admin, firstUser, { title, status: 'wishlist' });
+    await admin.collection('projects').update(project.id, { artist: usedArtist.id });
+  }
+  const crossUserProject = await createProject(admin, secondUser, {
+    title: 'Cross user artist kit',
+    status: 'wishlist',
+  });
+  await admin.collection('projects').update(crossUserProject.id, { artist: usedArtist.id });
+  const secondUserProject = await createProject(admin, secondUser, {
+    title: 'Second user artist kit',
+    status: 'wishlist',
+  });
+  await admin.collection('projects').update(secondUserProject.id, { artist: otherUserArtist.id });
+
+  const firstArtistCounts = await getStats(firstClient, '/api/stats/artist-project-counts');
+  assert.deepEqual(firstArtistCounts, { counts: { [usedArtist.id]: 2 } });
+  assert.equal(firstArtistCounts.counts[unusedArtist.id], undefined);
+  const secondArtistCounts = await getStats(secondClient, '/api/stats/artist-project-counts');
+  assert.deepEqual(secondArtistCounts, { counts: { [otherUserArtist.id]: 1 } });
+
   console.log('PocketBase stats routes: seeded aliases and user isolation passed');
 } finally {
   await new Promise(resolve => {

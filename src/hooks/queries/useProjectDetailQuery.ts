@@ -3,11 +3,11 @@ import { resolveFileUrl } from '@/lib/pocketbase';
 import { projectsService } from '@/services/pocketbase/projects.service';
 import { createLogger } from '@/utils/logger';
 import { toUserDateString } from '@/utils/date/timezoneUtils';
+import { ProjectType } from '@/types/project';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
+import { queryKeys } from './queryKeys';
 
 const projectDetailLogger = createLogger('useProjectDetailQuery');
-import { ProjectType } from '@/types/project';
-import { queryKeys } from './queryKeys';
-import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 /**
  * Helper function to normalize database date strings to YYYY-MM-DD.

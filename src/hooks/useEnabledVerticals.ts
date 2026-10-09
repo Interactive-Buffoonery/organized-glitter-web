@@ -4,8 +4,8 @@ import {
   DEFAULT_VERTICAL_TOGGLES,
   type VerticalToggles,
 } from '@/services/pocketbase/dashboardSettings.service';
-import { queryKeys } from './queries/queryKeys';
 import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
+import { queryKeys } from './queries/queryKeys';
 
 export type UseEnabledVerticalsResult = VerticalToggles & {
   isLoading: boolean;

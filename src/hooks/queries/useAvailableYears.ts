@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { projectsService } from '@/services/pocketbase/projects.service';
-import { queryKeys } from './queryKeys';
-import { useAuth } from '@/hooks/useAuth';
 import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
+import { useAuth } from '@/hooks/useAuth';
+import { queryKeys } from './queryKeys';
 
 export const useAvailableYears = () => {
   const { user } = useAuth();

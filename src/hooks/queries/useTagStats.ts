@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { TagService } from '@/services/pocketbase/tags.service';
-import { queryKeys } from './queryKeys';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 import { useAuth } from '@/hooks/useAuth';
 import { isNonRetryableError } from '@/services/errors';
 import { createLogger } from '@/utils/logger';
-import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
+import { queryKeys } from './queryKeys';
 
 const logger = createLogger('useTagStats');
 

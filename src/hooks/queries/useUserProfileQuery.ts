@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { UserDTO } from '@/services/types';
 import { UsersService } from '@/services/pocketbase/users.service';
 import { resolveFileUrl } from '@/lib/pocketbase';
-import { queryKeys } from './queryKeys';
 import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
+import { queryKeys } from './queryKeys';
 
 /**
  * Fetches user profile data via UsersService

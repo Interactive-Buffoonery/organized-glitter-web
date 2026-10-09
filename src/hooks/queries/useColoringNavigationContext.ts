@@ -11,9 +11,9 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { DashboardSettingsService } from '@/services/pocketbase/dashboardSettings.service';
-import { queryKeys } from './queryKeys';
-import type { ColoringNavigationContext } from '@/hooks/mutations/useSaveColoringNavigationContext';
 import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
+import type { ColoringNavigationContext } from '@/hooks/mutations/useSaveColoringNavigationContext';
+import { queryKeys } from './queryKeys';
 
 export const useColoringNavigationContext = (userId: string | undefined) => {
   return useQuery<ColoringNavigationContext | null>({

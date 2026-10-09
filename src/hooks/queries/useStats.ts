@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { projectsService } from '@/services/pocketbase/projects.service';
 import { ColoringService } from '@/services/pocketbase/coloring.service';
-import { queryKeys } from './queryKeys';
 import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
+import { queryKeys } from './queryKeys';
 
 type StatsQueryOptions = {
   enabled?: boolean;

@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { ManageListHeader } from '@/components/manage-lists/ManageListsLayout';
 import { useCreateArtist } from '@/hooks/mutations/useArtistMutations';
 import type { ArtistListItem } from '@/services/pocketbase/artists.service';
 
@@ -82,19 +83,12 @@ const ArtistPageHeader = ({ artists }: ArtistPageHeaderProps) => {
   );
 
   return (
-    <>
-      <div className="mb-8 flex flex-col items-start justify-between md:flex-row md:items-center">
-        <div>
-          <h1 className="font-handwritten text-3xl leading-tight tracking-tight md:text-4xl">
-            Artist List
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">Manage the artists in your stash</p>
-        </div>
+    <ManageListHeader
+      title="Artists"
+      action={
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="glass" className="mt-4 md:mt-0">
-              Add Artist
-            </Button>
+            <Button variant="glass">Add Artist</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -129,8 +123,8 @@ const ArtistPageHeader = ({ artists }: ArtistPageHeaderProps) => {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-    </>
+      }
+    />
   );
 };
 

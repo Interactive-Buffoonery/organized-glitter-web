@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronLeft, Edit2, Loader2, Plus, Trash2 } from 'lucide-react';
-import MainLayout from '@/components/layout/MainLayout';
+import { Edit2, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ManageListHeader, ManageListsLayout } from '@/components/manage-lists/ManageListsLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -160,93 +159,72 @@ export default function ColoringMediumList() {
   };
 
   return (
-    <MainLayout>
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 gap-1.5 pointer-coarse:min-h-11"
-          >
-            <Link to="/options">
-              <ChevronLeft className="size-4" />
-              Back to Manage Lists
-            </Link>
+    <ManageListsLayout>
+      <ManageListHeader
+        title="Coloring mediums"
+        action={
+          <Button type="button" variant="glass" onClick={openCreate} disabled={isEditorLocked}>
+            <Plus className="mr-2 size-4" />
+            Add coloring medium
           </Button>
-        </div>
+        }
+      />
 
-        <div className="dark:glass-card border-border bg-card text-card-foreground rounded-lg border shadow">
-          <div className="border-border flex flex-col gap-4 border-b p-6 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold">Coloring medium management</h1>
-              <p className="text-muted-foreground">Add, edit or remove coloring mediums.</p>
-            </div>
-            <Button type="button" variant="glass" onClick={openCreate} disabled={isEditorLocked}>
-              <Plus className="mr-2 size-4" />
-              Add coloring medium
-            </Button>
-          </div>
-
-          <div className="p-6">
-            {mediumsQuery.isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="text-primary size-8 animate-spin" />
-              </div>
-            ) : mediumsQuery.data?.items.length ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Brand</TableHead>
-                    <TableHead>Colors</TableHead>
-                    <TableHead className="w-32 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mediumsQuery.data.items.map(medium => (
-                    <TableRow key={medium.id}>
-                      <TableCell className="font-medium">{medium.name}</TableCell>
-                      <TableCell>{TYPE_LABELS[medium.type]}</TableCell>
-                      <TableCell>{medium.brand || 'No brand'}</TableCell>
-                      <TableCell>{medium.colorCount || 'Not recorded'}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon-sm"
-                            onClick={() => openEdit(medium)}
-                            disabled={isEditorLocked}
-                            aria-label={`Edit ${medium.name}`}
-                          >
-                            <Edit2 className="size-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon-sm"
-                            onClick={() => setMediumToDelete(medium)}
-                            disabled={deleteMedium.isPending}
-                            aria-label={`Delete ${medium.name}`}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-muted-foreground py-8 text-center">
-                You haven't added any coloring mediums yet.
-              </p>
-            )}
-          </div>
+      {mediumsQuery.isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="text-primary size-8 animate-spin" />
         </div>
-      </div>
+      ) : mediumsQuery.data?.items.length ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Brand</TableHead>
+              <TableHead>Colors</TableHead>
+              <TableHead className="w-32 text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {mediumsQuery.data.items.map(medium => (
+              <TableRow key={medium.id}>
+                <TableCell className="font-medium">{medium.name}</TableCell>
+                <TableCell>{TYPE_LABELS[medium.type]}</TableCell>
+                <TableCell>{medium.brand || 'No brand'}</TableCell>
+                <TableCell>{medium.colorCount || 'Not recorded'}</TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => openEdit(medium)}
+                      disabled={isEditorLocked}
+                      aria-label={`Edit ${medium.name}`}
+                    >
+                      <Edit2 className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => setMediumToDelete(medium)}
+                      disabled={deleteMedium.isPending}
+                      aria-label={`Delete ${medium.name}`}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : (
+        <p className="text-muted-foreground py-8 text-center">
+          You haven't added any coloring mediums yet.
+        </p>
+      )}
 
       <AlertDialog
         open={Boolean(mediumToDelete)}
@@ -391,6 +369,6 @@ export default function ColoringMediumList() {
           </form>
         </DialogContent>
       </Dialog>
-    </MainLayout>
+    </ManageListsLayout>
   );
 }

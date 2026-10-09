@@ -44,4 +44,32 @@ describe('useColoringPages detail seeding', () => {
     expect(state?.status).toBe('error');
     expect(state?.data).toBeUndefined();
   });
+
+  it('does not seed a page detail while its fetch is in flight', async () => {
+    mocks.listPages.mockResolvedValue({ items: [{ id: 'page' }] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const detailKey = queryKeys.coloring.pages.detail('page');
+    let rejectDetail!: (error: ClientResponseError) => void;
+    const detailPromise = new Promise<never>((_resolve, reject) => {
+      rejectDetail = reject;
+    });
+    const detailFetch = client
+      .fetchQuery({ queryKey: detailKey, queryFn: () => detailPromise })
+      .catch(() => undefined);
+
+    expect(client.getQueryState(detailKey)?.fetchStatus).toBe('fetching');
+    const { result } = renderPages(client);
+
+    try {
+      await waitFor(() => expect(result.current.data).toBeDefined());
+      expect(client.getQueryState(detailKey)?.fetchStatus).toBe('fetching');
+      expect(client.getQueryData(detailKey)).toBeUndefined();
+    } finally {
+      rejectDetail(new ClientResponseError({ status: 403 }));
+      await detailFetch;
+    }
+
+    expect(client.getQueryState(detailKey)?.status).toBe('error');
+    expect(client.getQueryData(detailKey)).toBeUndefined();
+  });
 });

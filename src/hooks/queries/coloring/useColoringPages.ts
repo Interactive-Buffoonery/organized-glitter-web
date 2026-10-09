@@ -19,9 +19,11 @@ export function useColoringPages(filters: ColoringPagesListOptions | undefined) 
   useEffect(() => {
     query.data?.items.forEach(page => {
       const detailKey = queryKeys.coloring.pages.detail(page.id);
-      // A failed detail (such as a 403) owns its own recovery. Seeding over it
-      // would clear the error and show a page the user cannot view.
-      if (queryClient.getQueryState(detailKey)?.status === 'error') return;
+      // A failed or in-flight detail owns its own result. In-flight seeds can
+      // survive a cancel and hide a pending denial.
+      const detailState = queryClient.getQueryState(detailKey);
+      if (detailState && (detailState.status === 'error' || detailState.fetchStatus !== 'idle'))
+        return;
       queryClient.setQueryData(detailKey, page);
     });
   }, [query.data, queryClient]);

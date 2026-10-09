@@ -1,5 +1,5 @@
 import { ClientResponseError } from 'pocketbase';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { defaultQueryRetry, queryClient } from '@/lib/queryClient';
 
@@ -37,6 +37,17 @@ describe('queryClient query retry defaults', () => {
     ['an unclassified error', new Error('Unexpected value')],
   ])('does not retry %s', (_label, error) => {
     expect(defaultQueryRetry(0, error)).toBe(false);
+  });
+
+  it('does not retry unclassified errors while offline', () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      expect(defaultQueryRetry(0, new Error('Unexpected value'))).toBe(false);
+      expect(defaultQueryRetry(0, new TypeError('Failed to fetch'))).toBe(true);
+      expect(defaultQueryRetry(0, responseError(0))).toBe(true);
+    } finally {
+      online.mockRestore();
+    }
   });
 
   it('stops after two retries', () => {

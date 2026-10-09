@@ -108,4 +108,13 @@ describe('ColoringPagePhotoSection', () => {
     const imageAlts = screen.getAllByRole('img').map(image => image.getAttribute('alt') ?? '');
     expect(imageAlts).not.toEqual(expect.arrayContaining([expect.stringMatching(/\bphoto\b/i)]));
   });
+
+  it('preserves the whole lead artwork', () => {
+    renderPhotoSection();
+
+    const leadArtwork = screen.getByRole('img', { name: 'Page 7 lead artwork' });
+    expect(leadArtwork).toHaveClass('object-contain');
+    expect(leadArtwork).not.toHaveClass('object-cover');
+    expect(screen.getByRole('img', { name: 'Page 7 attachment 1' })).toHaveClass('object-cover');
+  });
 });

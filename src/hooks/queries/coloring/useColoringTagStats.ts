@@ -13,7 +13,7 @@ export function useColoringTagStats(tagIds: string[]) {
     queryFn: async () => {
       const result = await ColoringTagService.getBulkColoringTagStats(tagIds);
       if (isServiceResponseError(result)) {
-        throw new Error(result.error?.message || 'Failed to load coloring tag stats');
+        throw result.error;
       }
       return result.data;
     },

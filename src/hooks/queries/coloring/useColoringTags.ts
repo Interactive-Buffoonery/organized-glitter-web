@@ -13,7 +13,7 @@ export function useColoringTags() {
     queryFn: async () => {
       const result = await ColoringTagService.listColoringTags();
       if (isServiceResponseError(result)) {
-        throw new Error(result.error?.message || 'Failed to load coloring tags');
+        throw result.error;
       }
       return result.data;
     },

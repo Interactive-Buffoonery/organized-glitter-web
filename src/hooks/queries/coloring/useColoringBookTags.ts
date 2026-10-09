@@ -10,7 +10,7 @@ export function useColoringBookTags(bookId: string | undefined) {
     queryFn: async () => {
       const result = await ColoringTagService.getBookTags(bookId!);
       if (isServiceResponseError(result)) {
-        throw new Error(result.error?.message || 'Failed to load coloring book tags');
+        throw result.error;
       }
       return result.data;
     },

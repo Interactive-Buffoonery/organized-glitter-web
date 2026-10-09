@@ -63,3 +63,48 @@ for (const viewport of [
     });
   }
 }
+
+for (const route of ['/login', '/register']) {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    for (const width of [1280, 320]) {
+      test(`${route} social sign-in failure is accessible in ${colorScheme} at ${width}px`, async ({
+        page,
+      }, testInfo) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+        await page.addInitScript(() => localStorage.setItem('theme', 'system'));
+        await page.route('**/api/collections/users/auth-methods*', route => route.abort());
+        await page.goto(route);
+        await expect(page.locator('html')).toHaveAttribute('data-theme', colorScheme);
+
+        const alert = page.getByRole('alert').filter({ hasText: 'Social sign-in is unavailable' });
+        await expect(alert).toHaveText(
+          'Social sign-in is unavailable right now. Use email and password.'
+        );
+        await alert.scrollIntoViewIfNeeded();
+        await expect(alert).toBeInViewport();
+        await expect(page.getByLabel('Email', { exact: true })).toBeEditable();
+        await expect(page.getByLabel('Password', { exact: true })).toBeEditable();
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+        ).toBe(true);
+
+        const builder = await createAxeBuilder(page, { include: '[role="alert"]' });
+        const results = await builder.analyze();
+        await testInfo.attach('social-sign-in-contrast', {
+          body: JSON.stringify(results, null, 2),
+          contentType: 'application/json',
+        });
+        expect(results.violations).toEqual([]);
+        expect(results.incomplete.filter(result => result.id === 'color-contrast')).toEqual([]);
+        expect(results.passes.find(result => result.id === 'color-contrast')?.nodes).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              html: expect.stringContaining('Social sign-in is unavailable'),
+            }),
+          ])
+        );
+      });
+    }
+  }
+}

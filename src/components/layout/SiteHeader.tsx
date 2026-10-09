@@ -70,7 +70,7 @@ export function SiteHeader({ currentPage = '' }: SiteHeaderProps) {
             aria-hidden
             hidden={logoFailed}
             onError={() => setLogoFailed(true)}
-            className="size-8 flex-shrink-0 object-contain"
+            className="size-10 flex-shrink-0 object-contain"
           />
           <span
             className={cn(

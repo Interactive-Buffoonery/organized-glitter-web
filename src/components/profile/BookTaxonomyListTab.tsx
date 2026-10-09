@@ -206,7 +206,9 @@ export function BookTaxonomyListTab({ kind }: BookTaxonomyListTabProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              {kind === 'publishers' && <TableHead>Website</TableHead>}
+              {kind === 'publishers' && (
+                <TableHead className="hidden sm:table-cell">Website</TableHead>
+              )}
               <TableHead className="w-32 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -215,7 +217,7 @@ export function BookTaxonomyListTab({ kind }: BookTaxonomyListTabProps) {
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.name}</TableCell>
                 {kind === 'publishers' && (
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     {getSafeHref(item.websiteUrl) ? (
                       <a
                         href={getSafeHref(item.websiteUrl)}

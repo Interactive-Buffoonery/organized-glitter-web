@@ -180,8 +180,8 @@ export default function ColoringMediumList() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Brand</TableHead>
-              <TableHead>Colors</TableHead>
+              <TableHead className="hidden sm:table-cell">Brand</TableHead>
+              <TableHead className="hidden sm:table-cell">Colors</TableHead>
               <TableHead className="w-32 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -190,8 +190,10 @@ export default function ColoringMediumList() {
               <TableRow key={medium.id}>
                 <TableCell className="font-medium">{medium.name}</TableCell>
                 <TableCell>{TYPE_LABELS[medium.type]}</TableCell>
-                <TableCell>{medium.brand || 'No brand'}</TableCell>
-                <TableCell>{medium.colorCount || 'Not recorded'}</TableCell>
+                <TableCell className="hidden sm:table-cell">{medium.brand || 'No brand'}</TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  {medium.colorCount || 'Not recorded'}
+                </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-2">
                     <Button

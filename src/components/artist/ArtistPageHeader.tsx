@@ -10,7 +10,7 @@ import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -88,11 +88,14 @@ const ArtistPageHeader = ({ artists }: ArtistPageHeaderProps) => {
       action={
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="glass">Add Artist</Button>
+            <Button type="button" variant="glass">
+              <Plus className="mr-2 size-4" />
+              Add artist
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Artist</DialogTitle>
+              <DialogTitle>Add artist</DialogTitle>
               <DialogDescription>
                 Enter the name of the diamond painting artist you want to add to your list.
               </DialogDescription>
@@ -117,7 +120,7 @@ const ArtistPageHeader = ({ artists }: ArtistPageHeaderProps) => {
                   {createArtistMutation.isPending && (
                     <Loader2 className="mr-2 size-4 animate-spin" />
                   )}
-                  Add Artist
+                  Add artist
                 </Button>
               </DialogFooter>
             </form>

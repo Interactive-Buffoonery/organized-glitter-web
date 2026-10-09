@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 
 const { enabledVerticalsState } = vi.hoisted(() => ({
   enabledVerticalsState: {
@@ -33,12 +33,22 @@ import Options from '../Options';
 
 const originalMatchMedia = window.matchMedia;
 
+let isDesktopScreen = false;
+const mediaListeners = new Set<() => void>();
+
 const setDesktop = (isDesktop: boolean) => {
+  isDesktopScreen = isDesktop;
+  mediaListeners.forEach(listener => listener());
+};
+
+const mockMatchMedia = () => {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: isDesktop,
+    get matches() {
+      return isDesktopScreen;
+    },
     media: query,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
+    addEventListener: (_event: string, listener: () => void) => mediaListeners.add(listener),
+    removeEventListener: (_event: string, listener: () => void) => mediaListeners.delete(listener),
   }));
 };
 
@@ -57,6 +67,8 @@ describe('Options', () => {
     enabledVerticalsState.diamond_painting = true;
     enabledVerticalsState.coloring_books = true;
     enabledVerticalsState.isLoading = false;
+    mediaListeners.clear();
+    mockMatchMedia();
     setDesktop(false);
   });
 
@@ -83,6 +95,15 @@ describe('Options', () => {
     enabledVerticalsState.diamond_painting = false;
 
     renderOptions();
+
+    expect(screen.getByText('List page')).toBeInTheDocument();
+  });
+
+  it('opens the first list when the screen grows to large', () => {
+    renderOptions();
+    expect(screen.queryByText('List page')).not.toBeInTheDocument();
+
+    act(() => setDesktop(true));
 
     expect(screen.getByText('List page')).toBeInTheDocument();
   });

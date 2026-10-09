@@ -15,7 +15,6 @@ export function useProgressNotesQuery(projectId: string | null) {
     },
     enabled: !!projectId,
     ...queryFreshness('frequent'),
-    retry: 2,
     placeholderData: () => [],
     refetchOnMount: false,
     refetchOnWindowFocus: false,

@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { TagService } from '@/services/pocketbase/tags.service';
 import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 import { useAuth } from '@/hooks/useAuth';
-import { isNonRetryableError } from '@/services/errors';
 import { createLogger } from '@/utils/logger';
 import { queryKeys } from './queryKeys';
 
@@ -42,14 +41,6 @@ export function useTagStats(tagIds: string[]): TagStatsResult {
     },
     enabled: !!user?.id && tagIds.length > 0,
     ...queryFreshness('frequent'),
-    retry: (failureCount, error: Error) => {
-      // Don't retry on client errors (4xx) - likely auth or permission issues
-      if (isNonRetryableError(error)) {
-        return false;
-      }
-      // Retry up to 2 times for network errors
-      return failureCount < 2;
-    },
     refetchOnWindowFocus: false, // Don't refetch when window gains focus
     refetchOnMount: false, // Don't refetch if we have fresh data
   });

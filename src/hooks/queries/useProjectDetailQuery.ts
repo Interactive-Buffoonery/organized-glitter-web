@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { resolveFileUrl } from '@/lib/pocketbase';
 import { projectsService } from '@/services/pocketbase/projects.service';
+import { defaultQueryRetry } from '@/lib/queryClient';
 import { createLogger } from '@/utils/logger';
 import { toUserDateString } from '@/utils/date/timezoneUtils';
 import { ProjectType } from '@/types/project';
@@ -105,8 +106,7 @@ export const useProjectDetailQuery = (
         }
       }
 
-      // Default retry logic for other errors
-      return failureCount < 3;
+      return defaultQueryRetry(failureCount, error);
     },
   });
 };

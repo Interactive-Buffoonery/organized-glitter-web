@@ -14,7 +14,6 @@ export function useColoringPages(filters: ColoringPagesListOptions | undefined) 
     queryFn: () => ColoringService.listPages(filters!),
     enabled: !!filters?.bookId,
     ...queryFreshness('frequent'),
-    retry: 2,
   });
 
   useEffect(() => {

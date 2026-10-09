@@ -129,6 +129,14 @@ Pick a profile by name; do not set `staleTime` or `gcTime` per call site. ESLint
 enforces this in `src/hooks` and `src/contexts`. The few deliberate exceptions
 disable the rule inline with a reason.
 
+## Query retry
+
+Every query uses one retry policy, `defaultQueryRetry` in
+`src/lib/queryClient.ts`. Network failures (including PocketBase status 0),
+429, and 5xx retry twice with backoff. Cancelled requests, 4xx, validation,
+and unclassified errors fail at once. Query functions rethrow the original
+error so `ErrorHandler` can classify it. Mutations never retry.
+
 ## Berry Cream
 
 The app's color palette family. Berry Cream Light uses warm pink surfaces, a

@@ -13,6 +13,5 @@ export function useColoringBooks(filters: ColoringBookListOptions | undefined) {
     enabled: !!filters?.userId,
     placeholderData: keepPreviousData,
     ...queryFreshness('frequent'),
-    retry: 2,
   });
 }

@@ -9,6 +9,5 @@ export function useBookIllustrators(userId: string | undefined) {
     queryFn: () => BookIllustratorsService.listAll(userId!),
     enabled: !!userId,
     ...queryFreshness('frequent'),
-    retry: 2,
   });
 }

@@ -9,6 +9,5 @@ export function useBookPublishers(userId: string | undefined) {
     queryFn: () => BookPublishersService.listAll(userId!),
     enabled: !!userId,
     ...queryFreshness('frequent'),
-    retry: 2,
   });
 }

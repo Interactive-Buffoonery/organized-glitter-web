@@ -1,22 +1,5 @@
 import { queryOptions } from '@tanstack/react-query';
-import { isNonRetryableError } from '@/services/errors';
 import { createLogger } from '@/utils/logger';
-
-const logger = createLogger('QueryUtils');
-
-const standardRetryConfig = (failureCount: number, error: Error): boolean => {
-  if (isNonRetryableError(error)) {
-    logger.debug('Not retrying non-retryable error', { message: error?.message });
-    return false;
-  }
-  const shouldRetry = failureCount < 2;
-  logger.debug('Retry decision', { failureCount, shouldRetry, message: error?.message });
-  return shouldRetry;
-};
-
-const standardRetryDelay = (attemptIndex: number): number => {
-  return Math.min(1000 * 2 ** attemptIndex, 30000);
-};
 
 export type QueryFreshness = 'standard' | 'frequent' | 'interactive' | 'activity';
 
@@ -55,8 +38,8 @@ interface UserScopedQueryOptionsArgs<TQueryKey extends readonly unknown[], TData
 
 /**
  * Builds a queryOptions object for queries scoped to an authenticated user.
- * Owns the retry policy, the user-enabled gate, and the freshness profile so
- * callers do not assemble these fields themselves.
+ * Owns the user-enabled gate and the freshness profile so callers do not
+ * assemble these fields themselves. Retry comes from the query client.
  */
 export const userScopedQueryOptions = <TQueryKey extends readonly unknown[], TData>({
   queryKey,
@@ -71,7 +54,5 @@ export const userScopedQueryOptions = <TQueryKey extends readonly unknown[], TDa
     ...queryFreshness(freshness),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    retry: standardRetryConfig,
-    retryDelay: standardRetryDelay,
   });
 };

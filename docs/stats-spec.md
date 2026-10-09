@@ -78,7 +78,7 @@ The `/api/stats/collection` response always returns all six buckets in the order
 
 ## Endpoint: `GET /api/stats/summary`
 
-Returns the top-level stats summary for the authenticated user. Read the in-stash count from `statusBreakdown.stash`; `metrics` does not include `inStash`.
+Returns the top-level stats summary for the authenticated user. Read the in-stash count from `statusBreakdown.stash`; `metrics.inStash` remains available for older clients and returns the same exact-status count.
 
 ### Query Params
 
@@ -96,6 +96,7 @@ Returns the top-level stats summary for the authenticated user. Read the in-stas
     "totalKits": 42,
     "completedThisYear": 6,
     "inProgress": 2,
+    "inStash": 16,
     "allTimeCompleted": 18,
     "wishlistSize": 9
   },
@@ -349,7 +350,7 @@ LIMIT 10;
 
 ## Coloring Endpoint: `GET /api/stats/coloring/summary?year=YYYY`
 
-Returns the top-level coloring stats summary for the authenticated user. All book and page status keys are present, even when their count is zero. Read the in-stash count from `bookStatusBreakdown.in_stash`; `metrics` does not include `inStash`.
+Returns the top-level coloring stats summary for the authenticated user. All book and page status keys are present, even when their count is zero. Read the in-stash count from `bookStatusBreakdown.in_stash`; `metrics.inStash` remains available for older clients and returns the same exact-status count.
 
 ### Query Params
 
@@ -367,6 +368,7 @@ Returns the top-level coloring stats summary for the authenticated user. All boo
     "totalBooks": 18,
     "completedPagesThisYear": 42,
     "activePages": 5,
+    "inStash": 6,
     "allTimeCompletedPages": 120,
     "wishlistSize": 3
   },

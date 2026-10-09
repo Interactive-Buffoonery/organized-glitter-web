@@ -237,7 +237,7 @@ try {
   await secondClient.collection('users').authWithPassword(secondUser.email, password);
 
   const firstSummary = await getStats(firstClient, '/api/stats/summary', '?year=2026');
-  assert.equal(Object.hasOwn(firstSummary.metrics, 'inStash'), false);
+  assert.equal(firstSummary.metrics.inStash, 0);
   assert.equal(firstSummary.statusBreakdown.stash, 0);
   assert.equal(firstSummary.metrics.totalKits, 3);
   assert.equal(firstSummary.metrics.completedThisYear, 1);
@@ -299,7 +299,7 @@ try {
     '/api/stats/coloring/summary',
     '?year=2026'
   );
-  assert.equal(Object.hasOwn(firstColoringSummary.metrics, 'inStash'), false);
+  assert.equal(firstColoringSummary.metrics.inStash, 0);
   assert.equal(firstColoringSummary.bookStatusBreakdown.in_stash, 0);
   assert.equal(firstColoringSummary.metrics.totalBooks, 1);
   assert.equal(firstColoringSummary.metrics.completedPagesThisYear, 1);
@@ -346,7 +346,38 @@ try {
     { key: 'completed', label: 'Completed', count: 0 },
   ]);
 
-  console.log('PocketBase stats routes: seeded aliases and user isolation passed');
+  for (const status of ['stash', 'stash', 'purchased', 'kitted']) {
+    await createProject(admin, firstUser, { title: `First user ${status}`, status });
+  }
+  await createProject(admin, secondUser, { title: 'Second user stash', status: 'stash' });
+  for (const status of ['in_stash', 'in_stash', 'purchased']) {
+    await createColoringBook(admin, firstUser, {
+      title: `First user ${status}`,
+      status,
+      totalPages: 1,
+    });
+  }
+  await createColoringBook(admin, secondUser, {
+    title: 'Second user stash book',
+    status: 'in_stash',
+    totalPages: 1,
+  });
+
+  for (const [client, expectedCount] of [
+    [firstClient, 2],
+    [secondClient, 1],
+  ]) {
+    const diamond = await getStats(client, '/api/stats/summary', '?year=2026');
+    assert.equal(diamond.statusBreakdown.stash, expectedCount);
+    assert.equal(diamond.metrics.inStash, expectedCount);
+    const coloring = await getStats(client, '/api/stats/coloring/summary', '?year=2026');
+    assert.equal(coloring.bookStatusBreakdown.in_stash, expectedCount);
+    assert.equal(coloring.metrics.inStash, expectedCount);
+  }
+
+  console.log(
+    'PocketBase stats routes: aliases, exact stash counts, compatibility, and user isolation passed'
+  );
 } finally {
   await new Promise(resolve => {
     if (server.exitCode !== null || server.signalCode !== null) return resolve();

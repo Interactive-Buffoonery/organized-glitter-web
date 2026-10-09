@@ -11,7 +11,7 @@ type StatsMetricKey =
   | 'allTimeCompleted'
   | 'wishlistSize';
 
-type StatsSummaryMetrics = Record<StatsMetricKey, number>;
+type StatsSummaryMetrics = Record<StatsMetricKey, number> & { inStash?: number };
 
 export type StatsStatusBreakdown = Record<ProjectStatus, number>;
 
@@ -136,7 +136,7 @@ type ColoringStatsMetricKey =
   | 'allTimeCompletedPages'
   | 'wishlistSize';
 
-type ColoringStatsSummaryMetrics = Record<ColoringStatsMetricKey, number>;
+type ColoringStatsSummaryMetrics = Record<ColoringStatsMetricKey, number> & { inStash?: number };
 
 export type ColoringBookStatusBreakdown = Record<ColoringBooksStatusOptions, number>;
 

@@ -150,19 +150,25 @@ export class ErrorHandler {
           cause: error,
         };
 
-      case 500:
-      case 502:
-      case 503:
-      case 504:
+      case 0:
         return {
-          type: 'server',
-          message: 'Server error. Please try again later.',
-          status,
+          type: 'network',
+          message: 'Network connection failed. Please check your connection and try again.',
+          status: 0,
           retryable: true,
           cause: error,
         };
 
       default:
+        if (status >= 500) {
+          return {
+            type: 'server',
+            message: 'Server error. Please try again later.',
+            status,
+            retryable: true,
+            cause: error,
+          };
+        }
         return {
           type: 'server',
           message: message || 'An unexpected error occurred',

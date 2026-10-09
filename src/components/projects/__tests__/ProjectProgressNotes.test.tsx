@@ -138,6 +138,20 @@ describe('ProjectProgressNotes', () => {
     deleteProgressNoteImageMutationState.isPending = false;
   });
 
+  it('shows the load error when no progress notes exist', () => {
+    useProgressNotesQueryMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: new Error('Offline'),
+    });
+
+    renderWithProviders(<ProjectProgressNotes project={baseProject} />);
+
+    expect(screen.getByText('Error loading progress notes. Please try again.')).toBeInTheDocument();
+    expect(screen.queryByTestId('progress-notes-list')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add a progress note/i })).not.toBeInTheDocument();
+  });
+
   it('preserves the mounted timeline during a failed background refetch', () => {
     const data = [{ id: 'note-1', content: 'Saved note' }];
     useProgressNotesQueryMock.mockReturnValue({ data, isLoading: false, error: null });
@@ -150,6 +164,10 @@ describe('ProjectProgressNotes', () => {
     });
     rerender(<ProjectProgressNotes project={baseProject} />);
     expect(screen.getByTestId('progress-notes-list')).toBe(list);
+    expect(list).toHaveTextContent('Notes: 1');
+    expect(
+      screen.queryByText('Error loading progress notes. Please try again.')
+    ).not.toBeInTheDocument();
   });
 
   it('uses the first-note copy and hides the list when there are no progress notes', () => {

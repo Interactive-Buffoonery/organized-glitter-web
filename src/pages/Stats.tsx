@@ -47,6 +47,7 @@ import type {
   StatsTopListGroup,
   StatsTopListItem,
 } from '@/types/stats';
+import { countUnit, type CountUnit } from '@/utils/countUnit';
 import {
   monthlyCompletionsToChartPoints,
   normalizeTopListGroup,
@@ -156,7 +157,7 @@ function LeadReport({
   emptyDescription,
 }: {
   title: string;
-  unit: string;
+  unit: CountUnit;
   timeScope: StatsTimeScope;
   queries: DiamondQueries | ColoringQueries;
   total: number | undefined;
@@ -181,7 +182,7 @@ function LeadReport({
           <p className="text-foreground mt-1 flex flex-wrap items-baseline gap-2 text-4xl font-semibold tracking-tight tabular-nums">
             {formatStatsNumber(leadTotal)}
             <span className="text-muted-foreground text-base font-medium tracking-normal">
-              {unit}
+              {countUnit(leadTotal, unit)}
             </span>
           </p>
         )}
@@ -242,7 +243,7 @@ function PriorYearsListLeft({
   return (
     <div className="space-y-1.5">
       <p className="text-muted-foreground text-xs">Prior years</p>
-      <dl aria-label="Prior year totals" className="text-muted-foreground text-xs leading-6">
+      <dl aria-label="Prior year totals" className="text-muted-foreground w-fit text-xs leading-6">
         {priorYears.map(year => (
           <div key={year.year} className="flex items-baseline justify-between gap-3">
             <dt className="font-mono tracking-[0.04em]">{year.year}</dt>
@@ -294,7 +295,7 @@ function DiamondRegion({
     <StatsCraftRegion id="diamond-stats-region" title="Diamond paintings" isSeparated={isSeparated}>
       <LeadReport
         title="Diamond paintings"
-        unit="paintings"
+        unit="painting"
         timeScope={timeScope}
         queries={queries}
         total={summary?.metrics.completedThisYear}
@@ -459,7 +460,7 @@ function ColoringRegion({
     >
       <LeadReport
         title="Coloring"
-        unit="pages"
+        unit="page"
         timeScope={timeScope}
         queries={queries}
         total={summary?.metrics.completedPagesThisYear}

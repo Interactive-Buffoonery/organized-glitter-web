@@ -18,10 +18,14 @@ const snapshot = {
   completedThisMonthCount: 4,
 };
 
-const renderRail = (isLoading = false, verticals = { canUseDiamond: true, canUseColoring: true }) =>
+const renderRail = (
+  isLoading = false,
+  verticals = { canUseDiamond: true, canUseColoring: true },
+  currentSnapshot = snapshot
+) =>
   render(
     <MemoryRouter>
-      <OverviewRightRail snapshot={snapshot} isLoading={isLoading} {...verticals} />
+      <OverviewRightRail snapshot={currentSnapshot} isLoading={isLoading} {...verticals} />
     </MemoryRouter>
   );
 
@@ -54,6 +58,17 @@ describe('OverviewRightRail', () => {
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('8')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
+  });
+
+  it('uses singular labels for one active item', () => {
+    renderRail(false, undefined, {
+      ...snapshot,
+      diamondActiveCount: 1,
+      coloringPageInProgressCount: 1,
+    });
+
+    expect(screen.getByText('Diamond painting in progress')).toBeInTheDocument();
+    expect(screen.getByText('Coloring page in progress')).toBeInTheDocument();
   });
 
   it('renders loading skeletons instead of snapshot numbers', () => {

@@ -91,7 +91,7 @@ export const OfflinePage: React.FC<OfflinePageProps> = ({
     return () => window.clearTimeout(portalTimer);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!portalContainer) {
       return;
     }

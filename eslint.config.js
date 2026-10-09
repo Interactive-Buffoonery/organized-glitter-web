@@ -132,7 +132,22 @@ export default tseslint.config(
         },
         {
           selector:
-            'Property[key.name=/^(refetchOnWindowFocus|refetchOnReconnect|refetchOnMount)$/][value.value=false]',
+            'Property[key.name=/^(refetchOnWindowFocus|refetchOnReconnect|refetchOnMount)$/][value.value=false], Property[key.value=/^(refetchOnWindowFocus|refetchOnReconnect|refetchOnMount)$/][value.value=false]',
+          message:
+            'Focus, reconnect, and mount refetching keep data fresh across devices (ADR-0004). Keep the query client defaults.',
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/hooks/queries/shared/queryUtils.ts'],
+    ignores: ['**/__tests__/**', '**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'Property[key.name=/^(refetchOnWindowFocus|refetchOnReconnect|refetchOnMount)$/][value.value=false], Property[key.value=/^(refetchOnWindowFocus|refetchOnReconnect|refetchOnMount)$/][value.value=false]',
           message:
             'Focus, reconnect, and mount refetching keep data fresh across devices (ADR-0004). Keep the query client defaults.',
         },

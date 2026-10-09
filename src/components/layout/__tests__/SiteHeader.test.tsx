@@ -80,7 +80,7 @@ describe('SiteHeader', () => {
     const homeLink = screen.getByRole('link', { name: 'Organized Glitter home' });
     expect(homeLink).toHaveAttribute('href', '/');
     expect(homeLink).toHaveClass('min-h-11', 'min-w-11');
-    expect(homeLink.querySelector('img')).toHaveClass('size-8');
+    expect(homeLink.querySelector('img')).toHaveClass('size-10');
   });
 
   it('hides the decorative logo when the image cannot load', () => {

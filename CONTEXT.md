@@ -131,11 +131,15 @@ disable the rule inline with a reason.
 
 ## Query retry
 
-Every query uses one retry policy, `defaultQueryRetry` in
-`src/lib/queryClient.ts`. Network failures (including PocketBase status 0),
-429, and 5xx retry twice with backoff. Cancelled requests, 4xx, validation,
-and unclassified errors fail at once. Query functions rethrow the original
-error so `ErrorHandler` can classify it. Mutations never retry.
+Queries inherit `defaultQueryRetry` from `src/lib/queryClient.ts`. Network
+failures (including PocketBase status 0), 429, and 5xx retry twice with backoff.
+Cancelled requests, other 4xx, validation, and unclassified errors fail at once.
+Query functions rethrow the original error so `ErrorHandler` can classify it.
+Mutations never retry.
+
+Two queries keep explicit exceptions: `useProjectDetailQuery` also retries
+401/403 auth races and expand-related 404 errors twice; other failures use the
+default policy. `useDashboardNavigationContext` retries once.
 
 ## Berry Cream
 

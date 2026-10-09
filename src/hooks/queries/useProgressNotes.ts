@@ -16,7 +16,5 @@ export function useProgressNotesQuery(projectId: string | null) {
     enabled: !!projectId,
     ...queryFreshness('frequent'),
     placeholderData: () => [],
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
   });
 }

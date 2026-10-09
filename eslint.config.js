@@ -130,6 +130,12 @@ export default tseslint.config(
           message:
             "Spread queryFreshness('<profile>') from '@/hooks/queries/shared/queryUtils' instead of setting staleTime or gcTime.",
         },
+        {
+          selector:
+            'Property[key.name=/^(refetchOnWindowFocus|refetchOnReconnect|refetchOnMount)$/][value.value=false]',
+          message:
+            'Focus, reconnect, and mount refetching keep data fresh across devices (ADR-0004). Keep the query client defaults.',
+        },
       ],
     },
   },

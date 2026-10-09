@@ -14,7 +14,5 @@ export function useColoringPageProgressNotes(pageId: string | null) {
     enabled: Boolean(pageId),
     ...queryFreshness('frequent'),
     placeholderData: () => [],
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
   });
 }

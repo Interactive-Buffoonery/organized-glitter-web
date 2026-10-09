@@ -52,7 +52,5 @@ export const userScopedQueryOptions = <TQueryKey extends readonly unknown[], TDa
     queryFn,
     enabled: !!userId,
     ...queryFreshness(freshness),
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
   });
 };

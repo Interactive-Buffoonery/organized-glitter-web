@@ -138,6 +138,20 @@ describe('ProjectProgressNotes', () => {
     deleteProgressNoteImageMutationState.isPending = false;
   });
 
+  it('preserves the mounted timeline during a failed background refetch', () => {
+    const data = [{ id: 'note-1', content: 'Saved note' }];
+    useProgressNotesQueryMock.mockReturnValue({ data, isLoading: false, error: null });
+    const { rerender } = renderWithProviders(<ProjectProgressNotes project={baseProject} />);
+    const list = screen.getByTestId('progress-notes-list');
+    useProgressNotesQueryMock.mockReturnValue({
+      data,
+      isLoading: false,
+      error: new Error('Offline'),
+    });
+    rerender(<ProjectProgressNotes project={baseProject} />);
+    expect(screen.getByTestId('progress-notes-list')).toBe(list);
+  });
+
   it('uses the first-note copy and hides the list when there are no progress notes', () => {
     renderWithProviders(<ProjectProgressNotes project={baseProject} />);
 

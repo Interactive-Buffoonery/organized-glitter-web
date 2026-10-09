@@ -116,6 +116,20 @@ describe('ColoringPageProgressNotes', () => {
     deleteNoteImageMutationState.isPending = false;
   });
 
+  it('preserves the mounted timeline during a failed background refetch', () => {
+    const data = [{ id: 'note-1', content: 'Saved note' }];
+    useColoringPageProgressNotesMock.mockReturnValue({ data, isLoading: false, error: null });
+    const { rerender } = renderWithProviders(<ColoringPageProgressNotes pageId="page-123" />);
+    const list = screen.getByTestId('progress-notes-list');
+    useColoringPageProgressNotesMock.mockReturnValue({
+      data,
+      isLoading: false,
+      error: new Error('Offline'),
+    });
+    rerender(<ColoringPageProgressNotes pageId="page-123" />);
+    expect(screen.getByTestId('progress-notes-list')).toBe(list);
+  });
+
   it('uses the first-note copy and hides the list when there are no notes', () => {
     renderWithProviders(<ColoringPageProgressNotes pageId="page-123" />);
 

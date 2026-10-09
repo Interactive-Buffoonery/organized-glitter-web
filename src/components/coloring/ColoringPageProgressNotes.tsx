@@ -116,7 +116,7 @@ export function ColoringPageProgressNotes({ pageId, target }: ColoringPageProgre
             </div>
           ))}
         </div>
-      ) : error ? (
+      ) : error && isEmpty ? (
         <div className="text-destructive-text py-8 text-center">
           <p>Error loading progress notes. Please try again.</p>
         </div>

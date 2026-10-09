@@ -1,3 +1,8 @@
+// Session contract: src/lib/pocketbase.ts uses the PocketBase SDK's default
+// LocalAuthStore (pocketbase_auth, token, record with legacy model fallback).
+// BaseAuthStore.isValid reads the JWT exp claim in seconds. Keep this adapter
+// aligned when upgrading the SDK or configuring a custom auth store.
+// This only chooses a navigation link; it must never authorize access.
 (function () {
   function hasCurrentSession() {
     try {

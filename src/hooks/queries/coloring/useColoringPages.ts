@@ -18,7 +18,11 @@ export function useColoringPages(filters: ColoringPagesListOptions | undefined) 
 
   useEffect(() => {
     query.data?.items.forEach(page => {
-      queryClient.setQueryData(queryKeys.coloring.pages.detail(page.id), page);
+      const detailKey = queryKeys.coloring.pages.detail(page.id);
+      // A failed detail (such as a 403) owns its own recovery. Seeding over it
+      // would clear the error and show a page the user cannot view.
+      if (queryClient.getQueryState(detailKey)?.status === 'error') return;
+      queryClient.setQueryData(detailKey, page);
     });
   }, [query.data, queryClient]);
 

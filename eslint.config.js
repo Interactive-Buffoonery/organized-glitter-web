@@ -119,6 +119,21 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/hooks/**/*.{ts,tsx}', 'src/contexts/**/*.{ts,tsx}'],
+    ignores: ['**/__tests__/**', '**/*.test.{ts,tsx}', 'src/hooks/queries/shared/queryUtils.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'Property[key.name=/^(staleTime|gcTime)$/], Property[key.value=/^(staleTime|gcTime)$/]',
+          message:
+            "Spread queryFreshness('<profile>') from '@/hooks/queries/shared/queryUtils' instead of setting staleTime or gcTime.",
+        },
+      ],
+    },
+  },
+  {
     files: ['src/types/pocketbase.types.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',

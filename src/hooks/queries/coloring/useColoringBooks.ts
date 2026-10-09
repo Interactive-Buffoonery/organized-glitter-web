@@ -4,6 +4,7 @@ import {
   type ColoringBookListOptions,
 } from '@/services/pocketbase/coloring.service';
 import { queryKeys } from '@/hooks/queries/queryKeys';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 export function useColoringBooks(filters: ColoringBookListOptions | undefined) {
   return useQuery({
@@ -11,7 +12,7 @@ export function useColoringBooks(filters: ColoringBookListOptions | undefined) {
     queryFn: () => ColoringService.listBooks(filters!),
     enabled: !!filters?.userId,
     placeholderData: keepPreviousData,
-    staleTime: 5 * 60 * 1000,
+    ...queryFreshness('frequent'),
     retry: 2,
   });
 }

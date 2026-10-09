@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { projectsService } from '@/services/pocketbase/projects.service';
 import { queryKeys } from './queryKeys';
 import { useAuth } from '@/hooks/useAuth';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 export const useAvailableYears = () => {
   const { user } = useAuth();
@@ -11,6 +12,6 @@ export const useAvailableYears = () => {
     queryKey: queryKeys.stats.availableYears(userId || 'anonymous'),
     queryFn: () => projectsService.getAvailableYears(userId!),
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    ...queryFreshness('frequent'),
   });
 };

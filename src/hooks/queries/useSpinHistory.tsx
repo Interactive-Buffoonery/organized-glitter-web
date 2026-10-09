@@ -11,6 +11,7 @@ import type { RandomizerSpinsResponse } from '@/types/pocketbase.types';
 import type { RandomizerSpinMetadata } from '@/types/randomizer';
 import { createLogger } from '@/utils/logger';
 import { ErrorHandler } from '@/services/pocketbase/base/ErrorHandler';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 const logger = createLogger('useSpinHistory');
 
@@ -61,8 +62,7 @@ export const useSpinHistory = ({ userId, limit = 8, enabled = true }: UseSpinHis
       return history;
     },
     enabled: enabled && !!userId,
-    staleTime: 30 * 1000, // 30 seconds - relatively fresh for user activity
-    gcTime: 5 * 60 * 1000, // 5 minutes garbage collection
+    ...queryFreshness('activity'),
     refetchOnWindowFocus: false, // Don't refetch when window gains focus
     retry: (failureCount, error) => {
       if (ErrorHandler.isPocketBaseError(error)) {

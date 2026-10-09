@@ -18,7 +18,7 @@ import type { CompanyListItem } from '@/services/pocketbase/companies.service';
 import type { ArtistListItem } from '@/services/pocketbase/artists.service';
 import { ProjectFilterCriteria, ProjectQueryOptions } from '@/types/projectFilters';
 import { Project } from '@/types/project';
-import { userScopedQueryOptions } from './shared/queryUtils';
+import { queryFreshness, userScopedQueryOptions } from './shared/queryUtils';
 
 export interface UseProjectsParams {
   userId: string | undefined;
@@ -272,7 +272,7 @@ export const useProjects = (
       queryFn: () =>
         fetchProjects({ userId: userId!, ...queryParams }, availableCompanies, availableArtists),
       userId,
-      freshness: 'statusCount',
+      freshness: 'interactive',
     }),
     enabled: !!userId && enabled,
     placeholderData: keepPreviousData,
@@ -321,7 +321,7 @@ export const useProjects = (
         ],
         queryFn: () =>
           fetchProjects({ userId, ...nextPageParams }, availableCompanies, availableArtists),
-        staleTime: 2 * 60 * 1000, // Same as main query
+        ...queryFreshness('interactive'),
       });
 
       lastPrefetchKeyRef.current = prefetchKey;

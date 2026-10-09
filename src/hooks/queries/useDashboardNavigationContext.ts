@@ -28,8 +28,10 @@ export const useDashboardNavigationContext = (
     enabled: Boolean(userId) && enabled,
     // Cold mounts should always ask PocketBase for the latest autosaved
     // snapshot instead of reusing a cached value from a prior dashboard visit.
+    /* eslint-disable no-restricted-syntax -- always refetch; no profile fits */
     staleTime: 0,
     gcTime: 5 * 60 * 1000,
+    /* eslint-enable no-restricted-syntax */
     retry: 1,
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,

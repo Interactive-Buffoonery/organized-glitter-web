@@ -3,6 +3,7 @@ import { UserDTO } from '@/services/types';
 import { UsersService } from '@/services/pocketbase/users.service';
 import { resolveFileUrl } from '@/lib/pocketbase';
 import { queryKeys } from './queryKeys';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 /**
  * Fetches user profile data via UsersService
@@ -20,8 +21,7 @@ export const useUserProfileQuery = (userId: string | undefined) => {
     queryKey: userId ? queryKeys.user.profile(userId) : ['user', 'profile', 'disabled'],
     queryFn: () => fetchUserProfile(userId as string),
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes - reduced for faster avatar updates
-    gcTime: 30 * 60 * 1000, // 30 minutes garbage collection
+    ...queryFreshness('frequent'),
     refetchOnWindowFocus: false, // Don't refetch when window regains focus
     retry: (failureCount, error) => {
       // Don't retry on 404 errors (user not found) or auth errors

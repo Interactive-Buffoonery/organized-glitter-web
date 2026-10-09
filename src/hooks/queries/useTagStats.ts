@@ -4,6 +4,7 @@ import { queryKeys } from './queryKeys';
 import { useAuth } from '@/hooks/useAuth';
 import { isNonRetryableError } from '@/services/errors';
 import { createLogger } from '@/utils/logger';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 const logger = createLogger('useTagStats');
 
@@ -40,8 +41,7 @@ export function useTagStats(tagIds: string[]): TagStatsResult {
       return result.data;
     },
     enabled: !!user?.id && tagIds.length > 0,
-    staleTime: 5 * 60 * 1000, // 5 minutes - tag stats don't change frequently
-    gcTime: 10 * 60 * 1000, // 10 minutes cache time (was cacheTime in v4)
+    ...queryFreshness('frequent'),
     retry: (failureCount, error: Error) => {
       // Don't retry on client errors (4xx) - likely auth or permission issues
       if (isNonRetryableError(error)) {

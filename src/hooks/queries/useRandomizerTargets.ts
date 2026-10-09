@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { RandomizerTargetsService } from '@/services/pocketbase/randomizerTargets.service';
 import type { RandomizerEligibility, RandomizerMode } from '@/types/randomizer';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 const randomizerTargetQueryKeys = {
   all: ['randomizer-targets'] as const,
@@ -27,7 +28,7 @@ export function useRandomizerTargets({
     queryKey: randomizerTargetQueryKeys.list(userId ?? '', mode, eligibility),
     queryFn: () => RandomizerTargetsService.listTargets(userId!, mode, eligibility),
     enabled: Boolean(userId) && enabled,
-    staleTime: 2 * 60 * 1000,
+    ...queryFreshness('interactive'),
     retry: 2,
   });
 }
@@ -41,8 +42,10 @@ export function useRandomizerHasTargets({
     queryKey: randomizerTargetQueryKeys.presence(userId ?? '', mode),
     queryFn: () => RandomizerTargetsService.hasTargets(userId!, mode),
     enabled: Boolean(userId) && enabled,
+    /* eslint-disable no-restricted-syntax -- one-off presence check, never cached */
     staleTime: 0,
     gcTime: 0,
+    /* eslint-enable no-restricted-syntax */
     retry: 2,
   });
 }

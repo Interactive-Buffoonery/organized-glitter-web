@@ -7,6 +7,7 @@ import {
   buildProjectUndatedCountQueryKey,
   getProjectUndatedSentinelField,
 } from './projectCollectionQuery';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 /**
  * Queries the total count of projects missing a value for the current sort
@@ -33,7 +34,7 @@ export const useUndatedProjectCount = (
       return projectsService.getUndatedCount({ ...filterCriteria, userId }, sentinelField);
     },
     enabled: !!userId && !!sentinelField,
-    staleTime: 30_000,
+    ...queryFreshness('activity'),
   });
 
   return {

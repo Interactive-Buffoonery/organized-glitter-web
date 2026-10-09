@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { ColoringTagService } from '@/services/pocketbase/coloringTags.service';
 import { isServiceResponseError } from '@/types/shared';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 export function useColoringBookTags(bookId: string | undefined) {
   return useQuery({
@@ -14,6 +15,6 @@ export function useColoringBookTags(bookId: string | undefined) {
       return result.data;
     },
     enabled: Boolean(bookId),
-    staleTime: 5 * 60 * 1000,
+    ...queryFreshness('frequent'),
   });
 }

@@ -59,25 +59,9 @@ export const MetadataProvider = React.memo(({ children }: MetadataProviderProps)
   // This reduces total load time from ~370ms to ~150ms (60% improvement)
   const [companiesQuery, artistsQuery, tagsQuery] = useQueries({
     queries: [
-      {
-        ...allCompaniesOptions(userId || ''),
-        // Enhanced caching for metadata (changes infrequently)
-        staleTime: 10 * 60 * 1000, // 10 minutes (vs default 2 minutes)
-        gcTime: 30 * 60 * 1000, // 30 minutes retention
-        refetchOnWindowFocus: false, // Reduce unnecessary refetches
-      },
-      {
-        ...artistsOptions(userId || ''),
-        staleTime: 10 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
-        refetchOnWindowFocus: false,
-      },
-      {
-        ...tagsOptions(userId || ''),
-        staleTime: 10 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
-        refetchOnWindowFocus: false,
-      },
+      allCompaniesOptions(userId || ''),
+      artistsOptions(userId || ''),
+      tagsOptions(userId || ''),
     ],
   });
 

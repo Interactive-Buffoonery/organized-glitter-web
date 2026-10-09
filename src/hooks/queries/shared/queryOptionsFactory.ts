@@ -92,7 +92,7 @@ export function artistsOptions(userId: string) {
     queryKey: queryKeys.artists.list(userId),
     queryFn: () => fetchArtists(userId),
     userId,
-    freshness: 'frequent',
+    freshness: 'standard',
   });
 }
 
@@ -101,6 +101,6 @@ export function tagsOptions(userId: string) {
     queryKey: queryKeys.tags.list(userId),
     queryFn: () => fetchTags(userId),
     userId,
-    freshness: 'frequent',
+    freshness: 'standard',
   });
 }

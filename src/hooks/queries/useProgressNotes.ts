@@ -4,6 +4,7 @@ import { ProgressNotesService } from '@/services/pocketbase/progressNotes.servic
 import { ProgressNote } from '@/types/project';
 
 import { queryKeys } from './queryKeys';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 export function useProgressNotesQuery(projectId: string | null) {
   return useQuery({
@@ -14,7 +15,7 @@ export function useProgressNotesQuery(projectId: string | null) {
       return ProgressNotesService.listByProject(projectId);
     },
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000,
+    ...queryFreshness('frequent'),
     retry: 2,
     placeholderData: () => [],
     refetchOnMount: false,

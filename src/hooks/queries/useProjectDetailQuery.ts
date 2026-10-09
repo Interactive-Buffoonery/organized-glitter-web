@@ -7,6 +7,7 @@ import { toUserDateString } from '@/utils/date/timezoneUtils';
 const projectDetailLogger = createLogger('useProjectDetailQuery');
 import { ProjectType } from '@/types/project';
 import { queryKeys } from './queryKeys';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 /**
  * Helper function to normalize database date strings to YYYY-MM-DD.
@@ -72,7 +73,7 @@ export const useProjectDetailQuery = (
     queryKey: queryKeys.projects.detail(projectId!),
     queryFn: () => fetchProjectDetail(projectId!, userTimezone),
     enabled: isQueryEnabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    ...queryFreshness('frequent'),
     retry: (failureCount, error) => {
       // Log retry attempts for debugging
       projectDetailLogger.debug('Retry attempt:', {

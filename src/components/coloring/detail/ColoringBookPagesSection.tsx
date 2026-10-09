@@ -5,6 +5,7 @@ import { SectionHeading } from '@/components/shared/Section';
 import { Button } from '@/components/ui/button';
 import { ErrorHandler } from '@/services/pocketbase/base/ErrorHandler';
 import type { ColoringBookDTO, ColoringPageDTO } from '@/services/pocketbase/coloring.service';
+import { countUnit } from '@/utils/countUnit';
 
 interface ColoringBookPagesSectionProps {
   book: ColoringBookDTO;
@@ -47,8 +48,8 @@ export const ColoringBookPagesSection = ({
   const rangeStart = (page - 1) * perPage + 1;
   const rangeEnd = Math.min(page * perPage, totalItems);
   const pageCountLabel = hasPagination
-    ? `${rangeStart}-${rangeEnd} of ${totalItems} pages`
-    : `${pages.length} pages`;
+    ? `${rangeStart}-${rangeEnd} of ${totalItems} ${countUnit(totalItems, 'page')}`
+    : `${pages.length} ${countUnit(pages.length, 'page')}`;
 
   return (
     <section className="space-y-4">

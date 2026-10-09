@@ -237,6 +237,8 @@ try {
   await secondClient.collection('users').authWithPassword(secondUser.email, password);
 
   const firstSummary = await getStats(firstClient, '/api/stats/summary', '?year=2026');
+  assert.equal(Object.hasOwn(firstSummary.metrics, 'inStash'), false);
+  assert.equal(firstSummary.statusBreakdown.stash, 0);
   assert.equal(firstSummary.metrics.totalKits, 3);
   assert.equal(firstSummary.metrics.completedThisYear, 1);
   assert.equal(firstSummary.metrics.allTimeCompleted, 1);
@@ -297,6 +299,8 @@ try {
     '/api/stats/coloring/summary',
     '?year=2026'
   );
+  assert.equal(Object.hasOwn(firstColoringSummary.metrics, 'inStash'), false);
+  assert.equal(firstColoringSummary.bookStatusBreakdown.in_stash, 0);
   assert.equal(firstColoringSummary.metrics.totalBooks, 1);
   assert.equal(firstColoringSummary.metrics.completedPagesThisYear, 1);
   assert.equal(firstColoringSummary.metrics.allTimeCompletedPages, 1);

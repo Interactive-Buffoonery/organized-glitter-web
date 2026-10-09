@@ -4,6 +4,8 @@
 
 The stats API is the shared source of truth for React and future native clients. Metric math lives in PocketBase hooks so clients do not duplicate aggregation rules.
 
+Response examples use illustrative values, not test fixture output.
+
 ## Auth
 
 All endpoints require an authenticated PocketBase user. The server derives the user from `e.auth.id`. Clients must not send a user id in query params or request bodies.
@@ -76,7 +78,7 @@ The `/api/stats/collection` response always returns all six buckets in the order
 
 ## Endpoint: `GET /api/stats/summary`
 
-Returns the top-level stats summary for the authenticated user.
+Returns the top-level stats summary for the authenticated user. Read the in-stash count from `statusBreakdown.stash`; `metrics` does not include `inStash`.
 
 ### Query Params
 
@@ -94,7 +96,6 @@ Returns the top-level stats summary for the authenticated user.
     "totalKits": 42,
     "completedThisYear": 6,
     "inProgress": 2,
-    "inStash": 16,
     "allTimeCompleted": 18,
     "wishlistSize": 9
   },
@@ -348,7 +349,7 @@ LIMIT 10;
 
 ## Coloring Endpoint: `GET /api/stats/coloring/summary?year=YYYY`
 
-Returns the top-level coloring stats summary for the authenticated user. All book and page status keys are present, even when their count is zero.
+Returns the top-level coloring stats summary for the authenticated user. All book and page status keys are present, even when their count is zero. Read the in-stash count from `bookStatusBreakdown.in_stash`; `metrics` does not include `inStash`.
 
 ### Query Params
 
@@ -366,7 +367,6 @@ Returns the top-level coloring stats summary for the authenticated user. All boo
     "totalBooks": 18,
     "completedPagesThisYear": 42,
     "activePages": 5,
-    "inStash": 6,
     "allTimeCompletedPages": 120,
     "wishlistSize": 3
   },

@@ -8,7 +8,6 @@ type StatsMetricKey =
   | 'totalKits'
   | 'completedThisYear'
   | 'inProgress'
-  | 'inStash'
   | 'allTimeCompleted'
   | 'wishlistSize';
 
@@ -134,7 +133,6 @@ type ColoringStatsMetricKey =
   | 'totalBooks'
   | 'completedPagesThisYear'
   | 'activePages'
-  | 'inStash'
   | 'allTimeCompletedPages'
   | 'wishlistSize';
 

@@ -172,7 +172,6 @@ describe('ProjectsService', () => {
           totalKits: 10,
           completedThisYear: 2,
           inProgress: 1,
-          inStash: 3,
           allTimeCompleted: 5,
           wishlistSize: 1,
         },

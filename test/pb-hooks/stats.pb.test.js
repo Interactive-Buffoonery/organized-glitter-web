@@ -264,7 +264,7 @@ describe('stats PocketBase hook contract', () => {
       archived: 0,
       destashed: 0,
     });
-    expect(body.metrics.inStash).toBe(3);
+    expect(body.metrics).not.toHaveProperty('inStash');
     expect(body.metrics.inProgress).toBe(5);
     expect(body.metrics.wishlistSize).toBe(1);
   });
@@ -442,7 +442,8 @@ describe('stats PocketBase hook contract', () => {
       'on_hold',
       'completed',
     ]);
-    expect(body.metrics.inStash).toBe(3);
+    expect(body.bookStatusBreakdown.in_stash).toBe(3);
+    expect(body.metrics).not.toHaveProperty('inStash');
     expect(body.metrics.activePages).toBe(8);
     expect(body.metrics.wishlistSize).toBe(1);
   });

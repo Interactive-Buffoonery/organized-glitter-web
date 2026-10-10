@@ -1,11 +1,13 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { ClientResponseError } from 'pocketbase';
 import { describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/hooks/queries/queryKeys';
+import { queryClient } from '@/lib/queryClient';
 import { useColoringPages } from '../useColoringPages';
+import { useColoringPage } from '../useColoringPage';
 
-const mocks = vi.hoisted(() => ({ listPages: vi.fn() }));
+const mocks = vi.hoisted(() => ({ listPages: vi.fn(), getPageById: vi.fn() }));
 vi.mock('@/services/pocketbase/coloring.service', () => ({ ColoringService: mocks }));
 
 const renderPages = (client: QueryClient) =>
@@ -71,5 +73,49 @@ describe('useColoringPages detail seeding', () => {
 
     expect(client.getQueryState(detailKey)?.status).toBe('error');
     expect(client.getQueryData(detailKey)).toBeUndefined();
+  });
+
+  it('recovers an offline detail through reconnect without a list seed', async () => {
+    let backendAvailable = false;
+    mocks.getPageById.mockImplementation(() =>
+      backendAvailable
+        ? Promise.resolve({ id: 'page', title: 'Recovered detail' })
+        : Promise.reject(new ClientResponseError({ status: 0 }))
+    );
+    mocks.listPages.mockResolvedValue({ items: [{ id: 'page', title: 'List data' }] });
+    const defaults = queryClient.getDefaultOptions();
+    const client = new QueryClient({
+      defaultOptions: {
+        ...defaults,
+        queries: { ...defaults.queries, retryDelay: 0 },
+      },
+    });
+    const detailKey = queryKeys.coloring.pages.detail('page');
+    const detail = renderHook(() => useColoringPage('page'), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    let list: ReturnType<typeof renderPages> | undefined;
+
+    try {
+      await waitFor(() => expect(detail.result.current.isError).toBe(true));
+      list = renderPages(client);
+      await waitFor(() => expect(list?.result.current.data).toBeDefined());
+      expect(client.getQueryState(detailKey)?.status).toBe('error');
+      expect(client.getQueryData(detailKey)).toBeUndefined();
+
+      backendAvailable = true;
+      act(() => onlineManager.setOnline(false));
+      act(() => onlineManager.setOnline(true));
+
+      await waitFor(() => expect(detail.result.current.isSuccess).toBe(true));
+      expect(detail.result.current.data).toEqual({ id: 'page', title: 'Recovered detail' });
+    } finally {
+      list?.unmount();
+      detail.unmount();
+      client.clear();
+      onlineManager.setOnline(true);
+    }
   });
 });

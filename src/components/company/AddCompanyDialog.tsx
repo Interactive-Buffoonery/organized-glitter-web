@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 
 import { useCreateCompany } from '@/hooks/mutations/useCompanyMutations';
 import FormField from '@/components/projects/form/FormField';
@@ -135,11 +135,14 @@ const AddCompanyDialog = ({ onCompanyAdded }: AddCompanyDialogProps) => {
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
-        <Button variant="glass">Add Company</Button>
+        <Button type="button" variant="glass">
+          <Plus className="mr-2 size-4" />
+          Add company
+        </Button>
       </DialogTrigger>
       <DialogContent layout="keyboard-safe">
         <DialogHeader>
-          <DialogTitle>Add New Company</DialogTitle>
+          <DialogTitle>Add company</DialogTitle>
           <DialogDescription>
             Enter the name and website URL of the diamond painting company you want to add to your
             list.
@@ -173,7 +176,7 @@ const AddCompanyDialog = ({ onCompanyAdded }: AddCompanyDialogProps) => {
           <DialogFooter>
             <Button type="submit" variant="glass" disabled={createCompanyMutation.isPending}>
               {createCompanyMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Add Company
+              Add company
             </Button>
           </DialogFooter>
         </form>

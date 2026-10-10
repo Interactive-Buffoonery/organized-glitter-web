@@ -17,11 +17,13 @@ It also updates EJS from `3.1.10` to `7.0.1`. Validate Babel transformations,
 typechecking, production service-worker generation, and PWA navigation when
 changing these overrides.
 
-The repository currently pins pnpm `11.1.2`. Frozen-lockfile policy
-revalidation was introduced in [pnpm 11.1.3](https://github.com/pnpm/pnpm/releases/tag/v11.1.3).
-Validate provenance fixes with pnpm `11.1.3` or newer, retaining the policy and
-release-age settings. A passing install with the older pin alone does not
-establish that every locked package meets the trust policy.
+The repository pins pnpm `11.1.3` and requires that version or newer.
+Frozen-lockfile policy revalidation was introduced in
+[pnpm 11.1.3](https://github.com/pnpm/pnpm/releases/tag/v11.1.3), so the CI setup
+action reads the pin and revalidates the frozen lockfile under the trust and
+release-age policies. Validate provenance fixes with pnpm `11.1.3` or newer.
+A passing install with an older version alone does not establish that every
+locked package meets the trust policy.
 
 Remove an override only after its parent package requests a policy-compliant
 replacement and the frozen lockfile passes revalidation. Do not replace these

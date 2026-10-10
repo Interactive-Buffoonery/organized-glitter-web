@@ -5,7 +5,7 @@
   "description": "A coloring book and diamond art tracker for craft stash, progress, and photos",
   "license": "AGPL-3.0-or-later",
   "type": "module",
-  "packageManager": "pnpm@11.1.2",
+  "packageManager": "pnpm@11.1.3",
   "keywords": [
     "coloring-books",
     "coloring-pages",
@@ -31,7 +31,7 @@
   },
   "engines": {
     "node": "24.x",
-    "pnpm": ">=11.1.2"
+    "pnpm": ">=11.1.3"
   },
   "scripts": {
     "dev": "vite",

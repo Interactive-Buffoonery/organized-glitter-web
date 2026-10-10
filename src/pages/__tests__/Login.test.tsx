@@ -160,6 +160,13 @@ describe('Login page', () => {
     authState.initialCheckComplete = true;
   });
 
+  it('separates the welcome heading words in the DOM', () => {
+    renderWithProviders(<Login />);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(
+      'Welcome Back to Organized Glitter'
+    );
+  });
+
   it('redirects already-authenticated users to their preserved destination', async () => {
     authState.isAuthenticated = true;
     useLocationMock.mockReturnValue({

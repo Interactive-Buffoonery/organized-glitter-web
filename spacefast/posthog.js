@@ -138,8 +138,9 @@ export async function proxyPosthog(request, env = {}) {
       },
       async cancel(reason) {
         finish();
+        const cancellation = reader.cancel(reason);
         abortController.abort(reason);
-        await reader.cancel(reason);
+        await cancellation;
       },
     });
     return new Response(responseBody, { status: upstream.status, headers: responseHeaders });

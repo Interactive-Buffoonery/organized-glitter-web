@@ -223,7 +223,18 @@ describe('Spacefast PostHog proxy', () => {
       'fetch',
       vi.fn(async (_url, options) => {
         signal = options.signal;
-        return new Response(new ReadableStream({ cancel }));
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              options.signal.addEventListener(
+                'abort',
+                () => controller.error(options.signal.reason),
+                { once: true }
+              );
+            },
+            cancel,
+          })
+        );
       })
     );
     const response = await proxyPosthog(

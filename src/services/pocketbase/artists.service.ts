@@ -28,6 +28,10 @@ export interface ArtistListItem {
   name: string;
 }
 
+interface ArtistProjectCountsResponse {
+  counts: Record<string, number>;
+}
+
 /** Transform PocketBase record to domain DTO */
 function toArtistDTO(record: ArtistsResponse): ArtistDTO {
   return {
@@ -181,5 +185,16 @@ export class ArtistsService {
 
       await pb.collection(Collections.Artists).delete(id);
     }, 'Artists.delete');
+  }
+
+  /** Get project counts for all artists owned by the current user. */
+  static async getProjectCounts(): Promise<Record<string, number>> {
+    return ErrorHandler.handleAsync(async () => {
+      const result = await pb.send<ArtistProjectCountsResponse>(
+        '/api/stats/artist-project-counts',
+        { method: 'GET' }
+      );
+      return result.counts;
+    }, 'Artists.getProjectCounts');
   }
 }

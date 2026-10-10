@@ -617,6 +617,24 @@ WHERE p.user = :authUserId
 GROUP BY p.company;
 ```
 
+## Endpoint: `GET /api/stats/artist-project-counts`
+
+Returns project counts keyed by artist record ID. Used by the artists list. Same
+response shape as `company-project-counts`; artists with no projects are omitted.
+
+### SQL Sketch
+
+```sql
+SELECT p.artist AS id, COUNT(*) AS total
+FROM projects p
+JOIN artists a ON a.id = p.artist
+WHERE p.user = :authUserId
+  AND a.user = :authUserId
+  AND p.artist IS NOT NULL
+  AND p.artist != ''
+GROUP BY p.artist;
+```
+
 ## Endpoint: `GET /api/stats/tag-project-counts`
 
 Returns project counts keyed by diamond tag record ID. Used by the tags list to
@@ -760,15 +778,16 @@ The response is platform-neutral. Clients may transform the data for rendering, 
 
 React consumes these endpoints through thin service methods in `projectsService` and `ColoringService`. Future SwiftUI and Android clients should call the same paths and render the same JSON shapes. All Crafts is intentionally composed client-side from the diamond and coloring responses; there is no combined backend endpoint yet.
 
-The bulk count endpoints (`company-project-counts`, `tag-project-counts`,
-`coloring-tag-book-counts`) and the latest-notes endpoint are consumed by
-`CompaniesService`, `TagService`, `ColoringTagsService`, and `fetchLatestNotes`
-respectively. Native clients should call the same paths.
+The bulk count endpoints (`company-project-counts`, `artist-project-counts`,
+`tag-project-counts`, `coloring-tag-book-counts`) and the latest-notes endpoint
+are consumed by `CompaniesService`, `ArtistsService`, `TagService`,
+`ColoringTagsService`, and `fetchLatestNotes` respectively. Native clients should call the same paths.
 
 Native clients are online-first with cached reads. This contract does not include offline-first tombstones, mutation ids, conflict fields, or client-owned stats caches.
 
 ## Changelog
 
+- 2026-10-08: Added `artist-project-counts` bulk count endpoint.
 - 2026-09-07: Added bulk count endpoints (company, tag, coloring tag) and `POST /api/notes/latest` contract.
 - 2026-05-02: Added yearly completions, completion-time, collection, and Month in Review endpoint contracts.
 - 2026-05-02: Initial contract for `summary` and `completions` endpoints.

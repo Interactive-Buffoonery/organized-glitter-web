@@ -106,7 +106,7 @@ const ProjectsTable = ({
       </div>
 
       <div className="bg-card hidden overflow-x-auto rounded-xl border lg:block">
-        <table className="min-w-[68rem] caption-bottom text-sm">
+        <table className="w-full min-w-[68rem] caption-bottom text-sm">
           <TableHeader>
             <TableRow>
               {PROJECTS_TABLE_COLUMNS.map(column => (
@@ -197,7 +197,11 @@ const ProjectsTable = ({
                       </span>
                     </TableCell>
 
-                    <TableCell>{project.company || '-'}</TableCell>
+                    <TableCell>
+                      {project.company || (
+                        <span className="text-muted-foreground">Not specified</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs tabular-nums">
                       {getSizeAndShapeLabel(project)}
                     </TableCell>

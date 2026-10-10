@@ -47,6 +47,15 @@ describe('Color Codes & Swatches', () => {
       })
     );
   });
+  it('explains what to record before opening the empty note editor', async () => {
+    const user = userEvent.setup();
+    render(<ColorReferenceSection pageId="page-a" />);
+    expect(
+      screen.getByText('Keep color codes, blends, and swatch photos for this page here.')
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add note' }));
+    expect(screen.getByRole('textbox', { name: 'Color notes' })).toHaveFocus();
+  });
   it('saves notes alone without rewriting color codes and allows clearing notes', async () => {
     state.reference = { notes: 'Existing', photos: ['sheet.jpg'] };
     const user = userEvent.setup();

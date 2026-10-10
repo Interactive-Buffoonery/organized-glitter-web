@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { SectionHeading } from '@/components/shared/Section';
 import { logger } from '@/utils/logger';
 import {
   useAddProgressNoteMutation,
@@ -100,13 +101,7 @@ const ProjectProgressNotes: React.FC<ProjectProgressNotesProps> = ({ project }) 
   return (
     <section>
       <div className="mb-4">
-        <h2 className="text-primary m-0 inline-flex items-center gap-2.5 text-[11px] font-semibold tracking-[0.14em] uppercase">
-          <span
-            aria-hidden="true"
-            className="bg-primary inline-block h-[2px] w-[22px] rounded-sm"
-          />
-          Progress
-        </h2>
+        <SectionHeading>Progress</SectionHeading>
       </div>
 
       {isLoading ? (

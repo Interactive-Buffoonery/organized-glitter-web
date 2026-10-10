@@ -183,7 +183,7 @@ const ProjectDeleteDialog = ({
 );
 
 const ProjectHeroImage = ({ project }: { project: ProjectType }) => (
-  <div className="relative">
+  <div className="relative mx-auto max-w-[400px]">
     {project.imageUrl ? (
       <>
         <div className="overflow-hidden rounded-2xl shadow-sm">
@@ -371,45 +371,52 @@ const ProjectDetailView = ({
   return (
     <div className="text-foreground">
       {/* Top bar: back link + edit + overflow */}
-      <div className="bg-background/85 sticky top-0 z-20 flex items-center justify-between gap-4 px-4 py-3 backdrop-blur-md sm:px-6">
-        {isFromRandomizer ? (
-          <Button asChild variant="ghost" size="sm" className="gap-1.5 pointer-coarse:min-h-11">
-            <Link to={randomizerHref}>
+      <div className="bg-background/85 sticky top-0 z-20 backdrop-blur-md">
+        <div
+          className={cn(
+            'mx-auto flex items-center justify-between gap-4 py-3',
+            isMobile ? 'px-4' : 'max-w-[1200px] px-7'
+          )}
+        >
+          {isFromRandomizer ? (
+            <Button asChild variant="ghost" size="sm" className="gap-1.5 pointer-coarse:min-h-11">
+              <Link to={randomizerHref}>
+                <ChevronLeft className="size-4" />
+                {backLabel}
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleBackToDashboard}
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+            >
               <ChevronLeft className="size-4" />
               {backLabel}
-            </Link>
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            onClick={handleBackToDashboard}
-            variant="ghost"
-            size="sm"
-            className="gap-1.5"
-          >
-            <ChevronLeft className="size-4" />
-            {backLabel}
-          </Button>
-        )}
-        <div className="flex items-center gap-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={navigateToEdit}
-            disabled={isSubmitting}
-            aria-label="Edit project"
-            className="text-primary hover:bg-primary/10 hover:text-primary px-2.5 font-medium"
-          >
-            Edit
-          </Button>
-          <ProjectActionsMenu
-            open={actionsMenuOpen}
-            onOpenChange={setActionsMenuOpen}
-            onArchive={onArchive}
-            onDeleteSelect={handleDeleteActionSelect}
-            isSubmitting={isSubmitting}
-          />
+            </Button>
+          )}
+          <div className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={navigateToEdit}
+              disabled={isSubmitting}
+              aria-label="Edit project"
+              className="text-primary hover:bg-primary/10 hover:text-primary px-2.5 font-medium"
+            >
+              Edit
+            </Button>
+            <ProjectActionsMenu
+              open={actionsMenuOpen}
+              onOpenChange={setActionsMenuOpen}
+              onArchive={onArchive}
+              onDeleteSelect={handleDeleteActionSelect}
+              isSubmitting={isSubmitting}
+            />
+          </div>
         </div>
       </div>
 

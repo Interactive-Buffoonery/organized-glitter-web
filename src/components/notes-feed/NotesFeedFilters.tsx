@@ -44,8 +44,8 @@ export function NotesFeedFilters({
         <Tabs value={craft} onValueChange={value => onCraftChange(value as NotesFeedTab)}>
           <TabsList className="grid w-full grid-cols-3 sm:w-auto">
             <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="diamond">Diamond Painting</TabsTrigger>
-            <TabsTrigger value="coloring">Coloring Pages</TabsTrigger>
+            <TabsTrigger value="diamond">Diamond paintings</TabsTrigger>
+            <TabsTrigger value="coloring">Coloring pages</TabsTrigger>
           </TabsList>
         </Tabs>
       ) : null}

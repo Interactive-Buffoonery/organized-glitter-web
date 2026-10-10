@@ -86,6 +86,20 @@ const mockColoringTag: Tag = {
 };
 
 describe('TagTable dashboard link', () => {
+  it('displays hex colors in uppercase without changing tag data', () => {
+    render(
+      <MemoryRouter>
+        <TagTable
+          tags={[{ ...mockTag, color: '#14b8a6' }]}
+          coloringTags={[mockColoringTag]}
+          loading={false}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getAllByText('#14B8A6')).toHaveLength(2);
+    expect(mockColoringTag.color).toBe('#14b8a6');
+  });
+
   beforeEach(() => {
     deleteTagMutateMock.mockClear();
     deleteColoringTagMutateMock.mockClear();

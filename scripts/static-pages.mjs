@@ -6,6 +6,12 @@ import { createLocalBuildRequestHandler } from '../server/local-build-server.js'
 const STYLESHEET = /<link rel="stylesheet" crossorigin href="\/assets\/[^"]+\.css">/g;
 const STYLESHEET_MARKER = '<!-- og-app-stylesheet -->';
 const PAGE_MARKER = '<!-- og-static-page -->';
+const AUTH_ACTIONS_MARKER = '<!-- og-static-auth-actions -->';
+const AUTH_ACTIONS_SCRIPT = '<script src="/js/static-auth-actions.js?v=1" defer></script>';
+
+export function injectStaticAuthActions(html) {
+  return html.replace(AUTH_ACTIONS_MARKER, AUTH_ACTIONS_SCRIPT);
+}
 
 /**
  * Serve the prerendered landing as dist/index.html and move the SPA shell to
@@ -20,7 +26,9 @@ export function promoteStaticPages(bundle, emitFile, criticalCss) {
   const styles = [`<style>\n${criticalCss}\n</style>`, ...stylesheets].join('\n    ');
   for (const asset of Object.values(bundle)) {
     if (asset.type === 'asset' && String(asset.source).includes(STYLESHEET_MARKER)) {
-      asset.source = String(asset.source).replace(STYLESHEET_MARKER, styles);
+      asset.source = injectStaticAuthActions(
+        String(asset.source).replace(STYLESHEET_MARKER, styles)
+      );
     }
   }
   const landing = bundle['landing.html'].source;

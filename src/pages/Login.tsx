@@ -196,8 +196,7 @@ const Login = () => {
                   tabIndex={-1}
                   className="mb-4 text-3xl font-semibold md:text-4xl"
                 >
-                  Welcome Back to
-                  <br />
+                  Welcome Back to <br />
                   <span className="text-primary">Organized Glitter</span>
                 </h1>
                 <p className="text-muted-foreground text-lg">

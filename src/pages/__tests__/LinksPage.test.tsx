@@ -31,6 +31,12 @@ const { default: LinksPage } = await import('../LinksPage');
 afterAll(() => vi.unstubAllEnvs());
 
 describe('LinksPage', () => {
+  it('uses a meaningful heading separate from document metadata', () => {
+    renderWithProviders(<LinksPage />, { initialRoute: '/links' });
+    expect(screen.getByRole('heading', { level: 1, name: "Sarah's links" })).toBeInTheDocument();
+    expect(document.title).toBe("Sarah's Links | Organized Glitter");
+  });
+
   it('renders link cards as native links instead of mouse-only card containers', () => {
     const { container } = renderWithProviders(<LinksPage />, { initialRoute: '/links' });
     const cardActions = screen.getByTestId('links-page-card-actions');

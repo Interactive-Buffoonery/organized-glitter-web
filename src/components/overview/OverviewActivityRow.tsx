@@ -16,14 +16,7 @@ const STATUS_DOT_CLASS: Record<OverviewStatusTone, string> = {
   muted: 'bg-muted-foreground',
 };
 
-const getActionLabel = (kind: OverviewFeedItem['kind']) => {
-  if (kind === 'coloring-page') return 'Open page';
-  return 'Open';
-};
-
 export function OverviewActivityRow({ item }: OverviewActivityRowProps) {
-  const actionLabel = getActionLabel(item.kind);
-
   return (
     <li className="border-border/60 border-b last:border-b-0">
       <Link
@@ -69,7 +62,7 @@ export function OverviewActivityRow({ item }: OverviewActivityRowProps) {
         <span className="text-muted-foreground text-sm">{item.activityLabel}</span>
 
         <span className="text-foreground flex items-center gap-1 text-sm font-semibold sm:justify-end">
-          {actionLabel}
+          Open
           <ChevronRight aria-hidden="true" className="size-4" />
         </span>
       </Link>

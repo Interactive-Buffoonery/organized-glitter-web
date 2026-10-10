@@ -97,7 +97,7 @@ const SocialLogin = ({ onProviderLogin, loading = false }: SocialLoginProps) => 
           Loading sign-in methods…
         </p>
       ) : providerError ? (
-        <p className="text-destructive text-center text-sm" role="alert">
+        <p className="text-destructive-text text-center text-sm" role="alert">
           {providerError}
         </p>
       ) : (

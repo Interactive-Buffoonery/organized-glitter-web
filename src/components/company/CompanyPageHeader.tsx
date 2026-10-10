@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { ManageListHeader } from '@/components/manage-lists/ManageListsLayout';
 import AddCompanyDialog from './AddCompanyDialog';
 
 /**
@@ -21,16 +22,10 @@ interface CompanyPageHeaderProps {
  */
 const CompanyPageHeader = ({ onCompanyAdded }: CompanyPageHeaderProps) => {
   return (
-    <div className="mb-8 flex flex-col items-start justify-between md:flex-row md:items-center">
-      <div>
-        <h1 className="font-handwritten text-3xl leading-tight tracking-tight md:text-4xl">
-          Company List
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">Manage your diamond painting companies</p>
-      </div>
-
-      <AddCompanyDialog onCompanyAdded={onCompanyAdded} />
-    </div>
+    <ManageListHeader
+      title="Companies"
+      action={<AddCompanyDialog onCompanyAdded={onCompanyAdded} />}
+    />
   );
 };
 

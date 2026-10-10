@@ -57,22 +57,25 @@ describe('AddTagDialog', () => {
     expect(screen.getByRole('button', { name: /add tag/i })).toBeInTheDocument();
   });
 
-  it('shows an error toast when submitted with an empty name', () => {
+  it('shows a field error when submitted with an empty name', () => {
     render(<AddTagDialog />);
     openDialog();
     clickSubmit();
-    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'error' }));
+    expect(screen.getByLabelText(/tag name/i)).toHaveAccessibleDescription(
+      'Tag name cannot be empty'
+    );
+    expect(toastMock).not.toHaveBeenCalled();
     expect(mutateMock).not.toHaveBeenCalled();
   });
 
-  it('disables the submit button and does not submit when name is over 100 characters', () => {
+  it('explains overlength submission without disabling the button', () => {
     render(<AddTagDialog />);
     openDialog();
     fireEvent.change(screen.getByLabelText(/tag name/i), {
       target: { value: 'x'.repeat(101) },
     });
     const submit = document.querySelector('form button[type="submit"]') as HTMLButtonElement;
-    expect(submit.disabled).toBe(true);
+    expect(submit.disabled).toBe(false);
     fireEvent.click(submit);
     expect(mutateMock).not.toHaveBeenCalled();
   });
@@ -89,6 +92,29 @@ describe('AddTagDialog', () => {
     const [variables] = mutateMock.mock.calls[0];
     expect(variables.name).toBe('forest');
     expect(variables.color).toMatch(/^#[0-9A-Fa-f]{6}$/);
+  });
+
+  it('keeps entered values available for retry when the mutation does not succeed', () => {
+    render(<AddTagDialog />);
+    openDialog();
+    const input = screen.getByLabelText(/tag name/i);
+    fireEvent.change(input, { target: { value: 'duplicate' } });
+    clickSubmit();
+    expect(screen.getByRole('dialog')).toBeVisible();
+    expect(input).toHaveValue('duplicate');
+    fireEvent.change(input, { target: { value: 'unique' } });
+    clickSubmit();
+    expect(mutateMock).toHaveBeenCalledTimes(2);
+    expect(mutateMock.mock.calls[1][0].name).toBe('unique');
+  });
+
+  it('disables submission and the name input while saving', () => {
+    mutationIsPending = true;
+    render(<AddTagDialog />);
+    openDialog();
+    expect(screen.getByLabelText(/tag name/i)).toBeDisabled();
+    const submit = document.querySelector('form button[type="submit"]') as HTMLButtonElement;
+    expect(submit).toBeDisabled();
   });
 
   it('on success closes the dialog and fires onTagAdded callback', async () => {

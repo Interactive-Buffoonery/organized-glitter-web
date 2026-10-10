@@ -8,11 +8,10 @@ type StatsMetricKey =
   | 'totalKits'
   | 'completedThisYear'
   | 'inProgress'
-  | 'inStash'
   | 'allTimeCompleted'
   | 'wishlistSize';
 
-type StatsSummaryMetrics = Record<StatsMetricKey, number>;
+type StatsSummaryMetrics = Record<StatsMetricKey, number> & { inStash?: number };
 
 export type StatsStatusBreakdown = Record<ProjectStatus, number>;
 
@@ -134,11 +133,10 @@ type ColoringStatsMetricKey =
   | 'totalBooks'
   | 'completedPagesThisYear'
   | 'activePages'
-  | 'inStash'
   | 'allTimeCompletedPages'
   | 'wishlistSize';
 
-type ColoringStatsSummaryMetrics = Record<ColoringStatsMetricKey, number>;
+type ColoringStatsSummaryMetrics = Record<ColoringStatsMetricKey, number> & { inStash?: number };
 
 export type ColoringBookStatusBreakdown = Record<ColoringBooksStatusOptions, number>;
 

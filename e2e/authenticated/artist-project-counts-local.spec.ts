@@ -31,16 +31,19 @@ test('artist counts link to matching projects and recover after an endpoint fail
   const usedName = `Counted artist ${suffix}`;
   const unusedName = `Unused artist ${suffix}`;
   const title = `Artist project ${suffix}`;
+  const unrelatedTitle = `Other artist project ${suffix}`;
 
   try {
     const used = await pb.collection('artists').create({ user, name: usedName });
     artists.push(used.id);
     const unused = await pb.collection('artists').create({ user, name: unusedName });
     artists.push(unused.id);
-    for (const name of [title, `${title} second`]) {
+    const other = await pb.collection('artists').create({ user, name: `Other artist ${suffix}` });
+    artists.push(other.id);
+    for (const name of [title, `${title} second`, unrelatedTitle]) {
       const project = await pb.collection('projects').create({
         user,
-        artist: used.id,
+        artist: name === unrelatedTitle ? other.id : used.id,
         title: name,
         status: 'stash',
         status_order: 2,
@@ -61,6 +64,8 @@ test('artist counts link to matching projects and recover after an endpoint fail
     await link.click();
     await expect(page).toHaveURL(new RegExp(`artist=${used.id}`));
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: `${title} second`, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: unrelatedTitle, exact: true })).toHaveCount(0);
 
     let unavailable = true;
     await page.route('**/api/stats/artist-project-counts', route =>

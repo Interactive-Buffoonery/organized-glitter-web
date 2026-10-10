@@ -21,12 +21,12 @@ vi.mock('@/components/ui/dialog', async importOriginal => {
 describe('AddTagDialog closing validation', () => {
   it('does not announce a required error while clearing a successfully saved name', () => {
     render(<AddTagDialog />);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Add Tag' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^add tag$/i })[0]);
     const dialog = screen.getByRole('dialog');
     const input = within(dialog).getByRole('textbox', { name: /tag name/i });
     const error = document.getElementById(`${input.id}-error`);
     fireEvent.change(input, { target: { value: 'forest' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Add Tag' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /^add tag$/i }));
     act(() => mutate.mock.calls[0][1].onSuccess());
     expect(input).toHaveValue('');
     expect(error).toBeInTheDocument();

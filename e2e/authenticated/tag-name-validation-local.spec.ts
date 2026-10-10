@@ -37,7 +37,7 @@ test('add and edit explain invalid names and save corrections through local Pock
 
   try {
     await page.goto('/options/tags');
-    await page.getByRole('button', { name: 'Add Tag', exact: true }).click();
+    await page.getByRole('button', { name: /^add tag$/i }).click();
     let dialog = page.getByRole('dialog');
     let input = dialog.getByRole('textbox', { name: /tag name/i });
     await expect(input).toHaveAttribute('required', '');
@@ -45,7 +45,7 @@ test('add and edit explain invalid names and save corrections through local Pock
     await expectNameError(input, 'Tag name cannot be empty');
     await expect(input).toBeFocused();
     await input.fill('   ');
-    await dialog.getByRole('button', { name: 'Add Tag', exact: true }).click();
+    await dialog.getByRole('button', { name: /^add tag$/i }).click();
     await expectNameError(input, 'Tag name cannot be empty');
     await expect(input).toBeFocused();
     await input.fill('x'.repeat(101));

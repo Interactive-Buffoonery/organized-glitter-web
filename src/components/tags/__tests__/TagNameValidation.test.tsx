@@ -27,12 +27,12 @@ const tag: Tag = {
 describe.each(['add', 'edit'] as const)('%s tag name validation', mode => {
   const open = () => {
     render(mode === 'add' ? <AddTagDialog /> : <EditTagDialog tag={tag} />);
-    fireEvent.click(screen.getByRole('button', { name: mode === 'add' ? 'Add Tag' : 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: mode === 'add' ? /^add tag$/i : 'Edit' }));
     const dialog = screen.getByRole('dialog');
     return {
       input: within(dialog).getByRole('textbox', { name: /tag name/i }),
       submit: within(dialog).getByRole('button', {
-        name: mode === 'add' ? 'Add Tag' : 'Update Tag',
+        name: mode === 'add' ? /^add tag$/i : 'Update Tag',
       }),
     };
   };
@@ -88,7 +88,7 @@ describe.each(['add', 'edit'] as const)('%s tag name validation', mode => {
     await user.keyboard('{Enter}');
     expect(input).toHaveAccessibleDescription('Tag name cannot be empty');
     await user.keyboard('{Escape}');
-    await user.click(screen.getByRole('button', { name: mode === 'add' ? 'Add Tag' : 'Edit' }));
+    await user.click(screen.getByRole('button', { name: mode === 'add' ? /^add tag$/i : 'Edit' }));
     expect(screen.getByRole('textbox', { name: /tag name/i })).not.toHaveAttribute(
       'aria-invalid',
       'true'

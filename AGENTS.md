@@ -14,7 +14,7 @@ Concise map for contributors and automation working in this repository.
 
 React + TypeScript + Vite with a PocketBase backend.
 
-- pnpm 11.1.2 or newer. Node 24.x.
+- pnpm 11.1.3 or newer. Node 24.x.
 - `@/*` maps to `src/*`.
 - Typecheck with `pnpm typecheck` only.
 - Prettier with the Tailwind plugin. ESLint with TypeScript and React Hooks.

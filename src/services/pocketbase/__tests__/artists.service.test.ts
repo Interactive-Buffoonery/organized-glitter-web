@@ -28,6 +28,7 @@ const pbMock = vi.hoisted(() => {
     pb: {
       collection: vi.fn(() => collectionMethods),
       filter: vi.fn((expr: string) => expr),
+      send: vi.fn(),
     },
     collectionMethods,
     createListResult,
@@ -179,6 +180,20 @@ describe('ArtistsService', () => {
           expect(error.type).toBe('permission');
         }
       }
+    });
+  });
+
+  describe('getProjectCounts()', () => {
+    it('loads all artist counts with one aggregate request', async () => {
+      pbMock.pb.send.mockResolvedValue({ counts: { a1: 3, a2: 1 } });
+
+      const counts = await ArtistsService.getProjectCounts();
+
+      expect(pbMock.pb.send).toHaveBeenCalledOnce();
+      expect(pbMock.pb.send).toHaveBeenCalledWith('/api/stats/artist-project-counts', {
+        method: 'GET',
+      });
+      expect(counts).toEqual({ a1: 3, a2: 1 });
     });
   });
 });

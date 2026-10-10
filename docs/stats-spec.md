@@ -4,6 +4,8 @@
 
 The stats API is the shared source of truth for React and future native clients. Metric math lives in PocketBase hooks so clients do not duplicate aggregation rules.
 
+Response examples use illustrative values, not test fixture output.
+
 ## Auth
 
 All endpoints require an authenticated PocketBase user. The server derives the user from `e.auth.id`. Clients must not send a user id in query params or request bodies.
@@ -23,7 +25,7 @@ All endpoints require an authenticated PocketBase user. The server derives the u
 | ------------ | ------------------------------------------------------------------------------------------------------ |
 | Wishlist     | `wishlist`                                                                                             |
 | In progress  | `progress`                                                                                             |
-| In stash     | `purchased`, `stash`, `kitted`                                                                         |
+| In stash     | `stash`                                                                                                |
 | All statuses | `wishlist`, `purchased`, `stash`, `kitted`, `progress`, `onhold`, `completed`, `archived`, `destashed` |
 
 ## Metrics Catalog
@@ -33,7 +35,7 @@ All endpoints require an authenticated PocketBase user. The server derives the u
 | Total kits               | Count of all projects owned by the authenticated user.                                                                     | `projects.user`                                            |
 | Completed this year      | Count of projects with `date_completed` in the current calendar year.                                                      | `projects.date_completed`                                  |
 | In progress              | Count of projects whose current status is `progress`.                                                                      | `projects.status`                                          |
-| In stash                 | Count of projects whose current status is `purchased`, `stash`, or `kitted`.                                               | `projects.status`                                          |
+| In stash                 | Count of projects whose current status is `stash`.                                                                         | `projects.status`                                          |
 | All-time completed       | Count of projects with a non-empty `date_completed`.                                                                       | `projects.date_completed`                                  |
 | Wishlist size            | Count of projects whose current status is `wishlist`.                                                                      | `projects.status`                                          |
 | Monthly completions      | Count of projects completed in each month of the requested year, with previous-year count, delta, and average finish time. | `projects.date_completed`, `projects.date_started`         |
@@ -50,7 +52,7 @@ All endpoints require an authenticated PocketBase user. The server derives the u
 | Total books                  | Count of all coloring books owned by the authenticated user.                                                                     | `coloring_books.user`                                                                          |
 | Completed pages this year    | Count of coloring pages with `completed_at` in the requested calendar year.                                                      | `coloring_pages.completed_at`, joined through `coloring_books.user`                            |
 | Active pages                 | Count of coloring pages whose current status is `in_progress`.                                                                   | `coloring_pages.status`                                                                        |
-| In stash                     | Count of coloring books whose current status is `purchased` or `in_stash`.                                                       | `coloring_books.status`                                                                        |
+| In stash                     | Count of coloring books whose current status is `in_stash`.                                                                      | `coloring_books.status`                                                                        |
 | All-time completed pages     | Count of coloring pages with a non-empty `completed_at`.                                                                         | `coloring_pages.completed_at`                                                                  |
 | Wishlist size                | Count of coloring books whose current status is `wishlist`.                                                                      | `coloring_books.status`                                                                        |
 | Monthly page completions     | Count of coloring pages completed in each month of the requested year, with previous-year count, delta, and average finish time. | `coloring_pages.completed_at`, `coloring_pages.started_at`                                     |
@@ -76,7 +78,7 @@ The `/api/stats/collection` response always returns all six buckets in the order
 
 ## Endpoint: `GET /api/stats/summary`
 
-Returns the top-level stats summary for the authenticated user.
+Returns the top-level stats summary for the authenticated user. Read the in-stash count from `statusBreakdown.stash`; `metrics.inStash` remains available for older clients and returns the same exact-status count.
 
 ### Query Params
 
@@ -94,7 +96,7 @@ Returns the top-level stats summary for the authenticated user.
     "totalKits": 42,
     "completedThisYear": 6,
     "inProgress": 2,
-    "inStash": 21,
+    "inStash": 16,
     "allTimeCompleted": 18,
     "wishlistSize": 9
   },
@@ -348,7 +350,7 @@ LIMIT 10;
 
 ## Coloring Endpoint: `GET /api/stats/coloring/summary?year=YYYY`
 
-Returns the top-level coloring stats summary for the authenticated user. All book and page status keys are present, even when their count is zero.
+Returns the top-level coloring stats summary for the authenticated user. All book and page status keys are present, even when their count is zero. Read the in-stash count from `bookStatusBreakdown.in_stash`; `metrics.inStash` remains available for older clients and returns the same exact-status count.
 
 ### Query Params
 
@@ -366,7 +368,7 @@ Returns the top-level coloring stats summary for the authenticated user. All boo
     "totalBooks": 18,
     "completedPagesThisYear": 42,
     "activePages": 5,
-    "inStash": 10,
+    "inStash": 6,
     "allTimeCompletedPages": 120,
     "wishlistSize": 3
   },
@@ -617,6 +619,24 @@ WHERE p.user = :authUserId
 GROUP BY p.company;
 ```
 
+## Endpoint: `GET /api/stats/artist-project-counts`
+
+Returns project counts keyed by artist record ID. Used by the artists list. Same
+response shape as `company-project-counts`; artists with no projects are omitted.
+
+### SQL Sketch
+
+```sql
+SELECT p.artist AS id, COUNT(*) AS total
+FROM projects p
+JOIN artists a ON a.id = p.artist
+WHERE p.user = :authUserId
+  AND a.user = :authUserId
+  AND p.artist IS NOT NULL
+  AND p.artist != ''
+GROUP BY p.artist;
+```
+
 ## Endpoint: `GET /api/stats/tag-project-counts`
 
 Returns project counts keyed by diamond tag record ID. Used by the tags list to
@@ -760,15 +780,16 @@ The response is platform-neutral. Clients may transform the data for rendering, 
 
 React consumes these endpoints through thin service methods in `projectsService` and `ColoringService`. Future SwiftUI and Android clients should call the same paths and render the same JSON shapes. All Crafts is intentionally composed client-side from the diamond and coloring responses; there is no combined backend endpoint yet.
 
-The bulk count endpoints (`company-project-counts`, `tag-project-counts`,
-`coloring-tag-book-counts`) and the latest-notes endpoint are consumed by
-`CompaniesService`, `TagService`, `ColoringTagsService`, and `fetchLatestNotes`
-respectively. Native clients should call the same paths.
+The bulk count endpoints (`company-project-counts`, `artist-project-counts`,
+`tag-project-counts`, `coloring-tag-book-counts`) and the latest-notes endpoint
+are consumed by `CompaniesService`, `ArtistsService`, `TagService`,
+`ColoringTagsService`, and `fetchLatestNotes` respectively. Native clients should call the same paths.
 
 Native clients are online-first with cached reads. This contract does not include offline-first tombstones, mutation ids, conflict fields, or client-owned stats caches.
 
 ## Changelog
 
+- 2026-10-08: Added `artist-project-counts` bulk count endpoint.
 - 2026-09-07: Added bulk count endpoints (company, tag, coloring tag) and `POST /api/notes/latest` contract.
 - 2026-05-02: Added yearly completions, completion-time, collection, and Month in Review endpoint contracts.
 - 2026-05-02: Initial contract for `summary` and `completions` endpoints.

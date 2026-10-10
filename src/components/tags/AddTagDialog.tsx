@@ -9,7 +9,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 
 import { useCreateTag } from '@/hooks/mutations/useCreateTag';
 import FormField from '@/components/projects/form/FormField';
@@ -66,11 +66,14 @@ const AddTagDialog = ({ onTagAdded }: AddTagDialogProps) => {
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="glass">Add Tag</Button>
+        <Button type="button" variant="glass">
+          <Plus className="mr-2 size-4" />
+          Add tag
+        </Button>
       </DialogTrigger>
       <DialogContent layout="keyboard-safe">
         <DialogHeader>
-          <DialogTitle>Add New Diamond Tag</DialogTitle>
+          <DialogTitle>Add tag</DialogTitle>
           <DialogDescription>
             Create a new tag to organize your diamond projects. Coloring tags are created from
             coloring book forms.
@@ -99,7 +102,7 @@ const AddTagDialog = ({ onTagAdded }: AddTagDialogProps) => {
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Add Tag
+              Add tag
             </Button>
           </DialogFooter>
         </form>

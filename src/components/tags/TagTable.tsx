@@ -281,7 +281,9 @@ const TagTable = ({ tags, coloringTags = EMPTY_COLORING_TAGS, loading }: TagTabl
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div className="size-6 rounded border" style={{ backgroundColor: tag.color }} />
-                    <span className="text-muted-foreground font-mono text-sm">{tag.color}</span>
+                    <span className="text-muted-foreground font-mono text-sm">
+                      {tag.color.toUpperCase()}
+                    </span>
                   </div>
                 </TableCell>
                 <TableCell>

@@ -328,12 +328,14 @@ Dependabot groups these three packages into one weekly update so compatibility
 and source-map behavior are reviewed together. The repository's
 `minimumReleaseAge` policy still applies to automated updates.
 
-## Local proxy deadline
+## Analytics proxy deadlines
 
-The local build server bounds the full upstream exchange, including response streaming, to
-10 seconds by default (`GLIMMER_PROXY_REQUEST_TIMEOUT_MS`). Request uploads retain their
-separate body deadline. Upstream failures return the existing controlled empty response;
-a timed-out response stream is closed. This is an app choice, not a PostHog-mandated deadline.
+The local build server and Spacefast adapter allow 10 seconds for upstream response
+headers, then 10 seconds of inactivity between response chunks. Each received chunk
+resets the response deadline, so a slow response can finish while a stalled stream
+still closes. The local timeout is configurable with `GLIMMER_PROXY_REQUEST_TIMEOUT_MS`.
+Request uploads retain their separate size and time limits. Upstream failures before
+headers return the existing controlled empty response; a stalled response stream closes.
 
 ## Usage analytics preference
 

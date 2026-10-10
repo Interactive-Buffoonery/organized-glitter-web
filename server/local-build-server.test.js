@@ -1074,6 +1074,26 @@ describe('Local build server PostHog proxy', () => {
     );
   });
 
+  it('preserves an active response beyond the upstream deadline', async () => {
+    vi.stubEnv('GLIMMER_PROXY_REQUEST_TIMEOUT_MS', '100');
+    let chunks = 0;
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        new ReadableStream({
+          async pull(controller) {
+            await new Promise(resolve => setTimeout(resolve, 60));
+            controller.enqueue(new TextEncoder().encode('chunk'));
+            if (++chunks === 4) controller.close();
+          },
+        })
+      )
+    );
+    server = http.createServer(createLocalBuildRequestHandler());
+    const port = await listen(server);
+    const response = await request(port, '/glimmer/static/array.js');
+    expect(response.body).toBe('chunkchunkchunkchunk');
+  });
+
   it('bounds a stalled upstream response stream', async () => {
     vi.stubEnv('GLIMMER_PROXY_REQUEST_TIMEOUT_MS', '30');
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(

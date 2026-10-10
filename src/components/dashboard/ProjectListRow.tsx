@@ -103,20 +103,24 @@ const ProjectListRowComponent = ({
               {project.title}
             </h3>
 
-            <p className="text-muted-foreground line-clamp-1 text-xs">{companyAndArtist || '-'}</p>
+            {companyAndArtist && (
+              <p className="text-muted-foreground line-clamp-1 text-xs">{companyAndArtist}</p>
+            )}
 
-            <p className="text-muted-foreground line-clamp-1 text-xs">
-              <span className="tabular-nums">{sizeAndShape}</span>
-              {lifecycleDate && (
-                <>
-                  <span className="mx-1.5">·</span>
-                  <span>
-                    {lifecycleDate.label}{' '}
-                    <span className="tabular-nums">{lifecycleDate.value}</span>
-                  </span>
-                </>
-              )}
-            </p>
+            {(sizeAndShape !== '-' || lifecycleDate) && (
+              <p className="text-muted-foreground line-clamp-1 text-xs">
+                {sizeAndShape !== '-' && <span className="tabular-nums">{sizeAndShape}</span>}
+                {lifecycleDate && (
+                  <>
+                    {sizeAndShape !== '-' && <span className="mx-1.5">·</span>}
+                    <span>
+                      {lifecycleDate.label}{' '}
+                      <span className="tabular-nums">{lifecycleDate.value}</span>
+                    </span>
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
           <div className="flex-shrink-0">

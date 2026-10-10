@@ -168,9 +168,7 @@ const LinksPage: React.FC = () => {
                 className="size-full object-cover object-top"
               />
             </div>
-            <h1 className="text-2xl leading-tight font-semibold tracking-normal">
-              {profileConfig.name}
-            </h1>
+            <h1 className="text-2xl leading-tight font-semibold tracking-normal">Sarah's links</h1>
           </header>
 
           <div data-testid="links-page-card-actions">

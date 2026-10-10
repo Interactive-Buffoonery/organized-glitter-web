@@ -490,13 +490,16 @@ async function proxyPostHog(req, res, url) {
     requestBody.once('close', () => clearTimeout(timeoutId));
   }
 
-  const upstreamTimeout = setTimeout(
-    () => {
+  const upstreamTimeoutMs = getPositiveIntegerEnv('GLIMMER_PROXY_REQUEST_TIMEOUT_MS', 10_000);
+  let upstreamTimeout;
+  function resetUpstreamTimeout() {
+    clearTimeout(upstreamTimeout);
+    upstreamTimeout = setTimeout(() => {
       abortController.abort(new Error('PostHog upstream request timed out'));
-    },
-    getPositiveIntegerEnv('GLIMMER_PROXY_REQUEST_TIMEOUT_MS', 10_000)
-  );
-  upstreamTimeout.unref?.();
+    }, upstreamTimeoutMs);
+    upstreamTimeout.unref?.();
+  }
+  resetUpstreamTimeout();
 
   try {
     let response;
@@ -541,6 +544,7 @@ async function proxyPostHog(req, res, url) {
     }
 
     clearTimeout(timeoutId);
+    resetUpstreamTimeout();
 
     applySecurityHeaders(res);
     response.headers.forEach((value, key) => {
@@ -565,6 +569,7 @@ async function proxyPostHog(req, res, url) {
       await body.pipeTo(
         new WritableStream({
           write(chunk) {
+            resetUpstreamTimeout();
             res.write(chunk);
           },
           close() {

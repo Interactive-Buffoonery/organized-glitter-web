@@ -83,11 +83,12 @@ Three bulk count endpoints aggregate record relationships server-side so list
 views avoid N+1 per-item queries:
 
 - `GET /api/stats/company-project-counts`: project counts by company.
+- `GET /api/stats/artist-project-counts`: project counts by artist.
 - `GET /api/stats/tag-project-counts`: project counts by diamond tag.
 - `GET /api/stats/coloring-tag-book-counts`: coloring book counts by coloring tag.
 
-All three require authentication, derive the user from `e.auth`, and return
-`{ counts: Record<string, number> }`. Tags or companies with zero associations
+All four require authentication, derive the user from `e.auth`, and return
+`{ counts: Record<string, number> }`. Tags, companies, or artists with zero associations
 are omitted; clients default missing keys to zero.
 
 See [`../stats-spec.md`](../stats-spec.md) for the full contract.

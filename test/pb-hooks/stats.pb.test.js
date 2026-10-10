@@ -10,6 +10,7 @@ const STATS_ROUTES = [
   'GET /api/stats/completions/yearly',
   'GET /api/stats/completion-times',
   'GET /api/stats/company-project-counts',
+  'GET /api/stats/artist-project-counts',
   'GET /api/stats/tag-project-counts',
   'GET /api/stats/coloring-tag-book-counts',
   'GET /api/stats/collection',
@@ -152,6 +153,7 @@ describe('stats PocketBase hook contract', () => {
 
   it.each([
     '/api/stats/company-project-counts',
+    '/api/stats/artist-project-counts',
     '/api/stats/tag-project-counts',
     '/api/stats/coloring-tag-book-counts',
   ])('protects %s with PocketBase auth middleware', path => {
@@ -176,6 +178,11 @@ describe('stats PocketBase hook contract', () => {
       path: '/api/stats/company-project-counts',
       groupBy: 'GROUP BY p.company',
       ownerPredicates: ['WHERE p.user = {:userId}', 'AND c.user = {:userId}'],
+    },
+    {
+      path: '/api/stats/artist-project-counts',
+      groupBy: 'GROUP BY p.artist',
+      ownerPredicates: ['WHERE p.user = {:userId}', 'AND a.user = {:userId}'],
     },
     {
       path: '/api/stats/tag-project-counts',

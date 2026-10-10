@@ -552,6 +552,44 @@ routerAdd(
 
 routerAdd(
   'GET',
+  '/api/stats/artist-project-counts',
+  e => {
+    if (!e.auth.getBool('verified')) {
+      throw new ForbiddenError('Email verification is required.');
+    }
+
+    const userId = e.auth.getString('id');
+    const rows = arrayOf(new DynamicModel({ id: '', total: 0 }));
+
+    $app
+      .db()
+      .newQuery(
+        `
+      SELECT p.artist AS id, COUNT(*) AS total
+      FROM projects p
+      JOIN artists a ON a.id = p.artist
+      WHERE p.user = {:userId}
+        AND a.user = {:userId}
+        AND p.artist IS NOT NULL
+        AND p.artist != ''
+      GROUP BY p.artist
+    `
+      )
+      .bind({ userId })
+      .all(rows);
+
+    const counts = {};
+    for (const row of rows) {
+      counts[row.id] = Number(row.total) || 0;
+    }
+
+    return e.json(200, { counts });
+  },
+  $apis.requireAuth()
+);
+
+routerAdd(
+  'GET',
   '/api/stats/tag-project-counts',
   e => {
     if (!e.auth.getBool('verified')) {

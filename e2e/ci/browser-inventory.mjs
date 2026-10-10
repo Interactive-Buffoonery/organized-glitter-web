@@ -53,6 +53,7 @@ export const browserSpecInventory = {
     'authenticated/route-mount.spec.ts',
     'authenticated/session-expiry-local.spec.ts',
     'authenticated/tag-keyboard-selection.spec.ts',
+    'authenticated/tag-name-validation-local.spec.ts',
     'authenticated/theme-preferences.spec.ts',
     'authenticated/ui-copy-local.spec.ts',
     'blog.spec.ts',

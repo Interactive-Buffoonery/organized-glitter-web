@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { SectionHeading } from '@/components/shared/Section';
 
 import {
   ProgressNoteDialog,
@@ -94,13 +95,7 @@ export function ColoringPageProgressNotes({ pageId, target }: ColoringPageProgre
   return (
     <section>
       <div className="mb-4">
-        <h2 className="text-primary m-0 inline-flex items-center gap-2.5 text-[11px] font-semibold tracking-[0.14em] uppercase">
-          <span
-            aria-hidden="true"
-            className="bg-primary inline-block h-[2px] w-[22px] rounded-sm"
-          />
-          Progress
-        </h2>
+        <SectionHeading>Progress</SectionHeading>
       </div>
 
       {isLoading ? (

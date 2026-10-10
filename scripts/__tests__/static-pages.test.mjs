@@ -10,10 +10,10 @@ import { promoteStaticPages, staticPages } from '../static-pages.mjs';
 const appHtml =
   '<head><link rel="stylesheet" crossorigin href="/assets/main-abc.css"></head><body><script type="module" src="/assets/main.js"></script></body>';
 const pageHtml = heading =>
-  `<head><!-- og-app-stylesheet --></head><body><h1>${heading}</h1></body>`;
+  `<head><!-- og-app-stylesheet --><!-- og-static-auth-actions --></head><body><h1>${heading}</h1></body>`;
 const critical = '@layer og-critical { body { margin: 0; } }';
 const styled = heading =>
-  `<head><style>\n${critical}\n</style>\n    <link rel="stylesheet" crossorigin href="/assets/main-abc.css"></head><body><h1>${heading}</h1></body>`;
+  `<head><style>\n${critical}\n</style>\n    <link rel="stylesheet" crossorigin href="/assets/main-abc.css"><script src="/js/static-auth-actions.js?v=1" defer></script></head><body><h1>${heading}</h1></body>`;
 
 function bundleFixture() {
   return {
@@ -106,6 +106,7 @@ describe('static page templates', () => {
       expect(document.querySelector('#root, #app-loading, #app-error')).toBeNull();
       expect(html).toContain('<!-- og-app-stylesheet -->');
       expect(html).toContain('<!-- og-static-page -->');
+      expect(html).toContain('<!-- og-static-auth-actions -->');
       expect(document.querySelector('meta[name="theme-color"]')).not.toBeNull();
     }
   );

@@ -64,7 +64,7 @@ describe('renderStaticPage', () => {
   });
 
   it.each(['landing', 'privacy', 'terms'])(
-    'keeps the signed-out header, skip link, and main landmark on %s',
+    'keeps signed-out defaults and a signed-in app action on %s',
     page => {
       const document = renderDocument(page);
       expect(document.querySelector('[data-static-page] main#main-content')).not.toBeNull();
@@ -82,6 +82,13 @@ describe('renderStaticPage', () => {
       ).toBe('/');
       expect(link('Login')?.getAttribute('href')).toBe('/login');
       expect(link('Get Started')?.getAttribute('href')).toBe('/register');
+      expect(link('Open app')?.getAttribute('href')).toBe('/overview');
+      expect(header?.querySelector('[data-static-auth="guest"]')?.hasAttribute('hidden')).toBe(
+        false
+      );
+      expect(header?.querySelector('[data-static-auth="member"]')?.hasAttribute('hidden')).toBe(
+        true
+      );
       expect(document.querySelector('footer')).not.toBeNull();
       expect(renderStaticPage(page)).not.toContain('<script');
       expect(document.querySelectorAll('button')).toHaveLength(0);

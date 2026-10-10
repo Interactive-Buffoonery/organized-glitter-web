@@ -7,13 +7,10 @@ import { notify } from '@/lib/notifications';
  */
 
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
-import MainLayout from '@/components/layout/MainLayout';
+import { ManageListsLayout } from '@/components/manage-lists/ManageListsLayout';
 
 import CompanyPageHeader from '@/components/company/CompanyPageHeader';
 import CompanyTable from '@/components/company/CompanyTable';
-import { Button } from '@/components/ui/button';
 import { useAllCompanies } from '@/hooks/queries/useCompanies';
 import { useAppReady } from '@/hooks/useAppReady';
 
@@ -43,29 +40,13 @@ const CompanyList = () => {
     // React Query will automatically refetch when invalidated by the mutation
   };
   return (
-    <MainLayout>
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 gap-1.5 pointer-coarse:min-h-11"
-          >
-            <Link to="/options">
-              <ChevronLeft className="size-4" />
-              Back to Manage Lists
-            </Link>
-          </Button>
-        </div>
+    <ManageListsLayout>
+      <CompanyPageHeader onCompanyAdded={handleCompanyAdded} />
 
-        <CompanyPageHeader onCompanyAdded={handleCompanyAdded} />
-
-        <div className="mt-6">
-          <CompanyTable companies={companies} loading={loading} />
-        </div>
+      <div className="mt-6">
+        <CompanyTable companies={companies} loading={loading} />
       </div>
-    </MainLayout>
+    </ManageListsLayout>
   );
 };
 

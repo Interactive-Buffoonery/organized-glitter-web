@@ -61,8 +61,11 @@ for (const viewport of viewports) {
             await closeNotice.click();
             await expect(closeNotice).toHaveCount(0);
           }
-          // This route has a fixed number of links rather than an account-sized list.
+          // Below lg this is the fixed list picker; at lg and up it opens the first list.
           await page.goto('/options');
+          await expect(page).toHaveURL(
+            viewport.width < 1024 ? /\/options$/ : /\/options\/companies$/
+          );
           await expect(
             page.getByRole('heading', { name: 'Manage Lists', exact: true })
           ).toBeVisible();

@@ -16,8 +16,7 @@ import { SarahSignature } from './SarahSignature';
 import { ScrapbookFeatures } from './ScrapbookFeatures';
 import { TwoCraftsSplit } from './TwoCraftsSplit';
 
-// Signed-out SiteHeader without the theme toggle, which needs JavaScript.
-// Returning members use Login, which forwards an existing session to /overview.
+// Static SiteHeader without the theme toggle, which needs the React app.
 function StaticSiteHeader() {
   return (
     <header
@@ -43,12 +42,19 @@ function StaticSiteHeader() {
           </span>
         </Link>
         <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" className="text-foreground/80 hover:text-foreground">
-            <Link to="/login">Login</Link>
-          </Button>
-          <Button asChild variant="glass" className="hidden font-medium sm:inline-flex">
-            <Link to="/register">Get Started</Link>
-          </Button>
+          <div className="flex items-center gap-2" data-static-auth="guest">
+            <Button asChild variant="ghost" className="text-foreground/80 hover:text-foreground">
+              <Link to="/login">Login</Link>
+            </Button>
+            <Button asChild variant="glass" className="hidden font-medium sm:inline-flex">
+              <Link to="/register">Get Started</Link>
+            </Button>
+          </div>
+          <div data-static-auth="member" hidden>
+            <Button asChild variant="glass" className="font-medium">
+              <Link to="/overview">Open app</Link>
+            </Button>
+          </div>
         </div>
       </div>
     </header>

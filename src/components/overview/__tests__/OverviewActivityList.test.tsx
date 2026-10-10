@@ -55,6 +55,12 @@ const renderList = (override?: Partial<React.ComponentProps<typeof OverviewActiv
   );
 
 describe('OverviewActivityList', () => {
+  it('uses the same visible Open action for both crafts', () => {
+    renderList();
+    expect(screen.getAllByText('Open', { exact: true })).toHaveLength(2);
+    expect(screen.queryByText('Open page', { exact: true })).not.toBeInTheDocument();
+  });
+
   it('renders the desktop column labels and mixed rows', () => {
     renderList();
 

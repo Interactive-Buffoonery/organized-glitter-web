@@ -65,25 +65,88 @@ export async function proxyPosthog(request, env = {}) {
   if (body === BODY_TIMEOUT) return new Response('Request body timed out', { status: 408 });
   if (body === null) return new Response('Request body too large', { status: 413 });
 
+  const abortController = new AbortController();
+  let upstreamTimeout;
+  function resetUpstreamTimeout() {
+    clearTimeout(upstreamTimeout);
+    upstreamTimeout = setTimeout(() => {
+      abortController.abort(new Error('PostHog upstream request timed out'));
+    }, REQUEST_TIMEOUT_MS);
+    upstreamTimeout.unref?.();
+  }
+  resetUpstreamTimeout();
+
   try {
     const upstream = await fetch(target, {
       method: request.method,
       headers,
       body,
       redirect: 'manual',
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: abortController.signal,
     });
-    if (upstream.status >= 300 && upstream.status < 400) return new Response(null, { status: 204 });
+    resetUpstreamTimeout();
+    if (upstream.status >= 300 && upstream.status < 400) {
+      clearTimeout(upstreamTimeout);
+      await upstream.body?.cancel();
+      return new Response(null, { status: 204 });
+    }
     const responseHeaders = new Headers();
     for (const name of RESPONSE_HEADERS) {
       const value = upstream.headers.get(name);
       if (value) responseHeaders.set(name, value);
     }
-    return new Response(request.method === 'HEAD' ? null : upstream.body, {
-      status: upstream.status,
-      headers: responseHeaders,
+    if (request.method === 'HEAD' || !upstream.body) {
+      clearTimeout(upstreamTimeout);
+      await upstream.body?.cancel();
+      return new Response(null, { status: upstream.status, headers: responseHeaders });
+    }
+
+    const reader = upstream.body.getReader();
+    let finished = false;
+    let onAbort;
+    function finish() {
+      finished = true;
+      clearTimeout(upstreamTimeout);
+      abortController.signal.removeEventListener('abort', onAbort);
+    }
+    const responseBody = new ReadableStream({
+      start(controller) {
+        onAbort = () => {
+          finish();
+          controller.error(abortController.signal.reason);
+          void reader.cancel(abortController.signal.reason).catch(() => {});
+        };
+        abortController.signal.addEventListener('abort', onAbort, { once: true });
+      },
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read();
+          if (finished) return;
+          if (done) {
+            finish();
+            reader.releaseLock();
+            controller.close();
+          } else {
+            resetUpstreamTimeout();
+            controller.enqueue(value);
+          }
+        } catch (error) {
+          if (finished) return;
+          finish();
+          controller.error(error);
+        }
+      },
+      async cancel(reason) {
+        finish();
+        const cancellation = reader.cancel(reason);
+        abortController.abort(reason);
+        await cancellation;
+      },
     });
+    return new Response(responseBody, { status: upstream.status, headers: responseHeaders });
   } catch {
+    clearTimeout(upstreamTimeout);
+    abortController.abort();
     return new Response(null, { status: 204 });
   }
 }

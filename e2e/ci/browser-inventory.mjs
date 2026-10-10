@@ -54,6 +54,7 @@ export const browserSpecInventory = {
     'authenticated/tag-keyboard-selection.spec.ts',
     'authenticated/tag-name-validation-local.spec.ts',
     'authenticated/theme-preferences.spec.ts',
+    'authenticated/ui-copy-local.spec.ts',
     'blog.spec.ts',
     'ci/authenticated-contrast.spec.ts',
     'cold-load.spec.ts',

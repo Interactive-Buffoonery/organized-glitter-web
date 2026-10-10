@@ -80,17 +80,32 @@ describe('ProjectNotes rich text', () => {
     expect(hasSessionDraft(key, 'account-a')).toBe(false);
   });
 
-  it('keeps an editing path when an older HTML note has no rendered content', async () => {
+  it.each([
+    '<p>Saved kit details</p>',
+    '<a href="https://example.test">Saved kit details</a>',
+    '<img src="saved-kit.jpg" alt="Saved kit details">',
+    '<table><tr><td>Saved kit details</td></tr></table>',
+    '<section>Saved kit details</section>',
+  ])('keeps the original HTML available in the editor for %s', async notes => {
     const user = userEvent.setup();
-    render(<ProjectNotes notes="<p>Saved kit details</p>" onSave={vi.fn()} variant="inline" />);
+    const onSave = vi.fn();
+    render(<ProjectNotes notes={notes} onSave={onSave} variant="inline" />);
     expect(
       screen.getByText('This note uses an older format. Edit it to view or update its contents.')
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Edit notes' }));
-    expect(screen.getByRole('textbox', { name: 'Project notes' })).toHaveValue(
-      '<p>Saved kit details</p>'
-    );
+    expect(screen.getByRole('textbox', { name: 'Project notes' })).toHaveValue(notes);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onSave).not.toHaveBeenCalled();
   });
+
+  it.each(['<https://example.test>', '<artist@example.test>', '`<table>`'])(
+    'keeps Markdown autolinks and code out of the legacy format prompt: %s',
+    notes => {
+      render(<ProjectNotes notes={notes} onSave={vi.fn()} variant="inline" />);
+      expect(screen.queryByText(/This note uses an older format/)).not.toBeInTheDocument();
+    }
+  );
 
   it('renders Markdown project notes', () => {
     render(<ProjectNotes notes="Kit has **square drills**" readOnly />);

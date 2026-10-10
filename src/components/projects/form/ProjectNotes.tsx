@@ -153,7 +153,7 @@ const ProjectNotes = ({
     // primary content); always visible when empty (the affordance IS the
     // primary content, since the placeholder copy points at it).
     const hasNotes = !!notes.trim();
-    const hasLegacyHtml = /^<(?:p|div|ul|ol|h[1-6]|blockquote|span|br)\b/i.test(notes.trim());
+    const hasLegacyHtml = /^<\/?[a-z][a-z0-9-]*(?:\s[^<>]*|\/?)>/i.test(notes.trim());
     const emptyEditButtonClass =
       'text-muted-foreground hover:bg-muted/60 hover:text-foreground grid size-7 shrink-0 place-items-center rounded-md transition-colors pointer-coarse:size-11';
 

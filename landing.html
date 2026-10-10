@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Organized Glitter | Coloring Book &amp; Diamond Art Tracker</title>
+    <meta
+      name="description"
+      content="Track coloring books, coloring pages, diamond art projects, stash status, progress photos, palettes, and mystery reveals in one craft tracker."
+    />
+    <link rel="canonical" href="https://app.invalid/" />
+    <meta name="author" content="Sarah (Serabi on GitHub)" />
+    <meta
+      name="keywords"
+      content="coloring books, coloring pages, coloring book tracker, coloring page tracker, diamond art, diamond painting, diamond painting tracker, craft stash, inventory tracker, mystery coloring, craft organization"
+    />
+    <!-- Theme color for the iOS Safari notch / Android status bar.
+         The media defaults follow the OS before JavaScript runs, then
+         /theme-color.js keeps them in sync with the selected app theme. -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f8e8f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151533" media="(prefers-color-scheme: dark)" />
+    <script src="/theme-color.js?v=8" defer></script>
+    <!-- og-static-auth-actions -->
+
+    <!-- Favicon -->
+    <!-- og-app-icons -->
+
+    <meta name="apple-mobile-web-app-title" content="Organized Glitter" />
+
+    <!-- Apply the saved theme before first paint; unset/invalid preference follows System.
+         Must run before the stylesheets so the .dark variants apply immediately. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          // next-themes uses data-theme; this bridge class supports Tailwind dark variants.
+          // Mirror resolveThemePreference: legacy Catppuccin maps to light/dark; anything
+          // else unrecognized (or empty) follows System like DEFAULT_THEME.
+          var isLegacyDark =
+            stored === 'catppuccin-frappe' ||
+            stored === 'catppuccin-macchiato' ||
+            stored === 'catppuccin-mocha';
+          if (stored === 'catppuccin-latte') {
+            localStorage.setItem('theme', 'light');
+            stored = 'light';
+          } else if (isLegacyDark) {
+            localStorage.setItem('theme', 'dark');
+            stored = 'dark';
+          } else if (stored && stored !== 'light' && stored !== 'dark' && stored !== 'system') {
+            // Unknown non-empty values must become `system` before next-themes
+            // hydrates. Leaving `not-a-theme` in storage makes resolvedTheme
+            // neither light nor dark, and ThemeClassSync would drop `.dark`.
+            localStorage.setItem('theme', 'system');
+            stored = 'system';
+          }
+          var followsSystem = stored !== 'light' && stored !== 'dark';
+          var isDark =
+            stored === 'dark' ||
+            (followsSystem && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', isDark);
+          document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        } catch (e) {
+          // localStorage unavailable (e.g. Safari private mode) — do nothing
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/safe-area.css?v=6" />
+    <!-- Static page: no app JavaScript. The build inlines critical CSS from
+         src/styles/static-critical.css and the app stylesheet here. -->
+    <!-- og-app-stylesheet -->
+
+    <!-- Open Graph / Facebook -->
+    <meta
+      property="og:title"
+      content="Organized Glitter | Coloring Book &amp; Diamond Art Tracker"
+    />
+    <meta
+      property="og:description"
+      content="Track coloring books, coloring pages, diamond art projects, stash status, progress photos, palettes, and mystery reveals in one craft tracker."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://app.invalid/images/social-preview-2026-09-27.jpg" />
+    <meta property="og:image:width" content="2400" />
+    <meta property="og:image:height" content="1260" />
+    <meta
+      property="og:image:alt"
+      content="Organized Glitter: track your coloring books and diamond art, with taped-in photos of a coloring page and a finished diamond painting"
+    />
+    <meta property="og:url" content="https://app.invalid/" />
+    <meta property="og:site_name" content="Organized Glitter" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Organized Glitter | Coloring Book &amp; Diamond Art Tracker"
+    />
+    <meta
+      name="twitter:description"
+      content="Track coloring books, coloring pages, diamond art projects, stash status, progress photos, palettes, and mystery reveals in one craft tracker."
+    />
+    <meta name="twitter:image" content="https://app.invalid/images/social-preview-2026-09-27.jpg" />
+    <meta
+      name="twitter:image:alt"
+      content="Organized Glitter: track your coloring books and diamond art, with taped-in photos of a coloring page and a finished diamond painting"
+    />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Organized Glitter",
+        "description": "Track coloring books, coloring pages, diamond art projects, stash status, progress photos, palettes, and mystery reveals in one craft tracker.",
+        "applicationCategory": "LifestyleApplication",
+        "operatingSystem": "Web",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "creator": {
+          "@type": "Organization",
+          "name": "Organized Glitter",
+          "url": "https://app.invalid"
+        },
+        "featureList": [
+          "Track coloring books, coloring pages, and diamond art projects",
+          "Track stash status for craft projects",
+          "Save progress photos and notes",
+          "Record coloring palettes and mystery reveals",
+          "Organize artists, publishers, companies, tags, and craft metadata",
+          "Accessible on all web browsers"
+        ],
+        "screenshot": {
+          "@type": "ImageObject",
+          "url": "https://app.invalid/images/social-preview-2026-09-27.jpg",
+          "width": "2400",
+          "height": "1260"
+        },
+        "applicationSubCategory": "Craft Organization",
+        "keywords": [
+          "coloring books",
+          "coloring pages",
+          "coloring book tracker",
+          "coloring page tracker",
+          "diamond art",
+          "diamond painting",
+          "diamond painting tracker",
+          "craft organization",
+          "project tracker"
+        ],
+        "datePublished": "2023-01-01",
+        "version": "1.0",
+        "mainEntityOfPage": {
+          "@type": "WebPage",
+          "@id": "https://app.invalid/"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Organized Glitter",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://app.invalid/images/logo.png",
+            "width": "512",
+            "height": "512"
+          }
+        },
+        "funder": {
+          "@type": "Person",
+          "name": "Sarah (Serabi)",
+          "url": "https://app.invalid"
+        }
+      }
+    </script>
+
+    <!-- Additional Organization Schema -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Organized Glitter",
+        "url": "https://app.invalid",
+        "logo": "https://app.invalid/images/logo.png",
+        "description": "A web tool for coloring book collectors, coloring page trackers, and diamond art enthusiasts to organize and track their craft projects.",
+        "sameAs": ["https://www.instagram.com/organized_glitter", "https://x.com/serabi"],
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "email": "contact@example.invalid",
+          "contactType": "customer service",
+          "url": "https://app.invalid/about"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <div class="page-atmosphere" aria-hidden="true"></div>
+    <div class="safari-edge-tint safari-edge-tint--top" aria-hidden="true"></div>
+    <div class="safari-edge-tint safari-edge-tint--bottom" aria-hidden="true"></div>
+    <!-- og-static-page -->
+    <!-- og-static-hosting-notice -->
+  </body>
+</html>

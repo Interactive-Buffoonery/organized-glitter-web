@@ -15,10 +15,12 @@ const publicInventory =
 const publicWebkitInventory =
   /[/\\]e2e[/\\](?:(?:home|page-titles)\.spec\.ts|a11y[/\\]public-a11y\.spec\.ts)$/;
 const chromiumSmokeInventory = [
+  /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
   /[/\\]e2e[/\\]ci[/\\](?:authenticated-accessibility-smoke|change-password-accessibility|feedback-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|unverified-login-recovery)\.spec\.ts$/,
   /[/\\]e2e[/\\]authenticated[/\\](?:archive-legacy-project-local|archive-recovery-local|archive-v3-restore-local|coloring-detail-errors-local|coloring-page-detail|diamond-pagination-url|notes-feed-timeline|project-create-cover-local|project-delete-atomic-local|project-field-clearing|project-inline-dates-local)\.spec\.ts$/,
 ];
 const webkitFlowInventory = [
+  /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
   /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|feedback-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
   /[/\\]e2e[/\\]a11y[/\\]mobile-state-a11y\.spec\.ts$/,
   /[/\\]e2e[/\\]authenticated[/\\](?:archive-v3-restore-local|avatar-crop-local|coloring-detail-errors-local|coloring-page-detail|notes-feed-timeline|project-create-cover-local|project-field-clearing|project-inline-dates-local|randomizer-interruption-local)\.spec\.ts$/,
@@ -55,8 +57,10 @@ const smokeProjects: Project[] = [
   },
   {
     name: 'mobile-webkit-smoke',
-    testMatch:
+    testMatch: [
+      /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
       /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|feedback-accessibility|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
+    ],
     dependencies: ['setup'],
     use: { ...devices['iPhone 13'], storageState },
   },

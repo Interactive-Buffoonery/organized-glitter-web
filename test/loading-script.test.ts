@@ -49,7 +49,7 @@ const dispatchAppReady = () => {
 const createShellDom = () => {
   document.body.innerHTML = `
     <div id="root" style="opacity: 0;"></div>
-    <div id="app-loading">
+    <div id="app-loading" style="opacity: 1;">
       <div></div>
     </div>
     <div id="app-error" role="alert" aria-hidden="true">
@@ -66,7 +66,7 @@ const createShellDom = () => {
         </p>
       </div>
     </div>
-    <div id="slow-load-warning"></div>
+    <div id="slow-load-warning" style="display: none;"></div>
   `;
 };
 
@@ -92,7 +92,51 @@ describe('loading bootstrap script', () => {
     document.body.innerHTML = '';
     delete window.__OG_PUBLIC_ANALYTICS__;
     delete window.__OG_BOOTSTRAP_ANALYTICS__;
+    Reflect.deleteProperty(window, '__OG_RESOURCE_RECOVERY__');
     vi.unstubAllGlobals();
+  });
+
+  it('shows focused static recovery only after managed resource recovery fails', () => {
+    bootstrapLoadingScript();
+    const module = document.createElement('script');
+    module.type = 'module';
+    module.src = '/assets/main-example.js';
+    module.setAttribute('data-og-bootstrap', '');
+    document.body.appendChild(module);
+    module.dispatchEvent(new Event('error'));
+    vi.advanceTimersByTime(300);
+    expect(document.getElementById('app-error')?.style.display).not.toBe('flex');
+    window.dispatchEvent(new CustomEvent('og:resource-failure'));
+    vi.advanceTimersByTime(300);
+    expect(document.getElementById('app-error')?.getAttribute('aria-hidden')).toBe('false');
+    expect(document.activeElement?.id).toBe('retry-button');
+    expect(document.getElementById('root')?.hasAttribute('inert')).toBe(true);
+    dispatchAppReady();
+    vi.advanceTimersByTime(300);
+    expect(document.getElementById('app-error')).toBeNull();
+    expect(document.getElementById('root')?.hasAttribute('inert')).toBe(false);
+  });
+
+  it('catches resource exhaustion before the shell listeners were installed', () => {
+    Object.assign(window, { __OG_RESOURCE_RECOVERY__: { state: 'failed' } });
+    bootstrapLoadingScript();
+    vi.advanceTimersByTime(300);
+    expect(document.getElementById('app-error')?.style.display).toBe('flex');
+  });
+
+  it('logs only a failure category without rejection URLs or credentials', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    bootstrapLoadingScript();
+    const event = new Event('unhandledrejection');
+    Object.defineProperty(event, 'reason', {
+      value: new Error(
+        'Failed to fetch dynamically imported module: /assets/page.js?token=private'
+      ),
+    });
+    window.dispatchEvent(event);
+    vi.advanceTimersByTime(300);
+    expect(log.mock.calls.flat().join(' ')).not.toContain('token=private');
+    expect(log.mock.calls.flat().join(' ')).toContain('runtime_error');
   });
 
   it.each(['runtime.sendMessage(). Tab not found', 'Script error. at :0:0'])(
@@ -132,6 +176,26 @@ describe('loading bootstrap script', () => {
     dispatchAppReady();
     expect(recovered).toHaveBeenCalledTimes(1);
     expect(recovered).toHaveBeenCalledWith('startup_timeout');
+  });
+
+  it('offers slow-start guidance at five seconds without marking private content ready', () => {
+    bootstrapLoadingScript();
+    vi.advanceTimersByTime(4999);
+    expect(document.getElementById('slow-load-warning')?.style.display).toBe('none');
+    vi.advanceTimersByTime(1);
+    expect(document.getElementById('slow-load-warning')?.style.display).toBe('block');
+    expect(document.getElementById('root')?.hasAttribute('inert')).toBe(true);
+    expect(document.getElementById('root')?.getAttribute('data-app-ready')).not.toBe('true');
+    vi.advanceTimersByTime(25300);
+    expect(document.getElementById('slow-load-warning')?.style.display).toBe('none');
+    expect(document.getElementById('app-error')?.style.display).toBe('flex');
+  });
+
+  it('does not add slow-start guidance after a completed startup', () => {
+    bootstrapLoadingScript();
+    dispatchAppReady();
+    vi.advanceTimersByTime(5500);
+    expect(document.getElementById('slow-load-warning')?.style.display).toBe('none');
   });
 
   it('makes the splash non-interactive immediately and removes it after fade completes', () => {

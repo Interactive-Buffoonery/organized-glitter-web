@@ -9,6 +9,10 @@ overrides:
   serialize-javascript: ^7.0.5
   sourcemap-codec: npm:@jridgewell/sourcemap-codec@^1.4.15
   smol-toml: 1.7.1
+  # Replace locked releases lacking provenance without exempting them from trust checks.
+  'semver@^6': 7.8.5
+  'undici-types@~6.21.0': 6.23.0
+  '@trickfilm400/rollup-plugin-off-main-thread@^3.0.0-pre1': 4.0.0
 
 allowBuilds:
   '@posthog/cli': true

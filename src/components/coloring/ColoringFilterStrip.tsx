@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Search, SlidersHorizontal, X } from 'lucide-react';
 import { usePostHog } from '@posthog/react';
@@ -292,29 +292,24 @@ export function ColoringControlsRow({ showFilterTrigger = false }: ColoringContr
     useColoringFilters();
   const { updateSearch, updateSort } = useColoringFilterHelpers();
   const [localSearch, setLocalSearch] = useState(filters.searchTerm);
+  const lastCommittedSearch = useRef(filters.searchTerm.trim());
 
   // Stay in sync if filters reset from elsewhere (e.g. URL hydration, panel reset).
   useEffect(() => {
     setLocalSearch(filters.searchTerm);
+    lastCommittedSearch.current = filters.searchTerm.trim();
   }, [filters.searchTerm]);
 
-  useEffect(() => {
-    if (localSearch === filters.searchTerm) return;
-
-    const timeout = window.setTimeout(() => {
-      updateSearch(localSearch);
-    }, 350);
-
-    return () => window.clearTimeout(timeout);
-  }, [filters.searchTerm, localSearch, updateSearch]);
-
-  const handleSearchSubmit = useCallback(
-    (e: { preventDefault: () => void }) => {
-      e.preventDefault();
-      updateSearch(localSearch);
+  const commitSearch = useCallback(
+    (term: string) => {
+      updateSearch(term);
+      const normalized = term.trim();
+      if (normalized === lastCommittedSearch.current) return;
+      lastCommittedSearch.current = normalized;
+      if (!normalized) return;
       posthog.capture(
         AnalyticsEvent.COLORING_BOOKS_SEARCH_PERFORMED,
-        getSearchAnalyticsProperties(localSearch, {
+        getSearchAnalyticsProperties(normalized, {
           craft: 'coloring',
           surface: 'coloring_books',
           active_filter_count: activeFilterCount,
@@ -322,7 +317,21 @@ export function ColoringControlsRow({ showFilterTrigger = false }: ColoringContr
         })
       );
     },
-    [activeFilterCount, localSearch, posthog, updateSearch]
+    [activeFilterCount, posthog, updateSearch]
+  );
+
+  useEffect(() => {
+    if (localSearch === filters.searchTerm) return;
+    const timeout = window.setTimeout(() => commitSearch(localSearch), 350);
+    return () => window.clearTimeout(timeout);
+  }, [filters.searchTerm, localSearch, commitSearch]);
+
+  const handleSearchSubmit = useCallback(
+    (e: { preventDefault: () => void }) => {
+      e.preventDefault();
+      commitSearch(localSearch);
+    },
+    [commitSearch, localSearch]
   );
 
   const toggleSortDirection = useCallback(() => {
@@ -380,7 +389,7 @@ export function ColoringControlsRow({ showFilterTrigger = false }: ColoringContr
               markUserInteraction();
               setLocalSearch(e.target.value);
             }}
-            onBlur={() => updateSearch(localSearch)}
+            onBlur={() => commitSearch(localSearch)}
             placeholder="Search title or author"
             className="pl-9 pointer-coarse:min-h-11"
             aria-label="Search coloring books"

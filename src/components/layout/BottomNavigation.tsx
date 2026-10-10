@@ -4,10 +4,10 @@
  * @created 2025-07-29
  */
 
-import { memo, useEffect, useState } from 'react';
+import { lazy, memo, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, LibraryBig, Plus, Shuffle } from 'lucide-react';
-import { NoteTargetPicker } from '@/components/notes-feed/NoteTargetPicker';
+import { ProtectedLazyRoute } from '@/components/routing/ProtectedLazyRoute';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,6 +24,12 @@ import { createAvatarConfig } from '@/utils/image/avatarUtils';
 import { createLogger } from '@/utils/logger';
 import { MobileAccountMenu } from './MobileAccountMenu';
 import type { LucideIcon } from 'lucide-react';
+
+const NoteTargetPicker = lazy(() =>
+  import('@/components/notes-feed/NoteTargetPicker').then(module => ({
+    default: module.NoteTargetPicker,
+  }))
+);
 
 interface NavigationItem {
   label: string;
@@ -53,7 +59,8 @@ const BottomNavigation = memo(() => {
     isLoading: isLoadingVerticals,
   } = useEnabledVerticals(user?.id);
   const { isMobile, isTablet } = useMobileDevice();
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerState, setPickerState] = useState<'idle' | 'open' | 'closed'>('idle');
+  const setPickerOpen = (open: boolean) => setPickerState(open ? 'open' : 'closed');
 
   const show = isMobile || isTablet;
   useEffect(() => {
@@ -100,7 +107,7 @@ const BottomNavigation = memo(() => {
     <>
       <nav
         aria-label="Bottom navigation"
-        className="border-border bg-background/90 fixed right-0 bottom-0 left-0 z-50 border-t backdrop-blur-md"
+        className="border-border bg-background/90 fixed right-0 bottom-0 left-0 z-50 border-t-[length:var(--bottom-nav-border-width)] backdrop-blur-md"
       >
         <div className="flex h-[var(--bottom-nav-content-height)] items-center justify-around px-2">
           {NAVIGATION_ITEMS.slice(0, 2).map(({ label, icon: Icon, path, ariaLabel }) => {
@@ -218,11 +225,15 @@ const BottomNavigation = memo(() => {
         <div className="h-[var(--bottom-nav-safe-area)]" />
       </nav>
 
-      <NoteTargetPicker
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        verticals={enabledVerticals}
-      />
+      {pickerState !== 'idle' && (
+        <ProtectedLazyRoute suspense="bare" errorBoundary="Progress note picker">
+          <NoteTargetPicker
+            open={pickerState === 'open'}
+            onOpenChange={setPickerOpen}
+            verticals={enabledVerticals}
+          />
+        </ProtectedLazyRoute>
+      )}
     </>
   );
 });

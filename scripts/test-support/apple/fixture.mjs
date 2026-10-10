@@ -122,6 +122,8 @@ export async function startAppleFixture() {
     for (const file of [
       'native_apple_auth.pb.js',
       'auth_sign_in_methods.pb.js',
+      'account_deletion.pb.js',
+      'account_deletion.js',
       'apple_grants.pb.js',
       'apple_grant_store.js',
       'apple_web_grant.js',

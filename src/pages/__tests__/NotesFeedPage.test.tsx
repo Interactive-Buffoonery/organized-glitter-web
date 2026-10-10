@@ -107,7 +107,7 @@ describe('NotesFeedPage', () => {
 
     renderWithProviders(<NotesFeedPage />);
 
-    await user.click(screen.getByRole('tab', { name: 'Coloring Pages' }));
+    await user.click(screen.getByRole('tab', { name: 'Coloring pages' }));
 
     expect(
       screen.getByText('Add a progress note to a coloring page, and it will show up here, also.')
@@ -130,8 +130,8 @@ describe('NotesFeedPage', () => {
     renderWithProviders(<NotesFeedPage />);
 
     expect(screen.queryByRole('tab', { name: 'All' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Diamond Painting' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Coloring Pages' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Diamond paintings' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Coloring pages' })).not.toBeInTheDocument();
     expect(
       screen.getByText('Add a progress note to a coloring page, and it will show up here, also.')
     ).toBeInTheDocument();
@@ -150,8 +150,8 @@ describe('NotesFeedPage', () => {
     renderWithProviders(<NotesFeedPage />);
 
     expect(screen.queryByRole('tab', { name: 'All' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Diamond Painting' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Coloring Pages' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Diamond paintings' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Coloring pages' })).not.toBeInTheDocument();
     expect(
       screen.getByText('Add a progress note to a diamond painting, and it will show up here, also.')
     ).toBeInTheDocument();
@@ -258,7 +258,7 @@ describe('NotesFeedPage', () => {
 
     renderWithProviders(<NotesFeedPage />);
 
-    await user.click(screen.getByRole('tab', { name: 'Diamond Painting' }));
+    await user.click(screen.getByRole('tab', { name: 'Diamond paintings' }));
     expect(useNotesFeedMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ craft: 'diamond' })
     );
@@ -315,7 +315,7 @@ describe('NotesFeedPage', () => {
       );
     });
 
-    await user.click(screen.getByRole('tab', { name: 'Coloring Pages' }));
+    await user.click(screen.getByRole('tab', { name: 'Coloring pages' }));
 
     await waitFor(() => {
       expect(useNotesFeedMock).toHaveBeenLastCalledWith(

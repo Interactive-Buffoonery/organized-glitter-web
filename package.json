@@ -5,7 +5,7 @@
   "description": "A coloring book and diamond art tracker for craft stash, progress, and photos",
   "license": "AGPL-3.0-or-later",
   "type": "module",
-  "packageManager": "pnpm@11.1.2",
+  "packageManager": "pnpm@11.1.3",
   "keywords": [
     "coloring-books",
     "coloring-pages",
@@ -31,12 +31,12 @@
   },
   "engines": {
     "node": "24.x",
-    "pnpm": ">=11.1.2"
+    "pnpm": ">=11.1.3"
   },
   "scripts": {
     "dev": "vite",
-    "build": "sh -c 'export VITE_APP_VERSION=${VITE_APP_VERSION:-local-build}; vite build' && node scripts/build-blog.mjs",
-    "build:with-sitemap": "sh -c 'export VITE_APP_VERSION=${VITE_APP_VERSION:-local-build}; vite build' && node scripts/build-blog.mjs",
+    "build": "sh -c 'export VITE_APP_VERSION=${VITE_APP_VERSION:-local-build}; vite build && node scripts/upload-sourcemaps.mjs' && node scripts/build-blog.mjs",
+    "build:with-sitemap": "sh -c 'export VITE_APP_VERSION=${VITE_APP_VERSION:-local-build}; vite build && node scripts/upload-sourcemaps.mjs' && node scripts/build-blog.mjs",
     "build:budget": "node scripts/bundle-budget.mjs",
     "spacefast:stage": "node scripts/stage-spacefast.mjs",
     "start": "node server/local-build-server.js",
@@ -52,6 +52,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
+    "test:cold-load": "playwright test --config playwright.cold-load.config.ts",
     "test:pwa:navigation": "playwright test --config=playwright.pwa.config.ts",
     "test:pr": "node scripts/run-local-validation.mjs --profile=pr --base=${VALIDATION_BASE_REF:-origin/dev}",
     "native:sync": "node scripts/native-sync-report.mjs",
@@ -96,7 +97,7 @@
     "lint:workflows": "node scripts/lint-workflows.mjs",
     "test:ci:static": "node scripts/generate-not-found.mjs --check && pnpm typecheck && pnpm format:check && pnpm lint && pnpm lint:pb-boundary && pnpm lint:workflows && node --test e2e/ci/browser-inventory.test.mjs",
     "test:ci:unit": "pnpm test && pnpm test:blog",
-    "test:ci:backend": "pnpm pb:test:examples && pnpm pb:validate:schema && pnpm pb:validate:migrations && pnpm pb:validate:upgrade && pnpm pb:test:protected-file-upgrade && pnpm pb:test:auth-verification && pnpm pb:test:feedback && pnpm pb:test:native-oauth-association && pnpm pb:test:auth-step-up && pnpm pb:test:native-apple && pnpm pb:test:archive-restore-v3 && pnpm pb:test:mobile-sync && pnpm pb:test:stats",
+    "test:ci:backend": "pnpm pb:test:examples && pnpm pb:validate:schema && pnpm pb:validate:migrations && pnpm pb:validate:upgrade && pnpm pb:test:protected-file-upgrade && pnpm pb:test:auth-verification && pnpm pb:test:feedback && pnpm pb:test:native-oauth-association && pnpm pb:test:auth-step-up && pnpm pb:test:native-apple && pnpm pb:test:archive-restore-v3 && pnpm pb:test:mobile-sync && pnpm pb:test:stats && pnpm pb:test:account-deletion",
     "test:ci:build": "pnpm build && pnpm build:budget",
     "test:publication": "node scripts/run-publication-validation.mjs",
     "qa:browser": "node scripts/run-local-release-qa.mjs --suite=smoke",
@@ -113,7 +114,8 @@
     "test:ci:react": "node scripts/run-react-review.mjs",
     "qa:browser:full": "node scripts/run-local-release-qa.mjs --suite=full",
     "test:blog": "pnpm --dir blog test",
-    "qa:blog": "node scripts/run-blog-qa.mjs"
+    "qa:blog": "node scripts/run-blog-qa.mjs",
+    "pb:test:account-deletion": "node scripts/test-account-deletion.mjs"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.2.8",

@@ -120,8 +120,12 @@
 @layer base {
   :root {
     --bottom-nav-content-height: 4rem;
+    --bottom-nav-border-width: 1px;
     --bottom-nav-safe-area: env(safe-area-inset-bottom, 0px);
-    --bottom-nav-total-height: calc(var(--bottom-nav-content-height) + var(--bottom-nav-safe-area));
+    --bottom-nav-total-height: calc(
+      var(--bottom-nav-content-height) + var(--bottom-nav-border-width) +
+        var(--bottom-nav-safe-area)
+    );
   }
 
   /* Berry Cream */
@@ -261,6 +265,8 @@
  * SarahSignature). Real paper and washi tape don't recolor when a user
  * flips dark mode, so these tokens are defined once on :root and only
  * lightly softened under .dark to keep them comfortable in low light.
+ * The feature and signature cards override these roles locally with themed
+ * surface and ink tokens in scrapbook.css.
  *
  * The paper register stays paper in both themes: light keeps the blush
  * sheet, dark shifts to a warmer toasted cream against the navy stage.
@@ -491,6 +497,8 @@
   }
 
   .mobile-app-container {
+    display: flex;
+    flex-direction: column;
     min-height: 100vh; /* Fallback for older browsers */
     min-height: 100dvh; /* Modern dynamic viewport height for mobile */
     overflow-x: hidden;

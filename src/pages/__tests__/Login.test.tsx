@@ -39,6 +39,10 @@ const {
   authFormPropsMock: vi.fn(),
 }));
 
+vi.mock('@/services/analytics-preference', () => ({
+  captureAccountAnalyticsEvent: posthogCaptureMock,
+}));
+
 const authState = {
   isAuthenticated: false,
   isLoading: false,
@@ -154,6 +158,13 @@ describe('Login page', () => {
     authState.isAuthenticated = false;
     authState.isLoading = false;
     authState.initialCheckComplete = true;
+  });
+
+  it('separates the welcome heading words in the DOM', () => {
+    renderWithProviders(<Login />);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(
+      'Welcome Back to Organized Glitter'
+    );
   });
 
   it('redirects already-authenticated users to their preserved destination', async () => {

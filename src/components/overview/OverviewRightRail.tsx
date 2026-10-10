@@ -5,6 +5,7 @@ import { showUserReportDialog } from '@/components/FeedbackDialogStore';
 import { GlassPanel } from '@/components/ui/glass-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { OverviewSnapshot } from '@/services/pocketbase/overview.service';
+import { countUnit } from '@/utils/countUnit';
 
 interface OverviewRightRailProps {
   snapshot: OverviewSnapshot;
@@ -34,10 +35,16 @@ export function OverviewRightRail({
   });
   const snapshotRows = [
     canUseDiamond
-      ? { label: 'Diamond paintings in progress', value: snapshot.diamondActiveCount }
+      ? {
+          label: `Diamond ${countUnit(snapshot.diamondActiveCount, 'painting')} in progress`,
+          value: snapshot.diamondActiveCount,
+        }
       : null,
     canUseColoring
-      ? { label: 'Coloring pages in progress', value: snapshot.coloringPageInProgressCount }
+      ? {
+          label: `Coloring ${countUnit(snapshot.coloringPageInProgressCount, 'page')} in progress`,
+          value: snapshot.coloringPageInProgressCount,
+        }
       : null,
     { label: 'Completed this month', value: snapshot.completedThisMonthCount },
   ].filter(row => row !== null);
@@ -102,18 +109,10 @@ export function OverviewRightRail({
             className="text-muted-foreground mt-0.5 size-4 shrink-0"
             strokeWidth={1.75}
           />
-          <div className="space-y-1.5">
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Thank you for being part of
-            </p>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Organized Glitter, I am SO glad
-            </p>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              to have you here. If you have any
-            </p>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              feedback or bug reports to share,
+          <div className="max-w-prose min-w-0 space-y-1.5">
+            <p className="text-muted-foreground text-sm leading-relaxed text-pretty">
+              Thank you for being part of Organized Glitter, I am SO glad to have you here. If you
+              have any feedback or bug reports to share,
             </p>
             <button
               type="button"

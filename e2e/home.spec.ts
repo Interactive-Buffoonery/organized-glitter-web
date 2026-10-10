@@ -1,16 +1,17 @@
 /**
- * Step-1 smoke test: prove the Playwright test runner works end-to-end.
- *
- * Navigates to the public home page (no login required), asserts the page
- * title contains "Organized Glitter", and fails the test if any
- * console.error fires during load. This is the minimum viable test; step 2
- * adds authenticated route-mount sweeps.
+ * Public homepage coverage: loading, runtime errors, and readable marketing
+ * cards across both themes and phone, tablet, and desktop widths.
  */
 
 import { test, expect, type ConsoleMessage } from '@playwright/test';
 
+import { expectNoAxeViolations, waitForAccessibilityScanReady } from './a11y/axe-test';
+
 test.describe('Home page', () => {
-  test('loads with the expected title and no console errors', async ({ page }) => {
+  test('loads without errors and keeps marketing cards readable across themes and widths', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(90_000);
     const consoleErrors: string[] = [];
 
     page.on('console', (msg: ConsoleMessage) => {
@@ -38,13 +39,64 @@ test.describe('Home page', () => {
       /Failed to load resource.*posthog/i,
       /Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
     ];
+    await page.addInitScript(() => localStorage.setItem('theme', 'system'));
+
+    for (const theme of ['light', 'dark'] as const) {
+      for (const width of [320, 390, 800, 1280]) {
+        await test.step(`marketing cards in ${theme} at ${width}px`, async () => {
+          await page.setViewportSize({ width, height: 900 });
+          await page.emulateMedia({ colorScheme: theme });
+          await page.goto('/');
+          await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+          await waitForAccessibilityScanReady(page);
+
+          for (const selector of ['.features-sheet', '.sig-panel']) {
+            const card = page.locator(selector);
+            await card.scrollIntoViewIfNeeded();
+            await expect(card.locator('xpath=../../..')).toHaveCSS('opacity', '1');
+            const surface = await card.evaluate(element => {
+              const color = getComputedStyle(element).backgroundColor;
+              const channels = color
+                .match(/[\d.]+/g)!
+                .slice(0, 3)
+                .map(Number);
+              const linear = channels.map(channel => {
+                const value = channel / 255;
+                return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+              });
+              const bounds = element.getBoundingClientRect();
+              return {
+                luminance: linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722,
+                left: bounds.left,
+                right: bounds.right,
+                clipped: element.scrollWidth > element.clientWidth,
+              };
+            });
+            if (theme === 'dark') expect(surface.luminance).toBeLessThan(0.15);
+            else expect(surface.luminance).toBeGreaterThan(0.8);
+            expect(surface.left).toBeGreaterThanOrEqual(0);
+            expect(surface.right).toBeLessThanOrEqual(width);
+            expect(surface.clipped).toBe(false);
+            await expectNoAxeViolations(page, { include: selector });
+          }
+          if (width === 320 || width === 1280) {
+            const screenshot = testInfo.outputPath(`home-${theme}-${width}.png`);
+            await page.screenshot({ path: screenshot, fullPage: true, animations: 'disabled' });
+            await testInfo.attach(`home-${theme}-${width}`, {
+              path: screenshot,
+              contentType: 'image/png',
+            });
+          }
+        });
+      }
+    }
+
     const realErrors = consoleErrors.filter(
       text => !ignorablePatterns.some(pattern => pattern.test(text))
     );
-
     expect(
       realErrors,
-      `Unexpected console errors on home page load:\n${realErrors.join('\n')}`
+      `Unexpected console errors on home page:\n${realErrors.join('\n')}`
     ).toHaveLength(0);
   });
 });

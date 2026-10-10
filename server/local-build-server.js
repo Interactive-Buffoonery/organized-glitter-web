@@ -490,97 +490,111 @@ async function proxyPostHog(req, res, url) {
     requestBody.once('close', () => clearTimeout(timeoutId));
   }
 
-  let response;
-  try {
-    response = await fetch(proxyTarget, {
-      method: req.method,
-      headers,
-      body: hasRequestBody ? requestBody : undefined,
-      duplex: hasRequestBody ? 'half' : undefined,
-      signal: abortController.signal,
-    });
-  } catch (error) {
-    clearTimeout(timeoutId);
-    const abortReason = abortController.signal.reason;
-
-    if (
-      error instanceof RequestBodyTooLargeError ||
-      abortReason instanceof RequestBodyTooLargeError
-    ) {
-      sendText(res, 413, 'Request body too large');
-      return;
-    }
-
-    if (
-      error instanceof RequestBodyTimeoutError ||
-      abortReason instanceof RequestBodyTimeoutError
-    ) {
-      sendText(res, 408, 'Request body timed out');
-      return;
-    }
-
-    console.warn('PostHog proxy request failed:', {
-      path: url.pathname,
-      target: proxyTarget.origin,
-      error: error instanceof Error ? error.message : String(error),
-      clientRequestDestroyed: req.destroyed,
-    });
-    applySecurityHeaders(res);
-    res.writeHead(204);
-    res.end();
-    return;
-  }
-
-  clearTimeout(timeoutId);
-
-  applySecurityHeaders(res);
-  response.headers.forEach((value, key) => {
-    if (!['content-encoding', 'content-length', 'transfer-encoding'].includes(key)) {
-      res.setHeader(key, value);
-    }
-  });
-  res.writeHead(response.status);
-
-  if (req.method === 'HEAD') {
-    res.end();
-    return;
-  }
-
-  const body = response.body ? ReadableStream.from(response.body) : null;
-  if (!body) {
-    res.end();
-    return;
-  }
+  const upstreamTimeout = setTimeout(
+    () => {
+      abortController.abort(new Error('PostHog upstream request timed out'));
+    },
+    getPositiveIntegerEnv('GLIMMER_PROXY_REQUEST_TIMEOUT_MS', 10_000)
+  );
+  upstreamTimeout.unref?.();
 
   try {
-    await body.pipeTo(
-      new WritableStream({
-        write(chunk) {
-          res.write(chunk);
-        },
-        close() {
-          res.end();
-        },
-        abort() {
-          res.destroy();
-        },
-      })
-    );
-  } catch (error) {
-    console.warn('PostHog proxy response stream failed:', {
-      path: url.pathname,
-      target: proxyTarget.origin,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    let response;
+    try {
+      response = await fetch(proxyTarget, {
+        method: req.method,
+        headers,
+        body: hasRequestBody ? requestBody : undefined,
+        duplex: hasRequestBody ? 'half' : undefined,
+        signal: abortController.signal,
+      });
+    } catch (error) {
+      clearTimeout(timeoutId);
+      const abortReason = abortController.signal.reason;
 
-    if (!res.headersSent) {
+      if (
+        error instanceof RequestBodyTooLargeError ||
+        abortReason instanceof RequestBodyTooLargeError
+      ) {
+        sendText(res, 413, 'Request body too large');
+        return;
+      }
+
+      if (
+        error instanceof RequestBodyTimeoutError ||
+        abortReason instanceof RequestBodyTimeoutError
+      ) {
+        sendText(res, 408, 'Request body timed out');
+        return;
+      }
+
+      console.warn('PostHog proxy request failed:', {
+        path: url.pathname,
+        target: proxyTarget.origin,
+        error: error instanceof Error ? error.message : String(error),
+        clientRequestDestroyed: req.destroyed,
+      });
       applySecurityHeaders(res);
       res.writeHead(204);
       res.end();
       return;
     }
 
-    res.destroy(error instanceof Error ? error : undefined);
+    clearTimeout(timeoutId);
+
+    applySecurityHeaders(res);
+    response.headers.forEach((value, key) => {
+      if (!['content-encoding', 'content-length', 'transfer-encoding'].includes(key)) {
+        res.setHeader(key, value);
+      }
+    });
+    res.writeHead(response.status);
+
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
+
+    const body = response.body;
+    if (!body) {
+      res.end();
+      return;
+    }
+
+    try {
+      await body.pipeTo(
+        new WritableStream({
+          write(chunk) {
+            res.write(chunk);
+          },
+          close() {
+            res.end();
+          },
+          abort() {
+            res.destroy();
+          },
+        }),
+        { signal: abortController.signal }
+      );
+    } catch (error) {
+      console.warn('PostHog proxy response stream failed:', {
+        path: url.pathname,
+        target: proxyTarget.origin,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      if (!res.headersSent) {
+        applySecurityHeaders(res);
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      res.destroy(error instanceof Error ? error : undefined);
+    }
+  } finally {
+    clearTimeout(upstreamTimeout);
+    clearTimeout(timeoutId);
   }
 }
 
@@ -784,7 +798,7 @@ export function createLocalBuildRequestHandler({
 
       await serveFile(req, res, {
         createFileStream,
-        filePath: path.join(staticDir, 'index.html'),
+        filePath: path.join(staticDir, 'app.html'),
         staticDir,
       });
     } catch (error) {

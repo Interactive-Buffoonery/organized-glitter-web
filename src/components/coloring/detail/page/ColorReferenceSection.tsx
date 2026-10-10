@@ -214,6 +214,11 @@ function ColorReferenceEditor({ pageId, userId }: { pageId: string; userId: stri
           </div>
         ))}
       </div>
+      {!query.isPending && !query.isError && !query.data?.notes && !editing && (
+        <p className="text-muted-foreground text-sm">
+          Keep color codes, blends, and swatch photos for this page here.
+        </p>
+      )}
       {query.data?.notes && !editing && (
         <p className="text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">{query.data.notes}</p>
       )}

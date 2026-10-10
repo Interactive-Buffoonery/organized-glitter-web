@@ -2,6 +2,7 @@
 const loadingEl = document.getElementById('app-loading');
 const errorEl = document.getElementById('app-error');
 const retryButton = document.getElementById('retry-button');
+const slowLoadRetryButton = document.getElementById('slow-load-retry');
 const slowLoadWarning = document.getElementById('slow-load-warning');
 const bootstrapAnalytics = typeof window !== 'undefined' ? window.__OG_BOOTSTRAP_ANALYTICS__ : null;
 
@@ -181,7 +182,8 @@ if (loadingEl && loadingEl.isConnected && !isRootReady()) {
   setRootInert(true);
 }
 
-// Show slow load warning after 10 seconds
+// Offer recovery while resources are still loading. Elapsed time never marks
+// authentication or a private route ready.
 const slowLoadTimeout = setTimeout(() => {
   if (
     !isAppLoaded &&
@@ -195,11 +197,12 @@ const slowLoadTimeout = setTimeout(() => {
       console.log('Slow load warning displayed');
     }
   }
-}, 10000);
+}, 5000);
 
 // Handle retry button click
-if (retryButton) {
-  retryButton.addEventListener('click', () => {
+for (const button of [retryButton, slowLoadRetryButton]) {
+  if (!button) continue;
+  button.addEventListener('click', () => {
     console.log('Retry button clicked');
     if (errorEl) {
       errorEl.style.display = 'none';
@@ -217,24 +220,23 @@ if (retryButton) {
     isAppLoaded = false;
     hideGeneration += 1;
     setRootInert(true);
+    window.__OG_RESOURCE_RECOVERY__?.resetReloadBudget?.();
     window.location.reload();
   });
 }
 
 /**
- * Show the static recovery card. Stacks and filenames stay in console only.
+ * Show the static recovery card. Raw errors and URLs can include credentials.
  * @param {'module_resource'|'startup_timeout'|'runtime_error'} reason
- * @param {unknown} [detailForConsole]
  */
-const showError = (reason, detailForConsole) => {
+const showError = reason => {
   if (hasError) return; // Prevent multiple error displays
 
   hasError = true;
   clearTimeout(slowLoadTimeout);
+  if (slowLoadWarning) slowLoadWarning.style.display = 'none';
 
-  const consoleDetail =
-    detailForConsole === undefined || detailForConsole === null ? reason : detailForConsole;
-  console.error('Showing bootstrap failure:', reason, consoleDetail);
+  console.error('Showing bootstrap failure:', reason);
 
   hideLoadingShell({
     afterHide: () => {
@@ -253,6 +255,14 @@ const showError = (reason, detailForConsole) => {
   });
 };
 
+window.addEventListener('og:resource-failure', () => {
+  if (!isRootReady()) showError('module_resource');
+});
+
+if (window.__OG_RESOURCE_RECOVERY__?.state === 'failed' && !isRootReady()) {
+  showError('module_resource');
+}
+
 // Resource errors do not bubble to the runtime error listener below.
 window.addEventListener(
   'error',
@@ -263,6 +273,7 @@ window.addEventListener(
     if (!(script instanceof HTMLScriptElement) || script.type !== 'module' || !script.src) {
       return;
     }
+    if (script.hasAttribute('data-og-bootstrap')) return;
 
     const source = new URL(script.src);
     if (
@@ -272,10 +283,7 @@ window.addEventListener(
       return;
     }
 
-    showError(
-      'module_resource',
-      'A file needed to start the app could not load. Select Try again to reload.'
-    );
+    showError('module_resource');
   },
   true
 );
@@ -287,30 +295,18 @@ window.addEventListener('error', function (event) {
   if (msg.includes('ResizeObserver')) return;
   if (isExternalStartupError(event.error || msg)) return;
 
-  const errorMessage = event.error
-    ? event.error.stack || event.error.message || 'Unknown error'
-    : `Error: ${event.message} at ${event.filename}:${event.lineno}:${event.colno}`;
-
-  console.error('Global error:', event.error || event.message);
-
-  // Once React has mounted, log but let React error boundaries handle the UI
+  // Once React is ready, its error boundaries own recovery.
   if (!isRootReady()) {
-    showError('runtime_error', errorMessage);
+    showError('runtime_error');
   }
 });
 
 // Handle unhandled promise rejections
 window.addEventListener('unhandledrejection', function (event) {
   if (isExternalStartupError(event.reason)) return;
-  const errorMessage = event.reason
-    ? event.reason.stack || event.reason.message || 'Unknown promise rejection'
-    : 'An unknown error occurred';
-
-  console.error('Unhandled rejection:', event.reason);
-
-  // Once React has mounted, log but let React error boundaries handle the UI
+  // Once React is ready, its error boundaries own recovery.
   if (!isRootReady()) {
-    showError('runtime_error', errorMessage);
+    showError('runtime_error');
   }
 });
 
@@ -400,7 +396,7 @@ setTimeout(() => {
     return;
   }
 
-  showError('startup_timeout', 'The app did not finish loading. Select Try again to reload.');
+  showError('startup_timeout');
 }, 30000);
 
 // Vite production HTML can execute /assets/main-*.js before this file. React

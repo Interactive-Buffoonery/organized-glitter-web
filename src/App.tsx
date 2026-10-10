@@ -25,6 +25,7 @@ import { useAppInitialization } from '@/hooks/useAppInitialization.ts';
 import { useConnectionRecovery } from '@/hooks/useConnectionRecovery.ts';
 import { OfflinePage } from '@/components/OfflinePage.tsx';
 import { getLegacyResetHashPath } from '@/utils/auth/resetLink';
+import { scheduleAfterAppReady } from '@/utils/pwa/scheduleAfterAppReady';
 
 /**
  * Main App component
@@ -36,7 +37,7 @@ const App: React.FC = () => {
 
   const { state: connectionState, checkConnection } = useConnectionRecovery();
 
-  // Register the PWA service worker. autoUpdate handles the reload on activation
+  // Register after the ready route settles. autoUpdate handles activation
   // (see main.tsx for the lifecycle listener that complements it).
   useEffect(() => {
     if (!('serviceWorker' in navigator)) {
@@ -45,24 +46,32 @@ const App: React.FC = () => {
 
     const pwaLogger = createLogger('PWA');
 
-    import('virtual:pwa-register')
-      .then(({ registerSW }) => {
-        registerSW({
-          // Register immediately so existing clients check for a newer SW/build on first load.
-          immediate: true,
-          onRegisteredSW(_swUrl, registration) {
-            registration?.update()?.catch(error => {
-              pwaLogger.debug(
-                'Automatic PWA update check failed (non-critical; initial registration can still succeed and the current build will keep running)',
-                { error }
-              );
-            });
-          },
+    let disposed = false;
+    const cancel = scheduleAfterAppReady(() => {
+      void import('virtual:pwa-register')
+        .then(({ registerSW }) => {
+          if (disposed) return;
+          registerSW({
+            // Register immediately so existing clients check for a newer SW/build on first load.
+            immediate: true,
+            onRegisteredSW(_swUrl, registration) {
+              registration?.update()?.catch(error => {
+                pwaLogger.debug(
+                  'Automatic PWA update check failed (non-critical; initial registration can still succeed and the current build will keep running)',
+                  { error }
+                );
+              });
+            },
+          });
+        })
+        .catch(error => {
+          pwaLogger.debug('PWA registration not available', { error });
         });
-      })
-      .catch(error => {
-        pwaLogger.debug('PWA registration not available', { error });
-      });
+    });
+    return () => {
+      disposed = true;
+      cancel();
+    };
   }, []);
 
   useEffect(() => {

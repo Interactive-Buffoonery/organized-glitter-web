@@ -6,13 +6,11 @@ import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { notify } from '@/lib/notifications';
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
-import { trackGrowthFunnelMilestone } from '@/services/growth-funnel-analytics';
 import { ColoringPageProgressNotesService } from '@/services/pocketbase/coloringPageProgressNotes.service';
 import { handleMutationError } from '@/hooks/mutations/handleMutationError';
 import { invalidateNotesFeedQueries } from '@/hooks/queries/notesFeedCache';
 import { toUserDateString } from '@/utils/date/timezoneUtils';
 import { createLogger } from '@/utils/logger';
-import { useAuth } from '@/hooks/useAuth';
 import type { MarkdownString } from '@/types/markdown';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
 
@@ -47,7 +45,6 @@ const invalidatePageProgressNotes = async (
 export const useAddColoringPageProgressNoteMutation = () => {
   const queryClient = useQueryClient();
   const userTimezone = useUserTimezone();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({
@@ -71,30 +68,12 @@ export const useAddColoringPageProgressNoteMutation = () => {
       });
     },
     onSuccess: (_, { pageId, noteData }) => {
-      capture(AnalyticsEvent.COLORING_PAGE_PROGRESS_NOTE_ADDED);
-      trackGrowthFunnelMilestone({
-        userId: user?.id,
-        event: AnalyticsEvent.FIRST_PROGRESS_NOTE_ADDED,
-        properties: {
-          craft: 'coloring',
-          entity_type: 'coloring_page_progress_note',
-          source_surface: 'coloring_page_detail',
-          has_photo: Boolean(noteData.imageFile),
-        },
-        activationSignal: 'progress_note_added',
+      capture(AnalyticsEvent.COLORING_PAGE_PROGRESS_NOTE_ADDED, {
+        craft: 'coloring',
+        entity_type: 'coloring_page_progress_note',
+        source_surface: 'coloring_page_detail',
+        has_photo: Boolean(noteData.imageFile),
       });
-      if (noteData.imageFile) {
-        trackGrowthFunnelMilestone({
-          userId: user?.id,
-          event: AnalyticsEvent.FIRST_PHOTO_ADDED,
-          properties: {
-            craft: 'coloring',
-            entity_type: 'coloring_page_progress_note',
-            source_surface: 'coloring_page_detail',
-          },
-          activationSignal: 'photo_added',
-        });
-      }
       void invalidatePageProgressNotes(queryClient, pageId).catch(error => {
         logger.error('Could not refresh coloring page progress notes after save:', error);
       });

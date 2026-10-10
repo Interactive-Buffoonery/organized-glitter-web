@@ -7,6 +7,9 @@ squares, a white center square, and a raspberry diamond on navy.
   or replace it with the earlier vector interpretation.
 - Keep the same navy tile in light and dark mode, without adding an outer border.
 - The icon background is `#05051A`; the current dark page background is `#151533`.
+- The header shows the tile at 40px, inside its 44px home link. The tile edge
+  is close to the dark header color, so the artwork carries the mark there.
+  Keep it at 40px rather than adding a border, ring, or resting shadow.
 
 ## Source and regeneration
 

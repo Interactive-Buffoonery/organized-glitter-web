@@ -62,6 +62,7 @@ function request(port, path, options = {}) {
       res => {
         const chunks = [];
 
+        res.on('error', reject);
         res.on('data', chunk => chunks.push(chunk));
         res.on('end', () => {
           resolve({
@@ -116,7 +117,8 @@ describe('Local build server static files', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     staticDir = await fs.mkdtemp(path.join(os.tmpdir(), 'organized-glitter-static-'));
-    await fs.writeFile(path.join(staticDir, 'index.html'), '<main>SPA shell</main>');
+    await fs.writeFile(path.join(staticDir, 'index.html'), '<main>Static landing</main>');
+    await fs.writeFile(path.join(staticDir, 'app.html'), '<main>SPA shell</main>');
   });
 
   afterEach(async () => {
@@ -306,14 +308,14 @@ describe('Local build server static files', () => {
   ])(
     'serves route-specific metadata for %s before JavaScript runs',
     async (requestPath, fileName, title, canonical) => {
-      for (const entry of [
-        'index.html',
-        'about.html',
-        'links.html',
-        'privacy.html',
-        'terms.html',
+      for (const [source, entry] of [
+        ['landing.html', 'index.html'],
+        ['about.html', 'about.html'],
+        ['links.html', 'links.html'],
+        ['privacy.html', 'privacy.html'],
+        ['terms.html', 'terms.html'],
       ]) {
-        await fs.copyFile(path.join(process.cwd(), entry), path.join(staticDir, entry));
+        await fs.copyFile(path.join(process.cwd(), source), path.join(staticDir, entry));
       }
       server = http.createServer(createLocalBuildRequestHandler({ staticDir }));
       const port = await listen(server);
@@ -333,6 +335,21 @@ describe('Local build server static files', () => {
       expect(response.body).toBe(await fs.readFile(path.join(staticDir, fileName), 'utf8'));
     }
   );
+
+  it.each([
+    ['/', 'Static landing'],
+    ['/index.html', 'Static landing'],
+    ['/login', 'SPA shell'],
+    ['/overview', 'SPA shell'],
+  ])('serves %s from the matching HTML document', async (requestPath, body) => {
+    server = http.createServer(createLocalBuildRequestHandler({ staticDir }));
+    const port = await listen(server);
+
+    const response = await request(port, requestPath);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toBe(`<main>${body}</main>`);
+  });
 
   it('keeps extensionless application routes on the SPA shell', async () => {
     server = http.createServer(createLocalBuildRequestHandler({ staticDir }));
@@ -1028,6 +1045,47 @@ describe('Local build server PostHog proxy', () => {
       })
     );
     expect(console.error).not.toHaveBeenCalledWith('Local build server error:', expect.anything());
+  });
+
+  it.each(['GET', 'POST'])('bounds a stalled upstream %s request', async method => {
+    vi.stubEnv('GLIMMER_PROXY_REQUEST_TIMEOUT_MS', '30');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
+      if (options.body) {
+        for await (const _chunk of options.body) {
+          /* Drain the upload. */
+        }
+      }
+      return new Promise((_, reject) => {
+        options.signal.addEventListener('abort', () => reject(options.signal.reason), {
+          once: true,
+        });
+      });
+    });
+    server = http.createServer(createLocalBuildRequestHandler());
+    const port = await listen(server);
+    const response = await request(port, '/glimmer/capture/', {
+      method,
+      body: method === 'POST' ? '{}' : undefined,
+    });
+    expect(response.statusCode).toBe(204);
+    expect(console.warn).toHaveBeenCalledWith(
+      'PostHog proxy request failed:',
+      expect.objectContaining({ error: 'PostHog upstream request timed out' })
+    );
+  });
+
+  it('bounds a stalled upstream response stream', async () => {
+    vi.stubEnv('GLIMMER_PROXY_REQUEST_TIMEOUT_MS', '30');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new ReadableStream({ start() {} }))
+    );
+    server = http.createServer(createLocalBuildRequestHandler());
+    const port = await listen(server);
+    await expect(request(port, '/glimmer/static/array.js')).rejects.toThrow();
+    expect(console.warn).toHaveBeenCalledWith(
+      'PostHog proxy response stream failed:',
+      expect.objectContaining({ error: 'PostHog upstream request timed out' })
+    );
   });
 
   it('returns 413 for declared oversized glimmer bodies without calling fetch', async () => {

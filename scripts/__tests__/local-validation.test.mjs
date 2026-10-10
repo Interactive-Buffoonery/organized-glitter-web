@@ -52,10 +52,18 @@ describe('local validation orchestrator', () => {
       ['publication', 'test:publication'],
       ['not-found', 'test:not-found'],
       ['pwa-navigation', 'test:pwa:navigation'],
+      ['cold-load', 'test:cold-load'],
       ['browser-smoke', 'qa:browser'],
       ['protected-file-browser', 'test:protected-file-rotation-browser'],
       ['blog-browser', 'qa:blog'],
     ]);
+  });
+
+  it('runs cold-load through the dedicated built-artifact config', () => {
+    const scripts = JSON.parse(readFileSync('package.json', 'utf8')).scripts;
+    expect(scripts['test:cold-load']).toBe(
+      'playwright test --config playwright.cold-load.config.ts'
+    );
   });
 
   it('can run and report only the local PocketBase gate', () => {
@@ -76,6 +84,7 @@ describe('local validation orchestrator', () => {
     const release = buildPhasePlan('release');
 
     expect(release).toContainEqual(['browser-full', 'qa:browser:full']);
+    expect(release).toContainEqual(['cold-load', 'test:cold-load']);
     expect(release).not.toContainEqual(['browser-smoke', 'qa:browser']);
   });
 

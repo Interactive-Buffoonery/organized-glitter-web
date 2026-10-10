@@ -85,20 +85,20 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="/css/loading.css?v=8" />
+    <link rel="stylesheet" href="/css/loading.css?v=9" />
     <link rel="stylesheet" href="/css/error.css?v=8" />
     <link rel="stylesheet" href="/css/safe-area.css?v=6" />
     <!-- og-public-analytics -->
     <!-- defer so #app-loading exists; keep ahead of Vite type=module bundles -->
     <script src="/js/bootstrap-analytics.js?v=2" defer></script>
-    <script src="/js/loading.js?v=10" defer></script>
+    <script src="/js/loading.js?v=11" defer></script>
   </head>
   <body>
     <div class="page-atmosphere" aria-hidden="true"></div>
     <div id="root"></div>
 
     <!-- Loading State — sibling of #root so React's createRoot() does not remove it -->
-    <div id="app-loading">
+    <div id="app-loading" role="main" aria-label="App startup">
       <div>
         <div class="loading-logo-container">
           <svg
@@ -119,14 +119,17 @@
           </svg>
         </div>
 
-        <div class="spinner"></div>
+        <div class="spinner" aria-hidden="true"></div>
 
         <h1>Organized Glitter</h1>
 
-        <p>Loading your craft collection...</p>
+        <p role="status" aria-label="Loading Organized Glitter">Loading your craft collection...</p>
 
         <div id="slow-load-warning">
-          <p>This is taking longer than expected. Please check your internet connection.</p>
+          <p role="status" aria-label="Slow startup">
+            This is taking a little longer. You can wait or reload to try again.
+          </p>
+          <button type="button" id="slow-load-retry">Reload</button>
         </div>
       </div>
     </div>

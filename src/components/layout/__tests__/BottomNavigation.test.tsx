@@ -6,27 +6,29 @@ import { QueryClient } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import TestWrapper from '@/test-utils/TestWrapper';
 
-const { mockNavigate, authState, mobileState, enabledVerticalsState, logger } = vi.hoisted(() => ({
-  mockNavigate: vi.fn(),
-  authState: {
-    user: { id: 'user-123' },
-  },
-  mobileState: {
-    isMobile: true,
-    isTablet: false,
-  },
-  enabledVerticalsState: {
-    diamond_painting: true,
-    coloring_books: false,
-    isLoading: false,
-  },
-  logger: {
-    info: vi.fn(),
-    debug: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+const { mockNavigate, authState, mobileState, enabledVerticalsState, logger, pickerImported } =
+  vi.hoisted(() => ({
+    mockNavigate: vi.fn(),
+    pickerImported: vi.fn(),
+    authState: {
+      user: { id: 'user-123' },
+    },
+    mobileState: {
+      isMobile: true,
+      isTablet: false,
+    },
+    enabledVerticalsState: {
+      diamond_painting: true,
+      coloring_books: false,
+      isLoading: false,
+    },
+    logger: {
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    },
+  }));
 
 vi.mock('react-router-dom', async importOriginal => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
@@ -52,10 +54,29 @@ vi.mock('@/utils/logger', () => ({
   createLogger: () => logger,
 }));
 
-vi.mock('@/components/notes-feed/NoteTargetPicker', () => ({
-  NoteTargetPicker: ({ open }: { open: boolean }) =>
-    open ? <dialog open>Progress note target picker</dialog> : null,
-}));
+vi.mock('@/components/notes-feed/NoteTargetPicker', () => {
+  pickerImported();
+  return {
+    NoteTargetPicker: ({
+      open,
+      onOpenChange,
+    }: {
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+    }) => (
+      <div data-testid="mounted-note-picker">
+        {open && (
+          <dialog open>
+            Progress note target picker
+            <button type="button" onClick={() => onOpenChange(false)}>
+              Close picker
+            </button>
+          </dialog>
+        )}
+      </div>
+    ),
+  };
+});
 
 vi.mock('../MobileAccountMenu', () => ({
   MobileAccountMenu: ({ triggerVariant }: { triggerVariant?: string }) => (
@@ -99,6 +120,13 @@ describe('BottomNavigation add action', () => {
     enabledVerticalsState.diamond_painting = true;
     enabledVerticalsState.coloring_books = false;
     enabledVerticalsState.isLoading = false;
+  });
+
+  it('does not import the progress-note editor during basic navigation startup', () => {
+    renderWithProviders(<BottomNavigation />, { initialRoute: '/dashboard' });
+
+    expect(pickerImported).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('mounted-note-picker')).not.toBeInTheDocument();
   });
 
   it('labels the collection tab Library and keeps its existing route', () => {
@@ -173,7 +201,11 @@ describe('BottomNavigation add action', () => {
     await user.click(screen.getByRole('button', { name: 'Add new item' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Add a progress note' }));
 
-    expect(screen.getByRole('dialog')).toHaveTextContent('Progress note target picker');
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Progress note target picker');
+    const picker = screen.getByTestId('mounted-note-picker');
+    await user.click(screen.getByRole('button', { name: 'Close picker' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mounted-note-picker')).toBe(picker);
   });
 
   it('hides the add action when both verticals are disabled', () => {

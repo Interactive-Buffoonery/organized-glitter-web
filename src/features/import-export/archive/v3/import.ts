@@ -83,6 +83,7 @@ export interface ArchiveV3ImportResult {
   totalPartCount: number;
   selectedLogicalItemCount: number;
   createdItemCount: number;
+  createdLibraryItemCount: number;
   scaffoldedItemCount: number;
   alreadyAppliedItemCount: number;
   restoredAssetCount: number;
@@ -400,6 +401,7 @@ export async function importArchiveV3Parts(
   const conflicts: ArchiveV3ItemFailure[] = [];
   const errors: ArchiveV3ItemFailure[] = [];
   let completed = 0;
+  let createdLibraryItemCount = 0;
 
   function stopPart(
     partNumber: number,
@@ -441,6 +443,12 @@ export async function importArchiveV3Parts(
           signal: input.session.signal,
         });
         itemResults.push({ ...response, partNumber: part.manifest.partNumber });
+        if (
+          response.outcome === 'created' &&
+          (item.kind === 'diamond-project' || item.kind === 'coloring-book')
+        ) {
+          createdLibraryItemCount += 1;
+        }
         assertSession(input.session);
       } catch (error) {
         const failure: ArchiveV3ItemFailure = {
@@ -483,6 +491,7 @@ export async function importArchiveV3Parts(
       totalPartCount: first.partCount,
       selectedLogicalItemCount: logicalItemIds.size,
       createdItemCount: itemResults.filter(result => result.outcome === 'created').length,
+      createdLibraryItemCount,
       scaffoldedItemCount: itemResults.reduce(
         (count, result) => count + (result.scaffoldedParentCount ?? 0),
         0

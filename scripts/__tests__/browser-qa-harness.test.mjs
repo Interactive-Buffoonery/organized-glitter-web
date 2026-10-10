@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -238,21 +239,48 @@ describe('browser QA harness safeguards', () => {
   });
 
   it('requires the exact managed inventory for smoke and full suites', () => {
-    expect(parseListedInventory('Total: 63 tests in 22 files', 'smoke')).toEqual({
-      files: 22,
-      tests: 63,
+    expect(parseListedInventory('Total: 83 tests in 23 files', 'smoke')).toEqual({
+      files: 23,
+      tests: 83,
     });
-    expect(parseListedInventory('Total: 254 tests in 39 files', 'full')).toEqual({
-      files: 39,
-      tests: 254,
+    expect(parseListedInventory('Total: 290 tests in 40 files', 'full')).toEqual({
+      files: 40,
+      tests: 290,
     });
-    expect(() => parseListedInventory('Total: 62 tests in 22 files', 'smoke')).toThrow(
-      /expected 63 tests in 22 files/i
+    expect(() => parseListedInventory('Total: 76 tests in 23 files', 'smoke')).toThrow(
+      /expected 83 tests in 23 files/i
     );
   });
 
+  it.each(['smoke', 'full'])('matches Playwright discovery for the %s suite', suite => {
+    const output = execFileSync(
+      process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
+      ['exec', 'playwright', 'test', '--config=playwright.ci.config.ts', '--list'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          E2E_QA_SUITE: suite,
+          E2E_APP_URL: 'http://127.0.0.1:3000',
+          VITE_POCKETBASE_URL: 'http://127.0.0.1:8090',
+          E2E_TEST_EMAIL: 'inventory@example.test',
+          E2E_TEST_PASSWORD: 'inventory-test-password',
+          E2E_FIXTURE_PROJECT_ID: 'localproject003',
+          E2E_COLORING_BOOK_ID: 'localbook000001',
+          E2E_COLORING_PAGE_ID: 'localpage000001',
+          E2E_COLORING_MEDIUM_ID: 'localmedium0001',
+          E2E_RANDOMIZER_PROJECT_IDS: Array.from(
+            { length: 8 },
+            (_, index) => `localproject00${index + 1}`
+          ).join(','),
+        },
+      }
+    );
+    expect(parseListedInventory(output, suite).tests).toBeGreaterThan(0);
+  });
+
   it('accepts a reconciled smoke report with no skipped tests', () => {
-    const tests = Array.from({ length: 63 }, (_, index) => ({
+    const tests = Array.from({ length: 83 }, (_, index) => ({
       projectName: 'authenticated-chromium-smoke',
       expectedStatus: 'passed',
       status: 'expected',
@@ -268,13 +296,13 @@ describe('browser QA harness safeguards', () => {
         },
       ],
       errors: [],
-      stats: { expected: 63, unexpected: 0, flaky: 0, skipped: 0 },
+      stats: { expected: 83, unexpected: 0, flaky: 0, skipped: 0 },
     };
 
     expect(validateManagedPlaywrightReport(report, 'smoke')).toEqual({
-      expected: 63,
+      expected: 83,
       skipped: 0,
-      total: 63,
+      total: 83,
     });
   });
 
@@ -290,7 +318,7 @@ describe('browser QA harness safeguards', () => {
             },
           ],
           errors: [],
-          stats: { expected: 63, unexpected: 0, flaky: 0, skipped: 0 },
+          stats: { expected: 83, unexpected: 0, flaky: 0, skipped: 0 },
         },
         'smoke'
       )
@@ -298,7 +326,7 @@ describe('browser QA harness safeguards', () => {
   });
 
   it('allows only the exact conditional full-suite skip', () => {
-    const passing = Array.from({ length: 253 }, (_, index) => ({
+    const passing = Array.from({ length: 289 }, (_, index) => ({
       projectName: 'authenticated-chromium-full',
       expectedStatus: 'passed',
       status: 'expected',
@@ -343,13 +371,13 @@ describe('browser QA harness safeguards', () => {
         },
       ],
       errors: [],
-      stats: { expected: 253, unexpected: 0, flaky: 0, skipped: 1 },
+      stats: { expected: 289, unexpected: 0, flaky: 0, skipped: 1 },
     };
 
     expect(validateManagedPlaywrightReport(report, 'full')).toEqual({
-      expected: 253,
+      expected: 289,
       skipped: 1,
-      total: 254,
+      total: 290,
     });
 
     allowedSkip.annotations[0].description = 'different reason';

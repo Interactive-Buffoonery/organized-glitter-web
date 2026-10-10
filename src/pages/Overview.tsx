@@ -101,8 +101,7 @@ const Overview = () => {
   });
 
   const criticalUserEmail = user?.email || '';
-  const displayName = useMemo(() => profile?.name || 'Artist', [profile?.name]);
-  const isProfileReady = !profileLoading && profile?.name;
+  const displayName = useMemo(() => profile?.username || '', [profile?.username]);
   const [activeCraftFilter, setActiveCraftFilter] =
     useState<OverviewCraftFilter>(readInitialCraftFilter);
   const [activeSort, setActiveSort] = useState<OverviewSortId>(readInitialSort);
@@ -210,7 +209,7 @@ const Overview = () => {
             avatarUrl={profile?.avatarUrl || null}
             avatarType={null}
             email={criticalUserEmail}
-            isLoadingProfile={!isProfileReady}
+            isLoadingProfile={profileLoading}
           />
 
           <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-14">

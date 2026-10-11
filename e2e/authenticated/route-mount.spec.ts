@@ -382,7 +382,7 @@ test.describe('Authenticated route mount sweep', () => {
   test('/options/publishers loads', async ({ page }) => {
     const capture = captureConsole(page);
     await page.goto('/options/publishers');
-    await expect(page.getByRole('heading', { name: 'Book Publisher Management' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Publishers' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add publisher' })).toBeVisible();
     await assertClean(page, capture, '/options/publishers');
   });
@@ -390,7 +390,7 @@ test.describe('Authenticated route mount sweep', () => {
   test('/options/illustrators loads', async ({ page }) => {
     const capture = captureConsole(page);
     await page.goto('/options/illustrators');
-    await expect(page.getByRole('heading', { name: 'Book Illustrator Management' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Illustrators' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add illustrator' })).toBeVisible();
     await assertClean(page, capture, '/options/illustrators');
   });
@@ -398,7 +398,7 @@ test.describe('Authenticated route mount sweep', () => {
   test('/options/coloring-mediums loads', async ({ page }) => {
     const capture = captureConsole(page);
     await page.goto('/options/coloring-mediums');
-    await expect(page.getByRole('heading', { name: 'Coloring medium management' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Coloring mediums' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add coloring medium' })).toBeVisible();
     await assertClean(page, capture, '/options/coloring-mediums');
   });

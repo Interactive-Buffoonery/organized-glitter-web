@@ -126,6 +126,24 @@ only; the recovery UI must not render `#error-details` or raw exception text.
 | Support page       | `tip_link_clicked`, `support_alternative_clicked`, pageviews of `/support` and `/support/success` | `amount` is the preset (2, 3, 5, 10) or `custom`; `action` is `feedback` or `app_store_review`. Sent by beacon because each link leaves the page. Stripe owns payment amounts and receipts, so no payment details, emails, or Stripe IDs.   |
 | Errors             | `$exception` via app and route error handlers                                                     | Do not include user-entered content in error properties.                                                                                                                                                                                    |
 
+## Manual exception privacy
+
+The escape hatch replaces manually captured errors with fresh Errors before calling the SDK.
+Messages use fixed labels and allowlisted error types. Thrown strings, object keys and values,
+custom names, causes, aggregate members and custom serialization are not forwarded. Rejection
+handling reports only a fixed reason type and never calls `String(reason)`.
+
+Stack inspection is bounded to 16 KiB and 100 lines, with at most 20 retained frames. Only
+same-origin `/assets/` entry and vendor bundles with fixed names and eight-character build
+hashes are retained, with line and column numbers for grouping and source-map lookup. Query
+strings, fragments, credentials, function labels, arbitrary filenames, source paths, extension
+frames and third-party locations are discarded. Unrecognized lazy chunks and development
+source frames are omitted; reports without approved frames group by the fixed error type.
+No sanitizer-generated stack is used as a replacement throw site.
+
+This is preventive hardening, not evidence of an observed leak. It does not enable automatic
+exception capture or change consent, DNT, account opt-out, autocapture or replay settings.
+
 ## Adding or changing events
 
 1. Decide what product question the event answers.

@@ -89,6 +89,7 @@ describe('tag mutation auth guards', () => {
     });
 
     expect(mockCreateTag).not.toHaveBeenCalled();
+    expect(mockCapture).not.toHaveBeenCalled();
   });
 
   it('calls TagService.createTag when authenticated', async () => {
@@ -99,6 +100,25 @@ describe('tag mutation auth guards', () => {
     });
 
     expect(mockCreateTag).toHaveBeenCalledWith({ name: 'Favorites' });
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+    expect(mockCapture).toHaveBeenCalledWith('tag_created', { craft_type: 'diamond' });
+  });
+
+  it('does not capture a failed tag creation or its input', async () => {
+    mockCreateTag.mockResolvedValue({
+      status: 'error',
+      data: null,
+      error: { message: 'Private failed-input content' },
+    });
+    const { result } = renderHookWithProviders(() => useCreateTag());
+
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({ name: 'Private failed-input content' })
+      ).rejects.toThrow();
+    });
+
+    expect(mockCapture).not.toHaveBeenCalled();
   });
 
   it('does not call TagService.updateTag when unauthenticated', async () => {

@@ -24,6 +24,7 @@ export const AnalyticsEvent = {
   ARTIST_CREATED: 'artist_created',
   ARTIST_UPDATED: 'artist_updated',
   ARTIST_DELETED: 'artist_deleted',
+  TAG_CREATED: 'tag_created',
   TAG_UPDATED: 'tag_updated',
   TAG_DELETED: 'tag_deleted',
 

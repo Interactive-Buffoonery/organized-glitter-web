@@ -2,6 +2,10 @@
 
 Status: active guidance for INT-202 and future analytics changes.
 
+Proposed reporting definitions: [Reporting specification v1](reporting-v1.md).
+Offline validation: [Safe symbolication smoke](symbolication-smoke.md).
+These plans do not apply live PostHog configuration.
+
 ## Current integration
 
 - Provider: `src/components/AnalyticsProvider.tsx`
@@ -127,6 +131,11 @@ only; the recovery UI must not render `#error-details` or raw exception text.
 | Errors             | `$exception` via app and route error handlers                                                     | Do not include user-entered content in error properties.                                                                                                                                                                                    |
 
 ## Adding or changing events
+
+`tag_created` records successful interactive diamond-tag creation through
+`useCreateTag`, with only the fixed `craft_type: diamond` context. Failed
+creation, tag names/IDs/colors and input content are excluded. Coloring-tag
+and import-created-tag coverage is not implied by this event.
 
 1. Decide what product question the event answers.
 2. Add or reuse an `AnalyticsEvent` constant.

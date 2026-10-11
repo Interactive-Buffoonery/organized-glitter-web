@@ -3,6 +3,7 @@ import { PostHogProvider } from '@posthog/react';
 import posthog, { type PostHogConfig } from 'posthog-js';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { sanitizeAnalyticsEvent } from '@/utils/analytics/sanitizeEvent';
+import { enrichWebAnalyticsEvent } from '@/utils/analytics/webContext';
 
 import {
   getAnalyticsEnabled,
@@ -15,7 +16,8 @@ const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST?.trim();
 
 const posthogOptions: Partial<PostHogConfig> = {
   api_host: posthogHost,
-  before_send: event => (event && getAnalyticsEnabled() ? sanitizeAnalyticsEvent(event) : null),
+  before_send: event =>
+    event && getAnalyticsEnabled() ? enrichWebAnalyticsEvent(sanitizeAnalyticsEvent(event)) : null,
   opt_out_capturing_by_default: !getAnalyticsEnabled(),
   ui_host: 'https://us.posthog.com',
   advanced_disable_flags: true,

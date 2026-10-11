@@ -16,7 +16,7 @@ const ERROR_NAMES = new Set([
 // Only fixed build entry/vendor names are accepted. Arbitrary filenames,
 // source paths, function labels and third-party URLs are never forwarded.
 const APP_ASSET =
-  /^\/assets\/(?:index|react-vendor|pocketbase-vendor|analytics-vendor|form-vendor|ui-vendor)-[A-Za-z0-9_-]{8}\.js$/;
+  /^\/assets\/(?:main|react-vendor|pocketbase-vendor|analytics-vendor|form-vendor|ui-vendor)-[A-Za-z0-9_-]{8}\.js$/;
 
 // V8 exposes stack through a shared native accessor. Never invoke a custom
 // accessor or custom stack formatter, and reject accessor-based headers before

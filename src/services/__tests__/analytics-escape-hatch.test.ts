@@ -85,7 +85,7 @@ describe('analytics-escape-hatch', () => {
       const error = new TypeError('private diary https://example.test/reset?token=synthetic-token');
       Object.defineProperty(error, 'stack', {
         value: `TypeError: private diary password=synthetic-password
-    at privatePhoto.png (${window.location.origin}/assets/index-AbCd1234.js?token=synthetic-token:12:34)
+    at privatePhoto.png (${window.location.origin}/assets/main-AbCd1234.js?token=synthetic-token:12:34)
 private diary text
     at https://example.test/private-photo.png:1:2`,
         configurable: true,
@@ -98,7 +98,7 @@ private diary text
       const [safe] = mockCaptureException.mock.calls[0];
       expect(safe.name).toBe('TypeError');
       expect(safe.stack).toBe(
-        `TypeError: Application error (message redacted)\n    at ${window.location.origin}/assets/index-AbCd1234.js:12:34`
+        `TypeError: Application error (message redacted)\n    at ${window.location.origin}/assets/main-AbCd1234.js:12:34`
       );
       expect(safe).not.toHaveProperty('cause');
       expect(safe).not.toHaveProperty('toJSON');

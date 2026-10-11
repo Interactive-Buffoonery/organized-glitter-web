@@ -134,8 +134,8 @@ custom names, causes, aggregate members and custom serialization are not forward
 handling reports only a fixed reason type and never calls `String(reason)`.
 
 Stack inspection is bounded to 16 KiB and 100 lines, with at most 20 retained frames. Only
-same-origin `/assets/` entry and vendor bundles with fixed names and eight-character build
-hashes are retained, with line and column numbers for grouping and source-map lookup. Query
+same-origin `/assets/main-*.js` entry and vendor bundles with fixed names and eight-character
+build hashes are retained, with line and column numbers for grouping and source-map lookup. Query
 strings, fragments, credentials, function labels, arbitrary filenames, source paths, extension
 frames and third-party locations are discarded. Unrecognized lazy chunks and development
 source frames are omitted; reports without approved frames group by the fixed error type.

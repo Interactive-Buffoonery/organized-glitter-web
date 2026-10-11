@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { safeException } from '@/utils/error/safeException';
 
-const asset = () => `${window.location.origin}/assets/index-AbCd1234.js`;
+const asset = () => `${window.location.origin}/assets/main-AbCd1234.js`;
 
 describe('safeException', () => {
   it('retains bounded V8 and Safari app frames without raw function names or URL tokens', () => {
@@ -10,7 +10,7 @@ describe('safeException', () => {
       value: `ReferenceError: private notes
     at privateFilename.png (${asset()}?token=synthetic-token#private:12:34)
 privateNotes@${asset()}:56:78
-    at https://other.test/assets/index-AbCd1234.js:1:2
+    at https://other.test/assets/main-AbCd1234.js:1:2
     at file:///Users/private-person/privateFilename.png:1:2
     at ${window.location.origin}/assets/privateFilename-AbCd1234.js:1:2
     at ${window.location.origin}/src/privateFilename.ts:1:2

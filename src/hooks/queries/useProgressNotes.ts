@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { ProgressNotesService } from '@/services/pocketbase/progressNotes.service';
 import { ProgressNote } from '@/types/project';
-
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 import { queryKeys } from './queryKeys';
 
 export function useProgressNotesQuery(projectId: string | null) {
@@ -14,7 +14,7 @@ export function useProgressNotesQuery(projectId: string | null) {
       return ProgressNotesService.listByProject(projectId);
     },
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000,
+    ...queryFreshness('frequent'),
     retry: 2,
     placeholderData: () => [],
     refetchOnMount: false,

@@ -18,13 +18,20 @@ const standardRetryDelay = (attemptIndex: number): number => {
   return Math.min(1000 * 2 ** attemptIndex, 30000);
 };
 
-type QueryFreshness = 'standard' | 'frequent' | 'statusCount';
+export type QueryFreshness = 'standard' | 'frequent' | 'interactive' | 'activity';
 
 const FRESHNESS_PROFILES: Record<QueryFreshness, { staleTime: number; gcTime: number }> = {
   standard: { staleTime: 10 * 60 * 1000, gcTime: 10 * 60 * 1000 },
   frequent: { staleTime: 5 * 60 * 1000, gcTime: 10 * 60 * 1000 },
-  statusCount: { staleTime: 2 * 60 * 1000, gcTime: 5 * 60 * 1000 },
+  interactive: { staleTime: 2 * 60 * 1000, gcTime: 10 * 60 * 1000 },
+  activity: { staleTime: 30 * 1000, gcTime: 5 * 60 * 1000 },
 };
+
+/**
+ * Cache timing for a named freshness profile. Spread into query options so
+ * every query picks a profile instead of choosing its own stale and gc times.
+ */
+export const queryFreshness = (profile: QueryFreshness) => ({ ...FRESHNESS_PROFILES[profile] });
 
 export const createQueryTimer = (hookName: string, operation: string) => {
   const startTime = performance.now();
@@ -57,13 +64,11 @@ export const userScopedQueryOptions = <TQueryKey extends readonly unknown[], TDa
   userId,
   freshness,
 }: UserScopedQueryOptionsArgs<TQueryKey, TData>) => {
-  const { staleTime, gcTime } = FRESHNESS_PROFILES[freshness];
   return queryOptions({
     queryKey,
     queryFn,
     enabled: !!userId,
-    staleTime,
-    gcTime,
+    ...queryFreshness(freshness),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: standardRetryConfig,

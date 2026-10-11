@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { ColoringTagService } from '@/services/pocketbase/coloringTags.service';
 import { isServiceResponseError } from '@/types/shared';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 export function useColoringTags() {
   const { user } = useAuth();
@@ -17,6 +18,6 @@ export function useColoringTags() {
       return result.data;
     },
     enabled: Boolean(user?.id),
-    staleTime: 5 * 60 * 1000,
+    ...queryFreshness('frequent'),
   });
 }

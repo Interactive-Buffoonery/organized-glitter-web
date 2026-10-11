@@ -7,6 +7,7 @@ import { getSpinHistoryCountEnhanced } from '@/services/pocketbase/randomizerSer
 import { randomizerQueryKeys } from '@/hooks/queries/useSpinHistory';
 import { createLogger } from '@/utils/logger';
 import { ErrorHandler } from '@/services/pocketbase/base/ErrorHandler';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 const logger = createLogger('useSpinHistoryCount');
 
@@ -39,8 +40,7 @@ export const useSpinHistoryCount = ({ userId, enabled = true }: UseSpinHistoryCo
       return count;
     },
     enabled: enabled && !!userId,
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    ...queryFreshness('activity'),
     refetchOnWindowFocus: true,
     retry: (failureCount, error) => {
       if (ErrorHandler.isPocketBaseError(error)) {

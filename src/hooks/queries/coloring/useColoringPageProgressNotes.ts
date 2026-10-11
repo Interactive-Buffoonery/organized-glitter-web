@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { ColoringPageProgressNotesService } from '@/services/pocketbase/coloringPageProgressNotes.service';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 export function useColoringPageProgressNotes(pageId: string | null) {
   return useQuery({
@@ -11,7 +12,7 @@ export function useColoringPageProgressNotes(pageId: string | null) {
       return ColoringPageProgressNotesService.listByPage(pageId);
     },
     enabled: Boolean(pageId),
-    staleTime: 5 * 60 * 1000,
+    ...queryFreshness('frequent'),
     retry: 2,
     placeholderData: () => [],
     refetchOnMount: false,

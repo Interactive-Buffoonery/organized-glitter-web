@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { OverviewService } from '@/services/pocketbase/overview.service';
 import type { VerticalToggles } from '@/services/pocketbase/dashboardSettings.service';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 interface UseOverviewDataOptions {
   verticals?: VerticalToggles;
@@ -23,7 +24,6 @@ export function useOverviewData(options: UseOverviewDataOptions = {}) {
     ],
     queryFn: () => OverviewService.getOverviewData(userId!, verticals),
     enabled: enabled && !!userId,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    ...queryFreshness('interactive'),
   });
 }

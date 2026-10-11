@@ -112,17 +112,22 @@ links and saved filters.
 
 ## Freshness profiles
 
-Named caching tiers used by `userScopedQueryOptions`
-(`src/hooks/queries/shared/queryUtils.ts`):
+Named cache timing tiers in `src/hooks/queries/shared/queryUtils.ts`. Spread
+`queryFreshness('<profile>')` into query options, or pass `freshness` to
+`userScopedQueryOptions`.
 
-- `standard`: 10 min stale / 10 min gc. Stable, user-scoped data
-  (companies list, all-companies).
-- `frequent`: 5 min stale / 10 min gc. More frequently changing data
-  (artists, tags).
-- `statusCount`: 2 min stale / 5 min gc. Live dashboard counts and the
-  project list.
+- `standard`: 10 min stale / 10 min gc. Stable metadata (companies, artists,
+  tags).
+- `frequent`: 5 min stale / 10 min gc. Most user data: profile, settings,
+  project detail, coloring pages and books, notes.
+- `interactive`: 2 min stale / 10 min gc. Dashboard counts, the project list,
+  stats, overview, and note targets.
+- `activity`: 30 sec stale / 5 min gc. Spin history and spin counts, undated
+  project counts.
 
-Pick a profile by name; do not assemble stale/gc fields per call site.
+Pick a profile by name; do not set `staleTime` or `gcTime` per call site. ESLint
+enforces this in `src/hooks` and `src/contexts`. The few deliberate exceptions
+disable the rule inline with a reason.
 
 ## Berry Cream
 

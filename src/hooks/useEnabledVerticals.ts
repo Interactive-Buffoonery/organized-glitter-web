@@ -4,6 +4,7 @@ import {
   DEFAULT_VERTICAL_TOGGLES,
   type VerticalToggles,
 } from '@/services/pocketbase/dashboardSettings.service';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 import { queryKeys } from './queries/queryKeys';
 
 export type UseEnabledVerticalsResult = VerticalToggles & {
@@ -17,8 +18,7 @@ export const useEnabledVerticals = (userId: string | undefined): UseEnabledVerti
       : ['dashboardSettings', 'verticals', 'disabled'],
     queryFn: () => DashboardSettingsService.getVerticalToggles(userId as string),
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    ...queryFreshness('frequent'),
     refetchOnWindowFocus: false,
   });
 

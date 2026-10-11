@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { OverviewService, type NoteTarget } from '@/services/pocketbase/overview.service';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 interface UseBookNoteTargetsOptions {
   enabled?: boolean;
@@ -20,7 +21,6 @@ export function useBookNoteTargets(
     queryKey: queryKeys.noteTargets.pagesForBook(userId || 'anonymous', bookId || 'none'),
     queryFn: () => OverviewService.getPagesForBook(userId!, bookId!),
     enabled: enabled && !!userId && !!bookId,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    ...queryFreshness('interactive'),
   });
 }

@@ -1,8 +1,13 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import fs from 'node:fs/promises';
 
 import { waitForAccessibilityScanReady } from '../a11y/axe-test';
 import { assertLocalE2ETargets } from '../fixtures/local-safety';
-import { measureScreenshotPaint } from '../fixtures/screenshot-paint';
+import {
+  measureScreenshotLargestRowStep,
+  measureScreenshotPaint,
+} from '../fixtures/screenshot-paint';
+import { captureScreenReviewScreenshot } from '../screen-review/screenshot';
 
 const viewports = [
   { width: 320, height: 900, hasTouch: true },
@@ -36,6 +41,53 @@ test.beforeEach(({ baseURL }) => {
     specName: 'layout-continuity',
   });
 });
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`${colorScheme} full-page review capture keeps the atmosphere continuous`, async ({
+    page,
+  }, testInfo) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await page.goto('/profile?tab=preferences');
+    const themeGroup = page.getByRole('radiogroup', { name: 'Theme' });
+    await expect(themeGroup).toBeVisible();
+    const originalTheme = await themeGroup.getByRole('radio', { checked: true }).innerText();
+    try {
+      await selectTheme(page, 'System');
+      await page.goto('/overview');
+      await expect(page.getByRole('heading', { name: /^Welcome back,/ })).toBeVisible();
+      await waitForAccessibilityScanReady(page);
+      const viewportHeight = await page.evaluate(() => window.innerHeight);
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollHeight))
+        .toBeGreaterThan(viewportHeight);
+
+      const screenshotPath = testInfo.outputPath(`${colorScheme}-full-page.png`);
+      const capture = await captureScreenReviewScreenshot({
+        page,
+        path: screenshotPath,
+        projectName: 'screen-review-desktop',
+        screenTitle: `Overview (${colorScheme})`,
+      });
+      expect(capture.mode).toBe('fullPage');
+      expect(await page.evaluate(() => window.innerHeight)).toBe(viewportHeight);
+
+      const screenshot = await fs.readFile(screenshotPath);
+      const largestRowStep = await measureScreenshotLargestRowStep(page, screenshot, {
+        x: 0,
+        width: 2,
+        yEnd: viewportHeight + 3,
+        yStart: viewportHeight - 2,
+      });
+      expect(largestRowStep).toBeLessThanOrEqual(3);
+      await testInfo.attach(`${colorScheme}-full-page`, {
+        path: screenshotPath,
+        contentType: 'image/png',
+      });
+    } finally {
+      await selectTheme(page, originalTheme.trim());
+    }
+  });
+}
 
 for (const viewport of viewports) {
   test.describe(`${viewport.width}px ${viewport.hasTouch ? 'touch' : 'desktop'}`, () => {

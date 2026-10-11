@@ -7,6 +7,8 @@ import { useAuth } from '@/hooks/useAuth';
 
 import { isServiceResponseError } from '@/types/shared';
 import { requireAuthenticatedUser } from '@/services/auth';
+import { capture } from '@/services/analytics-escape-hatch';
+import { AnalyticsEvent } from '@/services/analytics-events';
 import { logger } from '@/utils/logger';
 import type { Tag } from '@/types/tag';
 
@@ -30,6 +32,8 @@ export function useCreateTag() {
       return createTag(data);
     },
     onSuccess: tag => {
+      capture(AnalyticsEvent.TAG_CREATED, { craft: 'diamond' });
+
       queryClient.invalidateQueries({
         queryKey: queryKeys.tags.lists(),
       });

@@ -18,8 +18,9 @@ automated test builds only that fixture in memory with hidden source maps,
 evaluates its synthetic local Error in a sandbox with no network APIs or SDK,
 and maps the minified stack frame to the original Error line using Node's
 local SourceMap consumer. Nothing is written to the deployable bundle.
-The test explicitly simulates a local context even when CI runs the offline
-mapping test; this does not authorize or perform capture. CI must keep public
+The fixture reads `process.env.CI` directly; callers cannot override that guard.
+The mapping test uses an isolated VM with a synthetic local environment even
+when CI runs the offline test; this does not authorize or perform capture. CI must keep public
 analytics configuration empty and must not run any ingestion smoke.
 
 The existing uploader tests exercise release selection, injection and upload
@@ -55,6 +56,6 @@ Use only the fixed synthetic Error, the fixture's local environment guard and
 a non-CI manual context. Keep consent/DNT/opt-out gates and disabled replay,
 autocapture and automatic exception collection. Confirm the fixture source
 map matches the exact injected chunk/release before capture. Record only
-whether the known original throw line resolves, then remove local fixture
+whether the known original Error construction line resolves, then remove local fixture
 artifacts. Never add the fixture to the production app, collect user inputs,
 export private stack data or weaken redaction to make this check pass.

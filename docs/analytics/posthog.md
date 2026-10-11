@@ -239,10 +239,11 @@ threshold, rather than the general record count.
 The legacy `first_*`, `randomizer_first_spin`, and `activation_completed` events are no longer
 emitted. Historical events remain in PostHog. Existing browser milestone storage is inert.
 Do not combine legacy activation counts with ordinary action counts as if they were the same
-metric. For the activation definition, sum ordinary project/book creation events and
-`created_library_items` on archive imports (or `records` on project CSV imports), then require
-at least one progress-note, photo, or spin event. Calculate this per identified account in
-PostHog. These reports still depend on received events, not the current full library.
+metric. For the proposed activation definition, follow the exact ordering, seven-day
+entry window, maturity and received-event limitations in [reporting v1](reporting-v1.md).
+It combines ordinary project/book creation and successful import counts with a
+subsequent productive action. These reports describe received events, not the
+current full library.
 
 ## Local verification
 

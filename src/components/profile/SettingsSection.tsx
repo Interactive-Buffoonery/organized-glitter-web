@@ -1,4 +1,6 @@
 import React from 'react';
+import { ChevronRight } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 
 type SectionTone = 'default' | 'danger';
@@ -48,24 +50,26 @@ export function SettingsSection({
             'list-none [&::-webkit-details-marker]:hidden'
           )}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <span aria-hidden className={ruleClass} />
-            <h2 className={titleClass}>{title}</h2>
+            <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
+              <h2 className={titleClass}>{title}</h2>
+              {description && (
+                <p className="text-muted-foreground text-sm font-normal normal-case">
+                  {description}
+                </p>
+              )}
+            </div>
           </div>
-          <span
+          <ChevronRight
             className={cn(
-              'text-xs transition-transform group-open:rotate-90',
+              'size-4 shrink-0 transition-transform group-open:rotate-90',
               tone === 'danger' ? 'text-destructive-text/70' : 'text-muted-foreground'
             )}
-            aria-hidden
-          >
-            ▶
-          </span>
+            aria-hidden="true"
+          />
         </summary>
-        <div className="space-y-4 px-5 pb-6 sm:px-6">
-          {description && <p className="text-muted-foreground text-sm">{description}</p>}
-          {children}
-        </div>
+        <div className="space-y-4 px-5 pb-6 sm:px-6">{children}</div>
       </details>
     );
   }

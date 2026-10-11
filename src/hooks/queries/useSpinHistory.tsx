@@ -62,6 +62,5 @@ export const useSpinHistory = ({ userId, limit = 8, enabled = true }: UseSpinHis
     },
     enabled: enabled && !!userId,
     ...queryFreshness('activity'),
-    refetchOnWindowFocus: false, // Don't refetch when window gains focus
   });
 };

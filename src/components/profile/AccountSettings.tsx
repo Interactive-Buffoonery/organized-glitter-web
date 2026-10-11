@@ -323,7 +323,7 @@ const AccountSettings = ({
         <AnalyticsPreference />
       </SettingsSection>
 
-      <SettingsSection title="Danger zone" tone="danger" collapsible>
+      <SettingsSection title="Danger zone" description="Account deletion" tone="danger" collapsible>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
           <div className="space-y-1">
             <p className="text-foreground text-sm font-semibold">Delete account</p>

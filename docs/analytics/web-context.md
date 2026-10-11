@@ -58,10 +58,15 @@ the deployment, and `release` identifies the emitting build. Consumers must hand
 older events without these dimensions and must not treat absent platform as native.
 
 Native PR 61 (`Interactive-Buffoonery/organized-glitter-app`) owns native coverage and
-privacy filtering separately. This document does not assert which metadata fields that
-PR emits or change native naming. Native local saves and accepted synchronization are
-different milestones; do not equate a local save with a successful web server write.
-Platform-specific triggers should retain their distinct names until meanings align.
+privacy filtering separately. Its reviewed source at `85533f3` uses `platform=ios`,
+`environment=production|preview`, and `app_version` from `CFBundleShortVersionString`.
+Web `release` is a build identifier and native `app_version` is a marketing version;
+do not combine them as equivalent releases or rename either field in this web change.
+Any future native release/SHA alignment belongs in a separate native contract change.
+
+Native local saves and accepted synchronization are different milestones; do not
+equate a local save with a successful web server write. Platform-specific triggers
+should retain their distinct names until meanings align.
 
 No schema version is added: this is additive context, not a change to event meaning,
 property types, or trigger timing. Add a version only with a documented incompatible

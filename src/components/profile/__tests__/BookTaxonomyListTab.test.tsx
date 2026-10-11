@@ -52,6 +52,18 @@ function wrapper(client: QueryClient) {
   );
 }
 
+describe('BookTaxonomyListTab heading', () => {
+  it.each([
+    { kind: 'publishers' as const, title: 'Publishers', action: 'Add publisher' },
+    { kind: 'illustrators' as const, title: 'Illustrators', action: 'Add illustrator' },
+  ])('uses the short $title list heading', ({ kind, title, action }) => {
+    render(<BookTaxonomyListTab kind={kind} />, { wrapper: wrapper(makeClient()) });
+
+    expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: action })).toBeInTheDocument();
+  });
+});
+
 describe('BookTaxonomyListTab Stats cache', () => {
   beforeEach(() => {
     vi.clearAllMocks();

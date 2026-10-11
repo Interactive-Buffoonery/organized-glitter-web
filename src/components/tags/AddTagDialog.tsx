@@ -1,5 +1,4 @@
-import { notify } from '@/lib/notifications';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,11 +9,12 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 
 import { useCreateTag } from '@/hooks/mutations/useCreateTag';
 import FormField from '@/components/projects/form/FormField';
+import { TagNameField } from './TagNameField';
+import { TAG_NAME_MAX_LENGTH, validateTagName } from './tagNameValidation';
 import { ColorPicker, TAG_COLORS } from './ColorPicker';
 
 interface AddTagDialogProps {
@@ -25,28 +25,21 @@ const AddTagDialog = ({ onTagAdded }: AddTagDialogProps) => {
   const [newTagName, setNewTagName] = useState('');
   const [selectedColor, setSelectedColor] = useState(TAG_COLORS[0]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const nameError =
+    hasSubmitted || newTagName.trim().length > TAG_NAME_MAX_LENGTH
+      ? validateTagName(newTagName)
+      : undefined;
   const createTagMutation = useCreateTag();
   const isSubmitting = createTagMutation.isPending;
 
   const handleAddTag = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!newTagName.trim()) {
-      notify({
-        kind: 'error',
-        title: 'Tag name required',
-        description: 'Tag name cannot be empty',
-      });
-      return;
-    }
-
-    // Check character limit (100 characters max as per database constraint)
-    if (newTagName.trim().length > 100) {
-      notify({
-        kind: 'error',
-        title: 'Tag name too long',
-        description: 'Tag names must be 100 characters or less.',
-      });
+    setHasSubmitted(true);
+    if (validateTagName(newTagName)) {
+      requestAnimationFrame(() => nameInputRef.current?.focus());
       return;
     }
 
@@ -54,6 +47,7 @@ const AddTagDialog = ({ onTagAdded }: AddTagDialogProps) => {
       { name: newTagName.trim(), color: selectedColor },
       {
         onSuccess: () => {
+          setHasSubmitted(false);
           setNewTagName('');
           setSelectedColor(TAG_COLORS[0]);
           setIsDialogOpen(false);
@@ -64,49 +58,37 @@ const AddTagDialog = ({ onTagAdded }: AddTagDialogProps) => {
   };
 
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <Dialog
+      open={isDialogOpen}
+      onOpenChange={open => {
+        setHasSubmitted(false);
+        setIsDialogOpen(open);
+      }}
+    >
       <DialogTrigger asChild>
-        <Button variant="glass">Add Tag</Button>
+        <Button type="button" variant="glass">
+          <Plus className="mr-2 size-4" />
+          Add tag
+        </Button>
       </DialogTrigger>
       <DialogContent layout="keyboard-safe">
         <DialogHeader>
-          <DialogTitle>Add New Diamond Tag</DialogTitle>
+          <DialogTitle>Add tag</DialogTitle>
           <DialogDescription>
             Create a new tag to organize your diamond projects. Coloring tags are created from
             coloring book forms.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleAddTag}>
+        <form noValidate onSubmit={handleAddTag}>
           <div className="space-y-4 py-4">
-            <FormField id="tag-name" label="Tag Name" required={true}>
-              <div className="relative">
-                <Input
-                  id="tag-name"
-                  placeholder="Enter tag name"
-                  value={newTagName}
-                  onChange={e => setNewTagName(e.target.value)}
-                  disabled={isSubmitting}
-                  className={newTagName.length > 100 ? 'border-destructive' : ''}
-                />
-
-                {/* Character count indicator */}
-                {newTagName.length > 0 && (
-                  <div
-                    className={`absolute top-1/2 right-2 -translate-y-1/2 transform text-xs ${
-                      newTagName.length > 100 ? 'text-destructive-text' : 'text-muted-foreground'
-                    }`}
-                  >
-                    {newTagName.length}/100
-                  </div>
-                )}
-              </div>
-              {newTagName.length > 100 && (
-                <p className="text-destructive-text mt-1 text-xs">
-                  Tag name must be 100 characters or less
-                </p>
-              )}
-            </FormField>
+            <TagNameField
+              ref={nameInputRef}
+              value={newTagName}
+              onChange={setNewTagName}
+              disabled={isSubmitting}
+              error={nameError}
+            />
 
             <FormField id="tag-color" label="Color">
               <ColorPicker
@@ -118,9 +100,9 @@ const AddTagDialog = ({ onTagAdded }: AddTagDialogProps) => {
           </div>
 
           <DialogFooter>
-            <Button type="submit" disabled={isSubmitting || newTagName.length > 100}>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Add Tag
+              Add tag
             </Button>
           </DialogFooter>
         </form>

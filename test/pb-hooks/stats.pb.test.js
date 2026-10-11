@@ -10,6 +10,7 @@ const STATS_ROUTES = [
   'GET /api/stats/completions/yearly',
   'GET /api/stats/completion-times',
   'GET /api/stats/company-project-counts',
+  'GET /api/stats/artist-project-counts',
   'GET /api/stats/tag-project-counts',
   'GET /api/stats/coloring-tag-book-counts',
   'GET /api/stats/collection',
@@ -152,6 +153,7 @@ describe('stats PocketBase hook contract', () => {
 
   it.each([
     '/api/stats/company-project-counts',
+    '/api/stats/artist-project-counts',
     '/api/stats/tag-project-counts',
     '/api/stats/coloring-tag-book-counts',
   ])('protects %s with PocketBase auth middleware', path => {
@@ -176,6 +178,11 @@ describe('stats PocketBase hook contract', () => {
       path: '/api/stats/company-project-counts',
       groupBy: 'GROUP BY p.company',
       ownerPredicates: ['WHERE p.user = {:userId}', 'AND c.user = {:userId}'],
+    },
+    {
+      path: '/api/stats/artist-project-counts',
+      groupBy: 'GROUP BY p.artist',
+      ownerPredicates: ['WHERE p.user = {:userId}', 'AND a.user = {:userId}'],
     },
     {
       path: '/api/stats/tag-project-counts',
@@ -215,7 +222,7 @@ describe('stats PocketBase hook contract', () => {
     }
   });
 
-  it('returns all diamond summary status buckets and uses the documented stash group', () => {
+  it('keeps the diamond in-stash metric aligned with the exact stash status', () => {
     const loadedHook = loadStatsHook();
     const { body } = invokeRoute(loadedHook, '/api/stats/summary', {
       query: { year: 2026 },
@@ -264,7 +271,7 @@ describe('stats PocketBase hook contract', () => {
       archived: 0,
       destashed: 0,
     });
-    expect(body.metrics.inStash).toBe(9);
+    expect(body.metrics.inStash).toBe(3);
     expect(body.metrics.inProgress).toBe(5);
     expect(body.metrics.wishlistSize).toBe(1);
   });
@@ -389,7 +396,7 @@ describe('stats PocketBase hook contract', () => {
     ]);
   });
 
-  it('returns all coloring summary status buckets and uses the documented stash group', () => {
+  it('keeps the coloring in-stash metric aligned with the exact in-stash status', () => {
     const loadedHook = loadStatsHook();
     const { body } = invokeRoute(loadedHook, '/api/stats/coloring/summary', {
       query: { year: 2026 },
@@ -442,7 +449,8 @@ describe('stats PocketBase hook contract', () => {
       'on_hold',
       'completed',
     ]);
-    expect(body.metrics.inStash).toBe(5);
+    expect(body.bookStatusBreakdown.in_stash).toBe(3);
+    expect(body.metrics.inStash).toBe(3);
     expect(body.metrics.activePages).toBe(8);
     expect(body.metrics.wishlistSize).toBe(1);
   });

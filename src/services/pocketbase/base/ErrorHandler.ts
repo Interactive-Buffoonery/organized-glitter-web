@@ -150,19 +150,25 @@ export class ErrorHandler {
           cause: error,
         };
 
-      case 500:
-      case 502:
-      case 503:
-      case 504:
+      case 0:
         return {
-          type: 'server',
-          message: 'Server error. Please try again later.',
-          status,
+          type: 'network',
+          message: 'Network connection failed. Please check your connection and try again.',
+          status: 0,
           retryable: true,
           cause: error,
         };
 
       default:
+        if (status >= 500) {
+          return {
+            type: 'server',
+            message: 'Server error. Please try again later.',
+            status,
+            retryable: true,
+            cause: error,
+          };
+        }
         return {
           type: 'server',
           message: message || 'An unexpected error occurred',
@@ -392,17 +398,12 @@ export class ErrorHandler {
    * @returns true if error indicates a network failure, false otherwise
    */
   static isNetworkError(error: unknown): boolean {
-    // 1. Check offline state first (supplementary)
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      return true;
-    }
-
-    // 2. PocketBase ClientResponseError patterns (check before generic Error)
+    // PocketBase ClientResponseError patterns (check before generic Error)
     if (error instanceof ClientResponseError) {
       return error.status === 0 || !error.response;
     }
 
-    // 3. TypeError patterns (most common network errors)
+    // TypeError patterns (most common network errors)
     if (error instanceof TypeError) {
       const message = error.message.toLowerCase();
       return (
@@ -416,7 +417,7 @@ export class ErrorHandler {
       );
     }
 
-    // 4. Named error types
+    // Named error types
     if (error instanceof Error) {
       return ['NetworkError', 'AbortError', 'TimeoutError'].includes(error.name);
     }

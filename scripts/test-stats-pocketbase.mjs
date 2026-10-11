@@ -237,6 +237,8 @@ try {
   await secondClient.collection('users').authWithPassword(secondUser.email, password);
 
   const firstSummary = await getStats(firstClient, '/api/stats/summary', '?year=2026');
+  assert.equal(firstSummary.metrics.inStash, 0);
+  assert.equal(firstSummary.statusBreakdown.stash, 0);
   assert.equal(firstSummary.metrics.totalKits, 3);
   assert.equal(firstSummary.metrics.completedThisYear, 1);
   assert.equal(firstSummary.metrics.allTimeCompleted, 1);
@@ -297,6 +299,8 @@ try {
     '/api/stats/coloring/summary',
     '?year=2026'
   );
+  assert.equal(firstColoringSummary.metrics.inStash, 0);
+  assert.equal(firstColoringSummary.bookStatusBreakdown.in_stash, 0);
   assert.equal(firstColoringSummary.metrics.totalBooks, 1);
   assert.equal(firstColoringSummary.metrics.completedPagesThisYear, 1);
   assert.equal(firstColoringSummary.metrics.allTimeCompletedPages, 1);
@@ -342,7 +346,68 @@ try {
     { key: 'completed', label: 'Completed', count: 0 },
   ]);
 
-  console.log('PocketBase stats routes: seeded aliases and user isolation passed');
+  for (const status of ['stash', 'stash', 'purchased', 'kitted']) {
+    await createProject(admin, firstUser, { title: `First user ${status}`, status });
+  }
+  await createProject(admin, secondUser, { title: 'Second user stash', status: 'stash' });
+  for (const status of ['in_stash', 'in_stash', 'purchased']) {
+    await createColoringBook(admin, firstUser, {
+      title: `First user ${status}`,
+      status,
+      totalPages: 1,
+    });
+  }
+  await createColoringBook(admin, secondUser, {
+    title: 'Second user stash book',
+    status: 'in_stash',
+    totalPages: 1,
+  });
+
+  for (const [client, expectedCount] of [
+    [firstClient, 2],
+    [secondClient, 1],
+  ]) {
+    const diamond = await getStats(client, '/api/stats/summary', '?year=2026');
+    assert.equal(diamond.statusBreakdown.stash, expectedCount);
+    assert.equal(diamond.metrics.inStash, expectedCount);
+    const coloring = await getStats(client, '/api/stats/coloring/summary', '?year=2026');
+    assert.equal(coloring.bookStatusBreakdown.in_stash, expectedCount);
+    assert.equal(coloring.metrics.inStash, expectedCount);
+  }
+
+  const usedArtist = await admin
+    .collection('artists')
+    .create({ user: firstUser.id, name: 'Counted artist' });
+  const unusedArtist = await admin
+    .collection('artists')
+    .create({ user: firstUser.id, name: 'Unused artist' });
+  const otherUserArtist = await admin
+    .collection('artists')
+    .create({ user: secondUser.id, name: 'Other user artist' });
+  for (const title of ['Artist kit one', 'Artist kit two']) {
+    const project = await createProject(admin, firstUser, { title, status: 'wishlist' });
+    await admin.collection('projects').update(project.id, { artist: usedArtist.id });
+  }
+  const crossUserProject = await createProject(admin, secondUser, {
+    title: 'Cross user artist kit',
+    status: 'wishlist',
+  });
+  await admin.collection('projects').update(crossUserProject.id, { artist: usedArtist.id });
+  const secondUserProject = await createProject(admin, secondUser, {
+    title: 'Second user artist kit',
+    status: 'wishlist',
+  });
+  await admin.collection('projects').update(secondUserProject.id, { artist: otherUserArtist.id });
+
+  const firstArtistCounts = await getStats(firstClient, '/api/stats/artist-project-counts');
+  assert.deepEqual(firstArtistCounts, { counts: { [usedArtist.id]: 2 } });
+  assert.equal(firstArtistCounts.counts[unusedArtist.id], undefined);
+  const secondArtistCounts = await getStats(secondClient, '/api/stats/artist-project-counts');
+  assert.deepEqual(secondArtistCounts, { counts: { [otherUserArtist.id]: 1 } });
+
+  console.log(
+    'PocketBase stats routes: aliases, stash and artist counts, and user isolation passed'
+  );
 } finally {
   await new Promise(resolve => {
     if (server.exitCode !== null || server.signalCode !== null) return resolve();

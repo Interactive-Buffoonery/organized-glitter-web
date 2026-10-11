@@ -2,8 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { DashboardSettingsService } from '@/services/pocketbase/dashboardSettings.service';
 import { DEFAULT_RANDOMIZER_NEXT_UP, type RandomizerNextUpPreferences } from '@/types/randomizer';
-
-const STALE_TIME_MS = 5 * 60 * 1000;
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 export const useRandomizerNextUp = (userId: string | undefined) => {
   return useQuery<RandomizerNextUpPreferences>({
@@ -13,7 +12,7 @@ export const useRandomizerNextUp = (userId: string | undefined) => {
       return DashboardSettingsService.getRandomizerNextUp(userId);
     },
     enabled: Boolean(userId),
-    staleTime: STALE_TIME_MS,
+    ...queryFreshness('frequent'),
     placeholderData: { ...DEFAULT_RANDOMIZER_NEXT_UP, targets: {} },
   });
 };

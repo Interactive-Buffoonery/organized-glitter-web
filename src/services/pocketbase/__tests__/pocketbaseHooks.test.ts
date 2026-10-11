@@ -586,6 +586,7 @@ describe('PocketBase production hooks', () => {
       'GET /api/stats/completions/yearly',
       'GET /api/stats/completion-times',
       'GET /api/stats/company-project-counts',
+      'GET /api/stats/artist-project-counts',
       'GET /api/stats/tag-project-counts',
       'GET /api/stats/coloring-tag-book-counts',
       'GET /api/stats/collection',
@@ -606,6 +607,17 @@ describe('PocketBase production hooks', () => {
     expect(route).toContain('WHERE p.user = {:userId}');
     expect(route).toContain('AND c.user = {:userId}');
     expect(route).toContain('GROUP BY p.company');
+  });
+
+  it('aggregates artist project counts for the authenticated user', () => {
+    const hook = readHook('stats.pb.js');
+    const start = hook.indexOf("'/api/stats/artist-project-counts'");
+    const route = hook.slice(start, hook.indexOf('routerAdd(', start));
+
+    expect(route).toContain('$apis.requireAuth()');
+    expect(route).toContain('WHERE p.user = {:userId}');
+    expect(route).toContain('AND a.user = {:userId}');
+    expect(route).toContain('GROUP BY p.artist');
   });
 
   it('aggregates tag usage for the authenticated user', () => {

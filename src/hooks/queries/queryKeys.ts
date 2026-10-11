@@ -399,6 +399,8 @@ export const queryKeys = {
       [...queryKeys.stats.all, 'completionTimes', createUserKeyHash(userId)] as const,
     collection: (userId: string) =>
       [...queryKeys.stats.all, 'collection', createUserKeyHash(userId)] as const,
+    artistProjectCounts: (userId: string) =>
+      [...queryKeys.stats.all, 'artistProjectCounts', createUserKeyHash(userId)] as const,
     coloringSummary: (userId: string, year: number) =>
       [...queryKeys.stats.all, 'coloringSummary', createUserKeyHash(userId), year] as const,
     coloringCompletionsByMonth: (userId: string, year: number) =>

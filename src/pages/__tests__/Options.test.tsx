@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
-import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 
 const { enabledVerticalsState } = vi.hoisted(() => ({
   enabledVerticalsState: {
@@ -13,10 +13,6 @@ const { enabledVerticalsState } = vi.hoisted(() => ({
 
 vi.mock('@/components/layout/MainLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
-vi.mock('@/components/ui/glass-panel', () => ({
-  GlassPanel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('@/hooks/useAppReady', () => ({
@@ -35,10 +31,34 @@ vi.mock('@/hooks/useEnabledVerticals', () => ({
 
 import Options from '../Options';
 
+const originalMatchMedia = window.matchMedia;
+
+let isDesktopScreen = false;
+const mediaListeners = new Set<() => void>();
+
+const setDesktop = (isDesktop: boolean) => {
+  isDesktopScreen = isDesktop;
+  mediaListeners.forEach(listener => listener());
+};
+
+const mockMatchMedia = () => {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    get matches() {
+      return isDesktopScreen;
+    },
+    media: query,
+    addEventListener: (_event: string, listener: () => void) => mediaListeners.add(listener),
+    removeEventListener: (_event: string, listener: () => void) => mediaListeners.delete(listener),
+  }));
+};
+
 const renderOptions = () =>
   render(
-    <MemoryRouter>
-      <Options />
+    <MemoryRouter initialEntries={['/options']}>
+      <Routes>
+        <Route path="/options" element={<Options />} />
+        <Route path="/options/:list" element={<p>List page</p>} />
+      </Routes>
     </MemoryRouter>
   );
 
@@ -47,75 +67,54 @@ describe('Options', () => {
     enabledVerticalsState.diamond_painting = true;
     enabledVerticalsState.coloring_books = true;
     enabledVerticalsState.isLoading = false;
+    mediaListeners.clear();
+    mockMatchMedia();
+    setDesktop(false);
   });
 
-  it('shows coloring option links when coloring books are enabled', () => {
-    renderOptions();
-
-    expect(screen.getByRole('heading', { name: 'Coloring' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Publishers' })).toHaveAttribute(
-      'href',
-      '/options/publishers'
-    );
-    expect(screen.getByRole('link', { name: 'Illustrators' })).toHaveAttribute(
-      'href',
-      '/options/illustrators'
-    );
-    expect(screen.getByRole('link', { name: 'Coloring mediums' })).toHaveAttribute(
-      'href',
-      '/options/coloring-mediums'
-    );
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
   });
 
-  it('hides coloring option links when coloring books are disabled', () => {
-    enabledVerticalsState.coloring_books = false;
-
+  it('shows the list picker on small screens', () => {
     renderOptions();
 
-    expect(screen.queryByRole('heading', { name: 'Coloring' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Publishers' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Illustrators' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Coloring mediums' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Manage Lists' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Companies' })).toHaveAttribute(
       'href',
       '/options/companies'
     );
-  });
-
-  it('hides diamond painting option links when diamond painting is disabled', () => {
-    enabledVerticalsState.diamond_painting = false;
-
-    renderOptions();
-
-    expect(screen.queryByRole('heading', { name: 'Diamond painting' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Companies' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Artists' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Tags' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Publishers' })).toHaveAttribute(
       'href',
       '/options/publishers'
     );
   });
 
-  it('does not show option links while vertical preferences load', () => {
-    enabledVerticalsState.diamond_painting = true;
-    enabledVerticalsState.coloring_books = false;
+  it('opens the first enabled list on large screens', () => {
+    setDesktop(true);
+    enabledVerticalsState.diamond_painting = false;
+
+    renderOptions();
+
+    expect(screen.getByText('List page')).toBeInTheDocument();
+  });
+
+  it('opens the first list when the screen grows to large', () => {
+    renderOptions();
+    expect(screen.queryByText('List page')).not.toBeInTheDocument();
+
+    act(() => setDesktop(true));
+
+    expect(screen.getByText('List page')).toBeInTheDocument();
+  });
+
+  it('stays on the picker while craft preferences load on large screens', () => {
+    setDesktop(true);
     enabledVerticalsState.isLoading = true;
 
     renderOptions();
 
-    expect(screen.getByText('Loading options…')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Companies' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Publishers' })).not.toBeInTheDocument();
-  });
-
-  it('uses the Manage Lists heading without a generated summary', () => {
-    enabledVerticalsState.diamond_painting = false;
-    enabledVerticalsState.coloring_books = true;
-
-    renderOptions();
-
-    expect(screen.getByRole('heading', { name: 'Manage Lists' })).toBeInTheDocument();
-    expect(screen.queryByTestId('generated-summary')).not.toBeInTheDocument();
+    expect(screen.queryByText('List page')).not.toBeInTheDocument();
+    expect(screen.getByText('Loading lists…')).toBeInTheDocument();
   });
 });

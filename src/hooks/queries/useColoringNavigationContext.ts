@@ -11,10 +11,9 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { DashboardSettingsService } from '@/services/pocketbase/dashboardSettings.service';
-import { queryKeys } from './queryKeys';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 import type { ColoringNavigationContext } from '@/hooks/mutations/useSaveColoringNavigationContext';
-
-const STALE_TIME_MS = 5 * 60 * 1000;
+import { queryKeys } from './queryKeys';
 
 export const useColoringNavigationContext = (userId: string | undefined) => {
   return useQuery<ColoringNavigationContext | null>({
@@ -28,6 +27,6 @@ export const useColoringNavigationContext = (userId: string | undefined) => {
       return raw as ColoringNavigationContext;
     },
     enabled: Boolean(userId),
-    staleTime: STALE_TIME_MS,
+    ...queryFreshness('frequent'),
   });
 };

@@ -34,6 +34,10 @@ vi.mock('@/components/layout/MainLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+vi.mock('@/hooks/useEnabledVerticals', () => ({
+  useEnabledVerticals: () => ({ diamond_painting: true, coloring_books: true, isLoading: false }),
+}));
+
 vi.mock('@/hooks/useAppReady', () => ({
   useAppReady: vi.fn(),
 }));

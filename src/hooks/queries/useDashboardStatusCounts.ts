@@ -70,7 +70,7 @@ export const useDashboardStatusCounts = (userId: string | undefined, filters: Fi
         return result.counts;
       },
       userId,
-      freshness: 'statusCount',
+      freshness: 'interactive',
     })
   );
 

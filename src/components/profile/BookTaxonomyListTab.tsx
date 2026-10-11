@@ -46,6 +46,7 @@ import { BookIllustratorsService } from '@/services/pocketbase/bookIllustrators.
 import { BookPublishersService } from '@/services/pocketbase/bookPublishers.service';
 import { getSafeHref } from '@/utils/ui/urlSanitizer';
 import { createLogger } from '@/utils/logger';
+import { ManageListHeader } from '@/components/manage-lists/ManageListsLayout';
 
 const logger = createLogger('BookTaxonomyListTab');
 
@@ -63,14 +64,12 @@ interface EditingState {
 
 const copy = {
   publishers: {
-    title: 'Book Publisher Management',
-    description: 'Add, edit or remove coloring book publishers.',
+    title: 'Publishers',
     empty: "You haven't added any book publishers yet.",
     singular: 'publisher',
   },
   illustrators: {
-    title: 'Book Illustrator Management',
-    description: 'Add, edit or remove coloring book illustrators.',
+    title: 'Illustrators',
     empty: "You haven't added any book illustrators yet.",
     singular: 'illustrator',
   },
@@ -187,113 +186,112 @@ export function BookTaxonomyListTab({ kind }: BookTaxonomyListTabProps) {
   };
 
   return (
-    <div className="dark:glass-card border-border bg-card text-card-foreground rounded-lg border shadow">
-      <div className="border-border flex flex-col gap-4 border-b p-6 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">{strings.title}</h2>
-          <p className="text-muted-foreground">{strings.description}</p>
-        </div>
-        <Button type="button" variant="glass" onClick={openNewDialog}>
-          <Plus className="mr-2 size-4" />
-          Add {strings.singular}
-        </Button>
-      </div>
+    <>
+      <ManageListHeader
+        title={strings.title}
+        action={
+          <Button type="button" variant="glass" onClick={openNewDialog}>
+            <Plus className="mr-2 size-4" />
+            Add {strings.singular}
+          </Button>
+        }
+      />
 
-      <div className="p-6">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="text-primary size-8 animate-spin" />
-          </div>
-        ) : items.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                {kind === 'publishers' && <TableHead>Website</TableHead>}
-                <TableHead className="w-32 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map(item => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  {kind === 'publishers' && (
-                    <TableCell>
-                      {getSafeHref(item.websiteUrl) ? (
-                        <a
-                          href={getSafeHref(item.websiteUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-link hover:underline"
-                        >
-                          {item.websiteUrl}
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">No website provided</span>
-                      )}
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon-sm"
-                        onClick={() =>
-                          setEditing({
-                            id: item.id,
-                            name: item.name,
-                            websiteUrl: item.websiteUrl,
-                          })
-                        }
-                        aria-label={`Edit ${item.name}`}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="text-primary size-8 animate-spin" />
+        </div>
+      ) : items.length > 0 ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              {kind === 'publishers' && (
+                <TableHead className="hidden sm:table-cell">Website</TableHead>
+              )}
+              <TableHead className="w-32 text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map(item => (
+              <TableRow key={item.id}>
+                <TableCell className="font-medium">{item.name}</TableCell>
+                {kind === 'publishers' && (
+                  <TableCell className="hidden sm:table-cell">
+                    {getSafeHref(item.websiteUrl) ? (
+                      <a
+                        href={getSafeHref(item.websiteUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-link hover:underline"
                       >
-                        <Edit2 className="size-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon-sm"
-                            aria-label={`Delete ${item.name}`}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete {item.name}?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This permanently deletes the {strings.singular}. An item that is still
-                              used by a coloring book cannot be deleted; remove it from those books
-                              first.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className={buttonVariants({ variant: 'destructive' })}
-                              disabled={isDeleting}
-                              onClick={() => handleDelete(item.id)}
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
+                        {item.websiteUrl}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">No website provided</span>
+                    )}
                   </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <div className="py-4 text-center">
-            <p className="text-muted-foreground">{strings.empty}</p>
-          </div>
-        )}
-      </div>
+                )}
+                <TableCell>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() =>
+                        setEditing({
+                          id: item.id,
+                          name: item.name,
+                          websiteUrl: item.websiteUrl,
+                        })
+                      }
+                      aria-label={`Edit ${item.name}`}
+                    >
+                      <Edit2 className="size-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon-sm"
+                          aria-label={`Delete ${item.name}`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete {item.name}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This permanently deletes the {strings.singular}. An item that is still
+                            used by a coloring book cannot be deleted; remove it from those books
+                            first.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className={buttonVariants({ variant: 'destructive' })}
+                            disabled={isDeleting}
+                            onClick={() => handleDelete(item.id)}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : (
+        <div className="py-4 text-center">
+          <p className="text-muted-foreground">{strings.empty}</p>
+        </div>
+      )}
 
       <Dialog open={Boolean(editing)} onOpenChange={open => !open && setEditing(null)}>
         <DialogContent>
@@ -346,6 +344,6 @@ export function BookTaxonomyListTab({ kind }: BookTaxonomyListTabProps) {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

@@ -2,6 +2,10 @@
 
 Status: active guidance for INT-202 and future analytics changes.
 
+Proposed reporting definitions: [Reporting specification v1](reporting-v1.md).
+Offline validation: [Safe symbolication smoke](symbolication-smoke.md).
+These plans do not apply live PostHog configuration.
+
 ## Current integration
 
 - Provider: `src/components/AnalyticsProvider.tsx`
@@ -10,6 +14,7 @@ Status: active guidance for INT-202 and future analytics changes.
 - Escape hatch: `src/services/analytics-escape-hatch.ts`
 - Coloring property helpers: `src/services/coloring-analytics.ts`
 - Privacy disclosure: `src/pages/Privacy.tsx`
+- Ordinary web build context: [metadata and web/native naming contract](web-context.md)
 
 ## Privacy contract
 
@@ -126,7 +131,30 @@ only; the recovery UI must not render `#error-details` or raw exception text.
 | Support page       | `tip_link_clicked`, `support_alternative_clicked`, pageviews of `/support` and `/support/success` | `amount` is the preset (2, 3, 5, 10) or `custom`; `action` is `feedback` or `app_store_review`. Sent by beacon because each link leaves the page. Stripe owns payment amounts and receipts, so no payment details, emails, or Stripe IDs.   |
 | Errors             | `$exception` via app and route error handlers                                                     | Do not include user-entered content in error properties.                                                                                                                                                                                    |
 
+## Manual exception privacy
+
+The escape hatch replaces manually captured errors with fresh Errors before calling the SDK.
+Messages use fixed labels and allowlisted error types. Thrown strings, object keys and values,
+custom names, causes, aggregate members and custom serialization are not forwarded. Rejection
+handling reports only a fixed reason type and never calls `String(reason)`.
+
+Stack inspection is bounded to 16 KiB and 100 lines, with at most 20 retained frames. Only
+same-origin `/assets/main-*.js` entry and vendor bundles with fixed names and eight-character
+build hashes are retained, with line and column numbers for grouping and source-map lookup. Query
+strings, fragments, credentials, function labels, arbitrary filenames, source paths, extension
+frames and third-party locations are discarded. Unrecognized lazy chunks and development
+source frames are omitted; reports without approved frames group by the fixed error type.
+No sanitizer-generated stack is used as a replacement throw site.
+
+This is preventive hardening, not evidence of an observed leak. It does not enable automatic
+exception capture or change consent, DNT, account opt-out, autocapture or replay settings.
+
 ## Adding or changing events
+
+`tag_created` records successful interactive diamond-tag creation through
+`useCreateTag`, with only the fixed `craft: diamond` context. Failed
+creation, tag names/IDs/colors and input content are excluded. Coloring-tag
+and import-created-tag coverage is not implied by this event.
 
 1. Decide what product question the event answers.
 2. Add or reuse an `AnalyticsEvent` constant.
@@ -230,10 +258,11 @@ threshold, rather than the general record count.
 The legacy `first_*`, `randomizer_first_spin`, and `activation_completed` events are no longer
 emitted. Historical events remain in PostHog. Existing browser milestone storage is inert.
 Do not combine legacy activation counts with ordinary action counts as if they were the same
-metric. For the activation definition, sum ordinary project/book creation events and
-`created_library_items` on archive imports (or `records` on project CSV imports), then require
-at least one progress-note, photo, or spin event. Calculate this per identified account in
-PostHog. These reports still depend on received events, not the current full library.
+metric. For the proposed activation definition, follow the exact ordering, seven-day
+entry window, maturity and received-event limitations in [reporting v1](reporting-v1.md).
+It combines ordinary project/book creation and successful import counts with a
+subsequent productive action. These reports describe received events, not the
+current full library.
 
 ## Local verification
 

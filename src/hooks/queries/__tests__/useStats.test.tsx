@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, renderHookWithProviders, waitFor } fr
 import { createTestQueryClient } from '@/test-utils';
 import { vi } from 'vitest';
 import { queryKeys } from '../queryKeys';
-import { STATS_GC_TIME, STATS_STALE_TIME, useStatsSummary } from '../useStats';
+import { useStatsSummary } from '../useStats';
+import { queryFreshness } from '../shared/queryUtils';
 import {
   useColoringCollectionStats,
   useColoringCompletionTimeStats,
@@ -125,7 +126,7 @@ describe('stats query hooks', () => {
     }
   });
 
-  it('uses the shared stats cache timing for stats queries', () => {
+  it('uses the interactive freshness profile for stats queries', () => {
     mockGetStatsSummary.mockResolvedValue({
       generatedAt: '2026-05-02T16:00:00.000Z',
       year: 2026,
@@ -140,8 +141,7 @@ describe('stats query hooks', () => {
       .getQueryCache()
       .find({ queryKey: queryKeys.stats.summary('user-123', 2026) });
 
-    expect(query?.options.staleTime).toBe(STATS_STALE_TIME);
-    expect(query?.options.gcTime).toBe(STATS_GC_TIME);
+    expect(query?.options).toMatchObject(queryFreshness('interactive'));
   });
 
   it('fetches the stats summary endpoint', async () => {

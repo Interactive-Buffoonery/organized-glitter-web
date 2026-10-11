@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,10 +9,11 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Loader2, Pencil } from 'lucide-react';
 import FormField from '@/components/projects/form/FormField';
 import type { Tag } from '@/types/tag';
+import { TagNameField } from './TagNameField';
+import { TAG_NAME_MAX_LENGTH, validateTagName } from './tagNameValidation';
 import { ColorPicker } from './ColorPicker';
 import { useUpdateTag } from '@/hooks/mutations/useUpdateTag';
 import { logger } from '@/utils/logger';
@@ -44,9 +45,16 @@ const EditTagDialog = ({ tag }: EditTagDialogProps) => {
   const [tagName, setTagName] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const nameError =
+    hasSubmitted || tagName.trim().length > TAG_NAME_MAX_LENGTH
+      ? validateTagName(tagName)
+      : undefined;
   const updateTagMutation = useUpdateTag();
 
   const handleOpenChange = (open: boolean) => {
+    setHasSubmitted(false);
     if (open) {
       setTagName(tag.name);
       setSelectedColor(tag.color);
@@ -57,12 +65,9 @@ const EditTagDialog = ({ tag }: EditTagDialogProps) => {
   const handleUpdateTag = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!tagName.trim()) {
-      return;
-    }
-
-    // Check character limit (100 characters max as per database constraint)
-    if (tagName.trim().length > 100) {
+    setHasSubmitted(true);
+    if (validateTagName(tagName)) {
+      requestAnimationFrame(() => nameInputRef.current?.focus());
       return;
     }
 
@@ -122,35 +127,15 @@ const EditTagDialog = ({ tag }: EditTagDialogProps) => {
           <DialogDescription>Update the name and color of this tag.</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleUpdateTag}>
+        <form noValidate onSubmit={handleUpdateTag}>
           <div className="space-y-4 py-4">
-            <FormField id="edit-tag-name" label="Tag Name" required={true}>
-              <div className="relative">
-                <Input
-                  id="edit-tag-name"
-                  placeholder="Enter tag name"
-                  value={tagName}
-                  onChange={e => setTagName(e.target.value)}
-                  disabled={updateTagMutation.isPending}
-                  className={tagName.length > 100 ? 'border-destructive' : ''}
-                />
-                {/* Character count indicator */}
-                {tagName.length > 0 && (
-                  <div
-                    className={`absolute top-1/2 right-2 -translate-y-1/2 transform text-xs ${
-                      tagName.length > 100 ? 'text-destructive-text' : 'text-muted-foreground'
-                    }`}
-                  >
-                    {tagName.length}/100
-                  </div>
-                )}
-              </div>
-              {tagName.length > 100 && (
-                <p className="text-destructive-text mt-1 text-xs">
-                  Tag name must be 100 characters or less
-                </p>
-              )}
-            </FormField>
+            <TagNameField
+              ref={nameInputRef}
+              value={tagName}
+              onChange={setTagName}
+              disabled={updateTagMutation.isPending}
+              error={nameError}
+            />
 
             <FormField id="edit-tag-color" label="Color">
               <ColorPicker
@@ -162,7 +147,7 @@ const EditTagDialog = ({ tag }: EditTagDialogProps) => {
           </div>
 
           <DialogFooter>
-            <Button type="submit" disabled={updateTagMutation.isPending || tagName.length > 100}>
+            <Button type="submit" disabled={updateTagMutation.isPending}>
               {updateTagMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
               Update Tag
             </Button>

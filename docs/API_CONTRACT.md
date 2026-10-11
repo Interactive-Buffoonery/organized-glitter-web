@@ -152,6 +152,8 @@ error taxonomy and should not assume stats data is realtime.
 `GET /api/stats/company-project-counts` returns a `counts` object keyed by
 company record ID. It aggregates the authenticated user's projects in one
 database query and omits companies with no projects.
+`GET /api/stats/artist-project-counts` returns the same shape keyed by artist
+record ID.
 
 `GET /api/stats/tag-project-counts` and
 `GET /api/stats/coloring-tag-book-counts` return the same shape for diamond

@@ -126,5 +126,9 @@ describe('EditTagDialog', () => {
 
     // Dialog must remain open for retry.
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/tag name/i), { target: { value: 'unique' } });
+    fireEvent.click(screen.getByRole('button', { name: /update tag/i }));
+    expect(mutateMock).toHaveBeenCalledTimes(2);
+    expect(mutateMock.mock.calls[1][0].updates.name).toBe('unique');
   });
 });

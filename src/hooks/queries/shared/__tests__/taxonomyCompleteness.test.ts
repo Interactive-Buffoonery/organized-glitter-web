@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { ClientResponseError } from 'pocketbase';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ getList: vi.fn() }));
@@ -16,6 +17,7 @@ vi.mock('@/services/auth', () => ({
 }));
 
 import { allCompaniesOptions, artistsOptions, tagsOptions } from '../queryOptionsFactory';
+import { defaultQueryRetry } from '@/lib/queryClient';
 import { BookPublishersService } from '@/services/pocketbase/bookPublishers.service';
 import { BookIllustratorsService } from '@/services/pocketbase/bookIllustrators.service';
 
@@ -137,4 +139,18 @@ describe('complete coloring taxonomy queries', () => {
       }
     });
   }
+});
+
+describe('tag query failures', () => {
+  beforeEach(() => mocks.getList.mockReset());
+
+  it('rethrows the classified error so the retry policy can read it', async () => {
+    mocks.getList.mockRejectedValueOnce(new ClientResponseError({ status: 503, data: {} }));
+
+    const failure = await new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      .fetchQuery(tagsOptions('user-123'))
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ClientResponseError);
+    expect(defaultQueryRetry(0, failure)).toBe(true);
+  });
 });

@@ -117,7 +117,7 @@ const ProjectProgressNotes: React.FC<ProjectProgressNotesProps> = ({ project }) 
             </div>
           ))}
         </div>
-      ) : error ? (
+      ) : error && progressNotes.length === 0 ? (
         <div className="text-destructive-text py-8 text-center">
           <p>Error loading progress notes. Please try again.</p>
         </div>

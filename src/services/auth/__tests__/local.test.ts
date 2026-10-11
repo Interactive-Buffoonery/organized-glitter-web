@@ -187,7 +187,7 @@ describe('local auth service', () => {
 
     expect(result).toEqual({
       success: false,
-      error: 'Connection failed. Please check your internet connection and try again.',
+      error: 'Network connection failed. Please check your connection and try again.',
     });
   });
 

@@ -4,6 +4,7 @@ import {
   ColorReferencesService,
   type ColorReference,
 } from '@/services/pocketbase/colorReferences.service';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 export const colorReferenceKey = (userId: string, pageId: string) =>
   queryKeys.coloring.colorReferences.detail(userId, pageId);
@@ -28,6 +29,6 @@ export function useColorReferenceImages(
     ),
     queryFn: () => (reference ? ColorReferencesService.urls(reference, userId) : []),
     enabled: Boolean(reference?.photos.length && userId),
-    staleTime: 5 * 60_000,
+    ...queryFreshness('frequent'),
   });
 }

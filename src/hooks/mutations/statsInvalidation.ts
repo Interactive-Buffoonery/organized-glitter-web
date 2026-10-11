@@ -12,6 +12,7 @@ const diamondProjections = new Set([
   'completionsYearly',
   'completionTimes',
   'collection',
+  'artistProjectCounts',
 ]);
 
 const coloringProjections = new Set([

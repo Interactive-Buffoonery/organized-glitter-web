@@ -7,6 +7,7 @@ import { logger } from '@/utils/logger';
 import { captureException } from '@/services/analytics-escape-hatch';
 import { buildExceptionContext, classifyExternalError } from '@/utils/error/exceptionContext';
 import { getSupportMailto } from '@/lib/contactConfig';
+import { inspectException, safeException, thrownValueType } from '@/utils/error/safeException';
 
 /**
  * Flipped to `true` once React has mounted (via `markAppMounted`, called from
@@ -112,11 +113,19 @@ export const setupGlobalErrorHandlers = (): void => {
   window.addEventListener('unhandledrejection', event => {
     const { error, summary } = normalizeRejection(event.reason);
 
-    // Always capture, enriched with safe diagnostics + classification. Any
-    // sanitized summary of a non-Error reason is attached as context.
-    captureException(error, buildExceptionContext('fatal_global_handler', summary));
+    // Classify locally before redaction so external string rejections retain
+    // their existing capture annotation and fatal UI suppression.
+    const classification = classifyExternalError(inspectException(event.reason));
+    captureException(
+      error,
+      buildExceptionContext('fatal_global_handler', { ...summary, ...classification })
+    );
 
-    maybeShowFatalUi(error, 'Unhandled Promise Rejection');
+    maybeShowFatalUi(
+      error,
+      'Unhandled Promise Rejection',
+      classification.suspected_external_script
+    );
   });
 };
 
@@ -132,8 +141,8 @@ export const setupGlobalErrorHandlers = (): void => {
  *  - Only a genuine startup failure (pre-mount, non-external) shows the fatal
  *    "Unable to Load Application" screen.
  */
-const maybeShowFatalUi = (error: Error, context: string): void => {
-  if (classifyExternalError(error).suspected_external_script) {
+const maybeShowFatalUi = (error: Error, context: string, suspectedExternal = false): void => {
+  if (suspectedExternal || classifyExternalError(error).suspected_external_script) {
     logger.warn(`Suppressing fatal UI for suspected external error in ${context}:`, error.message);
     return;
   }
@@ -149,49 +158,15 @@ const maybeShowFatalUi = (error: Error, context: string): void => {
   handleFatalError(error, context);
 };
 
-/**
- * Normalize an unhandledrejection reason into a real Error plus a sanitized
- * summary of the original reason (so non-Error rejections still carry useful
- * triage context without ever using a bare `new Error(String(reason))`).
- */
+/** Keep native Errors local; never stringify arbitrary rejection reasons. */
 const normalizeRejection = (
   reason: unknown
 ): { error: Error; summary?: Record<string, unknown> } => {
-  if (reason instanceof Error) {
-    return { error: reason };
-  }
-
-  const rejectionReasonType = reason === null ? 'null' : typeof reason;
-
-  if (typeof reason === 'string') {
-    return {
-      error: new Error(`Unhandled rejection: ${reason}`),
-      summary: { rejection_reason_type: 'string' },
-    };
-  }
-
-  const summary: Record<string, unknown> = { rejection_reason_type: rejectionReasonType };
-
-  if (reason && typeof reason === 'object') {
-    try {
-      // A few safe top-level keys help triage plain-object rejections without
-      // serializing arbitrary (potentially sensitive / huge) payloads.
-      summary.rejection_keys = Object.keys(reason as Record<string, unknown>).slice(0, 10);
-    } catch {
-      // ignore: summary is best-effort
-    }
-  }
-
-  let description: string;
-  try {
-    description = String(reason).slice(0, 500);
-  } catch {
-    description = '[unstringifiable rejection reason]';
-  }
-
+  const inspected = inspectException(reason);
+  if (inspected instanceof Error) return { error: inspected };
   return {
-    error: new Error(`Unhandled rejection (${rejectionReasonType}): ${description}`),
-    summary,
+    error: safeException(reason).error,
+    summary: { rejection_reason_type: thrownValueType(reason) },
   };
 };
 

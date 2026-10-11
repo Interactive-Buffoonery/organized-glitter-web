@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { resolveFileUrl } from '@/lib/pocketbase';
 import { projectsService } from '@/services/pocketbase/projects.service';
+import { defaultQueryRetry } from '@/lib/queryClient';
 import { createLogger } from '@/utils/logger';
 import { toUserDateString } from '@/utils/date/timezoneUtils';
+import { ProjectType } from '@/types/project';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
+import { queryKeys } from './queryKeys';
 
 const projectDetailLogger = createLogger('useProjectDetailQuery');
-import { ProjectType } from '@/types/project';
-import { queryKeys } from './queryKeys';
 
 /**
  * Helper function to normalize database date strings to YYYY-MM-DD.
@@ -72,7 +74,7 @@ export const useProjectDetailQuery = (
     queryKey: queryKeys.projects.detail(projectId!),
     queryFn: () => fetchProjectDetail(projectId!, userTimezone),
     enabled: isQueryEnabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    ...queryFreshness('frequent'),
     retry: (failureCount, error) => {
       // Log retry attempts for debugging
       projectDetailLogger.debug('Retry attempt:', {
@@ -104,8 +106,7 @@ export const useProjectDetailQuery = (
         }
       }
 
-      // Default retry logic for other errors
-      return failureCount < 3;
+      return defaultQueryRetry(failureCount, error);
     },
   });
 };

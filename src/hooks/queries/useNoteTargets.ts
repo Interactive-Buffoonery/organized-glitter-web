@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { OverviewService, type NoteTarget } from '@/services/pocketbase/overview.service';
 import type { VerticalToggles } from '@/services/pocketbase/dashboardSettings.service';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 interface UseNoteTargetsOptions {
   verticals?: VerticalToggles;
@@ -30,7 +31,6 @@ export function useNoteTargets(options: UseNoteTargetsOptions = {}) {
     queryFn: () =>
       OverviewService.getNoteTargets(userId!, { searchTerm: activeSearchTerm, verticals }),
     enabled: enabled && !!userId,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    ...queryFreshness('interactive'),
   });
 }

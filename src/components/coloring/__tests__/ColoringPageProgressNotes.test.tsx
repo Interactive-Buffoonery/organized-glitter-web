@@ -116,6 +116,38 @@ describe('ColoringPageProgressNotes', () => {
     deleteNoteImageMutationState.isPending = false;
   });
 
+  it('shows the load error when no progress notes exist', () => {
+    useColoringPageProgressNotesMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: new Error('Offline'),
+    });
+
+    renderWithProviders(<ColoringPageProgressNotes pageId="page-123" />);
+
+    expect(screen.getByText('Error loading progress notes. Please try again.')).toBeInTheDocument();
+    expect(screen.queryByTestId('progress-notes-list')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add a progress note/i })).not.toBeInTheDocument();
+  });
+
+  it('preserves the mounted timeline during a failed background refetch', () => {
+    const data = [{ id: 'note-1', content: 'Saved note' }];
+    useColoringPageProgressNotesMock.mockReturnValue({ data, isLoading: false, error: null });
+    const { rerender } = renderWithProviders(<ColoringPageProgressNotes pageId="page-123" />);
+    const list = screen.getByTestId('progress-notes-list');
+    useColoringPageProgressNotesMock.mockReturnValue({
+      data,
+      isLoading: false,
+      error: new Error('Offline'),
+    });
+    rerender(<ColoringPageProgressNotes pageId="page-123" />);
+    expect(screen.getByTestId('progress-notes-list')).toBe(list);
+    expect(list).toHaveTextContent('Notes: 1');
+    expect(
+      screen.queryByText('Error loading progress notes. Please try again.')
+    ).not.toBeInTheDocument();
+  });
+
   it('uses the first-note copy and hides the list when there are no notes', () => {
     renderWithProviders(<ColoringPageProgressNotes pageId="page-123" />);
 

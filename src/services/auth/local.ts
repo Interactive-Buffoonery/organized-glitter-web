@@ -109,9 +109,7 @@ export const loginWithPassword = async (data: LoginData): Promise<AuthResult> =>
       errorMessage === 'Something went wrong.'
     ) {
       if (error instanceof ClientResponseError) {
-        if (error.status === 0) {
-          errorMessage = 'Connection failed. Please check your internet connection and try again.';
-        } else if (error.status === 400) {
+        if (error.status === 400) {
           errorMessage = 'The email or password you entered is incorrect. Please try again.';
         } else if (error.status >= 500) {
           errorMessage =

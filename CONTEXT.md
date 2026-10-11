@@ -112,17 +112,43 @@ links and saved filters.
 
 ## Freshness profiles
 
-Named caching tiers used by `userScopedQueryOptions`
-(`src/hooks/queries/shared/queryUtils.ts`):
+Named cache timing tiers in `src/hooks/queries/shared/queryUtils.ts`. Spread
+`queryFreshness('<profile>')` into query options, or pass `freshness` to
+`userScopedQueryOptions`.
 
-- `standard`: 10 min stale / 10 min gc. Stable, user-scoped data
-  (companies list, all-companies).
-- `frequent`: 5 min stale / 10 min gc. More frequently changing data
-  (artists, tags).
-- `statusCount`: 2 min stale / 5 min gc. Live dashboard counts and the
-  project list.
+- `standard`: 10 min stale / 10 min gc. Stable metadata (companies, artists,
+  tags).
+- `frequent`: 5 min stale / 10 min gc. Most user data: profile, settings,
+  project detail, coloring pages and books, notes.
+- `interactive`: 2 min stale / 10 min gc. Dashboard counts, the project list,
+  stats, overview, and note targets.
+- `activity`: 30 sec stale / 5 min gc. Spin history and spin counts, undated
+  project counts.
 
-Pick a profile by name; do not assemble stale/gc fields per call site.
+Pick a profile by name; do not set `staleTime` or `gcTime` per call site. ESLint
+enforces this in `src/hooks` and `src/contexts`. The few deliberate exceptions
+disable the rule inline with a reason.
+
+## Query retry
+
+Queries inherit `defaultQueryRetry` from `src/lib/queryClient.ts`. Network
+failures (including PocketBase status 0), 429, and 5xx retry twice with backoff.
+Cancelled requests, other 4xx, validation, and unclassified errors fail at once.
+Query functions rethrow the original error so `ErrorHandler` can classify it.
+Mutations never retry.
+
+Two queries keep explicit exceptions: `useProjectDetailQuery` also retries
+401/403 auth races and expand-related 404 errors twice; other failures use the
+default policy. `useDashboardNavigationContext` retries once.
+
+## Query refetching
+
+Queries refetch stale data on mount, window focus, and reconnect, using the
+query client defaults. This is how a save on one device shows up on another
+(ADR-0004, ADR-0006). ESLint blocks setting these to `false` in `src/hooks` and
+`src/contexts`. The one exception is `useDashboardNavigationContext`, which
+skips focus and reconnect refetches so saved filters do not replace the
+filters in use.
 
 ## Berry Cream
 

@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { ColoringTagService } from '@/services/pocketbase/coloringTags.service';
 import { isServiceResponseError } from '@/types/shared';
+import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 export function useColoringTagStats(tagIds: string[]) {
   const { user } = useAuth();
@@ -12,11 +13,11 @@ export function useColoringTagStats(tagIds: string[]) {
     queryFn: async () => {
       const result = await ColoringTagService.getBulkColoringTagStats(tagIds);
       if (isServiceResponseError(result)) {
-        throw new Error(result.error?.message || 'Failed to load coloring tag stats');
+        throw result.error;
       }
       return result.data;
     },
     enabled: Boolean(user?.id) && tagIds.length > 0,
-    staleTime: 5 * 60 * 1000,
+    ...queryFreshness('frequent'),
   });
 }

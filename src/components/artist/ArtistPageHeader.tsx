@@ -10,7 +10,7 @@ import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { ManageListHeader } from '@/components/manage-lists/ManageListsLayout';
 import { useCreateArtist } from '@/hooks/mutations/useArtistMutations';
 import type { ArtistListItem } from '@/services/pocketbase/artists.service';
 
@@ -82,23 +83,19 @@ const ArtistPageHeader = ({ artists }: ArtistPageHeaderProps) => {
   );
 
   return (
-    <>
-      <div className="mb-8 flex flex-col items-start justify-between md:flex-row md:items-center">
-        <div>
-          <h1 className="font-handwritten text-3xl leading-tight tracking-tight md:text-4xl">
-            Artist List
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">Manage the artists in your stash</p>
-        </div>
+    <ManageListHeader
+      title="Artists"
+      action={
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="glass" className="mt-4 md:mt-0">
-              Add Artist
+            <Button type="button" variant="glass">
+              <Plus className="mr-2 size-4" />
+              Add artist
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Artist</DialogTitle>
+              <DialogTitle>Add artist</DialogTitle>
               <DialogDescription>
                 Enter the name of the diamond painting artist you want to add to your list.
               </DialogDescription>
@@ -123,14 +120,14 @@ const ArtistPageHeader = ({ artists }: ArtistPageHeaderProps) => {
                   {createArtistMutation.isPending && (
                     <Loader2 className="mr-2 size-4 animate-spin" />
                   )}
-                  Add Artist
+                  Add artist
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-    </>
+      }
+    />
   );
 };
 

@@ -32,7 +32,7 @@ export function useCreateTag() {
       return createTag(data);
     },
     onSuccess: tag => {
-      capture(AnalyticsEvent.TAG_CREATED, { craft_type: 'diamond' });
+      capture(AnalyticsEvent.TAG_CREATED, { craft: 'diamond' });
 
       queryClient.invalidateQueries({
         queryKey: queryKeys.tags.lists(),

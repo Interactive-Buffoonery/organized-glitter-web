@@ -101,7 +101,7 @@ describe('tag mutation auth guards', () => {
 
     expect(mockCreateTag).toHaveBeenCalledWith({ name: 'Favorites' });
     expect(mockCapture).toHaveBeenCalledTimes(1);
-    expect(mockCapture).toHaveBeenCalledWith('tag_created', { craft_type: 'diamond' });
+    expect(mockCapture).toHaveBeenCalledWith('tag_created', { craft: 'diamond' });
   });
 
   it('does not capture a failed tag creation or its input', async () => {

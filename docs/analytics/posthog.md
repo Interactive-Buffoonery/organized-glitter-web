@@ -133,7 +133,7 @@ only; the recovery UI must not render `#error-details` or raw exception text.
 ## Adding or changing events
 
 `tag_created` records successful interactive diamond-tag creation through
-`useCreateTag`, with only the fixed `craft_type: diamond` context. Failed
+`useCreateTag`, with only the fixed `craft: diamond` context. Failed
 creation, tag names/IDs/colors and input content are excluded. Coloring-tag
 and import-created-tag coverage is not implied by this event.
 

@@ -44,7 +44,8 @@ describe('analytics-escape-hatch', () => {
 
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
       const [errorArg, propsArg] = mockCaptureException.mock.calls[0];
-      expect(errorArg).toBe(err);
+      expect(errorArg).not.toBe(err);
+      expect(errorArg.message).toBe('Application error (message redacted)');
       expect(propsArg).toMatchObject({
         $exception_source: 'test',
         suspected_external_script: false,
@@ -56,7 +57,7 @@ describe('analytics-escape-hatch', () => {
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
       const [errorArg, propsArg] = mockCaptureException.mock.calls[0];
       expect(errorArg).toBeInstanceOf(Error);
-      expect((errorArg as Error).message).toBe('something went wrong');
+      expect((errorArg as Error).message).toBe('Non-Error thrown (string)');
       expect(propsArg).toMatchObject({ non_error_type: 'string' });
     });
 
@@ -70,30 +71,75 @@ describe('analytics-escape-hatch', () => {
       expect(JSON.stringify(propsArg)).not.toContain('secret-value');
       expect(propsArg).toMatchObject({
         non_error_type: 'object',
-        non_error_keys: ['code', 'detail', 'token'],
       });
     });
 
-    it('caps non-Error object key metadata', () => {
-      const payload = Object.fromEntries(
-        Array.from({ length: 12 }, (_, index) => [`key_${index}`, `value_${index}`])
+    it('omits arbitrary object keys as well as values', () => {
+      captureException({ 'private-photo.png': 'private diary text' });
+      const [error, properties] = mockCaptureException.mock.calls[0];
+      expect(properties).not.toHaveProperty('non_error_keys');
+      expect(`${error.stack} ${JSON.stringify(properties)}`).not.toMatch(/private-photo|diary/);
+    });
+
+    it('redacts messages, custom fields and stack text while retaining app locations', () => {
+      const error = new TypeError('private diary https://example.test/reset?token=synthetic-token');
+      Object.defineProperty(error, 'stack', {
+        value: `TypeError: private diary password=synthetic-password
+    at privatePhoto.png (${window.location.origin}/assets/index-AbCd1234.js?token=synthetic-token:12:34)
+private diary text
+    at https://example.test/private-photo.png:1:2`,
+        configurable: true,
+      });
+      Object.assign(error, {
+        cause: { password: 'synthetic-password' },
+        toJSON: () => 'private diary',
+      });
+      captureException(error);
+      const [safe] = mockCaptureException.mock.calls[0];
+      expect(safe.name).toBe('TypeError');
+      expect(safe.stack).toBe(
+        `TypeError: Application error (message redacted)\n    at ${window.location.origin}/assets/index-AbCd1234.js:12:34`
       );
+      expect(safe).not.toHaveProperty('cause');
+      expect(safe).not.toHaveProperty('toJSON');
+      expect(error.message).toContain('private diary');
+    });
 
-      captureException(payload);
+    it.each([
+      null,
+      undefined,
+      42,
+      true,
+      Symbol('private diary'),
+      ['private-photo.png'],
+      { message: 'private diary' },
+    ])('does not expose malformed thrown content (%s)', value => {
+      captureException(value);
+      const [safe, properties] = mockCaptureException.mock.calls[0];
+      expect(`${safe.stack} ${JSON.stringify(properties)}`).not.toMatch(
+        /private diary|private-photo/
+      );
+    });
 
-      const [, propsArg] = mockCaptureException.mock.calls[0];
-      expect(propsArg.non_error_keys).toEqual([
-        'key_0',
-        'key_1',
-        'key_2',
-        'key_3',
-        'key_4',
-        'key_5',
-        'key_6',
-        'key_7',
-        'key_8',
-        'key_9',
-      ]);
+    it('never invokes custom stringification or getters and handles circular/revoked values', () => {
+      const stringify = vi.fn(() => {
+        throw new Error('must not execute');
+      });
+      const getter = vi.fn(() => {
+        throw new Error('must not execute');
+      });
+      const circular: Record<string, unknown> = { toString: stringify, toJSON: stringify };
+      circular.self = circular;
+      Object.defineProperty(circular, 'message', { get: getter });
+      const error = new Error('private diary');
+      Object.defineProperty(error, 'stack', { get: getter });
+      const revocable = Proxy.revocable({}, {});
+      revocable.revoke();
+      for (const value of [circular, error, revocable.proxy]) {
+        expect(() => captureException(value)).not.toThrow();
+      }
+      expect(stringify).not.toHaveBeenCalled();
+      expect(getter).not.toHaveBeenCalled();
     });
 
     it('tags a suspected external error from classification', () => {

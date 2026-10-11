@@ -9,6 +9,5 @@ export function useColoringMediums(userId: string | undefined) {
     queryFn: () => ColoringMediumsService.listColoringMediums(userId!),
     enabled: !!userId,
     ...queryFreshness('frequent'),
-    retry: 2,
   });
 }

@@ -9,6 +9,5 @@ export function useColoringBook(id: string | undefined) {
     queryFn: () => ColoringService.getBookById(id!),
     enabled: !!id,
     ...queryFreshness('frequent'),
-    retry: 2,
   });
 }

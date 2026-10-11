@@ -13,7 +13,6 @@ export function useColoringPageProgressNotes(pageId: string | null) {
     },
     enabled: Boolean(pageId),
     ...queryFreshness('frequent'),
-    retry: 2,
     placeholderData: () => [],
     refetchOnMount: false,
     refetchOnWindowFocus: false,

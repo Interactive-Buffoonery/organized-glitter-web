@@ -65,8 +65,7 @@ async function fetchTags(userId: string): Promise<Tag[]> {
 
     if (result.status === 'error') {
       logger.error('Tags fetch failed', result.error);
-      const errorMessage = result.error instanceof Error ? result.error.message : result.error;
-      throw new Error(errorMessage || 'Failed to fetch tags');
+      throw result.error;
     }
 
     timer.stop({ itemCount: result.data.length });

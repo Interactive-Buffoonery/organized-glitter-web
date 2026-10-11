@@ -27,6 +27,7 @@ test.describe('coloring detail request failures', () => {
     test(`${detail.name} retries a server failure without losing the return filter`, async ({
       page,
     }, testInfo) => {
+      if (detail.name === 'page') await page.clock.install();
       const routeId = detail.name === 'book' ? bookId : pageId;
       let allowSuccess = false;
       let intercepted = 0;
@@ -51,15 +52,11 @@ test.describe('coloring detail request failures', () => {
       const destination = `${detail.path()}?returnTo=${encodeURIComponent(returnTo)}`;
       await page.goto(destination);
       await expect.poll(() => intercepted).toBeGreaterThan(0);
+      await expect(
+        page.getByRole('heading', { name: `Could not load coloring ${detail.name}` })
+      ).toBeVisible();
       if (detail.name === 'page') {
-        await expect(page.getByRole('heading', { name: /^Page \d+$/ })).toBeVisible();
-        await expect(page.getByRole('alert')).toContainText(
-          'Could not refresh coloring page. Showing the last loaded details.'
-        );
-      } else {
-        await expect(
-          page.getByRole('heading', { name: 'Could not load coloring book' })
-        ).toBeVisible();
+        await expect(page.getByRole('heading', { name: /^Page \d+$/ })).toHaveCount(0);
       }
       await expect(
         page.getByRole('heading', { name: `Coloring ${detail.name} not found` })
@@ -73,20 +70,37 @@ test.describe('coloring detail request failures', () => {
       await expect(page).toHaveURL(
         new RegExp(encodeURIComponent(returnTo).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
       );
+      await expect(
+        page.getByRole('heading', { name: `Could not load coloring ${detail.name}` })
+      ).toHaveCount(0);
       if (detail.name === 'page') {
-        await expect(
-          page.getByRole('alert').filter({ hasText: 'Could not refresh coloring page' })
-        ).toHaveCount(0);
-      } else {
-        await expect(
-          page.getByRole('heading', { name: 'Could not load coloring book' })
-        ).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: /^Page \d+$/ })).toBeVisible();
       }
       const backPath =
         detail.name === 'book'
           ? returnTo
           : `/coloring/${bookId}?returnTo=${encodeURIComponent(returnTo)}`;
       await expect(page.locator(`main a[href="${backPath}"]`).first()).toBeVisible();
+      if (detail.name === 'page') {
+        allowSuccess = false;
+        await page.clock.setSystemTime(new Date(Date.now() + 6 * 60 * 1000));
+        const failedRefresh = page.waitForResponse(
+          response => response.url().includes(`/records/${pageId}`) && response.status() === 503
+        );
+        await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
+        await failedRefresh;
+        await expect(page.getByRole('heading', { name: /^Page \d+$/ })).toBeVisible();
+        const refreshNotice = page.getByRole('alert').filter({
+          hasText: 'Could not refresh coloring page. Showing the last loaded details.',
+        });
+        await expect(refreshNotice).toBeVisible();
+        allowSuccess = true;
+        await page.getByRole('button', { name: 'Try again' }).click();
+        await expect(refreshNotice).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: /^Page \d+$/ })).toBeVisible();
+        await expect(page.locator(`main a[href="${backPath}"]`).first()).toBeVisible();
+        await expect(page).toHaveURL(url => url.searchParams.get('returnTo') === returnTo);
+      }
       await testInfo.attach(`${detail.name}-recovered`, {
         body: await page.screenshot(),
         contentType: 'image/png',

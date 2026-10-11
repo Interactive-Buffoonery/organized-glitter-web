@@ -139,6 +139,39 @@ describe('ErrorHandler', () => {
       expect(result.cause).toBe(error);
     });
 
+    it('treats a status 0 response as a retryable network failure', () => {
+      const error = new ClientResponseError({ status: 0, message: 'Failed to fetch' });
+      const result = ErrorHandler.handleError(error, 'test');
+
+      expect(result.type).toBe('network');
+      expect(result.retryable).toBe(true);
+      expect(result.cause).toBe(error);
+    });
+
+    it('keeps an aborted status 0 response as cancelled', () => {
+      const error = new ClientResponseError({ status: 0, isAbort: true });
+      const result = ErrorHandler.handleError(error, 'test');
+
+      expect(result.type).toBe('cancelled');
+      expect(result.retryable).toBe(false);
+    });
+
+    it.each([501, 505, 599])('treats status %i as a retryable server error', status => {
+      const error = new ClientResponseError({ status, message: 'Server error', data: {} });
+
+      expect(ErrorHandler.handleError(error, 'test')).toMatchObject({
+        type: 'server',
+        status,
+        retryable: true,
+      });
+    });
+
+    it('does not retry unlisted client errors', () => {
+      const error = new ClientResponseError({ status: 418, message: 'Teapot', data: {} });
+
+      expect(ErrorHandler.handleError(error, 'test').retryable).toBe(false);
+    });
+
     it('should handle abort errors as cancelled', () => {
       const error = new Error('The operation was aborted');
       error.name = 'AbortError';

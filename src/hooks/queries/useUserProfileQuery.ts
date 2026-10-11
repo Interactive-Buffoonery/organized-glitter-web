@@ -23,16 +23,6 @@ export const useUserProfileQuery = (userId: string | undefined) => {
     enabled: !!userId,
     ...queryFreshness('frequent'),
     refetchOnWindowFocus: false, // Don't refetch when window regains focus
-    retry: (failureCount, error) => {
-      // Don't retry on 404 errors (user not found) or auth errors
-      if (error && typeof error === 'object' && 'status' in error) {
-        const status = (error as { status: number }).status;
-        if (status === 404 || status === 401) {
-          return false;
-        }
-      }
-      return failureCount < 2; // Retry fewer times for profile data
-    },
   });
 };
 

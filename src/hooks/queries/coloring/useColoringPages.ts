@@ -14,12 +14,17 @@ export function useColoringPages(filters: ColoringPagesListOptions | undefined) 
     queryFn: () => ColoringService.listPages(filters!),
     enabled: !!filters?.bookId,
     ...queryFreshness('frequent'),
-    retry: 2,
   });
 
   useEffect(() => {
     query.data?.items.forEach(page => {
-      queryClient.setQueryData(queryKeys.coloring.pages.detail(page.id), page);
+      const detailKey = queryKeys.coloring.pages.detail(page.id);
+      // A failed or in-flight detail owns its own result. In-flight seeds can
+      // survive a cancel and hide a pending denial.
+      const detailState = queryClient.getQueryState(detailKey);
+      if (detailState && (detailState.status === 'error' || detailState.fetchStatus !== 'idle'))
+        return;
+      queryClient.setQueryData(detailKey, page);
     });
   }, [query.data, queryClient]);
 

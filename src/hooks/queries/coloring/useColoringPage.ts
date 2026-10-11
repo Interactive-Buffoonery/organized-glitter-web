@@ -9,6 +9,5 @@ export function useColoringPage(pageId: string | undefined) {
     queryFn: () => ColoringService.getPageById(pageId!),
     enabled: !!pageId,
     ...queryFreshness('frequent'),
-    retry: 2,
   });
 }

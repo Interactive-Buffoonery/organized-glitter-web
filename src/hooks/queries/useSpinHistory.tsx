@@ -10,7 +10,6 @@ import {
 import type { RandomizerSpinsResponse } from '@/types/pocketbase.types';
 import type { RandomizerSpinMetadata } from '@/types/randomizer';
 import { createLogger } from '@/utils/logger';
-import { ErrorHandler } from '@/services/pocketbase/base/ErrorHandler';
 import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 
 const logger = createLogger('useSpinHistory');
@@ -64,27 +63,5 @@ export const useSpinHistory = ({ userId, limit = 8, enabled = true }: UseSpinHis
     enabled: enabled && !!userId,
     ...queryFreshness('activity'),
     refetchOnWindowFocus: false, // Don't refetch when window gains focus
-    retry: (failureCount, error) => {
-      if (ErrorHandler.isPocketBaseError(error)) {
-        const details = (error.details ?? {}) as { canRetry?: boolean };
-        const canRetry = details.canRetry ?? error.retryable;
-        logger.debug('Service error detected', {
-          type: error.type,
-          canRetry,
-        });
-        return canRetry && failureCount < 2;
-      }
-
-      const errorMessage = error?.message || '';
-      const isClientError =
-        errorMessage.includes('400') ||
-        errorMessage.includes('401') ||
-        errorMessage.includes('403') ||
-        errorMessage.includes('404');
-
-      if (isClientError) return false;
-      return failureCount < 2;
-    },
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 };

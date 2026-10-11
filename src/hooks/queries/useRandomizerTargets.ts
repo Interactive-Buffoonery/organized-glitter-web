@@ -29,7 +29,6 @@ export function useRandomizerTargets({
     queryFn: () => RandomizerTargetsService.listTargets(userId!, mode, eligibility),
     enabled: Boolean(userId) && enabled,
     ...queryFreshness('interactive'),
-    retry: 2,
   });
 }
 
@@ -46,6 +45,5 @@ export function useRandomizerHasTargets({
     staleTime: 0,
     gcTime: 0,
     /* eslint-enable no-restricted-syntax */
-    retry: 2,
   });
 }

@@ -115,6 +115,16 @@ describe('fatalErrorHandler global handlers', () => {
     expect(fatalUiShown()).toBe(false);
   });
 
+  it('retains external string rejection classification without forwarding its text', async () => {
+    const { setupGlobalErrorHandlers } = await freshHandler();
+    setupGlobalErrorHandlers();
+    fireRejection('runtime.sendMessage(). Tab not found: private-photo.png');
+    const [error, properties] = mockCaptureException.mock.calls[0];
+    expect(error.message).not.toContain('private-photo');
+    expect(properties.suspected_external_script).toBe(true);
+    expect(fatalUiShown()).toBe(false);
+  });
+
   it('normalizes a non-Error rejection into a real Error with a sanitized summary', async () => {
     const { setupGlobalErrorHandlers } = await freshHandler();
     setupGlobalErrorHandlers();
@@ -128,18 +138,44 @@ describe('fatalErrorHandler global handlers', () => {
       $exception_source: 'fatal_global_handler',
       rejection_reason_type: 'object',
     });
-    expect(propsArg.rejection_keys).toEqual(expect.arrayContaining(['status', 'message']));
+    expect(propsArg).not.toHaveProperty('rejection_keys');
+    expect(errorArg.message).toBe('Non-Error thrown (object)');
   });
 
-  it('uses an Error rejection directly', async () => {
+  it('does not stringify arrays, custom objects or circular rejection reasons', async () => {
+    const { setupGlobalErrorHandlers, markAppMounted } = await freshHandler();
+    setupGlobalErrorHandlers();
+    markAppMounted();
+    const stringify = vi.fn(() => 'private diary password=synthetic-password');
+    const reason: Record<string, unknown> = { toString: stringify };
+    reason.self = reason;
+    for (const value of [
+      reason,
+      ['private-photo.png'],
+      'https://example.test/?token=synthetic-token',
+    ]) {
+      fireRejection(value);
+      const [error, properties] = mockCaptureException.mock.calls.at(-1)!;
+      expect(`${error.stack} ${JSON.stringify(properties)}`).not.toMatch(
+        /private|synthetic|example/
+      );
+      expect(properties).not.toHaveProperty('rejection_keys');
+    }
+    expect(stringify).not.toHaveBeenCalled();
+  });
+
+  it('retains a local Error rejection snapshot', async () => {
     const { setupGlobalErrorHandlers } = await freshHandler();
     setupGlobalErrorHandlers();
 
     const err = new Error('promise blew up');
+    Object.defineProperty(err, 'stack', { value: 'Error: promise blew up', configurable: true });
     fireRejection(err);
 
     const [errorArg] = mockCaptureException.mock.calls[0];
-    expect(errorArg).toBe(err);
+    expect(errorArg).not.toBe(err);
+    expect(errorArg.message).toBe(err.message);
+    expect(errorArg.stack).toBe(err.stack);
   });
 });
 

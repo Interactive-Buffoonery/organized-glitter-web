@@ -42,14 +42,15 @@ describe('RouteErrorBoundary', () => {
   it('captures with route and componentStack context when a child throws', () => {
     render(
       <RouteErrorBoundary routeName="dashboard">
-        <ThrowError message="route blew up" />
+        <ThrowError message="private diary private-photo.png https://example.test/?token=synthetic-token" />
       </RouteErrorBoundary>
     );
 
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
     const [errorArg, propsArg] = mockCaptureException.mock.calls[0];
     expect(errorArg).toBeInstanceOf(Error);
-    expect((errorArg as Error).message).toBe('route blew up');
+    expect((errorArg as Error).message).toBe('Application error (message redacted)');
+    expect((errorArg as Error).stack).not.toMatch(/private diary|private-photo|synthetic-token/);
     expect(propsArg).toEqual(
       expect.objectContaining({
         $exception_source: 'react_error_boundary',

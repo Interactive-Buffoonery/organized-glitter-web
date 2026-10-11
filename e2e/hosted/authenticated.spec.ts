@@ -16,7 +16,7 @@ test('key signed-in routes load in one paced session', async ({ page }) => {
     '/dashboard?craft=coloring',
     page.getByRole('searchbox', { name: 'Search coloring books' })
   );
-  await visit(`/coloring/${bookId}`, page.getByRole('heading', { name: 'Pages' }));
+  await visit(`/coloring/${bookId}`, page.getByRole('heading', { name: 'Pages', exact: true }));
   await visit(
     `/coloring/${bookId}/pages/${pageId}`,
     page.getByRole('heading', { name: /^Page \d+$/ })

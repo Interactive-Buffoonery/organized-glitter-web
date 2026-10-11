@@ -6,11 +6,14 @@ import { queryKeys } from '../queries/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
 
 import { isServiceResponseError } from '@/types/shared';
-import { requireAuthenticatedUser } from '@/services/auth';
+import { getCurrentUserId, requireAuthenticatedUser } from '@/services/auth';
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
-import { logger } from '@/utils/logger';
+import { createLogger } from '@/utils/logger';
 import type { Tag } from '@/types/tag';
+import { runPostWriteEffect } from './runPostWriteEffect';
+
+const logger = createLogger('useCreateTag');
 
 async function createTag(data: TagFormValues): Promise<Tag> {
   const response = await TagService.createTag(data);
@@ -32,7 +35,11 @@ export function useCreateTag() {
       return createTag(data);
     },
     onSuccess: tag => {
-      capture(AnalyticsEvent.TAG_CREATED, { craft: 'diamond' });
+      runPostWriteEffect(logger, 'Tag creation analytics failed', () => {
+        if (getCurrentUserId() === tag.userId) {
+          capture(AnalyticsEvent.TAG_CREATED, { craft: 'diamond' });
+        }
+      });
 
       queryClient.invalidateQueries({
         queryKey: queryKeys.tags.lists(),

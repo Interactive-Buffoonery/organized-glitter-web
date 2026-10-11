@@ -181,6 +181,70 @@ describe('AnalyticsProvider lifecycle with the real SDK', () => {
     expect(posthog.capture('project_created')).toBeDefined();
   });
 
+  it('enriches hook, escape-hatch and account service captures after privacy filtering', async () => {
+    vi.stubGlobal('__APP_BUILD_ID__', 'synthetic-release');
+    vi.stubEnv('VITE_DEPLOYMENT_ENVIRONMENT', 'preview');
+    auth.user = { id: 'context-account', created: '2026-01-01' };
+    auth.isAuthenticated = true;
+    auth.initialCheckComplete = true;
+    const captureSpy = vi.spyOn(posthog, 'capture');
+    render(
+      <MemoryRouter>
+        <AnalyticsProvider>
+          <div />
+        </AnalyticsProvider>
+      </MemoryRouter>
+    );
+    await settlePreference();
+    const { capture } = await import('@/services/analytics-escape-hatch');
+    capture('project_created', {
+      craft_type: 'diamond_painting',
+      path: '/projects/private-id?q=private-query',
+    });
+    captureAccountAnalyticsEvent('auth_login_succeeded', { auth_method: 'password' });
+    for (const name of [
+      'session_context',
+      '$pageview',
+      'project_created',
+      'auth_login_succeeded',
+    ]) {
+      const index = captureSpy.mock.calls.findIndex(([event]) => event === name);
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(captureSpy.mock.results[index].value?.properties).toMatchObject({
+        platform: 'web',
+        environment: 'preview',
+        release: 'synthetic-release',
+      });
+    }
+    const index = captureSpy.mock.calls.findIndex(([event]) => event === 'project_created');
+    expect(captureSpy.mock.results[index].value?.properties).toMatchObject({
+      craft_type: 'diamond_painting',
+      path: '/projects/:id',
+    });
+    expect(JSON.stringify(captureSpy.mock.results[index].value)).not.toContain('private-');
+    vi.unstubAllEnvs();
+  });
+
+  it('preserves DNT and disabled replay/autocapture', async () => {
+    render(
+      <MemoryRouter>
+        <AnalyticsProvider>
+          <div />
+        </AnalyticsProvider>
+      </MemoryRouter>
+    );
+    await settlePreference();
+    expect(posthog.config.respect_dnt).toBe(true);
+    expect(posthog.config.disable_session_recording).toBe(true);
+    expect(posthog.config.autocapture).toBe(false);
+    Object.defineProperty(navigator, 'doNotTrack', { configurable: true, value: '1' });
+    try {
+      expect(posthog.capture('project_created')).toBeUndefined();
+    } finally {
+      Reflect.deleteProperty(navigator, 'doNotTrack');
+    }
+  });
+
   it('preserves anonymous identity across provider remounts', () => {
     posthog.reset();
     auth.initialCheckComplete = true;

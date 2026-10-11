@@ -108,7 +108,6 @@ const diamondSummary: StatsSummaryResponse = {
     totalKits: 12,
     completedThisYear: 3,
     inProgress: 1,
-    inStash: 5,
     allTimeCompleted: 6,
     wishlistSize: 2,
   },
@@ -132,7 +131,6 @@ const coloringSummary: ColoringStatsSummaryResponse = {
     totalBooks: 8,
     completedPagesThisYear: 14,
     activePages: 3,
-    inStash: 4,
     allTimeCompletedPages: 30,
     wishlistSize: 1,
   },
@@ -270,6 +268,16 @@ describe('Stats page', () => {
     expect(screen.getAllByText('Completed this year')).toHaveLength(2);
     expect(screen.getByText('Total kits')).toBeInTheDocument();
     expect(screen.getByText('Total books')).toBeInTheDocument();
+  });
+
+  it('shows the same exact in-stash count as the Library status filter', () => {
+    render(<Stats />);
+
+    const inStashRow = screen.getByText('In stash').closest('div');
+
+    expect(inStashRow).not.toBeNull();
+    expect(within(inStashRow as HTMLElement).getByText('3')).toBeInTheDocument();
+    expect(within(inStashRow as HTMLElement).queryByText('5')).not.toBeInTheDocument();
   });
 
   it('changes craft scope without merging all-craft sections', async () => {

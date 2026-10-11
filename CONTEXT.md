@@ -141,6 +141,15 @@ Two queries keep explicit exceptions: `useProjectDetailQuery` also retries
 401/403 auth races and expand-related 404 errors twice; other failures use the
 default policy. `useDashboardNavigationContext` retries once.
 
+## Query refetching
+
+Queries refetch stale data on mount, window focus, and reconnect, using the
+query client defaults. This is how a save on one device shows up on another
+(ADR-0004, ADR-0006). ESLint blocks setting these to `false` in `src/hooks` and
+`src/contexts`. The one exception is `useDashboardNavigationContext`, which
+skips focus and reconnect refetches so saved filters do not replace the
+filters in use.
+
 ## Berry Cream
 
 The app's color palette family. Berry Cream Light uses warm pink surfaces, a

@@ -96,6 +96,44 @@ describe('AvatarManager', () => {
     );
   });
 
+  it('preserves an upload draft across saved avatar refreshes until reopening', async () => {
+    const source = new File(['source'], 'photo.jpg', { type: 'image/jpeg' });
+    vi.mocked(imageCompression).mockReset().mockResolvedValue(source);
+    const { rerender } = render(<AvatarManager {...baseProps} isOpen />);
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [source] },
+    });
+    await screen.findByText('Finish crop');
+
+    const refreshedProps = {
+      ...baseProps,
+      currentAvatar: undefined,
+      currentConfig: { type: 'initials' as const },
+    };
+    rerender(<AvatarManager {...refreshedProps} isOpen />);
+    expect(screen.getByText('Finish crop')).toBeInTheDocument();
+    expect(screen.getByAltText('Avatar preview')).toHaveAttribute('src', 'blob:avatar-preview');
+
+    fireEvent.click(screen.getByText('Finish crop'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Avatar' })).toBeEnabled());
+    const latestProps = {
+      ...baseProps,
+      currentAvatar: 'https://example.test/latest.png',
+      currentConfig: { type: 'upload' as const, uploadUrl: 'https://example.test/latest.png' },
+    };
+    rerender(<AvatarManager {...latestProps} isOpen />);
+    expect(screen.getByRole('button', { name: 'Save Avatar' })).toBeEnabled();
+    expect(screen.getByAltText('Avatar preview')).toHaveAttribute('src', 'blob:avatar-preview');
+
+    rerender(<AvatarManager {...latestProps} isOpen={false} />);
+    rerender(<AvatarManager {...latestProps} isOpen />);
+    expect(screen.getByAltText('Avatar preview')).toHaveAttribute(
+      'src',
+      'https://example.test/latest.png'
+    );
+    expect(screen.getByRole('button', { name: 'Save Avatar' })).toBeDisabled();
+  });
+
   it('shows the saved avatar with a file token in the management dialog', () => {
     render(
       <PrivateFileTokenContext.Provider

@@ -84,16 +84,20 @@ export function AvatarManager({
     prevResetKey.currentAvatar !== currentAvatar
   ) {
     setPrevResetKey(nextResetKey);
-    if (isOpen) {
-      setUploadState(buildUploadState(isOpen, currentConfigType, currentAvatar));
-      setProcessingError(null);
-      setIsProcessing(false);
-      setShowCropModal(false);
-    } else {
-      setUploadState({});
+    const hasUploadDraft = isProcessing || uploadFile || finalCompressedFile || showCropModal;
+    const preserveDraft = prevResetKey.isOpen && isOpen && hasUploadDraft;
+    if (!preserveDraft) {
+      if (isOpen) {
+        setUploadState(buildUploadState(isOpen, currentConfigType, currentAvatar));
+        setProcessingError(null);
+        setIsProcessing(false);
+        setShowCropModal(false);
+      } else {
+        setUploadState({});
+      }
+      setUploadFile(null);
+      setFinalCompressedFile(null);
     }
-    setUploadFile(null);
-    setFinalCompressedFile(null);
   }
 
   useEffect(() => {

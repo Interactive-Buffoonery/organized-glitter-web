@@ -23,6 +23,12 @@ Set `VITE_APP_VERSION` to the deployed public commit and `VITE_SOURCE_URL` to it
 immutable GitHub tree URL. The tracker and Astro footer expose the source link.
 Public Vite values are shipped to browsers; never put credentials in them.
 
+Set `VITE_DEPLOYMENT_ENVIRONMENT=production` for official production builds.
+Override it to `preview` when building a release preview, even when using Vite
+production mode and the same backend. The value is a public analytics dimension,
+not a backend selector. An absent or invalid value produces `environment=other`
+on ordinary web events. See the [web analytics context contract](analytics/web-context.md).
+
 `BLOG_ENABLED=true` builds and assembles Astro into the same website. An explicit
 `WORDPRESS_API_URL` fetches published posts and selected newsletter support pages.
 Missing WordPress configuration produces an empty updates page without outbound
@@ -74,6 +80,8 @@ credentials.
 After a same-repository, non-draft `dev` to `main` PR passes CI, add the
 `spacefast-preview` label. This requests one preview build in the private ops
 repository for that exact head commit. It does not publish the official site.
+Ops must explicitly set `VITE_DEPLOYMENT_ENVIRONMENT=preview` for that build;
+the official-site example is for production and must not be reused unchanged.
 New pushes do not automatically request another preview. Remove and re-add the
 label after the new CI passes to rebuild.
 

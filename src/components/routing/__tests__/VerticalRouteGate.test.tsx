@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 const { useAppReadyMock, useHideSplashMock, authState, enabledVerticalsState } = vi.hoisted(() => ({
   useAppReadyMock: vi.fn(),
@@ -71,5 +72,95 @@ describe('VerticalRouteGate', () => {
 
     expect(screen.getByText('Protected coloring page')).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});
+
+function DraftEditor() {
+  const [draft, setDraft] = useState('');
+  return (
+    <input aria-label="Draft" value={draft} onChange={event => setDraft(event.target.value)} />
+  );
+}
+
+function GateWithNavigation() {
+  const navigate = useNavigate();
+  return (
+    <>
+      <button type="button" onClick={() => navigate('/coloring/other/edit')}>
+        Another editor
+      </button>
+      <VerticalRouteGate requiredVertical="coloring_books">
+        <DraftEditor />
+      </VerticalRouteGate>
+    </>
+  );
+}
+
+describe('VerticalRouteGate admission', () => {
+  beforeEach(() => {
+    authState.user = { id: 'user-123' };
+    enabledVerticalsState.diamond_painting = true;
+    enabledVerticalsState.coloring_books = true;
+    enabledVerticalsState.isLoading = false;
+  });
+
+  it('keeps a mounted draft when a background refresh disables its tracker', () => {
+    const view = render(
+      <MemoryRouter>
+        <GateWithNavigation />
+      </MemoryRouter>
+    );
+    fireEvent.change(screen.getByRole('textbox', { name: 'Draft' }), {
+      target: { value: 'Unsaved note' },
+    });
+    enabledVerticalsState.coloring_books = false;
+    view.rerender(
+      <MemoryRouter>
+        <GateWithNavigation />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('textbox', { name: 'Draft' })).toHaveValue('Unsaved note');
+  });
+
+  it('reevaluates access when entering another route', () => {
+    const view = render(
+      <MemoryRouter>
+        <GateWithNavigation />
+      </MemoryRouter>
+    );
+    enabledVerticalsState.coloring_books = false;
+    view.rerender(
+      <MemoryRouter>
+        <GateWithNavigation />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Another editor' }));
+    expect(screen.queryByRole('textbox', { name: 'Draft' })).not.toBeInTheDocument();
+  });
+
+  it('reevaluates access when the account changes', () => {
+    const view = render(
+      <MemoryRouter>
+        <GateWithNavigation />
+      </MemoryRouter>
+    );
+    enabledVerticalsState.coloring_books = false;
+    authState.user = { id: 'another-user' };
+    view.rerender(
+      <MemoryRouter>
+        <GateWithNavigation />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('textbox', { name: 'Draft' })).not.toBeInTheDocument();
+  });
+
+  it('rejects an initially disabled tracker', () => {
+    enabledVerticalsState.coloring_books = false;
+    render(
+      <MemoryRouter>
+        <GateWithNavigation />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('textbox', { name: 'Draft' })).not.toBeInTheDocument();
   });
 });

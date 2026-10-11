@@ -40,6 +40,5 @@ export const useSpinHistoryCount = ({ userId, enabled = true }: UseSpinHistoryCo
     },
     enabled: enabled && !!userId,
     ...queryFreshness('activity'),
-    refetchOnWindowFocus: true,
   });
 };

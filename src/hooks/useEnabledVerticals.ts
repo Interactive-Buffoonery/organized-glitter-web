@@ -19,7 +19,6 @@ export const useEnabledVerticals = (userId: string | undefined): UseEnabledVerti
     queryFn: () => DashboardSettingsService.getVerticalToggles(userId as string),
     enabled: !!userId,
     ...queryFreshness('frequent'),
-    refetchOnWindowFocus: false,
   });
 
   const resolved =

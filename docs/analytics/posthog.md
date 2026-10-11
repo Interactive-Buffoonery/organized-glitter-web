@@ -2,6 +2,10 @@
 
 Status: active guidance for INT-202 and future analytics changes.
 
+Proposed reporting definitions: [Reporting specification v1](reporting-v1.md).
+Offline validation: [Safe symbolication smoke](symbolication-smoke.md).
+These plans do not apply live PostHog configuration.
+
 ## Current integration
 
 - Provider: `src/components/AnalyticsProvider.tsx`
@@ -10,6 +14,7 @@ Status: active guidance for INT-202 and future analytics changes.
 - Escape hatch: `src/services/analytics-escape-hatch.ts`
 - Coloring property helpers: `src/services/coloring-analytics.ts`
 - Privacy disclosure: `src/pages/Privacy.tsx`
+- Ordinary web build context: [metadata and web/native naming contract](web-context.md)
 
 ## Privacy contract
 
@@ -146,6 +151,11 @@ exception capture or change consent, DNT, account opt-out, autocapture or replay
 
 ## Adding or changing events
 
+`tag_created` records successful interactive diamond-tag creation through
+`useCreateTag`, with only the fixed `craft: diamond` context. Failed
+creation, tag names/IDs/colors and input content are excluded. Coloring-tag
+and import-created-tag coverage is not implied by this event.
+
 1. Decide what product question the event answers.
 2. Add or reuse an `AnalyticsEvent` constant.
 3. Normalize properties through a helper when values come from user records.
@@ -248,10 +258,11 @@ threshold, rather than the general record count.
 The legacy `first_*`, `randomizer_first_spin`, and `activation_completed` events are no longer
 emitted. Historical events remain in PostHog. Existing browser milestone storage is inert.
 Do not combine legacy activation counts with ordinary action counts as if they were the same
-metric. For the activation definition, sum ordinary project/book creation events and
-`created_library_items` on archive imports (or `records` on project CSV imports), then require
-at least one progress-note, photo, or spin event. Calculate this per identified account in
-PostHog. These reports still depend on received events, not the current full library.
+metric. For the proposed activation definition, follow the exact ordering, seven-day
+entry window, maturity and received-event limitations in [reporting v1](reporting-v1.md).
+It combines ordinary project/book creation and successful import counts with a
+subsequent productive action. These reports describe received events, not the
+current full library.
 
 ## Local verification
 

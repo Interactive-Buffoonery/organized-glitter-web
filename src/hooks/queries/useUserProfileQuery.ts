@@ -22,7 +22,6 @@ export const useUserProfileQuery = (userId: string | undefined) => {
     queryFn: () => fetchUserProfile(userId as string),
     enabled: !!userId,
     ...queryFreshness('frequent'),
-    refetchOnWindowFocus: false, // Don't refetch when window regains focus
   });
 };
 

@@ -7,14 +7,11 @@ import { notify } from '@/lib/notifications';
  */
 
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
-import MainLayout from '@/components/layout/MainLayout';
+import { ManageListsLayout } from '@/components/manage-lists/ManageListsLayout';
 
 import { useArtists } from '@/hooks/queries/useArtists';
 import ArtistPageHeader from '@/components/artist/ArtistPageHeader';
 import ArtistTable from '@/components/artist/ArtistTable';
-import { Button } from '@/components/ui/button';
 import { createLogger } from '@/utils/logger';
 import { useAppReady } from '@/hooks/useAppReady';
 
@@ -73,28 +70,12 @@ const ArtistList = () => {
   }, [error]);
 
   return (
-    <MainLayout>
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 gap-1.5 pointer-coarse:min-h-11"
-          >
-            <Link to="/options">
-              <ChevronLeft className="size-4" />
-              Back to Manage Lists
-            </Link>
-          </Button>
-        </div>
-
-        <ArtistPageHeader artists={artists} />
-        <div className="mt-6">
-          <ArtistTable artists={artists} loading={loading} />
-        </div>
+    <ManageListsLayout>
+      <ArtistPageHeader artists={artists} />
+      <div className="mt-6">
+        <ArtistTable artists={artists} loading={loading} />
       </div>
-    </MainLayout>
+    </ManageListsLayout>
   );
 };
 

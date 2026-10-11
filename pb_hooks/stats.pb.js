@@ -92,8 +92,6 @@ routerAdd(
       }
     }
 
-    const inStash = statusBreakdown.purchased + statusBreakdown.stash + statusBreakdown.kitted;
-
     return e.json(200, {
       generatedAt: new Date().toISOString(),
       year,
@@ -101,7 +99,7 @@ routerAdd(
         totalKits: Number(summary.totalKits) || 0,
         completedThisYear: Number(summary.completedThisYear) || 0,
         inProgress: statusBreakdown.progress,
-        inStash,
+        inStash: statusBreakdown.stash,
         allTimeCompleted: Number(summary.allTimeCompleted) || 0,
         wishlistSize: statusBreakdown.wishlist,
       },
@@ -537,6 +535,44 @@ routerAdd(
         AND p.company IS NOT NULL
         AND p.company != ''
       GROUP BY p.company
+    `
+      )
+      .bind({ userId })
+      .all(rows);
+
+    const counts = {};
+    for (const row of rows) {
+      counts[row.id] = Number(row.total) || 0;
+    }
+
+    return e.json(200, { counts });
+  },
+  $apis.requireAuth()
+);
+
+routerAdd(
+  'GET',
+  '/api/stats/artist-project-counts',
+  e => {
+    if (!e.auth.getBool('verified')) {
+      throw new ForbiddenError('Email verification is required.');
+    }
+
+    const userId = e.auth.getString('id');
+    const rows = arrayOf(new DynamicModel({ id: '', total: 0 }));
+
+    $app
+      .db()
+      .newQuery(
+        `
+      SELECT p.artist AS id, COUNT(*) AS total
+      FROM projects p
+      JOIN artists a ON a.id = p.artist
+      WHERE p.user = {:userId}
+        AND a.user = {:userId}
+        AND p.artist IS NOT NULL
+        AND p.artist != ''
+      GROUP BY p.artist
     `
       )
       .bind({ userId })
@@ -1138,7 +1174,7 @@ routerAdd(
         totalBooks: Number(summary.totalBooks) || 0,
         completedPagesThisYear: Number(summary.completedPagesThisYear) || 0,
         activePages: pageStatusBreakdown.in_progress,
-        inStash: bookStatusBreakdown.purchased + bookStatusBreakdown.in_stash,
+        inStash: bookStatusBreakdown.in_stash,
         allTimeCompletedPages: Number(summary.allTimeCompletedPages) || 0,
         wishlistSize: bookStatusBreakdown.wishlist,
       },

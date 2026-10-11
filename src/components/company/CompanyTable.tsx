@@ -211,7 +211,7 @@ const CompanyTable = ({ companies, loading }: CompanyTableProps) => {
         <TableHeader>
           <TableRow>
             <TableHead>Company Name</TableHead>
-            <TableHead>Website</TableHead>
+            <TableHead className="hidden sm:table-cell">Website</TableHead>
             <TableHead>Projects</TableHead>
             <TableHead className="w-24">Actions</TableHead>
           </TableRow>
@@ -220,7 +220,7 @@ const CompanyTable = ({ companies, loading }: CompanyTableProps) => {
           {companies.map(company => (
             <TableRow key={company.id}>
               <TableCell className="font-medium">{company.name}</TableCell>
-              <TableCell>
+              <TableCell className="hidden sm:table-cell">
                 {getSafeHref(company.website_url) ? (
                   <a
                     href={getSafeHref(company.website_url)}

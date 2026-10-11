@@ -7,13 +7,10 @@ import { notify } from '@/lib/notifications';
  */
 
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
-import MainLayout from '@/components/layout/MainLayout';
+import { ManageListsLayout } from '@/components/manage-lists/ManageListsLayout';
 
 import TagPageHeader from '@/components/tags/TagPageHeader';
 import TagTable from '@/components/tags/TagTable';
-import { Button } from '@/components/ui/button';
 import { useMetadata } from '@/contexts/MetadataContext';
 import { useAppReady } from '@/hooks/useAppReady';
 import { useColoringTags } from '@/hooks/queries/coloring/useColoringTags';
@@ -38,33 +35,17 @@ const TagList = () => {
   }, [error.tags]);
 
   return (
-    <MainLayout>
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 gap-1.5 pointer-coarse:min-h-11"
-          >
-            <Link to="/options">
-              <ChevronLeft className="size-4" />
-              Back to Manage Lists
-            </Link>
-          </Button>
-        </div>
+    <ManageListsLayout>
+      <TagPageHeader />
 
-        <TagPageHeader />
-
-        <div className="mt-6">
-          <TagTable
-            tags={tags}
-            coloringTags={coloringTags}
-            loading={loading || loadingColoringTags}
-          />
-        </div>
+      <div className="mt-6">
+        <TagTable
+          tags={tags}
+          coloringTags={coloringTags}
+          loading={loading || loadingColoringTags}
+        />
       </div>
-    </MainLayout>
+    </ManageListsLayout>
   );
 };
 

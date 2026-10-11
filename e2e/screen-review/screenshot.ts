@@ -4,6 +4,7 @@ export type ScreenshotMode = 'fullPage' | 'viewport';
 
 const MAX_SAFE_FULL_PAGE_SCREENSHOT_HEIGHT = 30_000;
 const MAX_REASONABLE_DOCUMENT_HEIGHT = 120_000;
+const MAX_SAFE_EXPANDED_VIEWPORT_HEIGHT = 30_000;
 
 const MOBILE_PROJECT_PATTERN = /mobile/i;
 
@@ -81,12 +82,34 @@ export const captureScreenReviewScreenshot = async ({
   assertReasonableDocumentHeight({ screenTitle, documentHeight });
 
   const mode = chooseScreenshotMode({ projectName, documentHeight, deviceScaleFactor });
+  const viewport = page.viewportSize();
+  const canExpandViewport =
+    mode === 'fullPage' &&
+    viewport !== null &&
+    documentHeight > viewport.height &&
+    documentHeight <= MAX_SAFE_EXPANDED_VIEWPORT_HEIGHT;
+  let viewportIsExpanded = false;
+  try {
+    if (canExpandViewport) {
+      await page.setViewportSize({ width: viewport.width, height: documentHeight });
+      viewportIsExpanded = true;
+      const expandedDocumentHeight = await getDocumentScreenshotHeight(page);
+      if (expandedDocumentHeight > documentHeight + 1) {
+        await page.setViewportSize(viewport);
+        viewportIsExpanded = false;
+      }
+    }
 
-  await page.screenshot({
-    path,
-    fullPage: mode === 'fullPage',
-    animations: 'disabled',
-  });
+    await page.screenshot({
+      path,
+      fullPage: mode === 'fullPage' && !viewportIsExpanded,
+      animations: 'disabled',
+    });
+  } finally {
+    if (viewportIsExpanded) {
+      await page.setViewportSize(viewport);
+    }
+  }
 
   return { mode, documentHeight, deviceScaleFactor };
 };

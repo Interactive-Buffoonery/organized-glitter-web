@@ -10,6 +10,7 @@ Status: active guidance for INT-202 and future analytics changes.
 - Escape hatch: `src/services/analytics-escape-hatch.ts`
 - Coloring property helpers: `src/services/coloring-analytics.ts`
 - Privacy disclosure: `src/pages/Privacy.tsx`
+- Ordinary web build context: [metadata and web/native naming contract](web-context.md)
 
 ## Privacy contract
 

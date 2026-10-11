@@ -47,27 +47,27 @@ const stableRoutes = [
   },
   {
     path: '/options/companies',
-    ready: (page: Page) => page.getByRole('heading', { name: 'Company List' }),
+    ready: (page: Page) => page.getByRole('heading', { name: 'Companies' }),
   },
   {
     path: '/options/artists',
-    ready: (page: Page) => page.getByRole('heading', { name: 'Artist List' }),
+    ready: (page: Page) => page.getByRole('heading', { name: 'Artists' }),
   },
   {
     path: '/options/tags',
-    ready: (page: Page) => page.getByRole('heading', { name: 'Tag List' }),
+    ready: (page: Page) => page.getByRole('heading', { name: 'Tags' }),
   },
   {
     path: '/options/publishers',
-    ready: (page: Page) => page.getByRole('heading', { name: 'Book Publisher Management' }),
+    ready: (page: Page) => page.getByRole('heading', { name: 'Publishers' }),
   },
   {
     path: '/options/illustrators',
-    ready: (page: Page) => page.getByRole('heading', { name: 'Book Illustrator Management' }),
+    ready: (page: Page) => page.getByRole('heading', { name: 'Illustrators' }),
   },
   {
     path: '/options/coloring-mediums',
-    ready: (page: Page) => page.getByRole('heading', { name: 'Coloring medium management' }),
+    ready: (page: Page) => page.getByRole('heading', { name: 'Coloring mediums' }),
   },
 ];
 

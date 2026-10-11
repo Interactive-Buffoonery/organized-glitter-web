@@ -41,8 +41,6 @@ export function useTagStats(tagIds: string[]): TagStatsResult {
     },
     enabled: !!user?.id && tagIds.length > 0,
     ...queryFreshness('frequent'),
-    refetchOnWindowFocus: false, // Don't refetch when window gains focus
-    refetchOnMount: false, // Don't refetch if we have fresh data
   });
 
   return {

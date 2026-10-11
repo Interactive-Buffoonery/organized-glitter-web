@@ -30,4 +30,16 @@ describe('userScopedQueryOptions', () => {
     expect(options).toMatchObject(queryFreshness('interactive'));
     expect(options.enabled).toBe(true);
   });
+
+  it('leaves focus and reconnect refetching to the query client', () => {
+    const options = userScopedQueryOptions({
+      queryKey: ['example'],
+      queryFn: async () => [],
+      userId: 'user-123',
+      freshness: 'standard',
+    });
+
+    expect(options).not.toHaveProperty('refetchOnWindowFocus');
+    expect(options).not.toHaveProperty('refetchOnReconnect');
+  });
 });

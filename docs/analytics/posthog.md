@@ -14,6 +14,7 @@ These plans do not apply live PostHog configuration.
 - Escape hatch: `src/services/analytics-escape-hatch.ts`
 - Coloring property helpers: `src/services/coloring-analytics.ts`
 - Privacy disclosure: `src/pages/Privacy.tsx`
+- Ordinary web build context: [metadata and web/native naming contract](web-context.md)
 
 ## Privacy contract
 

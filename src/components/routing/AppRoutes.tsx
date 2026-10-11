@@ -1,5 +1,5 @@
-import React from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 import { ProtectedLazyRoute } from '@/components/routing/ProtectedLazyRoute';
@@ -15,10 +15,27 @@ export const VerticalRouteGate: React.FC<{
   requiredVertical: 'diamond_painting' | 'coloring_books';
 }> = ({ children, requiredVertical }) => {
   const { user } = useAuth();
+  const location = useLocation();
   const { diamond_painting, coloring_books, isLoading } = useEnabledVerticals(user?.id);
+  const admissionKey = JSON.stringify([user?.id, location.key, requiredVertical]);
+  const trackerEnabled =
+    requiredVertical === 'diamond_painting' ? diamond_painting : coloring_books;
+  const [admission, setAdmission] = useState({ key: admissionKey, admitted: false });
+  const alreadyAdmitted = admission.key === admissionKey && admission.admitted;
+  const canAdmit = !isLoading && trackerEnabled;
+
+  // Tracker preferences hide routes, rather than revoke access. Keep an open
+  // editor mounted when another device disables its tracker.
+  if (admission.key !== admissionKey || (!admission.admitted && canAdmit)) {
+    setAdmission({ key: admissionKey, admitted: canAdmit });
+  }
   // Hide splash while vertical access resolves, but do not complete the 30s
   // failsafe. Children (the lazy page) have not mounted yet on this branch.
   useHideSplash();
+
+  if (alreadyAdmitted) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (

@@ -265,9 +265,27 @@ describe('Stats page', () => {
     expect(screen.queryByRole('tab', { name: 'Collection' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Diamond paintings' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Coloring' })).toBeInTheDocument();
-    expect(screen.getAllByText('Completed this year')).toHaveLength(2);
+    expect(screen.getAllByText(`Completed in ${new Date().getFullYear()}`)).toHaveLength(2);
     expect(screen.getByText('Total kits')).toBeInTheDocument();
     expect(screen.getByText('Total books')).toBeInTheDocument();
+  });
+
+  it('labels both craft completion totals with the selected year', async () => {
+    const user = userEvent.setup();
+    render(<Stats />);
+
+    await user.click(screen.getByRole('button', { name: '2025', exact: true }));
+
+    expect(screen.getAllByText('Completed in 2025')).toHaveLength(2);
+    expect(screen.queryByText('Completed this year')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'All time' }));
+    expect(screen.getAllByText('Completed, all time')).toHaveLength(2);
+    expect(screen.queryByText('Completed in 2025')).not.toBeInTheDocument();
+
+    const year = new Date().getFullYear();
+    await user.click(screen.getByRole('button', { name: String(year), exact: true }));
+    expect(screen.getAllByText(`Completed in ${year}`)).toHaveLength(2);
   });
 
   it('shows the same exact in-stash count as the Library status filter', () => {

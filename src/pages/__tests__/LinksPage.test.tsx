@@ -68,6 +68,14 @@ describe('LinksPage', () => {
     ).toHaveLength(4);
   });
 
+  it('renders the Lireka promo code without Markdown backticks', () => {
+    renderWithProviders(<LinksPage />, { initialRoute: '/links' });
+
+    const lirekaLink = screen.getByRole('link', { name: /^Lireka/i });
+    expect(lirekaLink).toHaveTextContent('Use PAR-F6NP7SF to get 5% off your first order!');
+    expect(lirekaLink.textContent).not.toContain('`');
+  });
+
   it('renders the Instagram destination as a native external link', () => {
     renderWithProviders(<LinksPage />, { initialRoute: '/links' });
 

@@ -169,7 +169,8 @@ function LeadReport({
       ? monthlyCompletionsToChartPoints(queries.monthly.data?.months ?? [], timeScope.year)
       : yearlyCompletionsToChartPoints(queries.yearly.data?.years ?? []);
   const chartQuery = timeScope.kind === 'year' ? queries.monthly : queries.yearly;
-  const leadLabel = timeScope.kind === 'year' ? 'Completed this year' : 'Completed, all time';
+  const leadLabel =
+    timeScope.kind === 'year' ? `Completed in ${timeScope.year}` : 'Completed, all time';
   const leadTotal = timeScope.kind === 'year' ? total : queries.yearly.data?.total;
 
   const leadNumber = (

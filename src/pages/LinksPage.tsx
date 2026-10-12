@@ -66,7 +66,7 @@ const affiliateLinks = [
   },
   {
     title:
-      'Use `PAR-F6NP7SF` to get 5% off your first order! Great source for the Disney mystery coloring books.',
+      'Use PAR-F6NP7SF to get 5% off your first order! Great source for the Disney mystery coloring books.',
     brand: 'Lireka',
     url: 'https://www.lireka.com/en',
     featured: true,

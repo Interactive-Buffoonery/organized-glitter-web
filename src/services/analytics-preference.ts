@@ -4,6 +4,8 @@ import { UsersService } from '@/services/pocketbase/users.service';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('AnalyticsPreference');
+const ACCOUNT_CONSENT_STORAGE_KEY = 'og:analytics:account-consent';
+const PREFERENCE_REFRESH_INTERVAL_MS = 5 * 60_000;
 const listeners = new Set<() => void>();
 let state = {
   accountId: null as string | null,
@@ -40,6 +42,16 @@ export function syncAnalyticsConsent(): void {
 
 function publish(next: typeof state): void {
   state = next;
+  if (next.ready && next.accountId && !next.saving) {
+    try {
+      localStorage.setItem(
+        ACCOUNT_CONSENT_STORAGE_KEY,
+        JSON.stringify({ accountId: next.accountId, enabled: next.enabled })
+      );
+    } catch {
+      logger.warn('Could not store confirmed analytics preference');
+    }
+  }
   syncAnalyticsConsent();
   listeners.forEach(listener => listener());
 }
@@ -47,6 +59,16 @@ function publish(next: typeof state): void {
 export function subscribeAnalyticsPreference(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+function getSignedOutAnalyticsEnabled(): boolean {
+  try {
+    const stored = localStorage.getItem(ACCOUNT_CONSENT_STORAGE_KEY);
+    return !stored || JSON.parse(stored)?.enabled !== false;
+  } catch {
+    logger.debug('Could not read remembered analytics preference');
+    return true;
+  }
 }
 
 export function initializeAnalyticsPreference(): () => void {
@@ -90,7 +112,7 @@ export function initializeAnalyticsPreference(): () => void {
     unsubscribeRecord = undefined;
     publish({
       accountId,
-      enabled: !accountId,
+      enabled: !accountId && getSignedOutAnalyticsEnabled(),
       ready: !accountId,
       saving: false,
       loadFailed: false,
@@ -115,7 +137,7 @@ export function initializeAnalyticsPreference(): () => void {
     if (document.visibilityState === 'visible') void refresh();
   };
   window.addEventListener('focus', onFocus);
-  const interval = window.setInterval(onFocus, 30_000);
+  const interval = window.setInterval(onFocus, PREFERENCE_REFRESH_INTERVAL_MS);
   return () => {
     active = false;
     generation += 1;

@@ -1,5 +1,17 @@
 import type { CaptureResult } from 'posthog-js';
+import { AnalyticsEvent } from '@/services/analytics-events';
 import { sanitizeAnalyticsPath } from './sanitizePath';
+
+const allowedEvents = new Set<string>([
+  ...Object.values(AnalyticsEvent),
+  '$exception',
+  '$identify',
+  '$set',
+]);
+
+export function isAllowedAnalyticsEvent(name: string): boolean {
+  return allowedEvents.has(name);
+}
 
 function sanitizeProperty(value: unknown): unknown {
   if (typeof value === 'string') {
@@ -27,9 +39,14 @@ function sanitizeProperty(value: unknown): unknown {
 }
 
 export function sanitizeAnalyticsEvent(event: CaptureResult): CaptureResult {
+  const properties = sanitizeProperty(event.properties) as CaptureResult['properties'];
+  if (event.event === AnalyticsEvent.PAGE_VIEW) {
+    delete properties.title;
+    delete properties.$title;
+  }
   return {
     ...event,
-    properties: sanitizeProperty(event.properties) as CaptureResult['properties'],
+    properties,
     ...(event.$set && { $set: sanitizeProperty(event.$set) as CaptureResult['properties'] }),
     ...(event.$set_once && {
       $set_once: sanitizeProperty(event.$set_once) as CaptureResult['properties'],

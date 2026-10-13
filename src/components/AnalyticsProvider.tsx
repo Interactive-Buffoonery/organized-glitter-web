@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { PostHogProvider } from '@posthog/react';
 import posthog, { type PostHogConfig } from 'posthog-js';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { sanitizeAnalyticsEvent } from '@/utils/analytics/sanitizeEvent';
+import { isAllowedAnalyticsEvent, sanitizeAnalyticsEvent } from '@/utils/analytics/sanitizeEvent';
 import { enrichWebAnalyticsEvent } from '@/utils/analytics/webContext';
 
 import {
@@ -17,7 +17,9 @@ const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST?.trim();
 const posthogOptions: Partial<PostHogConfig> = {
   api_host: posthogHost,
   before_send: event =>
-    event && getAnalyticsEnabled() ? enrichWebAnalyticsEvent(sanitizeAnalyticsEvent(event)) : null,
+    event && getAnalyticsEnabled() && isAllowedAnalyticsEvent(event.event)
+      ? enrichWebAnalyticsEvent(sanitizeAnalyticsEvent(event))
+      : null,
   opt_out_capturing_by_default: !getAnalyticsEnabled(),
   ui_host: 'https://us.posthog.com',
   advanced_disable_flags: true,
@@ -25,6 +27,13 @@ const posthogOptions: Partial<PostHogConfig> = {
   // We handle pageviews manually via react-router
   capture_pageview: false,
   capture_pageleave: false,
+  capture_heatmaps: false,
+  capture_dead_clicks: false,
+  capture_performance: false,
+  rageclick: false,
+  disable_product_tours: true,
+  disable_conversations: true,
+  disable_web_experiments: true,
   save_campaign_params: false,
   // Respect Do Not Track
   respect_dnt: true,

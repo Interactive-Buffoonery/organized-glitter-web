@@ -40,7 +40,7 @@ export function buildWebAnalyticsContext(
   return { platform: 'web', environment, ...(release && { release }) };
 }
 
-/** Apply reserved dimensions only to registered product events, including pageviews. */
+/** Apply reserved dimensions to registered product events and manual exceptions. */
 export function enrichWebAnalyticsEvent(
   event: CaptureResult,
   context = buildWebAnalyticsContext(
@@ -49,7 +49,7 @@ export function enrichWebAnalyticsEvent(
     import.meta.env.DEV
   )
 ): CaptureResult {
-  if (!ordinaryEvents.has(event.event)) return event;
+  if (event.event !== '$exception' && !ordinaryEvents.has(event.event)) return event;
   const properties = { ...event.properties };
   // A persisted SDK super-property cannot supply a stale or unvalidated build identity.
   delete properties.release;

@@ -55,27 +55,27 @@ describe('web analytics context', () => {
     expect(buildWebAnalyticsContext('x'.repeat(80), 'preview', false).release).toHaveLength(80);
   });
 
-  it.each(Object.values(AnalyticsEvent).filter(name => !name.startsWith('bootstrap_')))(
-    'enriches the registered ordinary event %s without changing its meaning',
-    name => {
-      const event: CaptureResult = {
-        uuid: 'synthetic-event',
-        event: name,
-        properties: {
-          craft_type: 'coloring_books',
-          count: 2,
-          path: '/dashboard',
-          platform: 'unsafe',
-          environment: 'unsafe',
-          release: 'unsafe',
-        },
-      };
-      const context = buildWebAnalyticsContext('v1', 'preview', false);
-      const result = enrichWebAnalyticsEvent(event, context);
-      expect(result).toEqual({ ...event, properties: { ...event.properties, ...context } });
-      expect(event.properties.platform).toBe('unsafe');
-    }
-  );
+  it.each([
+    ...Object.values(AnalyticsEvent).filter(name => !name.startsWith('bootstrap_')),
+    '$exception',
+  ])('enriches the registered ordinary event %s without changing its meaning', name => {
+    const event: CaptureResult = {
+      uuid: 'synthetic-event',
+      event: name,
+      properties: {
+        craft_type: 'coloring_books',
+        count: 2,
+        path: '/dashboard',
+        platform: 'unsafe',
+        environment: 'unsafe',
+        release: 'unsafe',
+      },
+    };
+    const context = buildWebAnalyticsContext('v1', 'preview', false);
+    const result = enrichWebAnalyticsEvent(event, context);
+    expect(result).toEqual({ ...event, properties: { ...event.properties, ...context } });
+    expect(event.properties.platform).toBe('unsafe');
+  });
 
   it('removes stale SDK release when the current build has no real identity', () => {
     const event: CaptureResult = {
@@ -90,7 +90,6 @@ describe('web analytics context', () => {
   });
 
   it.each([
-    '$exception',
     '$identify',
     '$groupidentify',
     '$autocapture',

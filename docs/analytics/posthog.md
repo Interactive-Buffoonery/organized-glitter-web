@@ -97,9 +97,12 @@ These are diagnostic signals, not proof of a network connection or a human visit
 Diagnostic properties exclude raw user agents, URLs, record IDs, failed filenames, and
 exception text. Signed-in shell events always use the separate anonymous
 `og_bootstrap_anon_id`, never the stored SDK identity or PocketBase user ID. This preserves
-release, route, and browser diagnostics while dropping per-user startup correlation.
-Signed-out events reuse the stored SDK anonymous identity when available, otherwise the
-separate anonymous ID stored in the browser.
+release, route, and browser diagnostics while dropping linkage to the identified account or
+PocketBase ID. The anonymous ID is stable per browser, shared by accounts on that browser and
+the signed-out fallback. Repeated failures from one browser are still correlated, and timing
+correlation with later identified events is possible.
+Signed-out events reuse the stored SDK identity only when it is anonymous (no `$user_id` or
+identified `$user_state`), otherwise the separate anonymous ID stored in the browser.
 Do Not Track applies to both events. Signed-in startup capture requires a remembered, confirmed
 opt-in for the same account ID in saved PocketBase auth (`record.id`, or legacy `model.id`).
 Missing, corrupt, mismatched, opted-out, or unreadable signed-in consent suppresses capture.
@@ -400,25 +403,36 @@ confirms an opt-in. Failed saves show an error and reread the server value. Capt
 
 Open web clients listen for user-record changes and reread the preference on focus or when
 the document becomes visible, including PWA resume. A timer checks visible tabs every 30 seconds:
-failed reads or an unavailable realtime subscription trigger a refresh at that cadence; healthy
-subscriptions refresh every 5 minutes. Failed reads pause capture until a successful refresh.
+failed reads or a record subscription that failed to establish trigger a refresh at that cadence;
+healthy subscriptions refresh every 5 minutes. Every realtime connect or reconnect also triggers
+a reread to recover preference changes missed during a connection gap. Concurrent reads are
+deduplicated. Failed reads pause capture until a successful refresh.
 
 Every confirmed signed-in load, realtime update, or save remembers
 `og:analytics:account-consent` in localStorage as `{"accountId":"<id>","enabled":true|false}`.
 Pending opt-outs also write `enabled: false` before the save request, so signing out during a
 save keeps capture off. Confirmation or a successful reread replaces it with server truth.
 Pending opt-ins and failed loads do not replace the remembered record. Storage errors are contained,
-and the client keeps the same choice in memory if storage is missing or unreadable.
+and an in-memory opt-out takes precedence over stored consent, including a stale stored opt-in.
+Otherwise, stored consent takes precedence, with memory as the fallback when storage is missing
+or unreadable. Failed writes attempt to remove the stored record so signed-in shell capture
+fails closed.
 After sign-out, a remembered `enabled: false` keeps anonymous capture off in that browser.
 If neither storage nor memory has a choice, anonymous capture is allowed; opted-in records allow it too. Signing into any account always
 uses that account's server preference and replaces the remembered record after confirmation.
-No local browser choice is copied to another account.
+No local browser choice is copied to another account. Signing out resets an identified SDK
+identity before applying remembered opt-out. Signed-in opt-out alone does not reset identity.
+
+A pre-existing edge remains: signing back into the same account before a pending opt-out save
+resolves can briefly re-enable capture from the server's older preference. Once the save lands,
+a realtime update or the next refresh corrects it. This behavior predates the privacy-hardening branch.
 
 The pre-React bootstrap beacon cannot fetch an account preference. With a saved PocketBase sign-in,
 it captures only when the remembered consent account ID matches `record.id` (or legacy `model.id`)
 and `enabled === true`. Missing IDs, missing or corrupt consent, mismatches, opt-out, auth parse
 failures, and storage access failures suppress capture. Without a sign-in, remembered opt-out
-suppresses capture; missing or unreadable consent records permit it. It also honors Do Not Track
+suppresses capture; missing or corrupt consent records permit it. Storage access failures
+suppress shell capture. It also honors Do Not Track
 and the legacy `og:analytics:enabled === 'false'` browser opt-out. A remembered choice can lag a
 server change until a successful web refresh; the shell cannot confirm it with PocketBase.
 

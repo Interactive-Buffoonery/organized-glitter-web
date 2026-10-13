@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   update: vi.fn(),
   subscribe: vi.fn(),
+  connect: vi.fn(),
+  connectCallback: undefined as undefined | (() => void),
   authCallback: undefined as undefined | (() => void),
 }));
 vi.mock('@/services/auth', () => ({
@@ -23,6 +25,7 @@ vi.mock('@/services/pocketbase/users.service', () => ({
     getAnalyticsOptOut: mocks.get,
     updateAnalyticsOptOut: mocks.update,
     subscribeAnalyticsPreference: mocks.subscribe,
+    subscribeRealtimeConnect: mocks.connect,
   },
 }));
 
@@ -35,6 +38,10 @@ beforeEach(() => {
   mocks.get.mockResolvedValue(false);
   mocks.update.mockResolvedValue(true);
   mocks.subscribe.mockResolvedValue(async () => {});
+  mocks.connect.mockImplementation(async (callback: () => void) => {
+    mocks.connectCallback = callback;
+    return async () => {};
+  });
 });
 afterEach(() => {
   stop?.();
@@ -55,6 +62,92 @@ function signOut() {
 }
 
 describe('analytics preference privacy and recovery', () => {
+  it.each([false, true])(
+    'keeps newer in-memory opt-out over stale opt-in when removal is blocked: %s',
+    async isRemovalBlocked => {
+      const service = await initialize();
+      expect(JSON.parse(localStorage.getItem(service.ACCOUNT_CONSENT_STORAGE_KEY)!)).toEqual({
+        accountId: 'account-a',
+        enabled: true,
+      });
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      if (isRemovalBlocked)
+        vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+          throw new Error('blocked');
+        });
+      mocks.update.mockImplementation(() => new Promise(() => {}));
+      void service.setAnalyticsEnabled(false);
+      signOut();
+      expect(service.getAnalyticsEnabled()).toBe(false);
+      expect(localStorage.getItem(service.ACCOUNT_CONSENT_STORAGE_KEY)).toBe(
+        isRemovalBlocked ? JSON.stringify({ accountId: 'account-a', enabled: true }) : null
+      );
+    }
+  );
+
+  it('does not replace a stored opt-out with a pending opt-in', async () => {
+    mocks.get.mockResolvedValue(true);
+    mocks.update.mockImplementation(() => new Promise(() => {}));
+    const service = await initialize();
+    void service.setAnalyticsEnabled(true);
+    expect(JSON.parse(localStorage.getItem(service.ACCOUNT_CONSENT_STORAGE_KEY)!)).toEqual({
+      accountId: 'account-a',
+      enabled: false,
+    });
+    expect(service.getAnalyticsEnabled()).toBe(false);
+    signOut();
+    expect(service.getAnalyticsEnabled()).toBe(false);
+  });
+
+  it('refreshes missed opt-outs on realtime reconnect and ignores old account callbacks', async () => {
+    const unsubscribe = vi.fn(async () => {});
+    mocks.connect.mockImplementation(async (callback: () => void) => {
+      mocks.connectCallback = callback;
+      return unsubscribe;
+    });
+    const service = await initialize();
+    const oldCallback = mocks.connectCallback!;
+    mocks.get.mockResolvedValue(true);
+    oldCallback();
+    oldCallback();
+    await Promise.resolve();
+    expect(mocks.get).toHaveBeenCalledTimes(2);
+    expect(service.getAnalyticsEnabled()).toBe(false);
+    mocks.user = { id: 'account-b' };
+    mocks.authCallback?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    oldCallback();
+    expect(mocks.get).toHaveBeenCalledTimes(3);
+    mocks.connectCallback?.();
+    await Promise.resolve();
+    expect(mocks.get).toHaveBeenCalledTimes(4);
+    stop?.();
+    stop = undefined;
+    expect(unsubscribe).toHaveBeenCalledTimes(2);
+    mocks.connectCallback?.();
+    expect(mocks.get).toHaveBeenCalledTimes(4);
+  });
+
+  it('cleans up a connect listener that resolves after sign-out', async () => {
+    let resolveSubscription!: (unsubscribe: () => Promise<void>) => void;
+    mocks.connect.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveSubscription = resolve;
+        })
+    );
+    await initialize();
+    signOut();
+    const unsubscribe = vi.fn(async () => {});
+    resolveSubscription(unsubscribe);
+    await Promise.resolve();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves an opt-out when sign-out precedes the save response', async () => {
     let resolveSave!: (optOut: boolean) => void;
     mocks.update.mockImplementation(

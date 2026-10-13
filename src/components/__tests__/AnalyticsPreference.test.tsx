@@ -27,6 +27,7 @@ vi.mock('@/services/pocketbase/users.service', () => ({
     getAnalyticsOptOut: mocks.get,
     updateAnalyticsOptOut: mocks.update,
     subscribeAnalyticsPreference: mocks.subscribe,
+    subscribeRealtimeConnect: async () => async () => {},
   },
 }));
 
@@ -103,25 +104,6 @@ describe('account analytics preference', () => {
     });
     const control = await renderPreference();
     expect(control).toBeChecked();
-  });
-
-  it('refreshes visible tabs every five minutes instead of thirty seconds', async () => {
-    await renderPreference();
-    vi.useFakeTimers();
-    stop?.();
-    stop = initializeAnalyticsPreference();
-    await act(async () => {
-      await Promise.resolve();
-    });
-    mocks.get.mockClear();
-    await act(async () => {
-      vi.advanceTimersByTime(30_000);
-    });
-    expect(mocks.get).not.toHaveBeenCalled();
-    await act(async () => {
-      vi.advanceTimersByTime(270_000);
-    });
-    expect(mocks.get).toHaveBeenCalledTimes(1);
   });
 
   it('waits for the server, then saves the choice on the account', async () => {

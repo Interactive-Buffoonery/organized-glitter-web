@@ -168,6 +168,35 @@ describe('bootstrap-analytics beacon helper', () => {
     expect(properties.distinct_id).toBe(signedIn ? 'shell-anonymous' : 'sdk-identity');
   });
 
+  it.each([
+    ['anonymous SDK', { distinct_id: 'sdk-id', $user_state: 'anonymous' }, 'sdk-id'],
+    ['SDK user ID', { distinct_id: 'account-id', $user_id: 'account-id' }, 'shell-anonymous'],
+    [
+      'identified SDK state',
+      { distinct_id: 'account-id', $user_state: 'identified' },
+      'shell-anonymous',
+    ],
+  ])(
+    'uses only anonymous SDK identities for signed-out beacons: %s',
+    (_label, sdkState, expectedId) => {
+      const api = loadAnalytics();
+      localStorage.setItem('ph_phc_test_posthog', JSON.stringify(sdkState));
+      localStorage.setItem('og_bootstrap_anon_id', 'shell-anonymous');
+      const fetchFn = vi.fn((_url: string, _options: { body: string }) => Promise.resolve());
+      expect(
+        api.captureBootstrapFailureShown('startup_timeout', {
+          storage: localStorage,
+          config: { key: 'phc_test', host: '/glimmer' },
+          sendBeacon: () => false,
+          fetch: fetchFn,
+        })
+      ).toBe(true);
+      expect(JSON.parse(fetchFn.mock.calls[0]![1].body).batch[0].properties.distinct_id).toBe(
+        expectedId
+      );
+    }
+  );
+
   it('allows only the registered low-cardinality reasons', () => {
     const api = loadAnalytics();
     expect(api.isAllowedReason('module_resource')).toBe(true);

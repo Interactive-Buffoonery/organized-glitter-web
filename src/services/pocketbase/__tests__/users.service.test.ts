@@ -20,10 +20,12 @@ const pbMock = vi.hoisted(() => {
   return {
     pb: {
       collection: vi.fn(() => collectionMethods),
+      realtime: { subscribe: vi.fn() },
       filter: vi.fn((expr: string) => expr),
     },
     collectionMethods,
     reset: () => {
+      pbMock.pb.realtime.subscribe.mockReset();
       Object.values(collectionMethods).forEach(m => m.mockReset());
       collectionMethods.delete.mockResolvedValue(true);
     },
@@ -121,6 +123,15 @@ describe('UsersService', () => {
   });
 
   describe('analytics preference', () => {
+    it('subscribes to realtime connects with a scoped unsubscribe', async () => {
+      const unsubscribe = vi.fn(async () => {});
+      const callback = vi.fn();
+      pbMock.pb.realtime.subscribe.mockResolvedValue(unsubscribe);
+      const returnedUnsubscribe = await UsersService.subscribeRealtimeConnect(callback);
+      expect(pbMock.pb.realtime.subscribe).toHaveBeenCalledWith('PB_CONNECT', callback);
+      expect(returnedUnsubscribe).toBe(unsubscribe);
+    });
+
     it('reads the current account opt-out value', async () => {
       pbMock.collectionMethods.getOne.mockResolvedValue({ analytics_opt_out: true });
 

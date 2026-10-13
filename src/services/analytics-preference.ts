@@ -5,8 +5,8 @@ import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('AnalyticsPreference');
 export const ACCOUNT_CONSENT_STORAGE_KEY = 'og:analytics:account-consent';
-const PREFERENCE_REFRESH_INTERVAL_MS = 5 * 60_000;
-const PREFERENCE_REFRESH_TICK_MS = 30_000;
+const HEALTHY_PREFERENCE_REFRESH_MS = 5 * 60_000;
+const PREFERENCE_RETRY_TICK_MS = 30_000;
 let rememberedConsent: { accountId: string; enabled: boolean } | undefined;
 const listeners = new Set<() => void>();
 let state = {
@@ -38,6 +38,7 @@ export function syncAnalyticsConsent(): void {
       posthog.identify(user.id, { created: user.created });
     }
   } else {
+    if (!getCurrentUser() && posthog.get_property('$user_id')) posthog.reset();
     posthog.opt_out_capturing();
   }
 }
@@ -47,6 +48,11 @@ function rememberConsent(accountId: string, enabled: boolean): void {
   try {
     localStorage.setItem(ACCOUNT_CONSENT_STORAGE_KEY, JSON.stringify(rememberedConsent));
   } catch {
+    try {
+      localStorage.removeItem(ACCOUNT_CONSENT_STORAGE_KEY);
+    } catch {
+      // Storage may be entirely blocked; the in-memory opt-out still takes precedence.
+    }
     logger.warn('Could not store remembered analytics preference');
   }
 }
@@ -66,19 +72,22 @@ export function subscribeAnalyticsPreference(listener: () => void): () => void {
 }
 
 function getSignedOutAnalyticsEnabled(): boolean {
+  const isMemoryEnabled = rememberedConsent?.enabled !== false;
+  if (!isMemoryEnabled) return false;
   try {
     const stored = localStorage.getItem(ACCOUNT_CONSENT_STORAGE_KEY);
-    return stored ? JSON.parse(stored)?.enabled !== false : rememberedConsent?.enabled !== false;
+    return stored ? JSON.parse(stored)?.enabled !== false : isMemoryEnabled;
   } catch {
     logger.debug('Could not read remembered analytics preference');
-    return rememberedConsent?.enabled !== false;
+    return isMemoryEnabled;
   }
 }
 
 export function initializeAnalyticsPreference(): () => void {
   let active = true;
   let unsubscribeRecord: (() => Promise<void>) | undefined;
-  const stopRecordSubscription = (unsubscribe?: () => Promise<void>) => {
+  let unsubscribeConnect: (() => Promise<void>) | undefined;
+  const stopSubscription = (unsubscribe?: () => Promise<void>) => {
     if (unsubscribe)
       void unsubscribe().catch(() => logger.warn('Account analytics unsubscribe failed'));
   };
@@ -114,8 +123,10 @@ export function initializeAnalyticsPreference(): () => void {
     generation += 1;
     const currentGeneration = generation;
     loading = false;
-    stopRecordSubscription(unsubscribeRecord);
+    stopSubscription(unsubscribeRecord);
     unsubscribeRecord = undefined;
+    stopSubscription(unsubscribeConnect);
+    unsubscribeConnect = undefined;
     publish({
       accountId,
       enabled: !accountId && getSignedOutAnalyticsEnabled(),
@@ -132,35 +143,44 @@ export function initializeAnalyticsPreference(): () => void {
       }
     })
       .then(unsubscribe => {
-        if (!active || currentGeneration !== generation) stopRecordSubscription(unsubscribe);
+        if (!active || currentGeneration !== generation) stopSubscription(unsubscribe);
         else unsubscribeRecord = unsubscribe;
       })
       .catch(() => logger.warn('Account analytics subscription unavailable'));
+    void UsersService.subscribeRealtimeConnect(() => {
+      if (active && currentGeneration === generation) void refresh();
+    })
+      .then(unsubscribe => {
+        if (!active || currentGeneration !== generation) stopSubscription(unsubscribe);
+        else unsubscribeConnect = unsubscribe;
+      })
+      .catch(() => logger.warn('Account analytics reconnect subscription unavailable'));
   };
 
   const removeAuthListener = onAuthChange(changeAccount, true);
-  const onFocus = () => {
+  const refreshIfVisible = () => {
     if (document.visibilityState === 'visible') void refresh();
   };
-  window.addEventListener('focus', onFocus);
-  document.addEventListener('visibilitychange', onFocus);
+  window.addEventListener('focus', refreshIfVisible);
+  document.addEventListener('visibilitychange', refreshIfVisible);
   const interval = window.setInterval(() => {
     if (
       document.visibilityState === 'visible' &&
       (state.loadFailed ||
         !unsubscribeRecord ||
-        Date.now() - lastSuccessfulRefresh >= PREFERENCE_REFRESH_INTERVAL_MS)
+        Date.now() - lastSuccessfulRefresh >= HEALTHY_PREFERENCE_REFRESH_MS)
     ) {
       void refresh();
     }
-  }, PREFERENCE_REFRESH_TICK_MS);
+  }, PREFERENCE_RETRY_TICK_MS);
   return () => {
     active = false;
     generation += 1;
     removeAuthListener();
-    stopRecordSubscription(unsubscribeRecord);
-    window.removeEventListener('focus', onFocus);
-    document.removeEventListener('visibilitychange', onFocus);
+    stopSubscription(unsubscribeRecord);
+    stopSubscription(unsubscribeConnect);
+    window.removeEventListener('focus', refreshIfVisible);
+    document.removeEventListener('visibilitychange', refreshIfVisible);
     window.clearInterval(interval);
     publish({ accountId: null, enabled: false, ready: false, saving: false, loadFailed: false });
   };

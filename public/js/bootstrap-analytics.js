@@ -70,7 +70,7 @@
     return 'og_' + String(Date.now()) + '_' + Math.random().toString(36).slice(2, 10);
   }
 
-  function resolveDistinctId(storage, apiKey, signedIn) {
+  function resolveDistinctId(storage, apiKey, isSignedIn) {
     var store = storage;
     if (!store) {
       try {
@@ -81,12 +81,18 @@
     }
     if (!store) return createAnonId();
 
-    if (apiKey && !signedIn) {
+    if (apiKey && !isSignedIn) {
       try {
         var phRaw = store.getItem('ph_' + apiKey + '_posthog');
         if (phRaw) {
           var parsed = JSON.parse(phRaw);
-          if (parsed && typeof parsed.distinct_id === 'string' && parsed.distinct_id) {
+          if (
+            parsed &&
+            !parsed.$user_id &&
+            parsed.$user_state !== 'identified' &&
+            typeof parsed.distinct_id === 'string' &&
+            parsed.distinct_id
+          ) {
             return parsed.distinct_id;
           }
         }

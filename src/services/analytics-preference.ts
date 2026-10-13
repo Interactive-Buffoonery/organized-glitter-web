@@ -83,6 +83,22 @@ function getSignedOutAnalyticsEnabled(): boolean {
   }
 }
 
+/** Forgets a deleted account's remembered choice so signed-out capture uses the default. */
+export function clearRememberedAnalyticsConsent(accountId: string): void {
+  if (rememberedConsent?.accountId === accountId) rememberedConsent = undefined;
+  try {
+    const stored = localStorage.getItem(ACCOUNT_CONSENT_STORAGE_KEY);
+    if (stored && JSON.parse(stored)?.accountId === accountId) {
+      localStorage.removeItem(ACCOUNT_CONSENT_STORAGE_KEY);
+    }
+  } catch {
+    logger.warn('Could not clear remembered analytics preference');
+  }
+  if (state.ready && !state.accountId) {
+    publish({ ...state, enabled: getSignedOutAnalyticsEnabled() });
+  }
+}
+
 export function initializeAnalyticsPreference(): () => void {
   let active = true;
   let unsubscribeRecord: (() => Promise<void>) | undefined;

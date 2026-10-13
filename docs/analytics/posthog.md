@@ -422,6 +422,11 @@ opts out, signed-out capture in that browser resumes after a reload until a late
 After sign-out, a remembered `enabled: false` keeps anonymous capture off in that browser.
 If neither storage nor memory has a choice, anonymous capture is allowed; opted-in records allow it too. Signing into any account always
 uses that account's server preference and replaces the remembered record after confirmation.
+After the web client confirms that the signed-in account was deleted, including an already
+deleted response, it removes that account's remembered record from storage and memory once the
+sign-out attempt ends. Signed-out capture then falls back to the default above. A record for
+another account is left alone. If sign-out fails, a later realtime update for the deleted
+session could write the record again until the session is cleared.
 No local browser choice is copied to another account. Signing out resets an identified SDK
 identity before applying remembered opt-out. Signed-in opt-out alone does not reset identity.
 

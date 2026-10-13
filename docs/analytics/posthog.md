@@ -44,7 +44,8 @@ Do not capture:
 Route analytics must call `sanitizeAnalyticsPath()` before capture. The helper removes query
 strings and hashes, redacts known auth-token routes, and replaces project, book, and page IDs
 with route parameters. The final event sanitizer also applies this to SDK-added URL and path
-properties. Navigating between different records still captures each pageview even when their
+properties. It strips `title` and `$title` from pageviews because document titles can contain
+user-entered project and book names. Navigating between different records still captures each pageview even when their
 route template is the same.
 
 The provider initializes the shared SDK before React effects run. Lifecycle captures wait for
@@ -98,7 +99,11 @@ exception text. The event's `distinct_id` reuses the stored PostHog identity whe
 so startup failures can be correlated with later app activity. For an identified user,
 that identity can be their PocketBase user ID. Otherwise, bootstrap events use a separate
 anonymous ID stored in the browser.
-Do Not Track applies to both events. Rejected fallback requests are handled locally.
+Do Not Track applies to both events. Signed-in startup capture requires a remembered, confirmed
+opt-in for the same account ID in saved PocketBase auth (`record.id`, or legacy `model.id`).
+Missing, corrupt, mismatched, opted-out, or unreadable signed-in consent suppresses capture.
+Signed-out capture honors remembered account opt-out and the legacy browser opt-out.
+Rejected fallback requests are handled locally.
 
 Review these events alongside Error Tracking. They are custom events, not `$exception` issues.
 Older bootstrap events lack browser and environment context. PostHog's `Automation` label with
@@ -112,24 +117,24 @@ only; the recovery UI must not render `#error-details` or raw exception text.
 
 ## Coverage map
 
-| Area               | Current coverage                                                                                  | Notes                                                                                                                                                                                                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App lifecycle      | `session_context`, `$pageview`, identify/reset, `bootstrap_failure_shown`, `bootstrap_recovered`  | Page paths are sanitized before capture. The static shell captures displayed failures and same-document recovery with the safe diagnostics described above. Both bootstrap events respect DNT. No stacks, full paths, emails, or user text. |
-| API health         | `api_rate_limited`                                                                                | Captured on PocketBase 429 responses with route bucket, auth state, and consecutive count bucket only. No full URLs, IPs, record IDs, or request bodies.                                                                                    |
-| Auth               | `registration_started`, `auth_login_succeeded`, `auth_registration_succeeded`                     | Low-cardinality method/provider/entrypoint only. Device, OS, and browser come from PostHog's automatic event properties. Auth tokens, query strings, hashes, emails, and user-entered names must stay out of captured paths and payloads.   |
-| Growth reporting   | Successful creation, progress-note, photo, spin, and import events                                | Derive first recorded use per account in PostHog. Browser-local milestone and activation flags are retired.                                                                                                                                 |
-| Dashboard          | sort, search, filters, status segments, view mode, project open, load timing                      | Search captures length only.                                                                                                                                                                                                                |
-| Overview           | craft filter and sort                                                                             | No card impression tracking.                                                                                                                                                                                                                |
-| Diamond projects   | create, update, status change, archive, delete, progress note                                     | Payloads avoid names, notes, URLs, images, and record IDs.                                                                                                                                                                                  |
-| Options metadata   | company, artist, tag, publisher, illustrator, and coloring medium create/update/delete            | Names are not captured.                                                                                                                                                                                                                     |
-| Randomizer         | spin                                                                                              | Payload stays low-cardinality.                                                                                                                                                                                                              |
-| Import/export      | archive, DAC, bulk photo, and CSV completion events                                               | Counts, status, duration, file-size buckets, archive schema version, and `settings_data` only. No filenames, record IDs, manifest paths, user-entered names, notes, or URLs.                                                                |
-| Coloring books     | create/update/delete/status, search/sort/filter/view                                              | Uses low-cardinality helpers.                                                                                                                                                                                                               |
-| Coloring pages     | status, photos, mystery reveal, progress notes                                                    | No photo URLs or page subjects.                                                                                                                                                                                                             |
-| Profile/settings   | vertical preference updates                                                                       | Theme and account changes are pageview-only unless a product question justifies more.                                                                                                                                                       |
-| Public/legal pages | pageviews only                                                                                    | No explicit action events.                                                                                                                                                                                                                  |
-| Support page       | `tip_link_clicked`, `support_alternative_clicked`, pageviews of `/support` and `/support/success` | `amount` is the preset (2, 3, 5, 10) or `custom`; `action` is `feedback` or `app_store_review`. Sent by beacon because each link leaves the page. Stripe owns payment amounts and receipts, so no payment details, emails, or Stripe IDs.   |
-| Errors             | `$exception` via app and route error handlers                                                     | Do not include user-entered content in error properties.                                                                                                                                                                                    |
+| Area               | Current coverage                                                                                  | Notes                                                                                                                                                                                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| App lifecycle      | `session_context`, `$pageview`, identify/reset, `bootstrap_failure_shown`, `bootstrap_recovered`  | Page paths are sanitized and page titles are stripped before capture. The static shell captures displayed failures and same-document recovery with the safe diagnostics described above. Both bootstrap events respect DNT. No stacks, full paths, emails, or user text. |
+| API health         | `api_rate_limited`                                                                                | Captured on PocketBase 429 responses with route bucket, auth state, and consecutive count bucket only. No full URLs, IPs, record IDs, or request bodies.                                                                                                                 |
+| Auth               | `registration_started`, `auth_login_succeeded`, `auth_registration_succeeded`                     | Low-cardinality method/provider/entrypoint only. Device, OS, and browser come from PostHog's automatic event properties. Auth tokens, query strings, hashes, emails, and user-entered names must stay out of captured paths and payloads.                                |
+| Growth reporting   | Successful creation, progress-note, photo, spin, and import events                                | Derive first recorded use per account in PostHog. Browser-local milestone and activation flags are retired.                                                                                                                                                              |
+| Dashboard          | sort, search, filters, status segments, view mode, project open, load timing                      | Search captures length only.                                                                                                                                                                                                                                             |
+| Overview           | craft filter and sort                                                                             | No card impression tracking.                                                                                                                                                                                                                                             |
+| Diamond projects   | create, update, status change, archive, delete, progress note                                     | Payloads avoid names, notes, URLs, images, and record IDs.                                                                                                                                                                                                               |
+| Options metadata   | company, artist, tag, publisher, illustrator, and coloring medium create/update/delete            | Names are not captured.                                                                                                                                                                                                                                                  |
+| Randomizer         | spin                                                                                              | Payload stays low-cardinality.                                                                                                                                                                                                                                           |
+| Import/export      | archive, DAC, bulk photo, and CSV completion events                                               | Counts, status, duration, file-size buckets, archive schema version, and `settings_data` only. No filenames, record IDs, manifest paths, user-entered names, notes, or URLs.                                                                                             |
+| Coloring books     | create/update/delete/status, search/sort/filter/view                                              | Uses low-cardinality helpers.                                                                                                                                                                                                                                            |
+| Coloring pages     | status, photos, mystery reveal, progress notes                                                    | No photo URLs or page subjects.                                                                                                                                                                                                                                          |
+| Profile/settings   | vertical preference updates                                                                       | Theme and account changes are pageview-only unless a product question justifies more.                                                                                                                                                                                    |
+| Public/legal pages | pageviews only                                                                                    | No explicit action events.                                                                                                                                                                                                                                               |
+| Support page       | `tip_link_clicked`, `support_alternative_clicked`, pageviews of `/support` and `/support/success` | `amount` is the preset (2, 3, 5, 10) or `custom`; `action` is `feedback` or `app_store_review`. Sent by beacon because each link leaves the page. Stripe owns payment amounts and receipts, so no payment details, emails, or Stripe IDs.                                |
+| Errors             | `$exception` via app and route error handlers                                                     | Manual exceptions carry platform, environment, and validated release for deploy filtering. Do not include user-entered content in error properties.                                                                                                                      |
 
 ## Manual exception privacy
 
@@ -286,6 +291,14 @@ PostHog keys.
 - `capture_pageview: false` and `capture_pageleave: false`, because React Router pageviews are
   handled manually.
 - `autocapture: false`, `disable_session_recording: true`, and `disable_surveys: true`.
+- `capture_heatmaps: false`, `capture_dead_clicks: false`, `capture_performance: false`, and
+  `rageclick: false` pin remote-enableable click and web-vitals capture off.
+- `disable_product_tours: true`, `disable_conversations: true`, and
+  `disable_web_experiments: true` prevent remote activation of these features.
+- `before_send` allows only registered `AnalyticsEvent` values and required SDK events
+  `$exception`, `$identify`, and `$set`. All other events are dropped after the consent gate.
+- Manual `$exception` events receive the same validated `platform`, `environment`, and
+  optional `release` as ordinary web events; identity and person events are not enriched.
 - `capture_exceptions` is not enabled for automatic exception capture. Use manual
   `captureException()` calls with redacted properties.
 - `respect_dnt: true`.
@@ -295,6 +308,13 @@ PostHog keys.
   not currently use PostHog feature flags.
 - `mask_all_element_attributes: true`, `mask_all_text: true`, and
   `mask_personal_data_properties: true` as defensive privacy defaults.
+
+## PostHog project settings
+
+Disable GeoIP enrichment and enable **Discard client IP data**. The `/glimmer` proxy strips
+`X-Forwarded-For`, so PostHog sees the proxy IP and `$geoip_*` properties would be misleading.
+Keep heatmaps, session replay, and surveys off in project settings as well. These are recommended
+project settings; this code change does not apply them remotely.
 
 ## Source Maps
 
@@ -377,12 +397,23 @@ It stops capture immediately while saving an opt-out and only enables capture af
 confirms an opt-in. Failed saves show an error and reread the server value. Capture stays paused if that read fails.
 
 Open web clients listen for user-record changes, reread the preference on focus, and check every
-30 seconds as a fallback. Failed reads pause capture until the next successful refresh. No local
-browser choice is copied to another account. Signed-out browsing uses anonymous analytics.
+5 minutes as a fallback. Failed reads pause capture until the next successful refresh.
 
-The pre-React bootstrap beacon cannot fetch an account preference. It skips capture when a saved
-PocketBase sign-in is present or browser storage cannot be read. It still honors Do Not Track and
-any older browser opt-out. This avoids sending a bootstrap event for an account that opted out.
+Every confirmed signed-in load, realtime update, or save remembers
+`og:analytics:account-consent` in localStorage as `{"accountId":"<id>","enabled":true|false}`.
+Pending and failed loads or saves do not replace the confirmed record. Storage errors are contained.
+After sign-out, a remembered `enabled: false` keeps anonymous capture off in that browser.
+Missing, unreadable, or opted-in records allow anonymous capture. Signing into any account always
+uses that account's server preference and replaces the remembered record after confirmation.
+No local browser choice is copied to another account.
+
+The pre-React bootstrap beacon cannot fetch an account preference. With a saved PocketBase sign-in,
+it captures only when the remembered consent account ID matches `record.id` (or legacy `model.id`)
+and `enabled === true`. Missing IDs, missing or corrupt consent, mismatches, opt-out, auth parse
+failures, and storage access failures suppress capture. Without a sign-in, remembered opt-out
+suppresses capture; missing or unreadable consent records permit it. It also honors Do Not Track
+and the legacy `og:analytics:enabled === 'false'` browser opt-out. A remembered choice can lag a
+server change until a successful web refresh; the shell cannot confirm it with PocketBase.
 
 Turning usage analytics off stops new captures. Previously queued or delivered events may remain;
 this control does not delete historical data. Deploy the additive user-field migration before

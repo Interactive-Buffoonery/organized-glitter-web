@@ -1,6 +1,7 @@
 # Web analytics build context
 
-Ordinary registered web events, including `$pageview` and account-auth events, receive
+Ordinary registered web events, including `$pageview` and account-auth events, and manual
+`$exception` events receive
 context centrally in `AnalyticsProvider.before_send` after the existing consent gate and
 URL/path sanitizer. Hook, escape-hatch, and account-service captures share this path.
 No new events, user properties, browser reads, or telemetry sources are added.
@@ -41,9 +42,10 @@ These three keys are reserved centrally. Persisted SDK super-properties and call
 cannot override platform, environment, or the validated current release; an old release
 is removed when the current build has none. Event names and all other event-specific
 properties retain their meaning and continue through the existing privacy sanitizer.
-The context helper enriches names in `AnalyticsEvent` except bootstrap events. It does
-not enrich unknown names, `$exception`, identity/person events, or autocapture events.
-Bootstrap and exception diagnostics retain their separate contracts in this change.
+The context helper enriches names in `AnalyticsEvent` except bootstrap events, plus `$exception`.
+It does not enrich unknown names, identity/person events, or autocapture events. Bootstrap
+diagnostics retain their separate shell context contract. Exception payload redaction remains
+required before the shared build context is applied.
 
 Consent readiness, account opt-out and DNT remain required. Session replay, autocapture,
 and automatic exception capture remain disabled. The context allowlist does not grant
@@ -74,12 +76,13 @@ contract and a consumer migration plan.
 
 ## Scope and validation
 
-Exception redaction is owned by a separate task. Dashboard specs, tag creation, and
-smoke-test instrumentation are also separate. This change avoids their event registry,
-exception helper, sanitizer, bootstrap script, hooks, and native files. The only shared
-runtime edit is the provider callback, with provider integration tests alongside it.
+Exception redaction remains the responsibility of the manual exception helpers. The shared
+context helper adds only validated build dimensions, without changing exception content.
+Dashboard specs, tag creation, reporting definitions, and native instrumentation retain their
+separate contracts. See [PostHog analytics](posthog.md) for event filtering and consent rules.
 
 Unit tests cover the full ordinary event registry, bounds and privacy of build inputs,
-preview/missing environment behavior, stale SDK values, and diagnostic exclusions.
+preview/missing environment behavior, stale SDK values, exception enrichment, and identity
+and bootstrap exclusions.
 Provider tests exercise real SDK results for lifecycle, escape-hatch, and account-service
 events, together with account opt-out, DNT, and existing route privacy.

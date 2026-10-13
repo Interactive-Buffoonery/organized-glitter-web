@@ -7,6 +7,7 @@ import { TAG_COLOR_PALETTE } from '@/utils/ui/tagColors';
 import { generateSlug } from '@/utils/ui/slugify';
 import { createLogger } from '@/utils/logger';
 import { isSessionChangedError } from '@/services/auth/sessionRecovery';
+import { listAllPages } from '@/services/pocketbase/base/listAllPages';
 
 const logger = createLogger('ColoringTagService');
 const COLORING_TAGS_COLLECTION = 'coloring_tags';
@@ -63,12 +64,15 @@ export class ColoringTagService {
           clauses.push(pb.filter('name ~ {:search}', { search: options.search.trim() }));
         }
 
-        const records = await pb
-          .collection(COLORING_TAGS_COLLECTION)
-          .getList<ColoringTagsResponse>(1, 200, {
-            filter: clauses.join(' && '),
-            sort: 'name',
-          });
+        const records = await listAllPages(
+          (page, pageSize) =>
+            pb.collection(COLORING_TAGS_COLLECTION).getList<ColoringTagsResponse>(page, pageSize, {
+              filter: clauses.join(' && '),
+              sort: 'name',
+            }),
+          200,
+          { recordLabel: 'coloring tags' }
+        );
 
         return createSuccessResponse(
           records.items.map(record => toTag(record)).filter((tag): tag is Tag => Boolean(tag))

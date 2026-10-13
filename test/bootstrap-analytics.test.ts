@@ -56,6 +56,7 @@ const loadAnalytics = (): BootstrapAnalytics => {
 describe('bootstrap-analytics beacon helper', () => {
   beforeEach(() => {
     delete window.__OG_BOOTSTRAP_ANALYTICS__;
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -96,6 +97,51 @@ describe('bootstrap-analytics beacon helper', () => {
       })
     ).toBe(false);
     expect(sendBeacon).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['current matching opt-in', { record: { id: 'a' } }, { accountId: 'a', enabled: true }, true],
+    ['legacy matching opt-in', { model: { id: 'a' } }, { accountId: 'a', enabled: true }, true],
+    [
+      'record takes priority over model',
+      { record: { id: 'b' }, model: { id: 'a' } },
+      { accountId: 'a', enabled: true },
+      false,
+    ],
+    ['mismatched account', { record: { id: 'b' } }, { accountId: 'a', enabled: true }, false],
+    ['missing id', { record: {} }, { accountId: 'a', enabled: true }, false],
+    ['missing record', { token: 'synthetic' }, { accountId: 'a', enabled: true }, false],
+    ['missing consent', { record: { id: 'a' } }, null, false],
+    ['opt-out', { record: { id: 'a' } }, { accountId: 'a', enabled: false }, false],
+    ['non-boolean opt-in', { record: { id: 'a' } }, { accountId: 'a', enabled: 'true' }, false],
+    ['invalid auth', 'invalid-json', { accountId: 'a', enabled: true }, false],
+    ['invalid consent', { record: { id: 'a' } }, 'invalid-json', false],
+    ['signed-out opt-out', null, { accountId: 'a', enabled: false }, false],
+    ['signed-out opt-in', null, { accountId: 'a', enabled: true }, true],
+    ['signed-out missing consent', null, null, true],
+    ['signed-out unreadable consent', null, 'invalid-json', true],
+  ])('checks remembered account consent: %s', (_label, auth, consent, allowed) => {
+    const api = loadAnalytics();
+    const sendBeacon = vi.fn(() => true);
+    const serialize = (value: unknown) =>
+      value === null ? null : typeof value === 'string' ? value : JSON.stringify(value);
+    const storage = {
+      getItem: (key: string) =>
+        key === 'pocketbase_auth'
+          ? serialize(auth)
+          : key === 'og:analytics:account-consent'
+            ? serialize(consent)
+            : null,
+      setItem: vi.fn(),
+    };
+    expect(
+      api.captureBootstrapFailureShown('startup_timeout', {
+        config: { key: 'phc_test', host: '/glimmer' },
+        storage,
+        sendBeacon,
+      })
+    ).toBe(allowed);
+    expect(sendBeacon).toHaveBeenCalledTimes(allowed ? 1 : 0);
   });
 
   it('allows only the registered low-cardinality reasons', () => {

@@ -108,20 +108,23 @@
 
   function buildCapturePayload(apiKey, reason, distinctId, nowIso, context, eventName) {
     var timestamp = nowIso || new Date().toISOString();
+    var properties = {
+      token: apiKey,
+      distinct_id: distinctId,
+      reason: reason,
+      surface: SURFACE,
+      $lib: 'og-bootstrap-shell',
+      $lib_version: '1',
+    };
+    for (var key in context) {
+      if (Object.prototype.hasOwnProperty.call(context, key)) properties[key] = context[key];
+    }
     return {
       api_key: apiKey,
       batch: [
         {
           event: eventName || EVENT_NAME,
-          properties: {
-            token: apiKey,
-            distinct_id: distinctId,
-            reason: reason,
-            surface: SURFACE,
-            $lib: 'og-bootstrap-shell',
-            $lib_version: '1',
-            ...context,
-          },
+          properties: properties,
           timestamp: timestamp,
         },
       ],
@@ -185,13 +188,26 @@
     if (isDoNotTrackEnabled(options.navigator, options.window)) return false;
     try {
       var preferenceStorage = options.storage || global.localStorage;
-      if (
-        !preferenceStorage ||
-        preferenceStorage.getItem('pocketbase_auth') ||
-        preferenceStorage.getItem('og:analytics:enabled') === 'false'
-      ) {
+      if (!preferenceStorage) return false;
+      var authRaw = preferenceStorage.getItem('pocketbase_auth');
+      var consentRaw = preferenceStorage.getItem('og:analytics:account-consent');
+      var consent = null;
+      try {
+        consent = consentRaw ? JSON.parse(consentRaw) : null;
+      } catch (_) {
+        if (authRaw) return false;
+      }
+      if (authRaw) {
+        var auth = JSON.parse(authRaw);
+        var accountId = auth && auth.record && auth.record.id;
+        if (accountId == null) accountId = auth && auth.model && auth.model.id;
+        if (!accountId || !consent || consent.accountId !== accountId || consent.enabled !== true) {
+          return false;
+        }
+      } else if (consent && consent.enabled === false) {
         return false;
       }
+      if (preferenceStorage.getItem('og:analytics:enabled') === 'false') return false;
     } catch (_) {
       // The account preference cannot be checked before React starts.
       return false;

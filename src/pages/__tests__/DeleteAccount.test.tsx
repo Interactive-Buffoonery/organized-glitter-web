@@ -3,7 +3,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { authState, deleteAccountMock, navigateMock, notifyMock, signOutMock } = vi.hoisted(() => ({
+const {
+  authState,
+  clearRememberedAnalyticsConsentMock,
+  deleteAccountMock,
+  navigateMock,
+  notifyMock,
+  signOutMock,
+} = vi.hoisted(() => ({
   authState: {
     user: {
       id: 'user12345678901',
@@ -14,6 +21,7 @@ const { authState, deleteAccountMock, navigateMock, notifyMock, signOutMock } = 
     },
     signOut: vi.fn(),
   },
+  clearRememberedAnalyticsConsentMock: vi.fn(),
   deleteAccountMock: vi.fn(),
   navigateMock: vi.fn(),
   notifyMock: vi.fn(),
@@ -50,6 +58,10 @@ vi.mock('@/services/pocketbase/accountDeletion.service', () => ({
   },
 }));
 
+vi.mock('@/services/analytics-preference', () => ({
+  clearRememberedAnalyticsConsent: clearRememberedAnalyticsConsentMock,
+}));
+
 vi.mock('@/utils/logger', () => ({
   createLogger: () => ({
     debug: vi.fn(),
@@ -63,6 +75,7 @@ import DeleteAccount from '../DeleteAccount';
 
 describe('DeleteAccount', () => {
   beforeEach(() => {
+    clearRememberedAnalyticsConsentMock.mockReset();
     deleteAccountMock.mockReset();
     navigateMock.mockReset();
     notifyMock.mockReset();
@@ -98,6 +111,10 @@ describe('DeleteAccount', () => {
     });
 
     expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(clearRememberedAnalyticsConsentMock).toHaveBeenCalledExactlyOnceWith('user12345678901');
+    expect(clearRememberedAnalyticsConsentMock.mock.invocationCallOrder[0]).toBeGreaterThan(
+      signOutMock.mock.invocationCallOrder[0]
+    );
     expect(notifyMock).toHaveBeenCalledWith({
       kind: 'info',
       title: 'Account deleted successfully',
@@ -125,6 +142,7 @@ describe('DeleteAccount', () => {
       });
     });
     expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(clearRememberedAnalyticsConsentMock).toHaveBeenCalledExactlyOnceWith('user12345678901');
     expect(navigateMock).toHaveBeenCalledWith('/');
   });
 
@@ -153,6 +171,7 @@ describe('DeleteAccount', () => {
     });
 
     expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(clearRememberedAnalyticsConsentMock).toHaveBeenCalledExactlyOnceWith('user12345678901');
     expect(notifyMock).toHaveBeenCalledWith({
       kind: 'error',
       title: 'Account deleted',
@@ -195,6 +214,7 @@ describe('DeleteAccount', () => {
       });
     });
     expect(signOutMock).not.toHaveBeenCalled();
+    expect(clearRememberedAnalyticsConsentMock).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
@@ -220,6 +240,7 @@ describe('DeleteAccount', () => {
       });
     });
     expect(signOutMock).not.toHaveBeenCalled();
+    expect(clearRememberedAnalyticsConsentMock).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();
   });
 });

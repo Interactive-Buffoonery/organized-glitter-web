@@ -169,6 +169,50 @@ describe('analytics preference privacy and recovery', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 
+  it('forgets a deleted account choice and restores the signed-out default', async () => {
+    const service = await initialize();
+    await service.setAnalyticsEnabled(false);
+    signOut();
+    expect(service.getAnalyticsEnabled()).toBe(false);
+
+    service.clearRememberedAnalyticsConsent('account-a');
+
+    expect(localStorage.getItem(service.ACCOUNT_CONSENT_STORAGE_KEY)).toBeNull();
+    expect(service.getAnalyticsEnabled()).toBe(true);
+    mocks.user = { id: 'account-b' };
+    mocks.authCallback?.();
+    signOut();
+    expect(service.getAnalyticsEnabled()).toBe(true);
+  });
+
+  it('forgets a deleted account choice held only in memory', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const service = await initialize();
+    await service.setAnalyticsEnabled(false);
+    signOut();
+    expect(service.getAnalyticsEnabled()).toBe(false);
+
+    service.clearRememberedAnalyticsConsent('account-a');
+
+    expect(service.getAnalyticsEnabled()).toBe(true);
+  });
+
+  it("keeps another account's remembered choice when a different account is deleted", async () => {
+    const service = await initialize();
+    await service.setAnalyticsEnabled(false);
+    signOut();
+
+    service.clearRememberedAnalyticsConsent('account-b');
+
+    expect(JSON.parse(localStorage.getItem(service.ACCOUNT_CONSENT_STORAGE_KEY)!)).toEqual({
+      accountId: 'account-a',
+      enabled: false,
+    });
+    expect(service.getAnalyticsEnabled()).toBe(false);
+  });
+
   it('preserves an opt-out when sign-out precedes the save response', async () => {
     let resolveSave!: (optOut: boolean) => void;
     mocks.update.mockImplementation(

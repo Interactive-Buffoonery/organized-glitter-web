@@ -9,6 +9,7 @@ const HEALTHY_PREFERENCE_REFRESH_MS = 5 * 60_000;
 const PREFERENCE_RETRY_TICK_MS = 30_000;
 let rememberedConsent: { accountId: string; enabled: boolean } | undefined;
 const listeners = new Set<() => void>();
+const saveSettledListeners = new Set<() => void>();
 let state = {
   accountId: null as string | null,
   enabled: false,
@@ -92,14 +93,14 @@ export function initializeAnalyticsPreference(): () => void {
       void unsubscribe().catch(() => logger.warn('Account analytics unsubscribe failed'));
   };
   let loading = false;
-  // A reconnect during an in-flight read may follow missed changes, so read once more.
+  // Recovery events during a read or save may follow missed changes, so read once more.
   let isRereadQueued = false;
   let lastSuccessfulRefresh = 0;
 
   const refresh = async () => {
     const accountId = getCurrentUser()?.id ?? null;
-    if (!active || state.saving) return;
-    if (loading) {
+    if (!active) return;
+    if (loading || state.saving) {
       isRereadQueued = true;
       return;
     }
@@ -128,6 +129,14 @@ export function initializeAnalyticsPreference(): () => void {
       }
     }
   };
+
+  const refreshAfterSave = () => {
+    if (active && isRereadQueued && !loading && !state.saving) {
+      isRereadQueued = false;
+      void refresh();
+    }
+  };
+  saveSettledListeners.add(refreshAfterSave);
 
   const changeAccount = () => {
     const accountId = getCurrentUser()?.id ?? null;
@@ -188,6 +197,7 @@ export function initializeAnalyticsPreference(): () => void {
   }, PREFERENCE_RETRY_TICK_MS);
   return () => {
     active = false;
+    saveSettledListeners.delete(refreshAfterSave);
     generation += 1;
     removeAuthListener();
     stopSubscription(unsubscribeRecord);
@@ -229,6 +239,10 @@ export async function setAnalyticsEnabled(enabled: boolean): Promise<void> {
       }
     }
     throw error;
+  } finally {
+    if (generation === currentGeneration) {
+      saveSettledListeners.forEach(listener => listener());
+    }
   }
 }
 

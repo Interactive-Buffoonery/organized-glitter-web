@@ -153,6 +153,82 @@ describe('analytics preference privacy and recovery', () => {
     expect(mocks.get).toHaveBeenCalledTimes(3);
   });
 
+  it.each(['reconnect', 'focus', 'visibility'])(
+    'rereads a missed opt-out after a save with a queued %s refresh',
+    async trigger => {
+      const service = await initialize();
+      let resolveSave!: (optOut: boolean) => void;
+      mocks.update.mockImplementationOnce(
+        () =>
+          new Promise<boolean>(resolve => {
+            resolveSave = resolve;
+          })
+      );
+      const save = service.setAnalyticsEnabled(true);
+      mocks.get.mockResolvedValue(true);
+      for (let index = 0; index < 3; index += 1) {
+        if (trigger === 'reconnect') mocks.connectCallback?.();
+        else if (trigger === 'focus') window.dispatchEvent(new Event('focus'));
+        else document.dispatchEvent(new Event('visibilitychange'));
+      }
+      expect(mocks.get).toHaveBeenCalledTimes(1);
+      resolveSave(false);
+      await save;
+      await vi.waitFor(() => expect(service.getAnalyticsEnabled()).toBe(false));
+      expect(mocks.get).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it('drains a queued refresh after a failed save and failed reconciliation', async () => {
+    const service = await initialize();
+    let rejectSave!: (error: Error) => void;
+    mocks.update.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((_, reject) => {
+          rejectSave = reject;
+        })
+    );
+    const save = service.setAnalyticsEnabled(true);
+    const error = new Error('save failed');
+    const rejected = expect(save).rejects.toBe(error);
+    mocks.connectCallback?.();
+    mocks.get.mockRejectedValueOnce(new Error('confirmation failed')).mockResolvedValue(true);
+    rejectSave(error);
+    await rejected;
+    await vi.waitFor(() => expect(service.getAnalyticsPreference().ready).toBe(true));
+    expect(service.getAnalyticsEnabled()).toBe(false);
+    expect(mocks.get).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(['sign-out', 'account change', 'cleanup'])(
+    'discards a queued refresh on %s before the save settles',
+    async transition => {
+      const service = await initialize();
+      let resolveSave!: (optOut: boolean) => void;
+      mocks.update.mockImplementationOnce(
+        () =>
+          new Promise<boolean>(resolve => {
+            resolveSave = resolve;
+          })
+      );
+      const save = service.setAnalyticsEnabled(true);
+      mocks.connectCallback?.();
+      if (transition === 'sign-out') signOut();
+      else if (transition === 'account change') {
+        mocks.user = { id: 'account-b' };
+        mocks.authCallback?.();
+      } else {
+        stop?.();
+        stop = undefined;
+      }
+      await Promise.resolve();
+      const reads = mocks.get.mock.calls.length;
+      resolveSave(false);
+      await save;
+      expect(mocks.get).toHaveBeenCalledTimes(reads);
+    }
+  );
+
   it('cleans up a connect listener that resolves after sign-out', async () => {
     let resolveSubscription!: (unsubscribe: () => Promise<void>) => void;
     mocks.connect.mockImplementation(

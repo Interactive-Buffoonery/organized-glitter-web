@@ -92,8 +92,9 @@ describe('TagList coloring tag recovery', () => {
     await user.keyboard('{Enter}');
 
     expect(mocks.listColoringTags).toHaveBeenCalledTimes(2);
-    expect(await screen.findByRole('status')).toHaveTextContent('Loading coloring tags');
-    expect(screen.queryByRole('button', { name: 'Retry coloring tags' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Retrying coloring tags' })).toBe(retry);
+    expect(retry).toHaveAttribute('aria-disabled', 'true');
+    expect(retry).toHaveFocus();
     expect(screen.getByText('Sparkle')).toBeVisible();
     await act(async () => {
       resolveRetry(createSuccessResponse([tag('coloring-1', 'Cozy')]));
@@ -101,6 +102,40 @@ describe('TagList coloring tag recovery', () => {
     expect(await screen.findByText('Cozy')).toBeVisible();
     expect(screen.getByText('Sparkle')).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('retains the focused recovery button through a pending retry and another failure', async () => {
+    let resolveRetry!: (result: ServiceResponse<Tag[]>) => void;
+    mocks.listColoringTags
+      .mockResolvedValueOnce(createErrorResponse(new Error('Offline')))
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveRetry = resolve;
+          })
+      );
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole('alert');
+    await user.tab();
+    const retry = screen.getByRole('button', { name: 'Retry coloring tags' });
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByRole('button', { name: 'Retrying coloring tags' })).toBe(retry);
+    expect(retry).toHaveFocus();
+    expect(retry).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('Retrying coloring tags');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Could not load');
+    await user.keyboard('{Enter}');
+    expect(mocks.listColoringTags).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      resolveRetry(createErrorResponse(new Error('Still offline')));
+    });
+
+    expect(await screen.findByRole('button', { name: 'Retry coloring tags' })).toBe(retry);
+    expect(retry).toHaveFocus();
+    expect(retry).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load coloring tags');
   });
 
   it('does not describe a failed coloring request as an empty tag library', async () => {

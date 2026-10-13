@@ -2,12 +2,28 @@ import { useState } from 'react';
 import { ProjectCreateDTO } from '@/types/project';
 import { ProjectDTO } from '@/services/types';
 import { isAuthenticated, getCurrentUser } from '@/services/auth';
+import { isSessionChangedError } from '@/services/auth/sessionRecovery';
+import { getErrorMessage } from '@/services/errors';
 import { CompaniesService } from '@/services/pocketbase/companies.service';
 import { ArtistsService } from '@/services/pocketbase/artists.service';
 import { projectsService } from '@/services/pocketbase/projects.service';
 import { TagService } from '@/services/pocketbase/tags.service';
-import { logger } from '@/utils/logger';
+import { createLogger } from '@/utils/logger';
 import { queuedPbRequest } from '@/utils/error/rateLimit';
+
+const logger = createLogger('ImportCreateProject');
+
+function relationImportError(
+  title: string,
+  relation: 'company' | 'artist',
+  name: string,
+  cause: unknown
+): Error {
+  return new Error(
+    `Project "${title}": could not resolve ${relation} "${name}". ${getErrorMessage(cause)} This project was not imported. Retry this row after resolving the error.`,
+    { cause }
+  );
+}
 
 // Type for tag import results
 export interface TagImportResult {
@@ -80,7 +96,8 @@ export const useImportCreateProject = () => {
             projectData.company = newCompany.id;
           }
         } catch (error) {
-          logger.warn('Failed to resolve/create company:', error);
+          if (isSessionChangedError(error)) throw error;
+          throw relationImportError(data.title || 'Untitled', 'company', data.company, error);
         }
       }
 
@@ -97,7 +114,8 @@ export const useImportCreateProject = () => {
             projectData.artist = newArtist.id;
           }
         } catch (error) {
-          logger.warn('Failed to resolve/create artist:', error);
+          if (isSessionChangedError(error)) throw error;
+          throw relationImportError(data.title || 'Untitled', 'artist', data.artist, error);
         }
       }
 

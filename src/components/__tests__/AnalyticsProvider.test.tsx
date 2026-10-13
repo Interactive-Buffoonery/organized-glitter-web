@@ -32,6 +32,7 @@ vi.mock('@/services/pocketbase/users.service', () => ({
     getAnalyticsOptOut: async () => auth.user?.analytics_opt_out ?? false,
     updateAnalyticsOptOut: async (_id: string, optOut: boolean) => optOut,
     subscribeAnalyticsPreference: async () => async () => {},
+    subscribeRealtimeConnect: async () => async () => {},
   },
 }));
 import { captureAccountAnalyticsEvent, setAnalyticsEnabled } from '@/services/analytics-preference';
@@ -46,6 +47,7 @@ import { AnalyticsProvider } from '../AnalyticsProvider';
 
 describe('AnalyticsProvider lifecycle with the real SDK', () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.useFakeTimers();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}')));
     auth.user = null;
@@ -95,6 +97,59 @@ describe('AnalyticsProvider lifecycle with the real SDK', () => {
       path: '/projects/:id',
     });
   });
+
+  it('strips the document title from real SDK pageviews and drops unregistered events', async () => {
+    auth.initialCheckComplete = true;
+    const previousTitle = document.title;
+    document.title = 'My Secret Project | Organized Glitter';
+    const capture = vi.spyOn(posthog, 'capture');
+    try {
+      render(
+        <MemoryRouter>
+          <AnalyticsProvider>
+            <div />
+          </AnalyticsProvider>
+        </MemoryRouter>
+      );
+      await settlePreference();
+      const index = capture.mock.calls.findIndex(([name]) => name === '$pageview');
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(capture.mock.results[index].value).toBeDefined();
+      expect(JSON.stringify(capture.mock.results[index].value)).not.toContain('My Secret Project');
+      expect(posthog.capture('unregistered_event')).toBeUndefined();
+    } finally {
+      document.title = previousTitle;
+    }
+  });
+
+  it.each([true, false])(
+    'keeps the confirmed opt-out %s after sign-out with the real SDK',
+    async optOut => {
+      auth.initialCheckComplete = true;
+      auth.isAuthenticated = true;
+      auth.user = { id: 'consent-account', created: '2026-01-01', analytics_opt_out: optOut };
+      const capture = vi.spyOn(posthog, 'capture');
+      render(
+        <MemoryRouter>
+          <AnalyticsProvider>
+            <div />
+          </AnalyticsProvider>
+        </MemoryRouter>
+      );
+      await settlePreference();
+      if (!optOut) {
+        const index = capture.mock.calls.findIndex(([name]) => name === '$identify');
+        expect(index).toBeGreaterThanOrEqual(0);
+        expect(capture.mock.results[index].value?.event).toBe('$identify');
+      }
+      auth.user = null;
+      auth.isAuthenticated = false;
+      await settlePreference();
+      expect(posthog.has_opted_out_capturing()).toBe(optOut);
+      if (optOut) expect(posthog.capture('project_created')).toBeUndefined();
+      else expect(posthog.capture('project_created')).toBeDefined();
+    }
+  );
 
   it('does not capture campaign text, including properties saved by the old SDK settings', async () => {
     render(
@@ -237,6 +292,15 @@ describe('AnalyticsProvider lifecycle with the real SDK', () => {
     expect(posthog.config.respect_dnt).toBe(true);
     expect(posthog.config.disable_session_recording).toBe(true);
     expect(posthog.config.autocapture).toBe(false);
+    expect(posthog.config).toMatchObject({
+      capture_heatmaps: false,
+      capture_dead_clicks: false,
+      capture_performance: false,
+      rageclick: false,
+      disable_product_tours: true,
+      disable_conversations: true,
+      disable_web_experiments: true,
+    });
     Object.defineProperty(navigator, 'doNotTrack', { configurable: true, value: '1' });
     try {
       expect(posthog.capture('project_created')).toBeUndefined();
@@ -310,10 +374,10 @@ describe('AnalyticsProvider lifecycle with the real SDK', () => {
       </MemoryRouter>
     );
     await settlePreference();
+    first.unmount();
     posthog.reset();
     posthog.opt_in_capturing({ captureEventName: false });
     posthog.identify('previous-account');
-    first.unmount();
     const reset = vi.spyOn(posthog, 'reset');
     const identify = vi.spyOn(posthog, 'identify');
     auth.user = { id: 'restored-account', created: '2026-01-01' };
@@ -333,5 +397,38 @@ describe('AnalyticsProvider lifecycle with the real SDK', () => {
     expect(identify).toHaveBeenCalledTimes(1);
     expect(reset.mock.invocationCallOrder[0]).toBeLessThan(identify.mock.invocationCallOrder[0]);
     expect(posthog.get_distinct_id()).toBe('restored-account');
+  });
+  it('resets identified identity on opted-out sign-out, then restores opt-out', async () => {
+    auth.initialCheckComplete = true;
+    auth.isAuthenticated = true;
+    auth.user = { id: 'reset-account', created: '2026-01-01' };
+    render(
+      <MemoryRouter>
+        <AnalyticsProvider>
+          <div />
+        </AnalyticsProvider>
+      </MemoryRouter>
+    );
+    await settlePreference();
+    expect(posthog.get_property('$user_id')).toBe('reset-account');
+    const reset = vi.spyOn(posthog, 'reset');
+    const optOut = vi.spyOn(posthog, 'opt_out_capturing');
+    await act(async () => {
+      await setAnalyticsEnabled(false);
+    });
+    expect(reset).not.toHaveBeenCalled();
+    expect(posthog.get_distinct_id()).toBe('reset-account');
+    optOut.mockClear();
+    auth.user = null;
+    auth.isAuthenticated = false;
+    await settlePreference();
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(reset.mock.invocationCallOrder[0]).toBeLessThan(optOut.mock.invocationCallOrder[0]);
+    expect(posthog.get_property('$user_id')).toBeUndefined();
+    expect(posthog.get_distinct_id()).not.toBe('reset-account');
+    expect(posthog.has_opted_out_capturing()).toBe(true);
+    const persisted = JSON.parse(localStorage.getItem('ph_phc_synthetic_analytics_test_posthog')!);
+    expect(persisted.$user_id).toBeUndefined();
+    expect(persisted.distinct_id).not.toBe('reset-account');
   });
 });

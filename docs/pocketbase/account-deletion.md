@@ -12,9 +12,11 @@ email support is not the normal deletion flow. Never merge accounts by email.
 Delete active account records, owned library records and files. Stop sending
 account-linked analytics and clear account credentials, local library data,
 artwork, pending edits and queued analytics on the requesting device after
-confirmed server deletion. Other devices must reject the deleted session and
-clear their account data when they reconnect; remote erasure while offline is
-not guaranteed.
+confirmed server deletion. The web client also removes the deleted account's
+remembered analytics choice (`og:analytics:account-consent`), so signed-out
+analytics on that browser returns to the default. Other devices must reject
+the deleted session and clear their account data when they reconnect; remote
+erasure while offline is not guaranteed.
 
 Delete PostHog data linked to the account, including earlier anonymous events
 that became linked. Keep only genuinely anonymous events and anonymous

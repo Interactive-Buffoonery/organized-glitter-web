@@ -4,7 +4,12 @@ import { UsersService } from '@/services/pocketbase/users.service';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('AnalyticsPreference');
+export const ACCOUNT_CONSENT_STORAGE_KEY = 'og:analytics:account-consent';
+const HEALTHY_PREFERENCE_REFRESH_MS = 5 * 60_000;
+const PREFERENCE_RETRY_TICK_MS = 30_000;
+let rememberedConsent: { accountId: string; enabled: boolean } | undefined;
 const listeners = new Set<() => void>();
+const saveSettledListeners = new Set<() => void>();
 let state = {
   accountId: null as string | null,
   enabled: false,
@@ -34,12 +39,30 @@ export function syncAnalyticsConsent(): void {
       posthog.identify(user.id, { created: user.created });
     }
   } else {
+    if (!getCurrentUser() && posthog.get_property('$user_id')) posthog.reset();
     posthog.opt_out_capturing();
+  }
+}
+
+function rememberConsent(accountId: string, enabled: boolean): void {
+  rememberedConsent = { accountId, enabled };
+  try {
+    localStorage.setItem(ACCOUNT_CONSENT_STORAGE_KEY, JSON.stringify(rememberedConsent));
+  } catch {
+    try {
+      localStorage.removeItem(ACCOUNT_CONSENT_STORAGE_KEY);
+    } catch {
+      // Storage may be entirely blocked; the in-memory opt-out still takes precedence.
+    }
+    logger.warn('Could not store remembered analytics preference');
   }
 }
 
 function publish(next: typeof state): void {
   state = next;
+  if (next.ready && next.accountId && !next.saving) {
+    rememberConsent(next.accountId, next.enabled);
+  }
   syncAnalyticsConsent();
   listeners.forEach(listener => listener());
 }
@@ -49,18 +72,54 @@ export function subscribeAnalyticsPreference(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
+function getSignedOutAnalyticsEnabled(): boolean {
+  const isMemoryEnabled = rememberedConsent?.enabled !== false;
+  if (!isMemoryEnabled) return false;
+  try {
+    const stored = localStorage.getItem(ACCOUNT_CONSENT_STORAGE_KEY);
+    return stored ? JSON.parse(stored)?.enabled !== false : isMemoryEnabled;
+  } catch {
+    logger.debug('Could not read remembered analytics preference');
+    return isMemoryEnabled;
+  }
+}
+
+/** Forgets a deleted account's remembered choice so signed-out capture uses the default. */
+export function clearRememberedAnalyticsConsent(accountId: string): void {
+  if (rememberedConsent?.accountId === accountId) rememberedConsent = undefined;
+  try {
+    const stored = localStorage.getItem(ACCOUNT_CONSENT_STORAGE_KEY);
+    if (stored && JSON.parse(stored)?.accountId === accountId) {
+      localStorage.removeItem(ACCOUNT_CONSENT_STORAGE_KEY);
+    }
+  } catch {
+    logger.warn('Could not clear remembered analytics preference');
+  }
+  if (state.ready && !state.accountId) {
+    publish({ ...state, enabled: getSignedOutAnalyticsEnabled() });
+  }
+}
+
 export function initializeAnalyticsPreference(): () => void {
   let active = true;
   let unsubscribeRecord: (() => Promise<void>) | undefined;
-  const stopRecordSubscription = (unsubscribe?: () => Promise<void>) => {
+  let unsubscribeConnect: (() => Promise<void>) | undefined;
+  const stopSubscription = (unsubscribe?: () => Promise<void>) => {
     if (unsubscribe)
       void unsubscribe().catch(() => logger.warn('Account analytics unsubscribe failed'));
   };
   let loading = false;
+  // Recovery events during a read or save may follow missed changes, so read once more.
+  let isRereadQueued = false;
+  let lastSuccessfulRefresh = 0;
 
   const refresh = async () => {
     const accountId = getCurrentUser()?.id ?? null;
-    if (!active || loading || state.saving) return;
+    if (!active) return;
+    if (loading || state.saving) {
+      isRereadQueued = true;
+      return;
+    }
     const currentGeneration = generation;
     const currentRevision = revision;
     if (!accountId) return;
@@ -68,6 +127,7 @@ export function initializeAnalyticsPreference(): () => void {
     try {
       const optOut = await UsersService.getAnalyticsOptOut(accountId);
       if (active && generation === currentGeneration && revision === currentRevision) {
+        lastSuccessfulRefresh = Date.now();
         publish({ accountId, enabled: !optOut, ready: true, saving: false, loadFailed: false });
       }
     } catch {
@@ -76,9 +136,23 @@ export function initializeAnalyticsPreference(): () => void {
       }
       logger.warn('Could not load account analytics preference');
     } finally {
-      if (generation === currentGeneration) loading = false;
+      if (generation === currentGeneration) {
+        loading = false;
+        if (isRereadQueued) {
+          isRereadQueued = false;
+          void refresh();
+        }
+      }
     }
   };
+
+  const refreshAfterSave = () => {
+    if (active && isRereadQueued && !loading && !state.saving) {
+      isRereadQueued = false;
+      void refresh();
+    }
+  };
+  saveSettledListeners.add(refreshAfterSave);
 
   const changeAccount = () => {
     const accountId = getCurrentUser()?.id ?? null;
@@ -86,11 +160,14 @@ export function initializeAnalyticsPreference(): () => void {
     generation += 1;
     const currentGeneration = generation;
     loading = false;
-    stopRecordSubscription(unsubscribeRecord);
+    isRereadQueued = false;
+    stopSubscription(unsubscribeRecord);
     unsubscribeRecord = undefined;
+    stopSubscription(unsubscribeConnect);
+    unsubscribeConnect = undefined;
     publish({
       accountId,
-      enabled: !accountId,
+      enabled: !accountId && getSignedOutAnalyticsEnabled(),
       ready: !accountId,
       saving: false,
       loadFailed: false,
@@ -104,24 +181,45 @@ export function initializeAnalyticsPreference(): () => void {
       }
     })
       .then(unsubscribe => {
-        if (!active || currentGeneration !== generation) stopRecordSubscription(unsubscribe);
+        if (!active || currentGeneration !== generation) stopSubscription(unsubscribe);
         else unsubscribeRecord = unsubscribe;
       })
       .catch(() => logger.warn('Account analytics subscription unavailable'));
+    void UsersService.subscribeRealtimeConnect(() => {
+      if (active && currentGeneration === generation) void refresh();
+    })
+      .then(unsubscribe => {
+        if (!active || currentGeneration !== generation) stopSubscription(unsubscribe);
+        else unsubscribeConnect = unsubscribe;
+      })
+      .catch(() => logger.warn('Account analytics reconnect subscription unavailable'));
   };
 
   const removeAuthListener = onAuthChange(changeAccount, true);
-  const onFocus = () => {
+  const refreshIfVisible = () => {
     if (document.visibilityState === 'visible') void refresh();
   };
-  window.addEventListener('focus', onFocus);
-  const interval = window.setInterval(onFocus, 30_000);
+  window.addEventListener('focus', refreshIfVisible);
+  document.addEventListener('visibilitychange', refreshIfVisible);
+  const interval = window.setInterval(() => {
+    if (
+      document.visibilityState === 'visible' &&
+      (state.loadFailed ||
+        !unsubscribeRecord ||
+        Date.now() - lastSuccessfulRefresh >= HEALTHY_PREFERENCE_REFRESH_MS)
+    ) {
+      void refresh();
+    }
+  }, PREFERENCE_RETRY_TICK_MS);
   return () => {
     active = false;
+    saveSettledListeners.delete(refreshAfterSave);
     generation += 1;
     removeAuthListener();
-    stopRecordSubscription(unsubscribeRecord);
-    window.removeEventListener('focus', onFocus);
+    stopSubscription(unsubscribeRecord);
+    stopSubscription(unsubscribeConnect);
+    window.removeEventListener('focus', refreshIfVisible);
+    document.removeEventListener('visibilitychange', refreshIfVisible);
     window.clearInterval(interval);
     publish({ accountId: null, enabled: false, ready: false, saving: false, loadFailed: false });
   };
@@ -134,6 +232,8 @@ export async function setAnalyticsEnabled(enabled: boolean): Promise<void> {
   }
   const currentGeneration = generation;
   revision += 1;
+  // A pending opt-out can only reduce capture, including after sign-out.
+  if (!enabled) rememberConsent(accountId, false);
   publish({ ...state, enabled: enabled ? state.enabled : false, saving: true });
   try {
     const optOut = await UsersService.updateAnalyticsOptOut(accountId, !enabled);
@@ -155,6 +255,10 @@ export async function setAnalyticsEnabled(enabled: boolean): Promise<void> {
       }
     }
     throw error;
+  } finally {
+    if (generation === currentGeneration) {
+      saveSettledListeners.forEach(listener => listener());
+    }
   }
 }
 

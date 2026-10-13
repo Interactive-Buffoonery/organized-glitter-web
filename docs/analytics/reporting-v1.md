@@ -101,9 +101,9 @@ separate and labeled with their collection period.
 | `release-api-pressure-v1`       | Ordinary-web `api_rate_limited` counts by existing route/auth/count buckets and release when present.                                                                                                                                              | No total API-request denominator. Do not describe this as an API error rate.                                                                                                                         |
 
 Use event-time release properties only after confirming they are present and
-match the uploaded source-map release. Central release enrichment and exception
-redaction are dependencies owned by separate tasks; this PR does not modify
-their files or invent new collection. If release is absent, the release panel
+match the uploaded source-map release. `$exception` now receives the shared build
+context, including validated release, as described in [web-context.md](./web-context.md).
+Exception redaction remains a separate dependency. If release is absent, the release panel
 remains blocked while unsegmented counts can be reviewed.
 
 ## Dry-run acceptance examples

@@ -99,7 +99,6 @@ export const AnalyticsEvent = {
 
   // Import / Export
   IMPORT_COMPLETED: 'import_completed',
-  EXPORT_COMPLETED: 'export_completed',
   ARCHIVE_IMPORT_STARTED: 'archive_import_started',
   ARCHIVE_IMPORT_COMPLETED: 'archive_import_completed',
   ARCHIVE_EXPORT_STARTED: 'archive_export_started',

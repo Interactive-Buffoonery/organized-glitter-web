@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsPreference } from '@/components/profile/AnalyticsPreference';
-import { initializeAnalyticsPreference } from '@/services/analytics-preference';
+import {
+  getAnalyticsPreference,
+  initializeAnalyticsPreference,
+} from '@/services/analytics-preference';
 
 const mocks = vi.hoisted(() => ({
   user: { id: 'account-a' } as { id: string } | null,
@@ -24,6 +27,7 @@ vi.mock('@/services/pocketbase/users.service', () => ({
     getAnalyticsOptOut: mocks.get,
     updateAnalyticsOptOut: mocks.update,
     subscribeAnalyticsPreference: mocks.subscribe,
+    subscribeRealtimeConnect: async () => async () => {},
   },
 }));
 
@@ -31,6 +35,7 @@ let stop: (() => void) | undefined;
 beforeEach(() => {
   stop?.();
   vi.clearAllMocks();
+  localStorage.clear();
   mocks.user = { id: 'account-a' };
   mocks.get.mockResolvedValue(false);
   mocks.update.mockResolvedValue(true);
@@ -43,6 +48,8 @@ beforeEach(() => {
 afterEach(() => {
   stop?.();
   stop = undefined;
+  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 async function renderPreference() {
@@ -54,6 +61,51 @@ async function renderPreference() {
 }
 
 describe('account analytics preference', () => {
+  it('writes confirmed load, realtime and save choices to browser storage', async () => {
+    const control = await renderPreference();
+    const stored = () => JSON.parse(localStorage.getItem('og:analytics:account-consent')!);
+    expect(stored()).toEqual({ accountId: 'account-a', enabled: true });
+    act(() => mocks.remoteCallback?.(true));
+    expect(stored()).toEqual({ accountId: 'account-a', enabled: false });
+    mocks.update.mockResolvedValue(false);
+    fireEvent.click(control);
+    await waitFor(() => expect(stored().enabled).toBe(true));
+  });
+
+  it('does not write a choice on a failed load', async () => {
+    mocks.get.mockRejectedValue(new Error('offline'));
+    stop = initializeAnalyticsPreference();
+    await waitFor(() => expect(getAnalyticsPreference().loadFailed).toBe(true));
+    expect(localStorage.getItem('og:analytics:account-consent')).toBeNull();
+  });
+
+  it('persists a pending opt-out before confirmation', async () => {
+    const control = await renderPreference();
+    mocks.update.mockImplementation(() => new Promise(() => {}));
+    fireEvent.click(control);
+    expect(JSON.parse(localStorage.getItem('og:analytics:account-consent')!).enabled).toBe(false);
+  });
+
+  it('lets a new account server preference overwrite the stored opt-out', async () => {
+    localStorage.setItem(
+      'og:analytics:account-consent',
+      JSON.stringify({ accountId: 'previous', enabled: false })
+    );
+    await renderPreference();
+    expect(JSON.parse(localStorage.getItem('og:analytics:account-consent')!)).toEqual({
+      accountId: 'account-a',
+      enabled: true,
+    });
+  });
+
+  it('contains browser storage write failures', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const control = await renderPreference();
+    expect(control).toBeChecked();
+  });
+
   it('waits for the server, then saves the choice on the account', async () => {
     const control = await renderPreference();
     expect(control).toBeChecked();

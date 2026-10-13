@@ -70,7 +70,7 @@
     return 'og_' + String(Date.now()) + '_' + Math.random().toString(36).slice(2, 10);
   }
 
-  function resolveDistinctId(storage, apiKey) {
+  function resolveDistinctId(storage, apiKey, isSignedIn) {
     var store = storage;
     if (!store) {
       try {
@@ -81,12 +81,18 @@
     }
     if (!store) return createAnonId();
 
-    if (apiKey) {
+    if (apiKey && !isSignedIn) {
       try {
         var phRaw = store.getItem('ph_' + apiKey + '_posthog');
         if (phRaw) {
           var parsed = JSON.parse(phRaw);
-          if (parsed && typeof parsed.distinct_id === 'string' && parsed.distinct_id) {
+          if (
+            parsed &&
+            !parsed.$user_id &&
+            parsed.$user_state !== 'identified' &&
+            typeof parsed.distinct_id === 'string' &&
+            parsed.distinct_id
+          ) {
             return parsed.distinct_id;
           }
         }
@@ -108,20 +114,23 @@
 
   function buildCapturePayload(apiKey, reason, distinctId, nowIso, context, eventName) {
     var timestamp = nowIso || new Date().toISOString();
+    var properties = {
+      token: apiKey,
+      distinct_id: distinctId,
+      reason: reason,
+      surface: SURFACE,
+      $lib: 'og-bootstrap-shell',
+      $lib_version: '1',
+    };
+    for (var key in context) {
+      if (Object.prototype.hasOwnProperty.call(context, key)) properties[key] = context[key];
+    }
     return {
       api_key: apiKey,
       batch: [
         {
           event: eventName || EVENT_NAME,
-          properties: {
-            token: apiKey,
-            distinct_id: distinctId,
-            reason: reason,
-            surface: SURFACE,
-            $lib: 'og-bootstrap-shell',
-            $lib_version: '1',
-            ...context,
-          },
+          properties: properties,
           timestamp: timestamp,
         },
       ],
@@ -185,15 +194,28 @@
     if (isDoNotTrackEnabled(options.navigator, options.window)) return false;
     try {
       var preferenceStorage = options.storage || global.localStorage;
-      if (
-        !preferenceStorage ||
-        preferenceStorage.getItem('pocketbase_auth') ||
-        preferenceStorage.getItem('og:analytics:enabled') === 'false'
-      ) {
+      if (!preferenceStorage) return false;
+      var authRaw = preferenceStorage.getItem('pocketbase_auth');
+      var consentRaw = preferenceStorage.getItem('og:analytics:account-consent');
+      var consent = null;
+      try {
+        consent = consentRaw ? JSON.parse(consentRaw) : null;
+      } catch (_) {
+        if (authRaw) return false;
+      }
+      if (authRaw) {
+        var auth = JSON.parse(authRaw);
+        var accountId = auth && auth.record && auth.record.id;
+        if (accountId == null) accountId = auth && auth.model && auth.model.id;
+        if (!accountId || !consent || consent.accountId !== accountId || consent.enabled !== true) {
+          return false;
+        }
+      } else if (consent && consent.enabled === false) {
         return false;
       }
+      if (preferenceStorage.getItem('og:analytics:enabled') === 'false') return false;
     } catch (_) {
-      // The account preference cannot be checked before React starts.
+      // Unreadable storage or auth JSON fails closed.
       return false;
     }
 
@@ -202,7 +224,7 @@
 
     var ingestBase = resolveIngestBase(config.host);
     var url = ingestBase + '/e/';
-    var distinctId = resolveDistinctId(options.storage, config.key);
+    var distinctId = resolveDistinctId(preferenceStorage, config.key, Boolean(authRaw));
     var body = JSON.stringify(
       buildCapturePayload(
         config.key,

@@ -54,6 +54,56 @@ describe('ColoringTagService', () => {
     pbMock.collectionMethods.getList.mockResolvedValue(pbMock.createListResult([]));
   });
 
+  it('loads every coloring tag page with owner and search filters and name sorting', async () => {
+    const records = Array.from({ length: 201 }, (_, index) => ({
+      id: `tag-${index}`,
+      user: 'user-123',
+      name: `Cozy ${String(index).padStart(3, '0')}`,
+      slug: `cozy-${index}`,
+      color: '#14b8a6',
+      created: '2026-01-01',
+      updated: '2026-01-01',
+    }));
+    pbMock.collectionMethods.getList.mockImplementation(async (page: number) => ({
+      page,
+      perPage: 200,
+      totalItems: records.length,
+      totalPages: 2,
+      items: page === 1 ? records.slice(0, 200) : records.slice(200),
+    }));
+
+    const result = await ColoringTagService.listColoringTags({ search: '  Cozy  ' });
+
+    expect(result.status).toBe('success');
+    expect(result.data).toHaveLength(201);
+    expect(result.data?.at(-1)).toMatchObject({ id: 'tag-200', name: 'Cozy 200' });
+    for (const page of [1, 2]) {
+      expect(pbMock.collectionMethods.getList).toHaveBeenCalledWith(page, 200, {
+        filter: 'user = {:userId} && name ~ {:search}',
+        sort: 'name',
+      });
+    }
+    expect(pbMock.pb.filter).toHaveBeenCalledWith('user = {:userId}', { userId: 'user-123' });
+    expect(pbMock.pb.filter).toHaveBeenCalledWith('name ~ {:search}', { search: 'Cozy' });
+  });
+
+  it('returns an error rather than a partial coloring tag list when a later page fails', async () => {
+    const failure = new Error('Second page unavailable');
+    pbMock.collectionMethods.getList
+      .mockResolvedValueOnce({
+        page: 1,
+        perPage: 200,
+        totalItems: 201,
+        totalPages: 2,
+        items: Array.from({ length: 200 }, (_, index) => ({ id: `tag-${index}`, name: 'Cozy' })),
+      })
+      .mockRejectedValueOnce(failure);
+
+    const result = await ColoringTagService.listColoringTags();
+
+    expect(result).toEqual({ status: 'error', data: null, error: failure });
+  });
+
   it('creates coloring tags in the coloring_tags collection', async () => {
     pbMock.collectionMethods.create.mockResolvedValue({
       id: 'coloring-tag-1',

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CaptureResult } from 'posthog-js';
-import { sanitizeAnalyticsEvent } from '../sanitizeEvent';
+import { AnalyticsEvent } from '@/services/analytics-events';
+import { isAllowedAnalyticsEvent, sanitizeAnalyticsEvent } from '../sanitizeEvent';
 
 describe('sanitizeAnalyticsEvent', () => {
   it('removes record IDs from SDK URLs, paths and person properties', () => {
@@ -89,5 +90,40 @@ describe('sanitizeAnalyticsEvent', () => {
       ...event,
       properties: { ...event.properties, path: '/dashboard' },
     });
+  });
+});
+
+describe('analytics event allowlist', () => {
+  it.each([...Object.values(AnalyticsEvent), '$exception', '$identify', '$set'])(
+    'allows registered and required SDK event %s',
+    name => {
+      expect(isAllowedAnalyticsEvent(name)).toBe(true);
+    }
+  );
+  it.each([
+    '$autocapture',
+    '$$heatmap',
+    '$dead_click',
+    '$rageclick',
+    '$web_vitals',
+    '$pageleave',
+    'survey sent',
+    'unregistered_event',
+    'export_completed',
+  ])('drops unsupported event %s', name => {
+    expect(isAllowedAnalyticsEvent(name)).toBe(false);
+  });
+  it('strips page titles without mutating the original event', () => {
+    const event = {
+      uuid: 'test',
+      event: '$pageview',
+      properties: {
+        title: 'My Secret Project | Organized Glitter',
+        $title: 'Secret Book',
+        count: 1,
+      },
+    };
+    expect(sanitizeAnalyticsEvent(event).properties).toEqual({ count: 1 });
+    expect(event.properties.title).toContain('Secret');
   });
 });

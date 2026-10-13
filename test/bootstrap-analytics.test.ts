@@ -56,6 +56,7 @@ const loadAnalytics = (): BootstrapAnalytics => {
 describe('bootstrap-analytics beacon helper', () => {
   beforeEach(() => {
     delete window.__OG_BOOTSTRAP_ANALYTICS__;
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -97,6 +98,104 @@ describe('bootstrap-analytics beacon helper', () => {
     ).toBe(false);
     expect(sendBeacon).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['current matching opt-in', { record: { id: 'a' } }, { accountId: 'a', enabled: true }, true],
+    ['legacy matching opt-in', { model: { id: 'a' } }, { accountId: 'a', enabled: true }, true],
+    [
+      'record takes priority over model',
+      { record: { id: 'b' }, model: { id: 'a' } },
+      { accountId: 'a', enabled: true },
+      false,
+    ],
+    ['mismatched account', { record: { id: 'b' } }, { accountId: 'a', enabled: true }, false],
+    ['missing id', { record: {} }, { accountId: 'a', enabled: true }, false],
+    ['missing record', { token: 'synthetic' }, { accountId: 'a', enabled: true }, false],
+    ['missing consent', { record: { id: 'a' } }, null, false],
+    ['opt-out', { record: { id: 'a' } }, { accountId: 'a', enabled: false }, false],
+    ['non-boolean opt-in', { record: { id: 'a' } }, { accountId: 'a', enabled: 'true' }, false],
+    ['invalid auth', 'invalid-json', { accountId: 'a', enabled: true }, false],
+    ['invalid consent', { record: { id: 'a' } }, 'invalid-json', false],
+    ['signed-out opt-out', null, { accountId: 'a', enabled: false }, false],
+    ['signed-out opt-in', null, { accountId: 'a', enabled: true }, true],
+    ['signed-out missing consent', null, null, true],
+    ['signed-out unreadable consent', null, 'invalid-json', true],
+  ])('checks remembered account consent: %s', (_label, auth, consent, allowed) => {
+    const api = loadAnalytics();
+    const sendBeacon = vi.fn(() => true);
+    const serialize = (value: unknown) =>
+      value === null ? null : typeof value === 'string' ? value : JSON.stringify(value);
+    const storage = {
+      getItem: (key: string) =>
+        key === 'pocketbase_auth'
+          ? serialize(auth)
+          : key === 'og:analytics:account-consent'
+            ? serialize(consent)
+            : null,
+      setItem: vi.fn(),
+    };
+    expect(
+      api.captureBootstrapFailureShown('startup_timeout', {
+        config: { key: 'phc_test', host: '/glimmer' },
+        storage,
+        sendBeacon,
+      })
+    ).toBe(allowed);
+    expect(sendBeacon).toHaveBeenCalledTimes(allowed ? 1 : 0);
+  });
+
+  it.each([true, false])('uses a privacy-safe bootstrap identity when signed in: %s', signedIn => {
+    const api = loadAnalytics();
+    localStorage.setItem('ph_phc_test_posthog', JSON.stringify({ distinct_id: 'sdk-identity' }));
+    localStorage.setItem('og_bootstrap_anon_id', 'shell-anonymous');
+    if (signedIn) {
+      localStorage.setItem('pocketbase_auth', JSON.stringify({ record: { id: 'sdk-identity' } }));
+      localStorage.setItem(
+        'og:analytics:account-consent',
+        JSON.stringify({ accountId: 'sdk-identity', enabled: true })
+      );
+    }
+    const fetchFn = vi.fn((_url: string, _options: { body: string }) => Promise.resolve());
+    expect(
+      api.captureBootstrapFailureShown('startup_timeout', {
+        storage: localStorage,
+        config: { key: 'phc_test', host: '/glimmer' },
+        sendBeacon: () => false,
+        fetch: fetchFn,
+      })
+    ).toBe(true);
+    const properties = JSON.parse(fetchFn.mock.calls[0]![1].body).batch[0].properties;
+    expect(properties.distinct_id).toBe(signedIn ? 'shell-anonymous' : 'sdk-identity');
+  });
+
+  it.each([
+    ['anonymous SDK', { distinct_id: 'sdk-id', $user_state: 'anonymous' }, 'sdk-id'],
+    ['SDK user ID', { distinct_id: 'account-id', $user_id: 'account-id' }, 'shell-anonymous'],
+    [
+      'identified SDK state',
+      { distinct_id: 'account-id', $user_state: 'identified' },
+      'shell-anonymous',
+    ],
+  ])(
+    'uses only anonymous SDK identities for signed-out beacons: %s',
+    (_label, sdkState, expectedId) => {
+      const api = loadAnalytics();
+      localStorage.setItem('ph_phc_test_posthog', JSON.stringify(sdkState));
+      localStorage.setItem('og_bootstrap_anon_id', 'shell-anonymous');
+      const fetchFn = vi.fn((_url: string, _options: { body: string }) => Promise.resolve());
+      expect(
+        api.captureBootstrapFailureShown('startup_timeout', {
+          storage: localStorage,
+          config: { key: 'phc_test', host: '/glimmer' },
+          sendBeacon: () => false,
+          fetch: fetchFn,
+        })
+      ).toBe(true);
+      expect(JSON.parse(fetchFn.mock.calls[0]![1].body).batch[0].properties.distinct_id).toBe(
+        expectedId
+      );
+    }
+  );
 
   it('allows only the registered low-cardinality reasons', () => {
     const api = loadAnalytics();

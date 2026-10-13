@@ -121,6 +121,14 @@ export class UsersService {
     }, 'Users.updateAnalyticsOptOut');
   }
 
+  /** Listen for realtime connects and reconnects without replacing other listeners. */
+  static async subscribeRealtimeConnect(callback: () => void): Promise<UnsubscribeFunc> {
+    return ErrorHandler.handleAsync(
+      () => pb.realtime.subscribe('PB_CONNECT', callback),
+      'Users.subscribeRealtimeConnect'
+    );
+  }
+
   /** Subscribe to analytics preference changes for the current account. */
   static async subscribeAnalyticsPreference(
     userId: string,

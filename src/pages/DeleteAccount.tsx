@@ -15,6 +15,7 @@ import { useAppReady } from '@/hooks/useAppReady';
 import { useNoIndexPage } from '@/hooks/usePageMetadata';
 import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 import { clearAccountDrafts } from '@/hooks/drafts/formDraftStorage';
+import { clearRememberedAnalyticsConsent } from '@/services/analytics-preference';
 
 const deleteAccountLogger = createLogger('DeleteAccount');
 
@@ -120,6 +121,7 @@ const DeleteAccount = () => {
           throw signOutResult.error ?? new Error('Session cleanup failed');
         }
       } catch (signOutError) {
+        clearRememberedAnalyticsConsent(user.id);
         deleteAccountLogger.error(
           '[SECURE DELETION] Account deleted but session cleanup failed:',
           signOutError
@@ -133,6 +135,8 @@ const DeleteAccount = () => {
         });
         return;
       }
+      // Sign-out applies the remembered choice first, so this then restores the default.
+      clearRememberedAnalyticsConsent(user.id);
 
       notify({
         kind: 'info',

@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import type { ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -136,6 +136,37 @@ describe('TagList coloring tag recovery', () => {
     expect(retry).toHaveFocus();
     expect(retry).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByRole('alert')).toHaveTextContent('Could not load coloring tags');
+  });
+
+  it('keeps recovery focused while an offline retry waits for connection and then fails', async () => {
+    mocks.diamondTags = [];
+    mocks.listColoringTags.mockResolvedValue(createErrorResponse(new Error('Offline')));
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole('alert');
+    await user.tab();
+    const retry = screen.getByRole('button', { name: 'Retry coloring tags' });
+    try {
+      act(() => onlineManager.setOnline(false));
+      await user.keyboard('{Enter}');
+
+      expect(await screen.findByRole('button', { name: 'Waiting for connection' })).toBe(retry);
+      expect(retry).toHaveFocus();
+      expect(retry).toHaveAttribute('aria-disabled', 'true');
+      expect(screen.getByRole('alert')).toHaveTextContent('Waiting for connection...');
+      expect(screen.queryByText("You haven't created any tags yet.")).not.toBeInTheDocument();
+      await user.keyboard('{Enter}');
+      expect(mocks.listColoringTags).toHaveBeenCalledTimes(1);
+      act(() => onlineManager.setOnline(true));
+
+      expect(await screen.findByRole('button', { name: 'Retry coloring tags' })).toBe(retry);
+      expect(retry).toHaveFocus();
+      expect(mocks.listColoringTags).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('alert')).toHaveTextContent('Could not load coloring tags');
+      expect(screen.queryByText("You haven't created any tags yet.")).not.toBeInTheDocument();
+    } finally {
+      act(() => onlineManager.setOnline(true));
+    }
   });
 
   it('does not describe a failed coloring request as an empty tag library', async () => {

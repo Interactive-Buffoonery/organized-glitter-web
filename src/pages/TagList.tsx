@@ -28,7 +28,8 @@ const TagList = () => {
   const {
     data: coloringTags = [],
     isLoading: loadingColoringTags,
-    isFetching: fetchingColoringTags,
+    isPending: pendingColoringTags,
+    fetchStatus: coloringTagsFetchStatus,
     error: coloringTagsError,
     errorUpdatedAt: coloringTagsErrorUpdatedAt,
     refetch: refetchColoringTags,
@@ -36,7 +37,14 @@ const TagList = () => {
   const loading = isLoading.tags;
   const hasTags = tags.length > 0 || coloringTags.length > 0;
   const showColoringRecovery =
-    Boolean(coloringTagsError) || (loadingColoringTags && coloringTagsErrorUpdatedAt > 0);
+    Boolean(coloringTagsError) || (pendingColoringTags && coloringTagsErrorUpdatedAt > 0);
+  const busyColoringTags = coloringTagsFetchStatus !== 'idle';
+  const coloringRetryLabel =
+    coloringTagsFetchStatus === 'paused'
+      ? 'Waiting for connection'
+      : busyColoringTags
+        ? 'Retrying coloring tags'
+        : 'Retry coloring tags';
 
   // Handle errors from React Query - only fire toast when error state changes
   useEffect(() => {
@@ -56,20 +64,24 @@ const TagList = () => {
             role="alert"
           >
             <span className="text-muted-foreground text-sm">
-              {fetchingColoringTags ? 'Retrying coloring tags...' : 'Could not load coloring tags.'}
+              {coloringTagsFetchStatus === 'paused'
+                ? 'Waiting for connection...'
+                : busyColoringTags
+                  ? 'Retrying coloring tags...'
+                  : 'Could not load coloring tags.'}
             </span>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              aria-disabled={fetchingColoringTags}
+              aria-disabled={busyColoringTags}
               className="aria-disabled:opacity-50"
               onClick={() => {
-                if (!fetchingColoringTags) void refetchColoringTags();
+                if (!busyColoringTags) void refetchColoringTags();
               }}
-              aria-label={fetchingColoringTags ? 'Retrying coloring tags' : 'Retry coloring tags'}
+              aria-label={coloringRetryLabel}
             >
-              {fetchingColoringTags ? 'Retrying...' : 'Retry'}
+              {busyColoringTags ? 'Retrying...' : 'Retry'}
             </Button>
           </div>
         )}

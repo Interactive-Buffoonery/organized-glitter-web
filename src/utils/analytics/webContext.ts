@@ -1,5 +1,6 @@
 import type { CaptureResult } from 'posthog-js';
 import { AnalyticsEvent } from '@/services/analytics-events';
+import { EXCEPTION_EVENT } from './sanitizeEvent';
 
 type WebAnalyticsContext = {
   platform: 'web';
@@ -49,7 +50,7 @@ export function enrichWebAnalyticsEvent(
     import.meta.env.DEV
   )
 ): CaptureResult {
-  if (event.event !== '$exception' && !ordinaryEvents.has(event.event)) return event;
+  if (event.event !== EXCEPTION_EVENT && !ordinaryEvents.has(event.event)) return event;
   const properties = { ...event.properties };
   // A persisted SDK super-property cannot supply a stale or unvalidated build identity.
   delete properties.release;

@@ -70,7 +70,7 @@
     return 'og_' + String(Date.now()) + '_' + Math.random().toString(36).slice(2, 10);
   }
 
-  function resolveDistinctId(storage, apiKey) {
+  function resolveDistinctId(storage, apiKey, signedIn) {
     var store = storage;
     if (!store) {
       try {
@@ -81,7 +81,7 @@
     }
     if (!store) return createAnonId();
 
-    if (apiKey) {
+    if (apiKey && !signedIn) {
       try {
         var phRaw = store.getItem('ph_' + apiKey + '_posthog');
         if (phRaw) {
@@ -209,7 +209,7 @@
       }
       if (preferenceStorage.getItem('og:analytics:enabled') === 'false') return false;
     } catch (_) {
-      // The account preference cannot be checked before React starts.
+      // Unreadable storage or auth JSON fails closed.
       return false;
     }
 
@@ -218,7 +218,7 @@
 
     var ingestBase = resolveIngestBase(config.host);
     var url = ingestBase + '/e/';
-    var distinctId = resolveDistinctId(options.storage, config.key);
+    var distinctId = resolveDistinctId(preferenceStorage, config.key, Boolean(authRaw));
     var body = JSON.stringify(
       buildCapturePayload(
         config.key,

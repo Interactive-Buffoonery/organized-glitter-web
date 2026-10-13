@@ -95,10 +95,11 @@ the browser's automation flag, and milliseconds since the bootstrap analytics sc
 The Railway and Spacefast preview hostnames both report `preview`.
 These are diagnostic signals, not proof of a network connection or a human visitor.
 Diagnostic properties exclude raw user agents, URLs, record IDs, failed filenames, and
-exception text. The event's `distinct_id` reuses the stored PostHog identity when available
-so startup failures can be correlated with later app activity. For an identified user,
-that identity can be their PocketBase user ID. Otherwise, bootstrap events use a separate
-anonymous ID stored in the browser.
+exception text. Signed-in shell events always use the separate anonymous
+`og_bootstrap_anon_id`, never the stored SDK identity or PocketBase user ID. This preserves
+release, route, and browser diagnostics while dropping per-user startup correlation.
+Signed-out events reuse the stored SDK anonymous identity when available, otherwise the
+separate anonymous ID stored in the browser.
 Do Not Track applies to both events. Signed-in startup capture requires a remembered, confirmed
 opt-in for the same account ID in saved PocketBase auth (`record.id`, or legacy `model.id`).
 Missing, corrupt, mismatched, opted-out, or unreadable signed-in consent suppresses capture.
@@ -347,7 +348,8 @@ for production source-map uploads. Routine upgrades must preserve the privacy
 configuration above and the existing first-party `/glimmer` proxy.
 
 The app explicitly disables PostHog's automatic pageviews, page-leave events,
-autocapture, exception capture, session recording, and surveys. Recheck those
+autocapture, exception capture, session recording, surveys, heatmaps, dead clicks,
+performance, rageclick, product tours, conversations, and web experiments. Recheck those
 options against the upgraded browser SDK defaults so new automatic collection
 does not bypass the app's explicit instrumentation and consent behavior.
 
@@ -396,14 +398,19 @@ The web client pauses capture until it has read the current account preference f
 It stops capture immediately while saving an opt-out and only enables capture after the server
 confirms an opt-in. Failed saves show an error and reread the server value. Capture stays paused if that read fails.
 
-Open web clients listen for user-record changes, reread the preference on focus, and check every
-5 minutes as a fallback. Failed reads pause capture until the next successful refresh.
+Open web clients listen for user-record changes and reread the preference on focus or when
+the document becomes visible, including PWA resume. A timer checks visible tabs every 30 seconds:
+failed reads or an unavailable realtime subscription trigger a refresh at that cadence; healthy
+subscriptions refresh every 5 minutes. Failed reads pause capture until a successful refresh.
 
 Every confirmed signed-in load, realtime update, or save remembers
 `og:analytics:account-consent` in localStorage as `{"accountId":"<id>","enabled":true|false}`.
-Pending and failed loads or saves do not replace the confirmed record. Storage errors are contained.
+Pending opt-outs also write `enabled: false` before the save request, so signing out during a
+save keeps capture off. Confirmation or a successful reread replaces it with server truth.
+Pending opt-ins and failed loads do not replace the remembered record. Storage errors are contained,
+and the client keeps the same choice in memory if storage is missing or unreadable.
 After sign-out, a remembered `enabled: false` keeps anonymous capture off in that browser.
-Missing, unreadable, or opted-in records allow anonymous capture. Signing into any account always
+If neither storage nor memory has a choice, anonymous capture is allowed; opted-in records allow it too. Signing into any account always
 uses that account's server preference and replaces the remembered record after confirmation.
 No local browser choice is copied to another account.
 

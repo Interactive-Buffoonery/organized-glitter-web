@@ -2,9 +2,11 @@ import type { CaptureResult } from 'posthog-js';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import { sanitizeAnalyticsPath } from './sanitizePath';
 
+export const EXCEPTION_EVENT = '$exception';
+
 const allowedEvents = new Set<string>([
   ...Object.values(AnalyticsEvent),
-  '$exception',
+  EXCEPTION_EVENT,
   '$identify',
   '$set',
 ]);

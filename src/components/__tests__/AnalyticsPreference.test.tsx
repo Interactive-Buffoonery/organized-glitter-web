@@ -78,11 +78,11 @@ describe('account analytics preference', () => {
     expect(localStorage.getItem('og:analytics:account-consent')).toBeNull();
   });
 
-  it('does not persist an unconfirmed save', async () => {
+  it('persists a pending opt-out before confirmation', async () => {
     const control = await renderPreference();
     mocks.update.mockImplementation(() => new Promise(() => {}));
     fireEvent.click(control);
-    expect(JSON.parse(localStorage.getItem('og:analytics:account-consent')!).enabled).toBe(true);
+    expect(JSON.parse(localStorage.getItem('og:analytics:account-consent')!).enabled).toBe(false);
   });
 
   it('lets a new account server preference overwrite the stored opt-out', async () => {

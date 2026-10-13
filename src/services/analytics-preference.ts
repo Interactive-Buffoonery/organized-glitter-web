@@ -4,8 +4,10 @@ import { UsersService } from '@/services/pocketbase/users.service';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('AnalyticsPreference');
-const ACCOUNT_CONSENT_STORAGE_KEY = 'og:analytics:account-consent';
+export const ACCOUNT_CONSENT_STORAGE_KEY = 'og:analytics:account-consent';
 const PREFERENCE_REFRESH_INTERVAL_MS = 5 * 60_000;
+const PREFERENCE_REFRESH_TICK_MS = 30_000;
+let rememberedConsent: { accountId: string; enabled: boolean } | undefined;
 const listeners = new Set<() => void>();
 let state = {
   accountId: null as string | null,
@@ -40,17 +42,19 @@ export function syncAnalyticsConsent(): void {
   }
 }
 
+function rememberConsent(accountId: string, enabled: boolean): void {
+  rememberedConsent = { accountId, enabled };
+  try {
+    localStorage.setItem(ACCOUNT_CONSENT_STORAGE_KEY, JSON.stringify(rememberedConsent));
+  } catch {
+    logger.warn('Could not store remembered analytics preference');
+  }
+}
+
 function publish(next: typeof state): void {
   state = next;
   if (next.ready && next.accountId && !next.saving) {
-    try {
-      localStorage.setItem(
-        ACCOUNT_CONSENT_STORAGE_KEY,
-        JSON.stringify({ accountId: next.accountId, enabled: next.enabled })
-      );
-    } catch {
-      logger.warn('Could not store confirmed analytics preference');
-    }
+    rememberConsent(next.accountId, next.enabled);
   }
   syncAnalyticsConsent();
   listeners.forEach(listener => listener());
@@ -64,10 +68,10 @@ export function subscribeAnalyticsPreference(listener: () => void): () => void {
 function getSignedOutAnalyticsEnabled(): boolean {
   try {
     const stored = localStorage.getItem(ACCOUNT_CONSENT_STORAGE_KEY);
-    return !stored || JSON.parse(stored)?.enabled !== false;
+    return stored ? JSON.parse(stored)?.enabled !== false : rememberedConsent?.enabled !== false;
   } catch {
     logger.debug('Could not read remembered analytics preference');
-    return true;
+    return rememberedConsent?.enabled !== false;
   }
 }
 
@@ -79,6 +83,7 @@ export function initializeAnalyticsPreference(): () => void {
       void unsubscribe().catch(() => logger.warn('Account analytics unsubscribe failed'));
   };
   let loading = false;
+  let lastSuccessfulRefresh = 0;
 
   const refresh = async () => {
     const accountId = getCurrentUser()?.id ?? null;
@@ -90,6 +95,7 @@ export function initializeAnalyticsPreference(): () => void {
     try {
       const optOut = await UsersService.getAnalyticsOptOut(accountId);
       if (active && generation === currentGeneration && revision === currentRevision) {
+        lastSuccessfulRefresh = Date.now();
         publish({ accountId, enabled: !optOut, ready: true, saving: false, loadFailed: false });
       }
     } catch {
@@ -137,13 +143,24 @@ export function initializeAnalyticsPreference(): () => void {
     if (document.visibilityState === 'visible') void refresh();
   };
   window.addEventListener('focus', onFocus);
-  const interval = window.setInterval(onFocus, PREFERENCE_REFRESH_INTERVAL_MS);
+  document.addEventListener('visibilitychange', onFocus);
+  const interval = window.setInterval(() => {
+    if (
+      document.visibilityState === 'visible' &&
+      (state.loadFailed ||
+        !unsubscribeRecord ||
+        Date.now() - lastSuccessfulRefresh >= PREFERENCE_REFRESH_INTERVAL_MS)
+    ) {
+      void refresh();
+    }
+  }, PREFERENCE_REFRESH_TICK_MS);
   return () => {
     active = false;
     generation += 1;
     removeAuthListener();
     stopRecordSubscription(unsubscribeRecord);
     window.removeEventListener('focus', onFocus);
+    document.removeEventListener('visibilitychange', onFocus);
     window.clearInterval(interval);
     publish({ accountId: null, enabled: false, ready: false, saving: false, loadFailed: false });
   };
@@ -156,6 +173,8 @@ export async function setAnalyticsEnabled(enabled: boolean): Promise<void> {
   }
   const currentGeneration = generation;
   revision += 1;
+  // A pending opt-out can only reduce capture, including after sign-out.
+  if (!enabled) rememberConsent(accountId, false);
   publish({ ...state, enabled: enabled ? state.enabled : false, saving: true });
   try {
     const optOut = await UsersService.updateAnalyticsOptOut(accountId, !enabled);

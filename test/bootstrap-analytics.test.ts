@@ -144,6 +144,30 @@ describe('bootstrap-analytics beacon helper', () => {
     expect(sendBeacon).toHaveBeenCalledTimes(allowed ? 1 : 0);
   });
 
+  it.each([true, false])('uses a privacy-safe bootstrap identity when signed in: %s', signedIn => {
+    const api = loadAnalytics();
+    localStorage.setItem('ph_phc_test_posthog', JSON.stringify({ distinct_id: 'sdk-identity' }));
+    localStorage.setItem('og_bootstrap_anon_id', 'shell-anonymous');
+    if (signedIn) {
+      localStorage.setItem('pocketbase_auth', JSON.stringify({ record: { id: 'sdk-identity' } }));
+      localStorage.setItem(
+        'og:analytics:account-consent',
+        JSON.stringify({ accountId: 'sdk-identity', enabled: true })
+      );
+    }
+    const fetchFn = vi.fn((_url: string, _options: { body: string }) => Promise.resolve());
+    expect(
+      api.captureBootstrapFailureShown('startup_timeout', {
+        storage: localStorage,
+        config: { key: 'phc_test', host: '/glimmer' },
+        sendBeacon: () => false,
+        fetch: fetchFn,
+      })
+    ).toBe(true);
+    const properties = JSON.parse(fetchFn.mock.calls[0]![1].body).batch[0].properties;
+    expect(properties.distinct_id).toBe(signedIn ? 'shell-anonymous' : 'sdk-identity');
+  });
+
   it('allows only the registered low-cardinality reasons', () => {
     const api = loadAnalytics();
     expect(api.isAllowedReason('module_resource')).toBe(true);

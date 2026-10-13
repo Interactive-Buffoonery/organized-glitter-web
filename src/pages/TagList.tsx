@@ -8,6 +8,7 @@ import { notify } from '@/lib/notifications';
 
 import { useEffect } from 'react';
 import { ManageListsLayout } from '@/components/manage-lists/ManageListsLayout';
+import { Button } from '@/components/ui/button';
 
 import TagPageHeader from '@/components/tags/TagPageHeader';
 import TagTable from '@/components/tags/TagTable';
@@ -24,8 +25,26 @@ import { useColoringTags } from '@/hooks/queries/coloring/useColoringTags';
 const TagList = () => {
   useAppReady();
   const { tags, isLoading, error } = useMetadata();
-  const { data: coloringTags = [], isLoading: loadingColoringTags } = useColoringTags();
+  const {
+    data: coloringTags = [],
+    isLoading: loadingColoringTags,
+    isPending: pendingColoringTags,
+    fetchStatus: coloringTagsFetchStatus,
+    error: coloringTagsError,
+    errorUpdatedAt: coloringTagsErrorUpdatedAt,
+    refetch: refetchColoringTags,
+  } = useColoringTags();
   const loading = isLoading.tags;
+  const hasTags = tags.length > 0 || coloringTags.length > 0;
+  const isRetryingFailedColoringTags = pendingColoringTags && coloringTagsErrorUpdatedAt > 0;
+  const showColoringRecovery = Boolean(coloringTagsError) || isRetryingFailedColoringTags;
+  const busyColoringTags = coloringTagsFetchStatus !== 'idle';
+  const coloringRecoveryCopy =
+    coloringTagsFetchStatus === 'paused'
+      ? { message: 'Waiting for connection...', retryLabel: 'Waiting for connection' }
+      : busyColoringTags
+        ? { message: 'Retrying coloring tags...', retryLabel: 'Retrying coloring tags' }
+        : { message: 'Could not load coloring tags.', retryLabel: 'Retry coloring tags' };
 
   // Handle errors from React Query - only fire toast when error state changes
   useEffect(() => {
@@ -39,11 +58,39 @@ const TagList = () => {
       <TagPageHeader />
 
       <div className="mt-6">
-        <TagTable
-          tags={tags}
-          coloringTags={coloringTags}
-          loading={loading || loadingColoringTags}
-        />
+        {showColoringRecovery && (
+          <div
+            className="border-border bg-muted/30 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-2"
+            role="alert"
+          >
+            <span className="text-muted-foreground text-sm">{coloringRecoveryCopy.message}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-disabled={busyColoringTags}
+              className="aria-disabled:opacity-50"
+              onClick={() => {
+                if (!busyColoringTags) void refetchColoringTags();
+              }}
+              aria-label={coloringRecoveryCopy.retryLabel}
+            >
+              {busyColoringTags ? 'Retrying...' : 'Retry'}
+            </Button>
+          </div>
+        )}
+        {loadingColoringTags && !showColoringRecovery && (
+          <p role="status" className="text-muted-foreground mb-3 text-sm">
+            Loading coloring tags...
+          </p>
+        )}
+        {(!showColoringRecovery || hasTags || loading) && (
+          <TagTable
+            tags={tags}
+            coloringTags={coloringTags}
+            loading={loading || (loadingColoringTags && !hasTags)}
+          />
+        )}
       </div>
     </ManageListsLayout>
   );

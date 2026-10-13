@@ -62,8 +62,8 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
   // Backwards compatibility: if dimensions column exists but width/height don't
   const dimensions = getFieldValue(row, ['dimensions']);
   if (dimensions && !project.width && !project.height) {
-    // Try to extract width and height (format: "WxH" or "W x H")
-    const match = dimensions.match(/(\d+)(?:\s*[xX]\s*)(\d+)/);
+    // Match the complete pair so malformed values cannot supply partial dimensions.
+    const match = dimensions.match(/^(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)$/);
     if (match) {
       const widthValue = parseFloat(match[1]);
       const heightValue = parseFloat(match[2]);

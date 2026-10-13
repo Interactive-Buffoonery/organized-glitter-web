@@ -36,15 +36,15 @@ const TagList = () => {
   } = useColoringTags();
   const loading = isLoading.tags;
   const hasTags = tags.length > 0 || coloringTags.length > 0;
-  const showColoringRecovery =
-    Boolean(coloringTagsError) || (pendingColoringTags && coloringTagsErrorUpdatedAt > 0);
+  const isRetryingFailedColoringTags = pendingColoringTags && coloringTagsErrorUpdatedAt > 0;
+  const showColoringRecovery = Boolean(coloringTagsError) || isRetryingFailedColoringTags;
   const busyColoringTags = coloringTagsFetchStatus !== 'idle';
-  const coloringRetryLabel =
+  const coloringRecoveryCopy =
     coloringTagsFetchStatus === 'paused'
-      ? 'Waiting for connection'
+      ? { message: 'Waiting for connection...', retryLabel: 'Waiting for connection' }
       : busyColoringTags
-        ? 'Retrying coloring tags'
-        : 'Retry coloring tags';
+        ? { message: 'Retrying coloring tags...', retryLabel: 'Retrying coloring tags' }
+        : { message: 'Could not load coloring tags.', retryLabel: 'Retry coloring tags' };
 
   // Handle errors from React Query - only fire toast when error state changes
   useEffect(() => {
@@ -63,13 +63,7 @@ const TagList = () => {
             className="border-border bg-muted/30 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-2"
             role="alert"
           >
-            <span className="text-muted-foreground text-sm">
-              {coloringTagsFetchStatus === 'paused'
-                ? 'Waiting for connection...'
-                : busyColoringTags
-                  ? 'Retrying coloring tags...'
-                  : 'Could not load coloring tags.'}
-            </span>
+            <span className="text-muted-foreground text-sm">{coloringRecoveryCopy.message}</span>
             <Button
               type="button"
               variant="outline"
@@ -79,7 +73,7 @@ const TagList = () => {
               onClick={() => {
                 if (!busyColoringTags) void refetchColoringTags();
               }}
-              aria-label={coloringRetryLabel}
+              aria-label={coloringRecoveryCopy.retryLabel}
             >
               {busyColoringTags ? 'Retrying...' : 'Retry'}
             </Button>

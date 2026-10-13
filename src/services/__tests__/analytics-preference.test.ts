@@ -111,7 +111,6 @@ describe('analytics preference privacy and recovery', () => {
     const oldCallback = mocks.connectCallback!;
     mocks.get.mockResolvedValue(true);
     oldCallback();
-    oldCallback();
     await Promise.resolve();
     expect(mocks.get).toHaveBeenCalledTimes(2);
     expect(service.getAnalyticsEnabled()).toBe(false);
@@ -130,6 +129,28 @@ describe('analytics preference privacy and recovery', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(2);
     mocks.connectCallback?.();
     expect(mocks.get).toHaveBeenCalledTimes(4);
+  });
+
+  it('rereads once after a reconnect that arrives during an in-flight read', async () => {
+    const service = await initialize();
+    expect(mocks.get).toHaveBeenCalledTimes(1);
+    let resolveStale!: (optOut: boolean) => void;
+    mocks.get.mockImplementationOnce(
+      () =>
+        new Promise<boolean>(resolve => {
+          resolveStale = resolve;
+        })
+    );
+    mocks.connectCallback?.();
+    mocks.connectCallback?.();
+    mocks.connectCallback?.();
+    expect(mocks.get).toHaveBeenCalledTimes(2);
+    mocks.get.mockResolvedValue(true);
+    resolveStale(false);
+    await vi.waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(service.getAnalyticsEnabled()).toBe(false));
+    await Promise.resolve();
+    expect(mocks.get).toHaveBeenCalledTimes(3);
   });
 
   it('cleans up a connect listener that resolves after sign-out', async () => {

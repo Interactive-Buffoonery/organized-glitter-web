@@ -406,7 +406,8 @@ the document becomes visible, including PWA resume. A timer checks visible tabs 
 failed reads or a record subscription that failed to establish trigger a refresh at that cadence;
 healthy subscriptions refresh every 5 minutes. Every realtime connect or reconnect also triggers
 a reread to recover preference changes missed during a connection gap. Concurrent reads are
-deduplicated. Failed reads pause capture until a successful refresh.
+deduplicated: a refresh requested while a read is in flight runs once more after it settles.
+Failed reads pause capture until a successful refresh.
 
 Every confirmed signed-in load, realtime update, or save remembers
 `og:analytics:account-consent` in localStorage as `{"accountId":"<id>","enabled":true|false}`.
@@ -416,7 +417,8 @@ Pending opt-ins and failed loads do not replace the remembered record. Storage e
 and an in-memory opt-out takes precedence over stored consent, including a stale stored opt-in.
 Otherwise, stored consent takes precedence, with memory as the fallback when storage is missing
 or unreadable. Failed writes attempt to remove the stored record so signed-in shell capture
-fails closed.
+fails closed. The in-memory choice does not survive a reload, so if storage is full when someone
+opts out, signed-out capture in that browser resumes after a reload until a later write succeeds.
 After sign-out, a remembered `enabled: false` keeps anonymous capture off in that browser.
 If neither storage nor memory has a choice, anonymous capture is allowed; opted-in records allow it too. Signing into any account always
 uses that account's server preference and replaces the remembered record after confirmation.

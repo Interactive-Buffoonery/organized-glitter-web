@@ -92,11 +92,17 @@ export function initializeAnalyticsPreference(): () => void {
       void unsubscribe().catch(() => logger.warn('Account analytics unsubscribe failed'));
   };
   let loading = false;
+  // A reconnect during an in-flight read may follow missed changes, so read once more.
+  let isRereadQueued = false;
   let lastSuccessfulRefresh = 0;
 
   const refresh = async () => {
     const accountId = getCurrentUser()?.id ?? null;
-    if (!active || loading || state.saving) return;
+    if (!active || state.saving) return;
+    if (loading) {
+      isRereadQueued = true;
+      return;
+    }
     const currentGeneration = generation;
     const currentRevision = revision;
     if (!accountId) return;
@@ -113,7 +119,13 @@ export function initializeAnalyticsPreference(): () => void {
       }
       logger.warn('Could not load account analytics preference');
     } finally {
-      if (generation === currentGeneration) loading = false;
+      if (generation === currentGeneration) {
+        loading = false;
+        if (isRereadQueued) {
+          isRereadQueued = false;
+          void refresh();
+        }
+      }
     }
   };
 
@@ -123,6 +135,7 @@ export function initializeAnalyticsPreference(): () => void {
     generation += 1;
     const currentGeneration = generation;
     loading = false;
+    isRereadQueued = false;
     stopSubscription(unsubscribeRecord);
     unsubscribeRecord = undefined;
     stopSubscription(unsubscribeConnect);

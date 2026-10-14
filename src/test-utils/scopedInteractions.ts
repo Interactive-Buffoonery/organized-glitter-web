@@ -13,7 +13,7 @@ function assertStillRendered(owner: HTMLElement, description: string): void {
 }
 
 /** Queries for the open popup (Radix Select, Popover, or Dialog content) that `trigger` controls. */
-export function withinControlledPopup(trigger: HTMLElement) {
+function withinControlledPopup(trigger: HTMLElement) {
   assertStillRendered(trigger, 'The popup trigger');
   const popupId = trigger.getAttribute('aria-controls');
   const popup = popupId ? trigger.ownerDocument.getElementById(popupId) : null;

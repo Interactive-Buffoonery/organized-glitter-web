@@ -2,10 +2,11 @@ import JSZip from 'jszip';
 import { describe, expect, it, vi } from 'vitest';
 
 // The packer's splitting and rejection rules do not depend on the absolute size of the shared
-// restore limits, so this file shrinks them to KiB values that build in milliseconds. Only the
-// packer's view changes: functions inside archiveImportLimits keep their own lexical 64 MiB and
-// 16 MiB constants, and pack.ts owns ZIP_MAX_ENTRIES. archive-v3.test.ts keeps the real-limit
-// importer checks and the real item-count split.
+// restore limits, so this file shrinks them to KiB values that build in milliseconds. The packer
+// reads the mocked exports. Importer functions inside archiveImportLimits keep their own entry and
+// central-directory constants, so this file proves nothing about the importer's real limits, and
+// pack.ts owns ZIP_MAX_ENTRIES. archive-v3.test.ts keeps the real-limit importer checks and the
+// real item-count split.
 const limits = vi.hoisted(() => ({
   entryBytes: 1_024,
   manifestBytes: 16 * 1_024,

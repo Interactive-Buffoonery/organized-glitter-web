@@ -1,5 +1,7 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -46,6 +48,29 @@ const spawnPosthogCli = (cliBin, args, { cwd, env, attempts = 1, timeout = 15_00
   }
   return result;
 };
+
+// Keep the event loop available to answer the CLI's release lookup on loopback.
+const spawnPosthogCliAsync = (cliBin, args, { cwd, env }) =>
+  new Promise((resolve, reject) => {
+    const child = spawn(cliBin, args, {
+      cwd,
+      env: { ...cliProcessEnv(), ...env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', chunk => (stdout += chunk));
+    child.stderr.setEncoding('utf8').on('data', chunk => (stderr += chunk));
+    const timer = setTimeout(() => child.kill('SIGKILL'), 5_000);
+    child.on('error', error => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('close', (status, signal) => {
+      clearTimeout(timer);
+      resolve({ status, signal, stdout, stderr });
+    });
+  });
 
 describe('upload-sourcemaps script', () => {
   it('recursively removes sourcemaps and leaves other build files', () => {
@@ -173,9 +198,30 @@ describe('upload-sourcemaps script', () => {
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('timed out'));
   });
 
-  it('keeps the installed PostHog CLI sourcemap contract executable', () => {
+  it('keeps the installed PostHog CLI sourcemap contract executable', async () => {
     const rootDir = makeTempDir();
     const cliBin = path.resolve('node_modules/.bin/posthog-cli');
+    const releaseId = '123e4567-e89b-42d3-a456-426614174000';
+    const requests = [];
+    const server = createServer((request, response) => {
+      requests.push({ method: request.method, url: request.url });
+      const lookup = request.url.match(
+        /^\/api\/projects\/1\/error_tracking\/releases\/hash\/([^/]+)\/?$/
+      );
+      if (request.method !== 'GET' || !lookup) {
+        response.writeHead(404).end();
+        return;
+      }
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          id: releaseId,
+          hash_id: lookup[1],
+          version: 'fixture-v1',
+          project: 'sourcemap-contract-fixture',
+        })
+      );
+    });
     // The CLI wrapper downloads its native binary from GitHub Releases when
     // postinstall did not leave one in node_modules. Retry --help so a
     // transient 502/504 does not fail the contract check.
@@ -183,12 +229,14 @@ describe('upload-sourcemaps script', () => {
     const uploadHelp = spawnPosthogCli(cliBin, ['sourcemap', 'upload', '--help'], { attempts: 4 });
 
     try {
+      server.listen(0, '127.0.0.1');
+      await once(server, 'listening');
       const script = writeFixtureFile(
         rootDir,
         'main.js',
         'console.log("fixture");\n//# sourceMappingURL=main.js.map\n'
       );
-      writeFixtureFile(
+      const sourcemap = writeFixtureFile(
         rootDir,
         'main.js.map',
         JSON.stringify({
@@ -199,14 +247,27 @@ describe('upload-sourcemaps script', () => {
           mappings: '',
         })
       );
-      const inject = spawnPosthogCli(cliBin, ['sourcemap', 'inject', '--directory', rootDir], {
-        cwd: rootDir,
-        env: {
-          POSTHOG_CLI_API_KEY: 'phx_local_test_posthog_cli_key',
-          POSTHOG_CLI_PROJECT_ID: '1',
-          POSTHOG_CLI_HOST: 'http://127.0.0.1:1',
-        },
-      });
+      const inject = await spawnPosthogCliAsync(
+        cliBin,
+        [
+          'sourcemap',
+          'inject',
+          '--directory',
+          rootDir,
+          '--release-name',
+          'sourcemap-contract-fixture',
+          '--release-version',
+          'fixture-v1',
+        ],
+        {
+          cwd: rootDir,
+          env: {
+            POSTHOG_CLI_API_KEY: 'phx_local_test_posthog_cli_key',
+            POSTHOG_CLI_PROJECT_ID: '1',
+            POSTHOG_CLI_HOST: `http://127.0.0.1:${server.address().port}`,
+          },
+        }
+      );
 
       expect(injectHelp.status, formatCliResult(injectHelp)).toBe(0);
       expect(injectHelp.stdout).toContain('--directory');
@@ -215,15 +276,23 @@ describe('upload-sourcemaps script', () => {
       expect(uploadHelp.stdout).toContain('--release-name');
       expect(uploadHelp.stdout).toContain('--release-version');
       expect(uploadHelp.stdout).toContain('--delete-after');
-      expect([0, 1]).toContain(inject.status);
+      expect(inject.status, formatCliResult(inject)).toBe(0);
       expect(inject.stderr).not.toMatch(/unexpected argument|Usage:/i);
-      if (inject.status === 0) {
-        expect(readFileSync(script, 'utf8')).toContain('//# chunkId=');
-      } else {
-        expect(inject.stderr).toContain('found 1 pairs');
-        expect(inject.stderr).toMatch(/Request error|error sending request/i);
-      }
+      expect(requests).toEqual([
+        {
+          method: 'GET',
+          url: expect.stringMatching(/^\/api\/projects\/1\/error_tracking\/releases\/hash\//),
+        },
+      ]);
+      const injectedScript = readFileSync(script, 'utf8');
+      const chunkId = injectedScript.match(/\/\/# chunkId=([^\s]+)/)?.[1];
+      expect(chunkId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(JSON.parse(readFileSync(sourcemap, 'utf8'))).toMatchObject({
+        chunk_id: chunkId,
+        release_id: releaseId,
+      });
     } finally {
+      await new Promise(resolve => server.close(resolve));
       rmSync(rootDir, { recursive: true, force: true });
     }
   });

@@ -13,10 +13,58 @@ import {
   publicBuildEnvironmentDigest,
   recordPhaseFailure,
   formatValidationReport,
+  hostLoadAdvisory,
+  hostLoadSnapshot,
   validationEnvironment,
 } from '../run-local-validation.mjs';
 
 describe('local validation orchestrator', () => {
+  it('records only host load and CPU capacity at gate start', () => {
+    expect(
+      hostLoadSnapshot({
+        platform: 'linux',
+        loadavg: () => [6.734, 5.1, 2],
+        availableParallelism: () => 4,
+      })
+    ).toEqual({ loadAverage: [6.73, 5.1, 2], availableParallelism: 4 });
+  });
+
+  it('treats an all-zero Windows load average as unavailable', () => {
+    const snapshot = hostLoadSnapshot({
+      platform: 'win32',
+      loadavg: () => [0, 0, 0],
+      availableParallelism: () => 8,
+    });
+    expect(snapshot).toEqual({ loadAverage: null, availableParallelism: 8 });
+    expect(hostLoadAdvisory(snapshot)).toBeNull();
+  });
+
+  it('advises without blocking when the host is already busy', () => {
+    expect(hostLoadAdvisory({ loadAverage: [3.9, 2, 1], availableParallelism: 4 })).toBeNull();
+    const advisory = hostLoadAdvisory({ loadAverage: [9.95, 9.7, 6.9], availableParallelism: 4 });
+    expect(advisory).toMatch(/9\.95.*4 available CPU threads/);
+    expect(advisory).toMatch(/builds|browser/i);
+    expect(advisory).toMatch(/continues/i);
+  });
+
+  it('reports the host load snapshot without undefined values', () => {
+    const summary = {
+      outcome: 'passed',
+      platform: { operatingSystem: 'linux', architecture: 'x64' },
+      repository: { base: { ref: 'origin/dev', sha: 'abc' }, head: { commit: 'def' } },
+      phases: [],
+    };
+    expect(formatValidationReport(summary)).not.toContain('Host load');
+    const report = formatValidationReport({
+      ...summary,
+      host: { loadAverage: [9.95, 9.7, 6.9], availableParallelism: 4 },
+    });
+    expect(report).toContain('Host load at start: 9.95, 9.7, 6.9 (4 CPU threads)');
+    expect(
+      formatValidationReport({ ...summary, host: { loadAverage: null, availableParallelism: 4 } })
+    ).toContain('Host load at start: unavailable (4 CPU threads)');
+  });
+
   it('writes a failed run report before exiting when the base cannot resolve', () => {
     const result = spawnSync(
       process.execPath,

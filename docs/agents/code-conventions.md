@@ -56,6 +56,8 @@ section; keep both documents consistent when either changes.
 - If isolation is necessary, write down every credible failure mode first,
   then write the test and the code. Keep isolated tests only when they catch a
   real bug that the E2E gate would miss.
+- Keep pure-logic tests in the jsdom project until they pass the audit in
+  [unit test environments](test-environments.md).
 - For retained UI tests, use Testing Library queries by role or label before
   `getByTestId`. Keep them deterministic, and mock PocketBase and network calls
   through existing test utilities when available.

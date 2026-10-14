@@ -198,6 +198,32 @@ const toolIdentity = () => ({
   ),
 });
 
+const round = value => Math.round(value * 100) / 100;
+
+/** Host load and CPU capacity only; no process list, arguments, or environment. */
+export function hostLoadSnapshot({
+  platform = process.platform,
+  loadavg = os.loadavg,
+  availableParallelism = os.availableParallelism,
+} = {}) {
+  const loadAverage = loadavg().map(round);
+  return {
+    loadAverage:
+      platform === 'win32' && loadAverage.every(value => value === 0) ? null : loadAverage,
+    availableParallelism: availableParallelism(),
+  };
+}
+
+/** A non-blocking note when the host is already busy before the gate starts. */
+export function hostLoadAdvisory({ loadAverage, availableParallelism }) {
+  if (!loadAverage || loadAverage[0] < availableParallelism) return null;
+  return (
+    `Advisory: the 1-minute load average is ${loadAverage[0]} with ${availableParallelism} ` +
+    'available CPU threads. Concurrent builds, browser validation, or another test run can push ' +
+    'unit tests toward their timeouts. Validation continues.'
+  );
+}
+
 export function formatValidationReport(summary) {
   return [
     '# Local PocketBase and CI results',
@@ -206,6 +232,12 @@ export function formatValidationReport(summary) {
     `Computer: ${summary.platform.operatingSystem}/${summary.platform.architecture}`,
     `Source: ${summary.repository.head?.commit ?? 'unavailable'}`,
     `Comparison baseline: ${summary.repository.base.sha ?? summary.repository.base.ref}`,
+    ...(summary.host
+      ? [
+          `Host load at start: ${summary.host.loadAverage?.join(', ') ?? 'unavailable'} ` +
+            `(${summary.host.availableParallelism} CPU threads)`,
+        ]
+      : []),
     ...(summary.failure ? ['', `Failure: ${summary.failure}`] : []),
     '',
     '| Phase | Result | Seconds | Exit code |',
@@ -286,6 +318,7 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
       operatingSystem: process.platform,
       release: os.release(),
     },
+    host: hostLoadSnapshot(),
     tools: null,
     inputs: null,
     nativeSync: { outcome: 'not-run', reason: 'PocketBase validation must pass first.' },
@@ -294,6 +327,8 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
   writeSummary(summaryPath, summary);
   process.stdout.write(`Local validation summary: ${summaryPath}\n`);
   process.stdout.write(`Local validation report: ${path.join(runDir, 'report.md')}\n`);
+  const loadAdvisory = hostLoadAdvisory(summary.host);
+  if (loadAdvisory) process.stdout.write(`${loadAdvisory}\n`);
 
   let initialization = 'repository identity';
   try {

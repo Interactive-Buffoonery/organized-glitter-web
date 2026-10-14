@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import type { CSSProperties, ReactNode } from 'react';
+import { within } from '@testing-library/react';
 import { vi } from 'vitest';
 import {
   beforeEach,
@@ -11,6 +12,7 @@ import {
   userEvent,
   waitFor,
 } from '@/test-utils';
+import { findOwnedDialog, pasteIntoField } from '@/test-utils/scopedInteractions';
 import { getDraftGeneration, readFormDraft } from '@/hooks/drafts/formDraftStorage';
 import { isColoringBookDraftValues } from '@/hooks/drafts/formDraftAdapters';
 import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
@@ -202,6 +204,11 @@ vi.mock('@/lib/notifications', () => ({
 
 import ColoringBookEditDrawer from '../ColoringBookEditDrawer';
 
+/** The drawer renders in a portal, so tests bind their queries to the dialog they just opened. */
+function openedDrawer() {
+  return screen.getByRole('dialog', { name: /edit coloring book/i });
+}
+
 describe('ColoringBookEditDrawer', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -240,26 +247,28 @@ describe('ColoringBookEditDrawer', () => {
 
   it('renders the edit drawer with external footer actions', () => {
     renderWithProviders(<ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />);
+    const drawerElement = openedDrawer();
+    const drawer = within(drawerElement);
 
-    expect(screen.getByRole('dialog', { name: /edit coloring book/i })).toBeInTheDocument();
-    expect(screen.getByText(/Worlds of Wonder/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /archive coloring book/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /delete coloring book/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save changes' })).toHaveAttribute(
+    expect(drawerElement).toBeInTheDocument();
+    expect(drawer.getByText(/Worlds of Wonder/)).toBeInTheDocument();
+    expect(drawer.getByRole('button', { name: /archive coloring book/i })).toBeInTheDocument();
+    expect(drawer.getByRole('button', { name: /delete coloring book/i })).toBeInTheDocument();
+    expect(drawer.getByRole('button', { name: 'Save changes' })).toHaveAttribute(
       'form',
       'coloring-book-edit-drawer-form'
     );
-    expect(screen.getByTestId('coloring-book-form-layout')).not.toHaveClass(
+    expect(drawer.getByTestId('coloring-book-form-layout')).not.toHaveClass(
       'lg:grid-cols-[minmax(0,1fr)_320px]'
     );
-    expect(screen.getByTestId('coloring-book-drawer-status-tags')).toHaveClass(
+    expect(drawer.getByTestId('coloring-book-drawer-status-tags')).toHaveClass(
       'grid',
       'md:grid-cols-2'
     );
 
-    const statusHeading = screen.getByRole('heading', { name: 'Status' });
-    const tagsHeading = screen.getByRole('heading', { name: 'Tags' });
-    const coverHeading = screen.getByRole('heading', { name: 'Cover image' });
+    const statusHeading = drawer.getByRole('heading', { name: 'Status' });
+    const tagsHeading = drawer.getByRole('heading', { name: 'Tags' });
+    const coverHeading = drawer.getByRole('heading', { name: 'Cover image' });
 
     expect(statusHeading.compareDocumentPosition(coverHeading)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
@@ -276,17 +285,19 @@ describe('ColoringBookEditDrawer', () => {
     const { rerender } = renderWithProviders(
       <ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />
     );
+    const drawer = within(openedDrawer());
 
-    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    expect(drawer.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    expect(drawer.getByRole('button', { name: 'Save changes' })).toBeDisabled();
 
     authState.user = { id: 'another-user' };
     authState.isLoading = false;
     authState.initialCheckComplete = true;
     rerender(<ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />);
+    const rerenderedDrawer = within(openedDrawer());
 
-    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'false');
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    expect(rerenderedDrawer.getByRole('status')).toHaveAttribute('aria-busy', 'false');
+    expect(rerenderedDrawer.getByRole('button', { name: 'Save changes' })).toBeDisabled();
   });
 
   it('keeps the phone drawer footer anchored to the keyboard-safe viewport', async () => {
@@ -304,6 +315,7 @@ describe('ColoringBookEditDrawer', () => {
     });
 
     renderWithProviders(<ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />);
+    const drawer = within(openedDrawer());
 
     expect(keyboardSafeViewportStyleMock).toHaveBeenCalledWith(true);
     expect(drawerPropsMock).toHaveBeenCalledWith(
@@ -314,7 +326,8 @@ describe('ColoringBookEditDrawer', () => {
       })
     );
 
-    const drawerContent = screen.getByTestId('phone-coloring-book-edit-drawer-content');
+    const drawerContent = openedDrawer();
+    expect(drawerContent).toHaveAttribute('data-testid', 'phone-coloring-book-edit-drawer-content');
     expect(drawerContent).toHaveClass('flex', 'flex-col');
     expect(drawerContent).toHaveStyle({
       bottom: '300px',
@@ -322,8 +335,8 @@ describe('ColoringBookEditDrawer', () => {
       maxHeight: '500px',
     });
 
-    await user.click(screen.getByLabelText(/Title/));
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeVisible();
+    await user.click(drawer.getByLabelText(/Title/));
+    expect(drawer.getByRole('button', { name: 'Save changes' })).toBeVisible();
   });
 
   it.each(['phone', 'desktop'] as const)(
@@ -349,15 +362,18 @@ describe('ColoringBookEditDrawer', () => {
       renderWithProviders(
         <ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={onOpenChange} />
       );
-      await user.type(screen.getByLabelText('Notes'), 'Unsaved note');
+      const drawerElement = openedDrawer();
+      const drawer = within(drawerElement);
+      await pasteIntoField(user, drawer.getByLabelText('Notes'), 'Unsaved note');
       if (device === 'phone') {
         drawerPropsMock.mock.calls.at(-1)?.[0].onOpenChange(false);
       } else {
-        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+        await user.click(drawer.getByRole('button', { name: 'Cancel' }));
       }
       expect(confirm).toHaveBeenCalledOnce();
       expect(onOpenChange).not.toHaveBeenCalledWith(false);
-      expect(screen.getByRole('dialog', { name: /edit coloring book/i })).toBeInTheDocument();
+      expect(drawerElement).toBeInTheDocument();
+      expect(openedDrawer()).toBe(drawerElement);
       confirm.mockRestore();
     }
   );
@@ -375,10 +391,11 @@ describe('ColoringBookEditDrawer', () => {
         onSaved={onSaved}
       />
     );
+    const drawer = within(openedDrawer());
 
-    await user.clear(screen.getByLabelText(/Title/));
-    await user.type(screen.getByLabelText(/Title/), 'Updated Worlds');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.clear(drawer.getByLabelText(/Title/));
+    await pasteIntoField(user, drawer.getByLabelText(/Title/), 'Updated Worlds');
+    await user.click(drawer.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(updateBookMutateAsync).toHaveBeenCalledWith(
@@ -406,8 +423,9 @@ describe('ColoringBookEditDrawer', () => {
     });
 
     renderWithProviders(<ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />);
+    const drawer = within(openedDrawer());
 
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(drawer.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(notifyMock).toHaveBeenCalledWith({
@@ -425,19 +443,20 @@ describe('ColoringBookEditDrawer', () => {
       .mockResolvedValueOnce({ book: { ...bookState.data, revision: 8 } });
 
     renderWithProviders(<ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />);
+    const drawer = within(openedDrawer());
 
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    expect(await screen.findByRole('alert')).toHaveFocus();
+    await user.click(drawer.getByRole('button', { name: 'Save changes' }));
+    expect(await drawer.findByRole('alert')).toHaveFocus();
     expect(updateBookMutateAsync).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ bookId: 'book-123', expectedRevision: 0 })
     );
 
-    await user.click(screen.getByRole('button', { name: 'Keep my edits for a new save' }));
-    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save changes' })).toHaveFocus());
+    await user.click(drawer.getByRole('button', { name: 'Keep my edits for a new save' }));
+    await waitFor(() => expect(drawer.queryByRole('alert')).not.toBeInTheDocument());
+    await waitFor(() => expect(drawer.getByRole('button', { name: 'Save changes' })).toHaveFocus());
 
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(drawer.getByRole('button', { name: 'Save changes' }));
     await waitFor(() =>
       expect(updateBookMutateAsync).toHaveBeenNthCalledWith(
         2,
@@ -450,9 +469,16 @@ describe('ColoringBookEditDrawer', () => {
     const user = userEvent.setup();
 
     renderWithProviders(<ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />);
+    const drawer = within(openedDrawer());
 
-    await user.click(screen.getByRole('button', { name: /archive coloring book/i }));
-    await user.click(await screen.findByRole('button', { name: 'Archive' }));
+    const archiveButton = drawer.getByRole('button', { name: /archive coloring book/i });
+    await user.click(archiveButton);
+    const confirmation = await findOwnedDialog(
+      archiveButton,
+      'Archive coloring book?',
+      'alertdialog'
+    );
+    await user.click(confirmation.getByRole('button', { name: 'Archive' }));
 
     await waitFor(() => {
       expect(updateBookMutateAsync).toHaveBeenCalledWith({
@@ -467,9 +493,16 @@ describe('ColoringBookEditDrawer', () => {
     const user = userEvent.setup();
 
     renderWithProviders(<ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />);
+    const drawer = within(openedDrawer());
 
-    await user.click(screen.getByRole('button', { name: /delete coloring book/i }));
-    await user.click(await screen.findByRole('button', { name: 'Delete' }));
+    const deleteButton = drawer.getByRole('button', { name: /delete coloring book/i });
+    await user.click(deleteButton);
+    const confirmation = await findOwnedDialog(
+      deleteButton,
+      'Delete this coloring book?',
+      'alertdialog'
+    );
+    await user.click(confirmation.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(deleteBookMutateAsync).toHaveBeenCalledWith('book-123');
@@ -484,7 +517,8 @@ describe('ColoringBookEditDrawer', () => {
       renderWithProviders(
         <ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />
       );
-      await user.type(screen.getByLabelText('Notes'), 'Unsaved private note');
+      const drawer = within(openedDrawer());
+      await pasteIntoField(user, drawer.getByLabelText('Notes'), 'Unsaved private note');
       const identity = {
         backendUrl: POCKETBASE_URL,
         accountId: 'user-123',
@@ -500,11 +534,17 @@ describe('ColoringBookEditDrawer', () => {
         { timeout: 2000 }
       );
 
-      await user.click(
-        screen.getByRole('button', { name: new RegExp(`${action} coloring book`, 'i') })
+      const actionButton = drawer.getByRole('button', {
+        name: new RegExp(`${action} coloring book`, 'i'),
+      });
+      await user.click(actionButton);
+      const confirmation = await findOwnedDialog(
+        actionButton,
+        action === 'archive' ? 'Archive coloring book?' : 'Delete this coloring book?',
+        'alertdialog'
       );
       await user.click(
-        await screen.findByRole('button', { name: action === 'archive' ? 'Archive' : 'Delete' })
+        confirmation.getByRole('button', { name: action === 'archive' ? 'Archive' : 'Delete' })
       );
       await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/dashboard?craft=coloring'));
 

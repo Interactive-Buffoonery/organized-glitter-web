@@ -148,6 +148,22 @@ All essential testing-library utilities are re-exported:
 - `act` - Wrap state updates
 - `within` - Query within specific elements
 
+### Long Multi-Step Form Tests
+
+Vitest cannot cancel a timed-out test's pending `userEvent` steps, so a late step that searches
+the whole document can drive the next test's form. In long form tests, import these from
+`@/test-utils/scopedInteractions`:
+
+- Query through `within(view.container)`, or through the captured dialog for portal drawers.
+- `openControlledPopup(user, trigger)` - Open a Radix Select, Popover, or Dialog and query only
+  the popup that trigger controls
+- `findOwnedDialog(owner, name, role)` - Find a portal dialog that is not linked by
+  `aria-controls`, only while its opener is still rendered
+- `pasteIntoField(user, field, text)` - Enter long text when the test checks values, not
+  keystrokes
+- `typeIntoField(user, field, text)` - Type key by key when keystrokes matter, stopping if the
+  field loses focus
+
 ### Vitest Exports
 
 Essential Vitest utilities:

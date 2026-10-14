@@ -58,9 +58,12 @@ function assertFocused(field: HTMLElement): void {
 export async function typeIntoField(user: UserEvent, field: HTMLElement, text: string) {
   if (/[{[]/.test(text)) throw new Error('typeIntoField only accepts plain characters.');
   await user.click(field);
+  // A keyboard delay would let timeout cleanup move focus after the check below. This
+  // sub-session shares the user's device state but dispatches each key without a timer.
+  const keyboard = user.setup({ delay: null });
   for (const character of text) {
     assertFocused(field);
-    await user.keyboard(character);
+    await keyboard.keyboard(character);
   }
 }
 

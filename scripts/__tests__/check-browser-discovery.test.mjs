@@ -6,7 +6,7 @@ import {
   runBoundedCommand,
 } from '../check-browser-discovery.mjs';
 
-const listed = { smoke: 'Total: 83 tests in 23 files', full: 'Total: 290 tests in 40 files' };
+const listed = { smoke: 'Total: 83 tests in 23 files', full: 'Total: 293 tests in 40 files' };
 
 describe('browser discovery check', () => {
   it('lists each managed suite exactly once with the synthetic fixture environment', async () => {
@@ -18,7 +18,7 @@ describe('browser discovery check', () => {
 
     await expect(checkBrowserDiscovery({ run })).resolves.toEqual({
       smoke: { files: 23, tests: 83 },
-      full: { files: 40, tests: 290 },
+      full: { files: 40, tests: 293 },
     });
     expect(run).toHaveBeenCalledTimes(2);
     for (const suite of ['smoke', 'full']) {

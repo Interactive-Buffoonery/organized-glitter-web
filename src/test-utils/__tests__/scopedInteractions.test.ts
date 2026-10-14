@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { typeIntoField } from '../scopedInteractions';
+import { pasteIntoField, typeIntoField } from '../scopedInteractions';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -48,4 +48,40 @@ describe('scoped typing', () => {
     expect(field).toHaveValue('123');
     expect(input).toHaveBeenCalledTimes(3);
   });
+});
+
+describe('scoped pasting', () => {
+  it.each(['focus', 'paste'])(
+    'does not paste into a later field after cleanup on %s',
+    async event => {
+      vi.useFakeTimers();
+      const original = document.createElement('input');
+      const replacement = document.createElement('input');
+      document.body.append(original);
+      original.addEventListener(event, () => {
+        setTimeout(() => {
+          original.remove();
+          document.body.append(replacement);
+          replacement.focus();
+        }, 0);
+      });
+
+      const pasting = pasteIntoField(userEvent.setup({ delay: 20 }), original, '123').catch(
+        error => error
+      );
+      await vi.runAllTimersAsync();
+      const result = await pasting;
+
+      expect(replacement).toHaveFocus();
+      expect(replacement).toHaveValue('');
+      if (event === 'focus') {
+        expect(result).toBeInstanceOf(Error);
+        expect(result.message).toMatch(/field is not focused/);
+        expect(original).toHaveValue('');
+      } else {
+        expect(result).toBeUndefined();
+        expect(original).toHaveValue('123');
+      }
+    }
+  );
 });

@@ -340,7 +340,7 @@ test.describe('local import/export workflows', () => {
     await writeFile(zipPath, await zip.generateAsync({ type: 'nodebuffer' }));
     await openDataSettings(page);
     await uploadFile(page, 'Bulk photo ZIP file', zipPath);
-    await expect(page.getByText(/1 photos ready for review/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/1 photo ready for review/i)).toBeVisible({ timeout: 30_000 });
     await expect(
       page
         .getByText(/ambiguous/i)

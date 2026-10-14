@@ -115,6 +115,9 @@ If an explicit reference or title cannot be resolved, or its target type is
 incompatible, the photo appears as an unmatched, skipped row with a reason. It
 does not fall through to filename matching. Choose a valid target type and record
 in the review step to include it.
+If multiple records share a matching normalized title, the photo remains unmatched
+until you choose a target. Use an explicit target reference in the manifest to
+distinguish records with the same title.
 For a cover target with no existing image, selected photos are tried in order.
 After one uploads successfully, later photos for that target are skipped unless
 overwrite is enabled.

@@ -384,29 +384,29 @@ describe('EditColoringBook page', () => {
       expect(update.patch).not.toHaveProperty('total_pages');
     }
 
-    it('submits empty text and date fields', async () => {
+    async function clearFields(labels: string[]) {
       const user = userEvent.setup();
       bookState.data = populatedBook();
 
       const view = renderWithProviders(<EditColoringBook />);
       const form = within(view.container);
 
-      for (const label of [
+      for (const label of labels) {
+        await user.clear(form.getByLabelText(label));
+      }
+      await user.click(form.getByRole('button', { name: 'Update book' }));
+    }
+
+    it('submits empty text fields', async () => {
+      await clearFields([
         'Series',
         'Theme',
         'ISBN',
         'Publication year',
         'Edition',
         'Source URL',
-        'Purchased',
-        'Received',
-        'Started',
-        'Completed',
         'Notes',
-      ]) {
-        await user.clear(form.getByLabelText(label));
-      }
-      await user.click(form.getByRole('button', { name: 'Update book' }));
+      ]);
 
       await expectSingleUpdate({
         ...unchangedPatch,
@@ -416,11 +416,19 @@ describe('EditColoringBook page', () => {
         publication_year: 0,
         edition: '',
         source_url: '',
+        notes: '',
+      });
+    });
+
+    it('submits empty date fields', async () => {
+      await clearFields(['Purchased', 'Received', 'Started', 'Completed']);
+
+      await expectSingleUpdate({
+        ...unchangedPatch,
         date_purchased: '',
         date_received: '',
         date_started: '',
         date_completed: '',
-        notes: '',
       });
     });
 

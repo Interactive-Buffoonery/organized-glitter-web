@@ -311,6 +311,6 @@ describe('RandomizerWheel', () => {
     });
 
     expect(onSpinComplete).toHaveBeenCalledWith(targets[2]);
-    expect(announceSpinResultMock).toHaveBeenCalledWith('Gamma Project', 'Diamond painting');
+    expect(announceSpinResultMock).toHaveBeenCalledWith('Gamma Project');
   });
 });

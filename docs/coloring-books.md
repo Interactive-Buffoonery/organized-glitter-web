@@ -42,7 +42,7 @@ creating, updating, or deleting taxonomy rows.
 
 The `coloring_books.status` value `in_stash` remains the stored enum for books
 that are owned but not started. The app displays that value as
-`On Bookshelf (Not Started)` in coloring-book UI.
+`In library` in coloring-book UI.
 
 ## Form flow
 

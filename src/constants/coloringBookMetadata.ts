@@ -5,7 +5,7 @@ export const COLORING_BOOK_MAX_PAGES = 500;
 export const COLORING_BOOK_STATUS_OPTIONS = [
   { value: 'wishlist', label: 'Wishlist' },
   { value: 'purchased', label: 'Purchased' },
-  { value: 'in_stash', label: 'On Bookshelf (Not Started)' },
+  { value: 'in_stash', label: 'In library' },
   { value: 'in_progress', label: 'In progress' },
   { value: 'completed', label: 'Completed' },
   { value: 'archived', label: 'Archived' },

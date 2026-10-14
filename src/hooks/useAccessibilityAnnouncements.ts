@@ -137,13 +137,11 @@ export const useAccessibilityAnnouncements = () => {
   );
 
   /**
-   * Announce spin result with project details
+   * Announce the selected spin target
    */
   const announceSpinResult = useCallback(
-    (projectTitle: string, projectDetails?: string) => {
-      const message = projectDetails
-        ? `Spin complete! Selected project: ${projectTitle} by ${projectDetails}`
-        : `Spin complete! Selected project: ${projectTitle}`;
+    (itemTitle: string) => {
+      const message = `Spin complete! Selected: ${itemTitle}`;
 
       announce(message, { priority: 'assertive', clearPrevious: true, delay: 100 });
     },

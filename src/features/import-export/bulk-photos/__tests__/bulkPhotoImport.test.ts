@@ -913,3 +913,93 @@ describe('bulk photo import', () => {
     );
   });
 });
+
+describe('ambiguous bulk photo titles', () => {
+  const duplicateProjects: BulkPhotoLibrary = {
+    ...library,
+    diamondProjects: [
+      library.diamondProjects[0],
+      { ...library.diamondProjects[0], id: 'project-duplicate' },
+    ],
+  };
+  const duplicateBooks: BulkPhotoLibrary = {
+    ...library,
+    coloringBooks: [
+      library.coloringBooks[0],
+      { ...library.coloringBooks[0], id: 'book-duplicate' },
+    ],
+  };
+
+  it.each([
+    ['duplicate project titles', duplicateProjects, 'Starry Fox/photo.jpg'],
+    ['duplicate coloring book titles', duplicateBooks, 'Forest Animals/photo.jpg'],
+    ['duplicate book titles with a page number', duplicateBooks, 'Forest Animals/page12.jpg'],
+    [
+      'normalized project titles',
+      {
+        ...library,
+        diamondProjects: [
+          library.diamondProjects[0],
+          { ...library.diamondProjects[0], id: 'project-duplicate', title: 'Starry-Fox' },
+        ],
+      },
+      'Starry Fox/photo.jpg',
+    ],
+    [
+      'a project and coloring book with the same title',
+      {
+        ...library,
+        coloringBooks: [{ ...library.coloringBooks[0], title: 'Starry Fox' }],
+      },
+      'Starry Fox/photo.jpg',
+    ],
+    [
+      'a project and coloring book with the same title and page number',
+      {
+        ...library,
+        diamondProjects: [{ ...library.diamondProjects[0], title: 'Forest Animals' }],
+      },
+      'Forest Animals/page12.jpg',
+    ],
+  ])('requires a manual target for %s', async (_name, testLibrary, path) => {
+    const rows = analyzePhotoFiles([{ file: imageFile('photo.jpg'), path }], testLibrary);
+    expect(rows[0]).toMatchObject({ confidence: 'unmatched', confirmed: false, excluded: true });
+    expect(rows[0].targetId).toBeUndefined();
+    expect(rows[0].targetType).toBeUndefined();
+    expect(rows[0].reason).toMatch(/ambiguous/i);
+    const importAdapter = adapter();
+    const result = await importBulkPhotos(rows, testLibrary, { adapter: importAdapter });
+    expect(result.importedCount).toBe(0);
+    expect(importAdapter.updateProjectCover).not.toHaveBeenCalled();
+    expect(importAdapter.updateColoringBookCover).not.toHaveBeenCalled();
+    expect(importAdapter.appendColoringPagePhoto).not.toHaveBeenCalled();
+  });
+
+  it('rejects an ambiguous title-only manifest without falling back to a filename ID', () => {
+    const rows = analyzePhotoFiles([{ file: imageFile('project-1.jpg') }], duplicateProjects, [
+      { path: 'project-1.jpg', title: 'Starry Fox' },
+    ]);
+    expect(rows[0]).toMatchObject({ confidence: 'unmatched', confirmed: false, excluded: true });
+    expect(rows[0].targetId).toBeUndefined();
+    expect(rows[0].reason).toMatch(/ambiguous/i);
+  });
+
+  it('allows an explicit target reference to disambiguate duplicate titles', () => {
+    const rows = analyzePhotoFiles([{ file: imageFile('photo.jpg') }], duplicateProjects, [
+      { path: 'photo.jpg', targetRef: 'project:project-duplicate', title: 'Starry Fox' },
+    ]);
+    expect(rows[0]).toMatchObject({
+      targetId: 'project-duplicate',
+      confidence: 'manifest',
+      confirmed: true,
+    });
+  });
+
+  it('preserves filename ID precedence when a title is ambiguous', () => {
+    const rows = analyzePhotoFiles(
+      [{ file: imageFile('project-1.jpg'), path: 'Starry Fox/project-1.jpg' }],
+      duplicateProjects
+    );
+    expect(rows[0]).toMatchObject({ targetId: 'project-1', confidence: 'high', confirmed: true });
+  });
+});

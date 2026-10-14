@@ -1,8 +1,8 @@
-import { ProjectType, ProjectStatus } from '@/types/project';
+import { ProjectType } from '@/types/project';
 import Papa from 'papaparse';
 import { logger } from '@/utils/logger';
 import { safeDateString } from '@/utils/date/dateHelpers';
-import { validateKitCategoryValue } from '@/utils/csv/csvValidation';
+import { normalizeStatus, validateKitCategoryValue } from '@/utils/csv/csvValidation';
 import { restoreCsvFormulaTextField } from '@/utils/csv/csvFormulaSafety';
 
 export interface ParsedCsvData {
@@ -28,7 +28,7 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
 
   const status = getTextFieldValue(row, ['status', 'state', 'project status']);
   if (status) {
-    project.status = validateStatus(status);
+    project.status = normalizeStatus(status).normalized;
   }
 
   const company = getTextFieldValue(row, ['company', 'manufacturer', 'brand']);
@@ -210,32 +210,28 @@ export const parseCsvToProjects = (
       return;
     }
 
+    const projects: Partial<ProjectType>[] = [];
+    const parsingWarnings: Papa.ParseError[] = [];
+
     Papa.parse(csvContent, {
       header: true,
       skipEmptyLines: true,
       transformHeader: (header: string) => header.toLowerCase().trim(),
-      step: onProgress
-        ? (_results, parser) => {
-            // Calculate progress based on bytes processed
-            const progress = Math.round((parser.getCharIndex() / csvContent.length) * 100);
-            onProgress(progress);
-          }
-        : undefined,
-      complete: results => {
+      step: results => {
+        parsingWarnings.push(...results.errors);
+        const project = parseProjectFromRow(results.data as Record<string, string>);
+        if (project) projects.push(project);
+        if (onProgress) {
+          const progress = Math.round((results.meta.cursor / csvContent.length) * 100);
+          onProgress(Math.min(progress, 99));
+        }
+      },
+      complete: () => {
         try {
-          if (results.errors.length > 0) {
-            logger.warn('CSV parsing warnings:', results.errors);
+          if (parsingWarnings.length > 0) {
+            logger.warn('CSV parsing warnings:', parsingWarnings);
           }
-
-          const projects: Partial<ProjectType>[] = [];
-
-          for (let i = 0; i < results.data.length; i++) {
-            const row = results.data[i] as Record<string, string>;
-            const project = parseProjectFromRow(row);
-            if (project) {
-              projects.push(project);
-            }
-          }
+          onProgress?.(100);
 
           const allTagNamesArrays = projects.map(p => p.tagNames || []);
           const allUniqueTagNames = Array.from(new Set(allTagNamesArrays.flat()));
@@ -271,7 +267,7 @@ export const parseCsvFileToProjects = (
       header: true,
       skipEmptyLines: true,
       transformHeader: (header: string) => header.toLowerCase().trim(),
-      step: (results, parser) => {
+      step: results => {
         // Process each row as it's parsed (streaming)
         const row = results.data as Record<string, string>;
 
@@ -285,7 +281,7 @@ export const parseCsvFileToProjects = (
           // Report progress every 100 rows
           if (onProgress && rowCount % 100 === 0) {
             // Approximate progress based on bytes read vs file size
-            const progress = Math.round((parser.getCharIndex() / file.size) * 100);
+            const progress = Math.round((results.meta.cursor / file.size) * 100);
             onProgress(Math.min(progress, 99)); // Cap at 99% until complete
           }
         } catch (error) {
@@ -331,33 +327,6 @@ const getTextFieldValue = (
   const value = getFieldValue(row, possibleHeaders);
   return value ? restoreCsvFormulaTextField(value) : undefined;
 };
-
-/**
- * Validate and normalize the status field
- */
-const STATUS_ALIASES: Record<string, ProjectStatus> = {
-  wishlist: 'wishlist',
-  purchased: 'purchased',
-  stash: 'stash',
-  kitted: 'kitted',
-  'kitted up': 'kitted',
-  'kitted up, not started': 'kitted',
-  'ready to start': 'kitted',
-  progress: 'progress',
-  'in progress': 'progress',
-  onhold: 'onhold',
-  'on hold': 'onhold',
-  on_hold: 'onhold',
-  paused: 'onhold',
-  waiting: 'onhold',
-  suspended: 'onhold',
-  completed: 'completed',
-  archived: 'archived',
-  destashed: 'destashed',
-};
-
-const validateStatus = (status: string): ProjectStatus =>
-  STATUS_ALIASES[status.toLowerCase().trim()] ?? 'wishlist';
 
 /**
  * Validate and format a date string

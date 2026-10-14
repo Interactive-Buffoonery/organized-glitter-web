@@ -22,7 +22,7 @@ const DIAMOND_STATUS_OPTIONS = [
 
 const BOOK_STATUS_OPTIONS = [
   { value: 'purchased', label: 'Purchased' },
-  { value: 'in_stash', label: 'On Bookshelf (Not Started)' },
+  { value: 'in_stash', label: 'In library' },
   { value: 'in_progress', label: 'In progress' },
 ];
 

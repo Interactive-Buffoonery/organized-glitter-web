@@ -10,7 +10,7 @@ Multi-craft hobbyists who own a non-trivial number of in-progress and unstarted 
 
 ## Product Purpose
 
-Organized Glitter is a multi-craft project tracker built around a shared project/book ownership spine (Wishlist → Purchased → In Stash → In Progress → Completed → Archived → Destashed) with vertical-specific progress details layered on top. Diamond paintings track kit metadata and progress notes; coloring books track book ownership, generated page records, page photos, mediums, and mystery reveals. Its purpose is to let a crafter see all of their projects, log progress against the ones they're working on, and tell the truth about what they own without scrolling through a thousand camera-roll photos. Success looks like a user opening the app daily, logging real progress against real projects or pages, and feeling more in control of their stash, not less.
+Organized Glitter is a multi-craft project tracker built around a shared project/book ownership spine (Wishlist → Purchased → In Stash → In Progress → Completed → Archived → Destashed) with vertical-specific progress details layered on top. Coloring books display the stored `in_stash` status as "In library". Diamond paintings track kit metadata and progress notes; coloring books track book ownership, generated page records, page photos, mediums, and mystery reveals. Its purpose is to let a crafter see all of their projects, log progress against the ones they're working on, and tell the truth about what they own without scrolling through a thousand camera-roll photos. Success looks like a user opening the app daily, logging real progress against real projects or pages, and feeling more in control of their stash, not less.
 
 ## Brand Personality
 

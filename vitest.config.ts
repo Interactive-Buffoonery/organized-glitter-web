@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
+import { nodeLogicTestFiles } from './test/node-logic-test-files';
+
 const generatedTestArtifacts = [
   '**/node_modules/**',
   '**/dist/**',
@@ -96,6 +98,15 @@ export default defineConfig({
       {
         extends: true,
         test: {
+          name: 'logic',
+          environment: 'node',
+          include: nodeLogicTestFiles,
+          exclude: generatedTestArtifacts,
+        },
+      },
+      {
+        extends: true,
+        test: {
           name: 'dom',
           environment: 'jsdom',
           setupFiles: ['./test/setup.ts'],
@@ -104,7 +115,7 @@ export default defineConfig({
             'test/**/*.{test,spec}.{js,jsx,ts,tsx}',
             ...scriptDomTestFiles,
           ],
-          exclude: [...generatedTestArtifacts, ...nodeTestsUnderDomRoots],
+          exclude: [...generatedTestArtifacts, ...nodeTestsUnderDomRoots, ...nodeLogicTestFiles],
         },
       },
     ],

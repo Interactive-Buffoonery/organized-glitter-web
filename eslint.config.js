@@ -6,12 +6,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
-const refetchDefaultsRule = {
-  selector:
-    'Property[key.name=/^(refetchOnWindowFocus|refetchOnReconnect|refetchOnMount)$/][value.value=false], Property[key.value=/^(refetchOnWindowFocus|refetchOnReconnect|refetchOnMount)$/][value.value=false]',
-  message:
-    'Focus, reconnect, and mount refetching keep data fresh across devices (ADR-0004). Keep the query client defaults.',
-};
+import { queryLintConfigs } from './config/eslint-query-rules.js';
 
 export default tseslint.config(
   {
@@ -125,29 +120,7 @@ export default tseslint.config(
       ],
     },
   },
-  {
-    files: ['src/hooks/**/*.{ts,tsx}', 'src/contexts/**/*.{ts,tsx}'],
-    ignores: ['**/__tests__/**', '**/*.test.{ts,tsx}', 'src/hooks/queries/shared/queryUtils.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector:
-            'Property[key.name=/^(staleTime|gcTime)$/], Property[key.value=/^(staleTime|gcTime)$/]',
-          message:
-            "Spread queryFreshness('<profile>') from '@/hooks/queries/shared/queryUtils' instead of setting staleTime or gcTime.",
-        },
-        refetchDefaultsRule,
-      ],
-    },
-  },
-  {
-    files: ['src/hooks/queries/shared/queryUtils.ts'],
-    ignores: ['**/__tests__/**', '**/*.test.{ts,tsx}'],
-    rules: {
-      'no-restricted-syntax': ['error', refetchDefaultsRule],
-    },
-  },
+  ...queryLintConfigs,
   {
     files: ['src/types/pocketbase.types.ts'],
     rules: {

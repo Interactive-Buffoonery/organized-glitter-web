@@ -217,30 +217,30 @@ export const useProjectImport = () => {
         tagValidationResult.validatedTags.map(({ original, normalized }) => [original, normalized])
       );
 
-      const tagNameMap: Record<string, string> = {};
+      const tagNameMap = new Map<string, string>();
       const currentTagWarnings: string[] = []; // Use a local var for warnings during this phase
 
       try {
         // Build tag name map using normalized names
         existingUserTags.forEach(tag => {
           // Map by exact name
-          tagNameMap[tag.name] = tag.id;
+          tagNameMap.set(tag.name, tag.id);
 
           // Also map by normalized name to prevent duplicate creation
           const normalizedTagName = validatedTagNamesMap.get(tag.name) || tag.name;
           if (normalizedTagName !== tag.name) {
-            tagNameMap[normalizedTagName] = tag.id;
+            tagNameMap.set(normalizedTagName, tag.id);
           }
         });
         logger.debug('Built tag name map from existing tags.', {
           count: existingUserTags.length,
-          mappedNames: Object.keys(tagNameMap),
+          mappedNames: [...tagNameMap.keys()],
         });
 
         const newTagNamesToCreate: string[] = [];
         allUniqueTagNames.forEach(originalName => {
           const normalizedName = validatedTagNamesMap.get(originalName) || originalName;
-          if (normalizedName && normalizedName.trim() !== '' && !tagNameMap[normalizedName]) {
+          if (normalizedName && normalizedName.trim() !== '' && !tagNameMap.has(normalizedName)) {
             // Ensure normalized name is not empty and not already mapped
             newTagNamesToCreate.push(normalizedName);
           }
@@ -284,7 +284,7 @@ export const useProjectImport = () => {
               ...newTagData,
               userId: user.id,
             });
-            tagNameMap[tagName] = createdTag.id;
+            tagNameMap.set(tagName, createdTag.id);
             createdTagsCount++;
             logger.debug(`Successfully created new tag: ${tagName}`, {
               id: createdTag.id,
@@ -300,7 +300,7 @@ export const useProjectImport = () => {
           setProgress(Math.round(15 + (createdTagsCount / (newTagNamesToCreate.length || 1)) * 10));
         }
         logger.debug('Finished creating new tags and updated map.', {
-          finalMapSize: Object.keys(tagNameMap).length,
+          finalMapSize: tagNameMap.size,
           createdCount: createdTagsCount,
         });
       } catch (batchTagError) {
@@ -336,7 +336,7 @@ export const useProjectImport = () => {
           const projectTagIds = (parsedProject.tagNames || [])
             .map(originalName => {
               const normalizedName = validatedTagNamesMap.get(originalName) || originalName;
-              return tagNameMap[normalizedName];
+              return tagNameMap.get(normalizedName);
             })
             .filter(id => !!id) as string[];
 

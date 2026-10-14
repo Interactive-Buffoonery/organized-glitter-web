@@ -17,10 +17,12 @@ export const useNumberInput = (onChange: (value: number | null) => void) => {
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       // Strip commas from the input value
-      const cleanValue = e.target.value.replace(/,/g, '');
+      const cleanValue = e.target.value.replace(/,/g, '').trim();
       // Convert to number or null if empty
       const numValue = cleanValue ? Number(cleanValue) : null;
-      onChange(numValue);
+      if (numValue === null || Number.isFinite(numValue)) {
+        onChange(numValue);
+      }
     },
     [onChange]
   );
@@ -29,10 +31,12 @@ export const useNumberInput = (onChange: (value: number | null) => void) => {
     (e: React.ClipboardEvent<HTMLInputElement>) => {
       e.preventDefault();
       // Get pasted text and strip commas
-      const pastedText = e.clipboardData.getData('text').replace(/,/g, '');
+      const pastedText = e.clipboardData.getData('text').replace(/,/g, '').trim();
       // Convert to number or null if empty
       const numValue = pastedText ? Number(pastedText) : null;
-      onChange(numValue);
+      if (numValue === null || Number.isFinite(numValue)) {
+        onChange(numValue);
+      }
     },
     [onChange]
   );

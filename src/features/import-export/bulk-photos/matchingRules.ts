@@ -94,7 +94,12 @@ function manifestMatch(
 
   if (manifest.title) {
     const normalizedTitle = compact(manifest.title);
-    const project = library.diamondProjects.find(item => compact(item.title) === normalizedTitle);
+    const projects = library.diamondProjects.filter(
+      item => compact(item.title) === normalizedTitle
+    );
+    if (projects.length > 1)
+      return invalidManifestMatch('Manifest project title is ambiguous; select a target reference');
+    const project = projects[0];
     if (!project) return invalidManifestMatch('Manifest project title was not found');
     const targetType = manifest.targetType ?? 'project-cover';
     if (!isTargetTypeForKind('project', targetType)) {
@@ -155,9 +160,25 @@ function exactIdMatch(path: string, library: BulkPhotoLibrary): BulkPhotoMatch |
   return null;
 }
 
-function exactTitleMatch(path: string, library: BulkPhotoLibrary): BulkPhotoMatch | null {
+function pathTitleMatches(path: string, library: BulkPhotoLibrary) {
   const segments = pathSegments(path).map(compact);
-  const project = library.diamondProjects.find(item => segments.includes(compact(item.title)));
+  return {
+    projects: library.diamondProjects.filter(item => segments.includes(compact(item.title))),
+    books: library.coloringBooks.filter(item => segments.includes(compact(item.title))),
+  };
+}
+
+function ambiguousTitleMatch(): BulkPhotoMatch {
+  return {
+    confidence: 'unmatched',
+    reason: 'Folder title is ambiguous; select a target manually',
+  };
+}
+
+function exactTitleMatch(path: string, library: BulkPhotoLibrary): BulkPhotoMatch | null {
+  const { projects, books } = pathTitleMatches(path, library);
+  if (projects.length + books.length > 1) return ambiguousTitleMatch();
+  const project = projects[0];
   if (project) {
     const targetType = hasProgressToken(path) ? 'project-progress-note' : 'project-cover';
     return {
@@ -169,7 +190,7 @@ function exactTitleMatch(path: string, library: BulkPhotoLibrary): BulkPhotoMatc
     };
   }
 
-  const book = library.coloringBooks.find(item => segments.includes(compact(item.title)));
+  const book = books[0];
   if (book) {
     return {
       targetType: 'coloring-book-cover',
@@ -189,9 +210,9 @@ function coloringPageNumberMatch(path: string, library: BulkPhotoLibrary): BulkP
   const pageNumber = pageMatch ? Number(pageMatch[1]) : NaN;
   if (!Number.isFinite(pageNumber)) return null;
 
-  const book = library.coloringBooks.find(item =>
-    pathSegments(path).some(segment => compact(segment) === compact(item.title))
-  );
+  const { projects, books } = pathTitleMatches(path, library);
+  if (projects.length + books.length > 1) return ambiguousTitleMatch();
+  const book = books[0];
   const page = library.coloringPages.find(
     item => item.pageNumber === pageNumber && (!book || item.bookId === book.id)
   );

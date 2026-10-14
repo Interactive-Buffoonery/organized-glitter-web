@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { parseCsvFileToProjects, parseCsvToProjects } from '@/utils/csv/csvImport';
 
@@ -119,5 +119,48 @@ describe('CSV import serializers', () => {
     expect(projects[0].height).toBeUndefined();
     expect(projects[0].totalDiamonds).toBeUndefined();
     expect(projects[0].colorCount).toBeUndefined();
+  });
+});
+
+describe.each([
+  { name: 'CSV content', parse: parseCsvToProjects },
+  {
+    name: 'CSV file',
+    parse: (csv: string, onProgress?: (progress: number) => void) =>
+      parseCsvFileToProjects(new File([csv], 'projects.csv', { type: 'text/csv' }), onProgress),
+  },
+])('CSV normalization and progress from $name', ({ parse }) => {
+  it.each([
+    ['done', 'completed'],
+    ['finished', 'completed'],
+    ['complete', 'completed'],
+    ['bought', 'purchased'],
+    ['owned', 'stash'],
+    ['in_progress', 'progress'],
+    ['  DONE  ', 'completed'],
+  ])('normalizes the supported status alias %s', async (alias, status) => {
+    const { projects } = await parse(`Title,Status\nProject,${alias}`);
+    expect(projects[0].status).toBe(status);
+  });
+
+  it('preserves every project and tag while reporting real Papa Parse progress', async () => {
+    const csv = [
+      'Title,Status,Tags',
+      ...Array.from({ length: 101 }, (_, index) => `Project ${index},stash,Tag ${index % 3}`),
+    ].join('\n');
+    const onProgress = vi.fn();
+    const expected = await parse(csv);
+    const actual = await parse(csv, onProgress);
+
+    expect(actual).toEqual(expected);
+    expect(actual.projects).toHaveLength(101);
+    expect(actual.allUniqueTagNames).toEqual(['Tag 0', 'Tag 1', 'Tag 2']);
+    const progress = onProgress.mock.calls.map(([value]) => value as number);
+    expect(progress.length).toBeGreaterThan(1);
+    expect(progress.at(-1)).toBe(100);
+    expect(progress.every(value => value >= 0 && value <= 100)).toBe(true);
+    expect(progress.every((value, index) => index === 0 || value >= progress[index - 1])).toBe(
+      true
+    );
   });
 });

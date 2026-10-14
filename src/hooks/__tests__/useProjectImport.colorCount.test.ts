@@ -7,6 +7,7 @@ import { AnalyticsEvent } from '@/services/analytics-events';
 const {
   mockCaptureEvent,
   mockCreateProject,
+  mockCreateTag,
   mockGetCurrentUser,
   mockInvalidate,
   mockIsAuthenticated,
@@ -15,10 +16,11 @@ const {
 } = vi.hoisted(() => ({
   mockCaptureEvent: vi.fn(),
   mockCreateProject: vi.fn(),
+  mockCreateTag: vi.fn(),
   mockGetCurrentUser: vi.fn(),
   mockInvalidate: vi.fn(),
   mockIsAuthenticated: vi.fn(() => true),
-  mockListUserTags: vi.fn(async () => []),
+  mockListUserTags: vi.fn<() => Promise<Array<{ id: string; name: string }>>>(async () => []),
   mockNotify: vi.fn(),
 }));
 
@@ -38,7 +40,7 @@ vi.mock('@/services/pocketbase/importTags.service', () => ({
   ImportTagsService: {
     listUserTags: mockListUserTags,
     slugExists: vi.fn(async () => false),
-    createTag: vi.fn(),
+    createTag: mockCreateTag,
   },
 }));
 
@@ -72,6 +74,8 @@ const createCsvFile = (contents: string): File =>
 
 describe('useProjectImport color count persistence', () => {
   beforeEach(() => {
+    mockListUserTags.mockResolvedValue([]);
+    mockCreateTag.mockImplementation(async ({ name }: { name: string }) => ({ id: `tag-${name}` }));
     mockInvalidate.mockReset().mockResolvedValue(undefined);
     mockCreateProject.mockResolvedValue({
       project: { id: 'created-id' },
@@ -100,6 +104,37 @@ describe('useProjectImport color count persistence', () => {
     expect(dto.title).toBe('Galaxy Cat');
     expect(dto.colorCount).toBe(42);
   });
+
+  it.each(['constructor', 'toString', '__proto__'])(
+    'creates and links a new tag named %s',
+    async name => {
+      const { result } = renderHookWithProviders(() => useProjectImport());
+      await act(async () => {
+        await result.current.importProjectsFromCSV(
+          createCsvFile(`Title,Tags\nGalaxy Cat,${name}\n`)
+        );
+      });
+      expect(mockCreateTag).toHaveBeenCalledWith(expect.objectContaining({ name }));
+      const dto = mockCreateProject.mock.calls[0][0] as ProjectCreateDTO;
+      expect(dto.tagIds).toEqual([`tag-${name}`]);
+    }
+  );
+
+  it.each(['constructor', 'toString', '__proto__'])(
+    'links an existing tag named %s without creating it again',
+    async name => {
+      mockListUserTags.mockResolvedValue([{ id: 'existing-tag', name }]);
+      const { result } = renderHookWithProviders(() => useProjectImport());
+      await act(async () => {
+        await result.current.importProjectsFromCSV(
+          createCsvFile(`Title,Tags\nGalaxy Cat,${name}\n`)
+        );
+      });
+      expect(mockCreateTag).not.toHaveBeenCalled();
+      const dto = mockCreateProject.mock.calls[0][0] as ProjectCreateDTO;
+      expect(dto.tagIds).toEqual(['existing-tag']);
+    }
+  );
 
   it.each([
     {

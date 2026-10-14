@@ -461,8 +461,8 @@ and Number for the current result. Save the picked number and candidate list in 
 progress-note suggestions use "Section number" for number picks. Existing saved
 size metadata remains supported.
 
-Use Projects, Books, and Pages as list headings. Page copy is:
-"Pick some or all of your in-progress projects and spin the wheel!"
+Use Projects, Books, and Pages as list headings. Do not add introductory
+copy or a redundant heading above the wheel.
 Do not restore the discarded "one spin away" subtitle or "in the draw" headings.
 The empty Next up hint uses small italic text: "Run the randomizer and save a
 choice. It will appear here." Allow the hint to wrap on phones.

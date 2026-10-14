@@ -199,7 +199,6 @@ const ProjectRandomizer: React.FC = () => {
 
         <div className="grid min-w-0 gap-8 md:grid-cols-2 xl:gap-12">
           <section aria-label="Make a pick" className="min-w-0 md:order-last">
-            <h2 className="mb-6 text-center text-xl font-semibold">What will you work on next?</h2>
             <div className="flex min-w-0 flex-col items-center">
               {isLoadingTargets ? (
                 <RandomizerLoadingState />

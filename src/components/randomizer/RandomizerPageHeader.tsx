@@ -19,9 +19,6 @@ export function RandomizerPageHeader() {
           <h1 className="font-handwritten text-3xl leading-tight tracking-tight md:text-4xl">
             Randomizer
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Pick some or all of your in-progress projects and spin the wheel!
-          </p>
         </div>
       </div>
     </header>

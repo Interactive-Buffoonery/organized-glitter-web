@@ -175,7 +175,7 @@ const RandomizerWheelSession: React.FC<RandomizerWheelProps> = ({
           selectedTargetTitle: selectedTarget.title,
         });
 
-        announceSpinResult(selectedTarget.title, selectedTarget.subtitle);
+        announceSpinResult(selectedTarget.title);
       }
       spinCompletionCleanupRef.current = null;
     };

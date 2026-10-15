@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { within } from '@testing-library/react';
 import { vi } from 'vitest';
 import {
   beforeEach,
@@ -7,10 +8,14 @@ import {
   fireEvent,
   it,
   renderWithProviders,
-  screen,
   userEvent,
   waitFor,
 } from '@/test-utils';
+import {
+  openControlledPopup,
+  pasteIntoField,
+  typeIntoField,
+} from '@/test-utils/scopedInteractions';
 import type { ColoringBookDTO } from '@/services/pocketbase/coloring.service';
 import { ColoringBookForm } from '../ColoringBookForm';
 import { getDraftGeneration, readFormDraft } from '@/hooks/drafts/formDraftStorage';
@@ -88,9 +93,10 @@ describe('ColoringBookForm', () => {
     const user = userEvent.setup();
     const props = { ...baseProps, sessionDraftKey: 'coloring-new-test', accountId: 'user-1' };
     const first = renderWithProviders(<ColoringBookForm {...props} />);
+    const form = within(first.container);
     const file = new File(['cover'], 'pending-cover.png', { type: 'image/png' });
 
-    await user.upload(screen.getByLabelText('Cover image'), file);
+    await user.upload(form.getByLabelText('Cover image'), file);
     captureSessionDrafts('user-1', 'expired-crop-token');
     first.unmount();
 
@@ -107,7 +113,8 @@ describe('ColoringBookForm', () => {
       accountId: 'user-1',
     };
     const first = renderWithProviders(<ColoringBookForm {...props} />);
-    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Unsent note' } });
+    let form = within(first.container);
+    fireEvent.change(form.getByLabelText('Notes'), { target: { value: 'Unsent note' } });
     captureSessionDrafts('user-1', 'first-photo-token');
     const saved = takeSessionDraft<Record<string, unknown>>('coloring-missing-photo', 'user-1');
     expect(saved).toBeDefined();
@@ -119,9 +126,10 @@ describe('ColoringBookForm', () => {
     }));
     captureSessionDrafts('user-1', 'second-photo-token');
     unregister();
-    renderWithProviders(<ColoringBookForm {...props} />);
+    const restored = renderWithProviders(<ColoringBookForm {...props} />);
+    form = within(restored.container);
 
-    expect(screen.getByText('Select your photo again before saving.')).toBeInTheDocument();
+    expect(form.getByText('Select your photo again before saving.')).toBeInTheDocument();
   });
 
   it('keeps the captured revision when restoring an edit from the same account', async () => {
@@ -135,8 +143,9 @@ describe('ColoringBookForm', () => {
         accountId="user-1"
       />
     );
+    let form = within(first.container);
 
-    await user.type(screen.getByLabelText('Notes'), 'Recovered note');
+    await pasteIntoField(user, form.getByLabelText('Notes'), 'Recovered note');
     captureSessionDrafts('user-1', 'expired-edit-token');
     first.unmount();
 
@@ -153,15 +162,16 @@ describe('ColoringBookForm', () => {
         onSessionDraftConflict={onSessionDraftConflict}
       />
     );
+    form = within(second.container);
 
-    expect(screen.getByLabelText('Notes')).toHaveValue('Recovered note');
+    expect(form.getByLabelText('Notes')).toHaveValue('Recovered note');
     await waitFor(() => expect(onSessionDraftConflict).toHaveBeenCalledWith(true));
-    await user.click(screen.getByRole('button', { name: 'Discard draft' }));
+    await user.click(form.getByRole('button', { name: 'Discard draft' }));
     captureSessionDrafts('user-1', 'expired-edit-token-again');
     second.unmount();
 
     onSessionDraftConflict.mockClear();
-    renderWithProviders(
+    const third = renderWithProviders(
       <ColoringBookForm
         {...baseProps}
         initialBook={{ ...coloringBook(), revision: 5 }}
@@ -172,11 +182,12 @@ describe('ColoringBookForm', () => {
         onSessionDraftConflict={onSessionDraftConflict}
       />
     );
+    form = within(third.container);
 
-    expect(screen.getByLabelText('Notes')).toHaveValue('Recovered note');
+    expect(form.getByLabelText('Notes')).toHaveValue('Recovered note');
     await waitFor(() => expect(onSessionDraftConflict).toHaveBeenCalledWith(true));
-    await user.click(screen.getByRole('button', { name: 'Discard draft' }));
-    await user.click(screen.getByRole('button', { name: 'Update book' }));
+    await user.click(form.getByRole('button', { name: 'Discard draft' }));
+    await user.click(form.getByRole('button', { name: 'Update book' }));
 
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith(
@@ -201,15 +212,16 @@ describe('ColoringBookForm', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const form = within(view.container);
 
-    await user.type(screen.getByLabelText(/Title/), 'Disney Mystery Coloring: Pixar');
-    await user.clear(screen.getByLabelText(/Number of pages/));
-    await user.type(screen.getByLabelText(/Number of pages/), '100');
-    await user.type(screen.getByLabelText('Source URL'), 'https://example.com/book');
-    await user.type(screen.getByLabelText('Notes'), 'Bought for marker practice.');
-    await user.click(screen.getByLabelText('Mystery coloring book?'));
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await pasteIntoField(user, form.getByLabelText(/Title/), 'Disney Mystery Coloring: Pixar');
+    await user.clear(form.getByLabelText(/Number of pages/));
+    await typeIntoField(user, form.getByLabelText(/Number of pages/), '100');
+    await pasteIntoField(user, form.getByLabelText('Source URL'), 'https://example.com/book');
+    await pasteIntoField(user, form.getByLabelText('Notes'), 'Bought for marker practice.');
+    await user.click(form.getByLabelText('Mystery coloring book?'));
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
@@ -229,11 +241,12 @@ describe('ColoringBookForm', () => {
   it('completes a book when a completion date is entered', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const form = within(view.container);
 
-    await user.type(screen.getByLabelText(/Title/), 'Finished book');
-    fireEvent.change(screen.getByLabelText('Completed'), { target: { value: '2026-09-20' } });
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await pasteIntoField(user, form.getByLabelText(/Title/), 'Finished book');
+    fireEvent.change(form.getByLabelText('Completed'), { target: { value: '2026-09-20' } });
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
@@ -244,14 +257,15 @@ describe('ColoringBookForm', () => {
   });
 
   it('keeps a manual book status when its saved completion date is retyped or restored', () => {
-    renderWithProviders(
+    const view = renderWithProviders(
       <ColoringBookForm
         {...baseProps}
         initialBook={{ ...coloringBook(), dateCompleted: '2025-03-01' }}
       />
     );
-    const completedDate = screen.getByLabelText('Completed');
-    const status = screen.getByRole('combobox', { name: 'Status' });
+    const form = within(view.container);
+    const completedDate = form.getByLabelText('Completed');
+    const status = form.getByRole('combobox', { name: 'Status' });
 
     fireEvent.change(completedDate, { target: { value: '2025-03-' } });
     fireEvent.change(completedDate, { target: { value: '2025-03-01' } });
@@ -267,14 +281,15 @@ describe('ColoringBookForm', () => {
   it('restores the prior book status when a new completion date is cleared', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(
+    const view = renderWithProviders(
       <ColoringBookForm {...baseProps} initialBook={coloringBook()} onSubmit={onSubmit} />
     );
-    const completedDate = screen.getByLabelText('Completed');
+    const form = within(view.container);
+    const completedDate = form.getByLabelText('Completed');
 
     fireEvent.change(completedDate, { target: { value: '2026-09-20' } });
     fireEvent.change(completedDate, { target: { value: '' } });
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
@@ -295,15 +310,17 @@ describe('ColoringBookForm', () => {
       accountId: 'user-1',
     };
     const first = renderWithProviders(<ColoringBookForm {...props} />);
-    fireEvent.change(screen.getByLabelText('Completed'), { target: { value: '2026-09-20' } });
+    let form = within(first.container);
+    fireEvent.change(form.getByLabelText('Completed'), { target: { value: '2026-09-20' } });
     captureSessionDrafts('user-1', 'expired-status-token');
     first.unmount();
     localStorage.clear();
 
-    renderWithProviders(<ColoringBookForm {...props} />);
-    expect(screen.getByLabelText('Completed')).toHaveValue('2026-09-20');
-    fireEvent.change(screen.getByLabelText('Completed'), { target: { value: '' } });
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Add book' }));
+    const restored = renderWithProviders(<ColoringBookForm {...props} />);
+    form = within(restored.container);
+    expect(form.getByLabelText('Completed')).toHaveValue('2026-09-20');
+    fireEvent.change(form.getByLabelText('Completed'), { target: { value: '' } });
+    await userEvent.setup().click(form.getByRole('button', { name: 'Add book' }));
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith(
         expect.objectContaining({ dateCompleted: '', status: 'purchased' }),
@@ -316,18 +333,19 @@ describe('ColoringBookForm', () => {
   it('restores the prior book status when a changed saved completion date is cleared', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(
+    const view = renderWithProviders(
       <ColoringBookForm
         {...baseProps}
         initialBook={{ ...coloringBook(), dateCompleted: '2025-03-01' }}
         onSubmit={onSubmit}
       />
     );
-    const completedDate = screen.getByLabelText('Completed');
+    const form = within(view.container);
+    const completedDate = form.getByLabelText('Completed');
 
     fireEvent.change(completedDate, { target: { value: '2025-03-02' } });
     fireEvent.change(completedDate, { target: { value: '' } });
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
@@ -341,14 +359,18 @@ describe('ColoringBookForm', () => {
   it('keeps a changed completion date Completed after a manual active status choice', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(
+    const view = renderWithProviders(
       <ColoringBookForm {...baseProps} initialBook={coloringBook()} onSubmit={onSubmit} />
     );
-    fireEvent.change(screen.getByLabelText('Completed'), { target: { value: '2026-09-20' } });
+    const form = within(view.container);
+    fireEvent.change(form.getByLabelText('Completed'), { target: { value: '2026-09-20' } });
 
-    await user.click(screen.getByRole('combobox', { name: 'Status' }));
-    await user.click(screen.getByRole('option', { name: 'In progress' }));
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    const statusOptions = await openControlledPopup(
+      user,
+      form.getByRole('combobox', { name: 'Status' })
+    );
+    await user.click(statusOptions.getByRole('option', { name: 'In progress' }));
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
@@ -363,17 +385,18 @@ describe('ColoringBookForm', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const form = within(view.container);
 
-    const pageCountInput = screen.getByLabelText(/Number of pages/);
+    const pageCountInput = form.getByLabelText(/Number of pages/);
 
     await user.clear(pageCountInput);
 
     expect(pageCountInput).toHaveDisplayValue('');
 
-    await user.type(pageCountInput, '50');
-    await user.type(screen.getByLabelText(/Title/), 'Worlds of Wonder');
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await typeIntoField(user, pageCountInput, '50');
+    await pasteIntoField(user, form.getByLabelText(/Title/), 'Worlds of Wonder');
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
     expect(pageCountInput).toHaveDisplayValue('50');
     await waitFor(() => {
@@ -388,23 +411,27 @@ describe('ColoringBookForm', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const form = within(view.container);
 
-    const pageCountInput = screen.getByLabelText(/Number of pages/);
+    const pageCountInput = form.getByLabelText(/Number of pages/);
 
     await user.clear(pageCountInput);
-    await user.type(screen.getByLabelText(/Title/), 'Worlds of Wonder');
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await pasteIntoField(user, form.getByLabelText(/Title/), 'Worlds of Wonder');
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
     expect(pageCountInput).toHaveDisplayValue('');
-    expect(await screen.findByText('Total pages must be at least 1')).toBeInTheDocument();
+    expect(await form.findByText('Total pages must be at least 1')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('renders a PocketBase zero-default publication year as empty', () => {
-    renderWithProviders(<ColoringBookForm {...baseProps} initialBook={coloringBook()} />);
+    const view = renderWithProviders(
+      <ColoringBookForm {...baseProps} initialBook={coloringBook()} />
+    );
+    const form = within(view.container);
 
-    expect(screen.getByLabelText('Publication year')).toHaveDisplayValue('');
+    expect(form.getByLabelText('Publication year')).toHaveDisplayValue('');
   });
 
   it('keeps a removed cover removed in the restored preview', async () => {
@@ -415,22 +442,25 @@ describe('ColoringBookForm', () => {
       coverUrl: 'https://example.test/old-cover.jpg',
     };
     const first = renderWithProviders(<ColoringBookForm {...props} />);
-    await user.click(screen.getByRole('button', { name: 'Remove cover image' }));
+    let form = within(first.container);
+    await user.click(form.getByRole('button', { name: 'Remove cover image' }));
     first.unmount();
 
-    renderWithProviders(<ColoringBookForm {...props} />);
-    await user.click(await screen.findByRole('button', { name: 'Restore draft' }));
+    const restored = renderWithProviders(<ColoringBookForm {...props} />);
+    form = within(restored.container);
+    await user.click(await form.findByRole('button', { name: 'Restore draft' }));
 
-    expect(screen.queryByRole('button', { name: 'Remove cover image' })).not.toBeInTheDocument();
-    expect(screen.getByText('Choose cover image')).toBeInTheDocument();
+    expect(form.queryByRole('button', { name: 'Remove cover image' })).not.toBeInTheDocument();
+    expect(form.getByText('Choose cover image')).toBeInTheDocument();
   });
 
   it('reminds the user to reselect a cover interrupted during cropping', async () => {
     const user = userEvent.setup();
     const first = renderWithProviders(<ColoringBookForm {...baseProps} />);
+    let form = within(first.container);
     const file = new File(['cover'], 'cover.png', { type: 'image/png' });
 
-    await user.upload(screen.getByLabelText('Cover image'), file);
+    await user.upload(form.getByLabelText('Cover image'), file);
     const identity = {
       backendUrl: POCKETBASE_URL,
       accountId: 'user-1',
@@ -444,15 +474,17 @@ describe('ColoringBookForm', () => {
       readFormDraft(identity, generation, isColoringBookDraftValues).draft?.values.hadNewPhoto
     ).toBe(true);
 
-    renderWithProviders(<ColoringBookForm {...baseProps} />);
-    await user.click(await screen.findByRole('button', { name: 'Restore draft' }));
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    const restored = renderWithProviders(<ColoringBookForm {...baseProps} />);
+    form = within(restored.container);
+    await user.click(await form.findByRole('button', { name: 'Restore draft' }));
+    expect(form.getByRole('status')).toBeInTheDocument();
   });
 
   it('keeps the original server timestamp when the edit query refreshes', async () => {
     const book = coloringBook();
     const view = renderWithProviders(<ColoringBookForm {...baseProps} initialBook={book} />);
-    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Draft note' } });
+    const form = within(view.container);
+    fireEvent.change(form.getByLabelText('Notes'), { target: { value: 'Draft note' } });
     view.rerender(
       <ColoringBookForm {...baseProps} initialBook={{ ...book, updatedAt: '2026-02-01' }} />
     );
@@ -480,11 +512,12 @@ describe('ColoringBookForm', () => {
     const firstRender = renderWithProviders(
       <ColoringBookForm {...baseProps} onSubmit={onSubmit} />
     );
+    let form = within(firstRender.container);
 
-    expect(screen.getByLabelText(/Number of pages/)).toHaveAttribute('max', '500');
+    expect(form.getByLabelText(/Number of pages/)).toHaveAttribute('max', '500');
     firstRender.unmount();
 
-    renderWithProviders(
+    const restored = renderWithProviders(
       <ColoringBookForm
         {...baseProps}
         initialBook={coloringBook(600)}
@@ -492,9 +525,10 @@ describe('ColoringBookForm', () => {
         submitLabel="Save changes"
       />
     );
+    form = within(restored.container);
 
-    expect(screen.getByLabelText(/Number of pages/)).toHaveAttribute('max', '600');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(form.getByLabelText(/Number of pages/)).toHaveAttribute('max', '600');
+    await user.click(form.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
@@ -509,55 +543,59 @@ describe('ColoringBookForm', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const form = within(view.container);
 
-    await user.type(screen.getByLabelText(/Title/), 'Worlds of Wonder');
-    await user.clear(screen.getByLabelText(/Number of pages/));
-    await user.type(screen.getByLabelText(/Number of pages/), '501');
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await pasteIntoField(user, form.getByLabelText(/Title/), 'Worlds of Wonder');
+    await user.clear(form.getByLabelText(/Number of pages/));
+    await typeIntoField(user, form.getByLabelText(/Number of pages/), '501');
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Total pages must be 500 or less');
+    expect(await form.findByRole('alert')).toHaveTextContent('Total pages must be 500 or less');
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('hides ownership controls', () => {
-    renderWithProviders(<ColoringBookForm {...baseProps} />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} />);
+    const form = within(view.container);
 
-    expect(screen.queryByLabelText(/Ownership/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Ownership')).not.toBeInTheDocument();
+    expect(form.queryByLabelText(/Ownership/)).not.toBeInTheDocument();
+    expect(form.queryByText('Ownership')).not.toBeInTheDocument();
   });
 
   it('shows title validation before submitting', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const form = within(view.container);
 
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
-    expect(await screen.findByText('Title is required')).toBeInTheDocument();
+    expect(await form.findByText('Title is required')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('renders the diamond-style sections', async () => {
-    renderWithProviders(<ColoringBookForm {...baseProps} />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} />);
+    const form = within(view.container);
 
-    expect(screen.getByRole('heading', { name: 'Book' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Book Info' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Dates' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Source URL' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Cover image' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Status' })).toBeInTheDocument();
+    expect(form.getByRole('heading', { name: 'Book' })).toBeInTheDocument();
+    expect(form.getByRole('heading', { name: 'Book Info' })).toBeInTheDocument();
+    expect(form.getByRole('heading', { name: 'Dates' })).toBeInTheDocument();
+    expect(form.getByRole('heading', { name: 'Source URL' })).toBeInTheDocument();
+    expect(form.getByRole('heading', { name: 'Cover image' })).toBeInTheDocument();
+    expect(form.getByRole('heading', { name: 'Status' })).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getAllByRole('heading', { name: 'Tags' }).length).toBeGreaterThanOrEqual(1);
+      expect(form.getAllByRole('heading', { name: 'Tags' }).length).toBeGreaterThanOrEqual(1);
     });
-    expect(screen.queryByRole('heading', { name: 'Creators' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Library info' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Credits' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Publisher')).toBeInTheDocument();
-    expect(screen.getByLabelText('Illustrator')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Difficulty')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Mediums')).not.toBeInTheDocument();
+    expect(form.queryByRole('heading', { name: 'Creators' })).not.toBeInTheDocument();
+    expect(form.queryByRole('heading', { name: 'Library info' })).not.toBeInTheDocument();
+    expect(form.queryByRole('heading', { name: 'Credits' })).not.toBeInTheDocument();
+    expect(form.getByLabelText('Publisher')).toBeInTheDocument();
+    expect(form.getByLabelText('Illustrator')).toBeInTheDocument();
+    expect(form.queryByLabelText('Difficulty')).not.toBeInTheDocument();
+    expect(form.queryByLabelText('Mediums')).not.toBeInTheDocument();
   });
 
   it('adds coloring tags with the diamond-style inline tag control', async () => {
@@ -578,15 +616,19 @@ describe('ColoringBookForm', () => {
       ],
     });
 
-    renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const form = within(view.container);
 
-    await user.type(screen.getByLabelText(/Title/), 'Disney Mystery Coloring');
-    await user.click(screen.getByRole('button', { name: 'Add tag' }));
-    await user.click(await screen.findByRole('option', { name: 'Disney princesses' }));
+    await pasteIntoField(user, form.getByLabelText(/Title/), 'Disney Mystery Coloring');
+    const tagOptions = await openControlledPopup(
+      user,
+      form.getByRole('button', { name: 'Add tag' })
+    );
+    await user.click(await tagOptions.findByRole('option', { name: 'Disney princesses' }));
 
-    expect(screen.getByText('Disney princesses')).toBeInTheDocument();
+    expect(form.getByText('Disney princesses')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
@@ -604,12 +646,13 @@ describe('ColoringBookForm', () => {
     const onCancel = vi.fn();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    renderWithProviders(
+    const view = renderWithProviders(
       <ColoringBookForm {...baseProps} onCancel={onCancel} onSubmit={onSubmit} />
     );
+    const form = within(view.container);
 
-    await user.type(screen.getByLabelText(/Title/), 'Worlds of Wonder');
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
+    await pasteIntoField(user, form.getByLabelText(/Title/), 'Worlds of Wonder');
+    await user.click(form.getByRole('button', { name: 'Add book' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
@@ -622,7 +665,7 @@ describe('ColoringBookForm', () => {
       );
     });
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(form.getByRole('button', { name: 'Cancel' }));
 
     expect(onCancel).toHaveBeenCalledTimes(1);
     confirm.mockRestore();
@@ -637,21 +680,22 @@ describe('ColoringBookForm', () => {
         })
     );
 
-    renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} onSubmit={onSubmit} />);
+    const form = within(view.container);
 
-    fireEvent.change(screen.getByLabelText(/Title/), { target: { value: 'Worlds of Wonder' } });
-    const submitButton = screen.getByRole('button', { name: 'Add book' });
+    fireEvent.change(form.getByLabelText(/Title/), { target: { value: 'Worlds of Wonder' } });
+    const submitButton = form.getByRole('button', { name: 'Add book' });
 
     fireEvent.click(submitButton);
     fireEvent.click(submitButton);
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'Adding...' })).toBeDisabled();
+    expect(form.getByRole('button', { name: 'Adding...' })).toBeDisabled();
 
     resolveSubmit?.();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Add book' })).toBeEnabled();
+      expect(form.getByRole('button', { name: 'Add book' })).toBeEnabled();
     });
   });
 
@@ -664,29 +708,31 @@ describe('ColoringBookForm', () => {
         })
     );
 
-    renderWithProviders(
+    const view = renderWithProviders(
       <ColoringBookForm {...baseProps} coverUrl="/cover.jpg" onSubmit={onSubmit} />
     );
+    const form = within(view.container);
 
-    fireEvent.change(screen.getByLabelText(/Title/), { target: { value: 'Worlds of Wonder' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add book' }));
+    fireEvent.change(form.getByLabelText(/Title/), { target: { value: 'Worlds of Wonder' } });
+    fireEvent.click(form.getByRole('button', { name: 'Add book' }));
 
-    expect(screen.getByRole('button', { name: 'Adding...' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Remove cover image' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Add tag' })).toBeDisabled();
+    expect(form.getByRole('button', { name: 'Adding...' })).toBeDisabled();
+    expect(form.getByRole('button', { name: 'Remove cover image' })).toBeDisabled();
+    expect(form.getByRole('button', { name: 'Add tag' })).toBeDisabled();
 
     resolveSubmit?.();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Add book' })).toBeEnabled();
+      expect(form.getByRole('button', { name: 'Add book' })).toBeEnabled();
     });
   });
 
   it('shows replace cover copy when an existing cover is present', () => {
-    renderWithProviders(<ColoringBookForm {...baseProps} coverUrl="/cover.jpg" />);
+    const view = renderWithProviders(<ColoringBookForm {...baseProps} coverUrl="/cover.jpg" />);
+    const form = within(view.container);
 
-    expect(screen.getByText('Replace cover image')).toBeInTheDocument();
-    expect(screen.queryByText('Choose cover image')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Cover image')).toHaveClass('sr-only');
+    expect(form.getByText('Replace cover image')).toBeInTheDocument();
+    expect(form.queryByText('Choose cover image')).not.toBeInTheDocument();
+    expect(form.getByLabelText('Cover image')).toHaveClass('sr-only');
   });
 });

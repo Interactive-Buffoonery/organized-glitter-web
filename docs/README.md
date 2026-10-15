@@ -9,7 +9,8 @@ The public repository contains the complete website and PocketBase source.
 - [Local PocketBase development](pocketbase/local-development.md),
   [type generation](pocketbase-typegen.md), and [schema](schema/collections.md).
 - [API contract](API_CONTRACT.md) and [private file contract](FILE_ACCESS_CONTRACT.md).
-- [CI](agents/ci.md), [code conventions](agents/code-conventions.md), and
+- [CI](agents/ci.md), [code conventions](agents/code-conventions.md),
+  [unit test environments](agents/test-environments.md), and
   [Playwright testing](testing-playwright.md).
 - [Architecture decisions](adr/README.md) and [design system](design-system/overview.md).
 - [Spacefast routing](spacefast-routing.md), [optional analytics proxy](spacefast-posthog.md),

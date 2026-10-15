@@ -13,7 +13,8 @@ checksum-verified binaries, validates the comparison-baseline upgrade and
 exercises protected files, authentication, feedback, Apple, archive, sync and
 stats behavior. It also seeds and checks the example library in a local server.
 A failure stops subsequent phases. `pnpm pr:create` only opens the PR after the
-complete local gate succeeds.
+complete local gate succeeds. Run the gate without concurrent builds or browser
+validation; see [unit test environments and headroom](test-environments.md).
 
 After PocketBase passes, the PR and release gates write a local advisory
 [native app sync report](../native-sync-report.md). Its findings do not block

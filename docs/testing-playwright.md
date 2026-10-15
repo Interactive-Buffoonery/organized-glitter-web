@@ -78,6 +78,18 @@ Run the inventory check without starting browsers:
 node --test e2e/ci/browser-inventory.test.mjs
 ```
 
+That check classifies files only. To confirm the managed smoke and full inventory
+counts against what Playwright actually discovers, run one bounded `--list` per
+suite with synthetic fixture values:
+
+```bash
+node scripts/check-browser-discovery.mjs
+```
+
+Both commands run in `pnpm test:ci:static`, locally and in CI. When a spec is
+added to or removed from a managed suite, update the counts in
+`scripts/run-local-release-qa.mjs`.
+
 `qa:browser:full` adds eight spec files to the managed inventory: mobile state
 accessibility, signed-in page contrast, format-chip contrast, image selection,
 import/export, mobile touch targets, metadata rollback, and session-expiry

@@ -1,41 +1,67 @@
 # Continuous integration
 
-GitHub Actions runs scope selection, static checks, unit/server tests, React
-review, production build/budget, and publication security. `CI result` requires
-every one of those jobs to succeed. Actions does not install, start or test a
-PocketBase runtime, and does not run the backend-dependent browser suites.
+GitHub Actions retains scope, static, unit/server, React, build/budget and
+publication gates and adds `Complete PR validation` on GitHub-hosted
+`ubuntu-24.04`. It runs the existing strict `pnpm test:pr` orchestration rather
+than maintaining a second test inventory. `CI result` fails closed unless every
+expected job succeeds, including complete PR validation.
 
-## Local runtime validation before PR creation
-
-`pnpm test:pr` runs PocketBase first on the computer doing the work, then static,
-unit, React, build, publication and browser checks. The backend suite boots
-checksum-verified binaries, validates the comparison-baseline upgrade and
-exercises protected files, authentication, feedback, Apple, archive, sync and
-stats behavior. It also seeds and checks the example library in a local server.
-A failure stops subsequent phases. `pnpm pr:create` only opens the PR after the
-complete local gate succeeds. Run the gate without concurrent builds or browser
-validation; see [unit test environments and headroom](test-environments.md).
-
-After PocketBase passes, the PR and release gates write a local advisory
-[native app sync report](../native-sync-report.md). Its findings do not block
-the web gate, and it is skipped in CI.
-
-For a focused backend run:
+## Cloud drafts and complete validation
 
 ```bash
-VALIDATION_BASE_REF=origin/dev pnpm pb:validate:local
+VALIDATION_BASE_REF=origin/dev pnpm test:cloud
 ```
 
-Both commands write `summary.json` and a readable `report.md` under ignored
-`.tmp/local-validation/<run>/`. Report the PocketBase outcome to Sarah before
-opening a backend PR, then include it in the PR validation section. Record the
-machine, baseline, commands, behavior tested, and any failures or coverage gaps.
-The report contains source and phase identity, not credentials or runtime data.
+This cloud profile runs backend, static, unit, React, build and publication
+checks. It writes `summary.json` and `report.md` under ignored
+`.tmp/local-validation/<run>/`, including source/base identity. Every browser
+phase is explicitly `delegated-to-ci`, never a local pass. A successful cloud
+run says `cloud-checks-passed`; complete PR validation remains unestablished.
+Failures stop execution and remaining executable phases say `not-run`.
 
-`pnpm test:release` retains the broader local browser selection. Keep databases,
-auth state, images uploaded by users and credentials out of public artifacts.
-Passing Actions verifies the remote static/unit/publication gate only; it does
-not prove local backend or browser acceptance, nor deploy the website.
+After cloud checks, open a **draft** PR against `dev` with exact head/base SHAs,
+local results and limitations. If the cloud environment blocks a check, include
+the evidence and mark it blocked; the draft may obtain hosted proof. Backend
+source changes still require running and reporting the local backend profile
+before a draft. `pnpm test:pr` and `pnpm pr:create` remain strict.
+
+The hosted job installs Node from `.nvmrc` (24.x), pnpm from `packageManager`
+(11.1.3), and frozen lockfile dependencies with the existing setup action and
+provenance policy. `pnpm exec playwright install --with-deps chromium webkit`
+installs browsers matching that lockfile plus Ubuntu system libraries. The job
+uses no production credentials and boots checksum-verified disposable local
+PocketBase through the existing backend and browser harnesses, with synthetic
+fixtures. The strict gate executes, in order:
+
+1. Backend, including schema, migrations, baseline upgrade and runtime suites.
+2. Static, unit/server, changed-source React, build/budget and publication checks.
+3. Not-found, PWA navigation, cold-load, browser smoke, protected-file browser
+   (Chromium and WebKit), and blog browser.
+
+A failure leaves subsequent phases not-run. Fix infrastructure defects and
+rerun affected checks; report genuine application failures separately. The
+historical PR 91 startup `page.unrouteAll` timeout is not assumed fixed: compare
+any recurrence on head and the exact `origin/dev` baseline.
+
+The proposed required check names are **`Complete PR validation`** and the
+existing aggregate **`CI result`**. Sarah can require them after observing the
+workflow. Before merge, both must pass for the latest PR commit, with complete
+backend/browser coverage. The complete job checks out the exact event PR head
+SHA and uses the event base SHA for comparisons. Record both SHAs in the PR.
+No branch protection or repository permissions are changed by this work.
+
+Actions uses ordinary `pull_request` semantics, read-only contents permission,
+no persisted checkout credentials, bounded timeouts and cancellation of
+superseded PR runs. No privileged PR-code trigger or production service is
+used. Only the sanitized phase report is written to the job summary. **No
+artifacts are uploaded**, so databases, authentication state, traces, images,
+runtime logs and private files have no artifact retention. Keep local reports
+private unless reviewed for publication.
+
+`pnpm test:release` retains its broader local browser selection. After backend
+passes, local gates may write the advisory [native sync report](../native-sync-report.md);
+it is skipped in CI. Passing these checks does not deploy, release, certify
+provider settings or validate hosted production hooks and migrations.
 
 ## Event comparisons and scope
 
@@ -50,10 +76,8 @@ full suite and compares with the populated public extraction revision
 `04789b9d000e6eb1390ca2a6ae60f855a3b1fca6`. It does not claim that the new
 branch previously deployed that schema.
 
-The scope job exports only the event comparison baseline used by React review.
-The helper also describes local backend and browser coverage in its plan, but
-those selections do not start hosted runtime jobs. Scheduled and manual Actions runs
-execute the same static/unit/publication jobs as pull requests.
+The scope job exports the event comparison baseline for React review and the
+complete PR validation job. Scheduled and manual runs execute the same full gate.
 
 Branch protection and fork execution must be verified separately by an owner.
 Passing checks do not prove official provider, mail, backup, or deployment gates.

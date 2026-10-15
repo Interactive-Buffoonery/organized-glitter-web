@@ -273,6 +273,45 @@ test.describe('local import/export workflows', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
+  for (const scenario of [
+    {
+      name: 'advertised column aliases',
+      headers: 'project_name,project_status,date_purchased,total_diamonds,color_count',
+      values: 'done,2024-06-15,1234,42',
+      expected: {
+        status: 'completed',
+        date_purchased: '2024-06-15 00:00:00.000Z',
+        total_diamonds: 1234,
+        color_count: 42,
+      },
+    },
+    {
+      name: 'whole diamond counts',
+      headers: 'Title,Status,Total Diamonds,# of Colors',
+      values: 'stash,12.5,42',
+      expected: { status: 'stash', total_diamonds: 12, color_count: 42 },
+    },
+    {
+      name: 'inherited enum property names',
+      headers: 'Title,Status,Drill Shape,Type of Kit',
+      values: 'constructor,__proto__,constructor',
+      expected: { status: 'wishlist', drill_shape: '', kit_category: 'full' },
+    },
+  ]) {
+    test(`preserves CSV import integrity for ${scenario.name}`, async ({ page }) => {
+      const title = `${runPrefix} ${scenario.name}`;
+      const csvPath = path.join(tempDir, 'integrity.csv');
+      await writeFile(csvPath, `${scenario.headers}\n${title},${scenario.values}\n`);
+
+      await openDataSettings(page);
+      await uploadFile(page, 'Organized Glitter CSV file', csvPath);
+      await page.getByRole('button', { name: /^Import CSV$/ }).click();
+      await expect(page.getByText(/Imported 1, failed 0/i)).toBeVisible({ timeout: 30_000 });
+      const project = await getProjectByTitle(pb, title);
+      expect(project).toMatchObject(scenario.expected);
+    });
+  }
+
   test('preserves status aliases and reserved tag names during CSV import', async ({ page }) => {
     const reservedName = 'constructor';
     const existing = await pb.collection('tags').getFullList<{ id: string }>({

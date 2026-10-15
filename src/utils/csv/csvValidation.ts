@@ -138,7 +138,8 @@ function normalizeDrillShape(value: string | null | undefined): {
   }
 
   const trimmed = value.trim();
-  const normalized = DRILL_SHAPE_MAPPING[trimmed.toLowerCase()];
+  const key = trimmed.toLowerCase();
+  const normalized = Object.hasOwn(DRILL_SHAPE_MAPPING, key) ? DRILL_SHAPE_MAPPING[key] : undefined;
 
   if (normalized) {
     const issue =
@@ -181,7 +182,8 @@ export function normalizeStatus(value: string | null | undefined): {
   }
 
   const trimmed = value.trim();
-  const normalized = STATUS_MAPPING[trimmed.toLowerCase()];
+  const key = trimmed.toLowerCase();
+  const normalized = Object.hasOwn(STATUS_MAPPING, key) ? STATUS_MAPPING[key] : undefined;
 
   if (normalized) {
     const issue =
@@ -220,7 +222,8 @@ export function validateKitCategoryValue(
   value: string | null | undefined
 ): 'full' | 'mini' | undefined {
   if (!value) return undefined;
-  const mapped = KIT_CATEGORY_MAPPING[value.trim().toLowerCase()];
+  const key = value.trim().toLowerCase();
+  const mapped = Object.hasOwn(KIT_CATEGORY_MAPPING, key) ? KIT_CATEGORY_MAPPING[key] : undefined;
   return mapped || undefined;
 }
 

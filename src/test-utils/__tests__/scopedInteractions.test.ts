@@ -58,17 +58,25 @@ describe('scoped pasting', () => {
       const original = document.createElement('input');
       const replacement = document.createElement('input');
       document.body.append(original);
-      original.addEventListener(event, () => {
+      const user = userEvent.setup({ delay: 20 });
+      const scheduleCleanup = () => {
         setTimeout(() => {
           original.remove();
           document.body.append(replacement);
           replacement.focus();
         }, 0);
-      });
+      };
+      if (event === 'focus') {
+        original.addEventListener('focus', scheduleCleanup);
+      } else {
+        const paste = user.paste.bind(user);
+        vi.spyOn(user, 'paste').mockImplementation(text => {
+          scheduleCleanup();
+          return paste(text);
+        });
+      }
 
-      const pasting = pasteIntoField(userEvent.setup({ delay: 20 }), original, '123').catch(
-        error => error
-      );
+      const pasting = pasteIntoField(user, original, '123').catch(error => error);
       await vi.runAllTimersAsync();
       const result = await pasting;
 

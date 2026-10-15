@@ -54,6 +54,7 @@
     "test:ui": "vitest --ui",
     "test:cold-load": "playwright test --config playwright.cold-load.config.ts",
     "test:pwa:navigation": "playwright test --config=playwright.pwa.config.ts",
+    "test:cloud": "node scripts/run-local-validation.mjs --profile=cloud --base=${VALIDATION_BASE_REF:-origin/dev}",
     "test:pr": "node scripts/run-local-validation.mjs --profile=pr --base=${VALIDATION_BASE_REF:-origin/dev}",
     "native:sync": "node scripts/native-sync-report.mjs",
     "test:release": "node scripts/run-local-validation.mjs --profile=release --base=${VALIDATION_BASE_REF:-origin/main}",

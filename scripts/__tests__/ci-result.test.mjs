@@ -40,12 +40,25 @@ describe('authoritative CI result', () => {
     expect(evaluateCiResult(jobs).every(job => job.passed)).toBe(false);
   });
 
-  it('keeps PocketBase and dependent browser runtime work off Actions', () => {
+  it('requires the complete strict PR gate on a standard hosted runner', () => {
     const workflow = parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
-    expect(workflow.jobs).not.toHaveProperty('backend');
-    expect(workflow.jobs).not.toHaveProperty('browser');
-    expect(requiredJobs).not.toContain('backend');
-    expect(requiredJobs).not.toContain('browser');
+    const job = workflow.jobs['complete-pr'];
+    expect(requiredJobs).toContain('complete-pr');
+    expect(job.name).toBe('Complete PR validation');
+    expect(job['runs-on']).toBe('ubuntu-24.04');
+    expect(job['timeout-minutes']).toBeLessThanOrEqual(60);
+    expect(job.steps).toContainEqual(
+      expect.objectContaining({
+        run: 'pnpm exec playwright install --with-deps chromium webkit',
+      })
+    );
+    expect(job.steps).toContainEqual(expect.objectContaining({ run: 'pnpm test:pr' }));
+    expect(workflow.permissions).toEqual({ contents: 'read' });
+    expect(workflow.on).toHaveProperty('pull_request');
+    expect(workflow.on).not.toHaveProperty('pull_request_target');
+    expect(job.steps.some(step => /upload-artifact/.test(step.uses ?? ''))).toBe(false);
+    expect(job.steps[0].with['persist-credentials']).toBe(false);
+    expect(job.steps[0].with.ref).toContain('github.event.pull_request.head.sha');
   });
 
   it('does not ignore a failed dependency added to the workflow later', () => {

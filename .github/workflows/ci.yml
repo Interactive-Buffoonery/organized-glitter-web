@@ -103,10 +103,44 @@ jobs:
       - name: Scan publication inputs, history, tree, and output
         run: pnpm test:publication
 
+  complete-pr:
+    name: Complete PR validation
+    needs: scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      VALIDATION_BASE_REF: ${{ needs.scope.outputs.base_sha }}
+      APP_TEST_ENV: test
+      VITE_POCKETBASE_URL: http://127.0.0.1:8090
+      VITE_APP_URL: http://127.0.0.1:3000
+      VITE_PUBLIC_POSTHOG_KEY: ''
+      VITE_PUBLIC_POSTHOG_HOST: ''
+      REACT_DOCTOR_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-project
+      - name: Install lockfile-matched browsers and system libraries
+        run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Run backend and every strict PR phase
+        run: pnpm test:pr
+      - name: Summarize phase outcomes without runtime artifacts
+        if: always()
+        shell: bash
+        run: |
+          for report in .tmp/local-validation/*-pr/report.md; do
+            if [ -f "$report" ]; then
+              cat "$report" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
   result:
     name: CI result
     if: always()
-    needs: [scope, static-checks, unit-tests, react-doctor, publication-security]
+    needs: [scope, static-checks, unit-tests, react-doctor, publication-security, complete-pr]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

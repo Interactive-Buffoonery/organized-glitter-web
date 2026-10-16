@@ -203,8 +203,22 @@ describe('upload-sourcemaps script', () => {
     const cliBin = path.resolve('node_modules/.bin/posthog-cli');
     const releaseId = '123e4567-e89b-42d3-a456-426614174000';
     const requests = [];
+    const uploadRequests = [];
     const server = createServer((request, response) => {
       requests.push({ method: request.method, url: request.url });
+      if (
+        request.method === 'POST' &&
+        request.url === '/api/projects/1/error_tracking/symbol_sets/bulk_check_upload'
+      ) {
+        let body = '';
+        request.setEncoding('utf8').on('data', chunk => (body += chunk));
+        request.on('end', () => {
+          uploadRequests.push(JSON.parse(body));
+          response.writeHead(200, { 'Content-Type': 'application/json' });
+          response.end(JSON.stringify({ chunk_ids_to_upload: [] }));
+        });
+        return;
+      }
       const lookup = request.url.match(
         /^\/api\/projects\/1\/error_tracking\/releases\/hash\/([^/]+)\/?$/
       );
@@ -244,7 +258,7 @@ describe('upload-sourcemaps script', () => {
           file: 'main.js',
           sources: ['main.ts'],
           names: [],
-          mappings: '',
+          mappings: 'AAAA',
         })
       );
       const inject = await spawnPosthogCliAsync(
@@ -254,6 +268,8 @@ describe('upload-sourcemaps script', () => {
           'inject',
           '--directory',
           rootDir,
+          '--release-mode',
+          'symbol-set',
           '--release-name',
           'sourcemap-contract-fixture',
           '--release-version',
@@ -291,6 +307,40 @@ describe('upload-sourcemaps script', () => {
         chunk_id: chunkId,
         release_id: releaseId,
       });
+
+      const upload = await spawnPosthogCliAsync(
+        cliBin,
+        [
+          'sourcemap',
+          'upload',
+          '--directory',
+          rootDir,
+          '--release-mode',
+          'symbol-set',
+          '--release-name',
+          'sourcemap-contract-fixture',
+          '--release-version',
+          'fixture-v1',
+          '--delete-after',
+        ],
+        {
+          cwd: rootDir,
+          env: {
+            POSTHOG_CLI_API_KEY: 'phx_local_test_posthog_cli_key',
+            POSTHOG_CLI_PROJECT_ID: '1',
+            POSTHOG_CLI_HOST: `http://127.0.0.1:${server.address().port}`,
+          },
+        }
+      );
+      expect(upload.status, formatCliResult(upload)).toBe(0);
+      expect(uploadRequests).toEqual([
+        expect.objectContaining({
+          symbol_sets: [expect.objectContaining({ chunk_id: chunkId, release_id: releaseId })],
+        }),
+      ]);
+      expect(existsSync(sourcemap)).toBe(false);
+      expect(readFileSync(script, 'utf8')).toContain(`//# chunkId=${chunkId}`);
+      expect(readFileSync(script, 'utf8')).not.toContain('sourceMappingURL=');
     } finally {
       await new Promise(resolve => server.close(resolve));
       rmSync(rootDir, { recursive: true, force: true });
@@ -320,12 +370,25 @@ describe('upload-sourcemaps script', () => {
 
       expect(status).toBe(0);
       expect(spawnSyncFn).toHaveBeenCalledTimes(2);
-      expect(spawnSyncFn.mock.calls[0][1]).toEqual(['sourcemap', 'inject', '--directory', distDir]);
+      expect(spawnSyncFn.mock.calls[0][1]).toEqual([
+        'sourcemap',
+        'inject',
+        '--directory',
+        distDir,
+        '--release-mode',
+        'symbol-set',
+        '--release-name',
+        'organized-glitter',
+        '--release-version',
+        'abc123',
+      ]);
       expect(spawnSyncFn.mock.calls[1][1]).toEqual([
         'sourcemap',
         'upload',
         '--directory',
         distDir,
+        '--release-mode',
+        'symbol-set',
         '--release-name',
         'organized-glitter',
         '--release-version',

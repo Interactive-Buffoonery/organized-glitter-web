@@ -114,16 +114,22 @@ export const runSourcemapUpload = ({
       );
     }
 
-    run(['sourcemap', 'inject', '--directory', distDir]);
+    // Preserve release-bound symbol sets instead of the CLI's event-mode default.
+    const releaseArgs = [
+      '--release-mode',
+      'symbol-set',
+      '--release-name',
+      releaseName,
+      '--release-version',
+      releaseVersion,
+    ];
+    run(['sourcemap', 'inject', '--directory', distDir, ...releaseArgs]);
     run([
       'sourcemap',
       'upload',
       '--directory',
       distDir,
-      '--release-name',
-      releaseName,
-      '--release-version',
-      releaseVersion,
+      ...releaseArgs,
       // Remove .map files after a successful upload so they never ship in dist.
       '--delete-after',
     ]);

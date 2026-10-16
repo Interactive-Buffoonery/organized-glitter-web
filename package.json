@@ -151,7 +151,7 @@
     "@tiptap/markdown": "^3.31.2",
     "@tiptap/pm": "^3.31.2",
     "@tiptap/react": "^3.31.2",
-    "@tiptap/starter-kit": "^3.31.2",
+    "@tiptap/starter-kit": "^3.32.0",
     "@types/papaparse": "^5.3.16",
     "aria-hidden": "^1.2.6",
     "browser-image-compression": "^2.0.2",

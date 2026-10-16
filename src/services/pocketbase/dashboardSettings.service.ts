@@ -173,9 +173,9 @@ export class DashboardSettingsService {
       try {
         const record = await pb
           .collection('user_dashboard_settings')
-          .getFirstListItem<
-            UserDashboardSettingsResponse<unknown, T>
-          >(pb.filter('user = {:userId}', { userId }));
+          .getFirstListItem<UserDashboardSettingsResponse<unknown, T>>(
+            pb.filter('user = {:userId}', { userId })
+          );
         return (record.navigation_context ?? null) as T | null;
       } catch (error) {
         const handled = ErrorHandler.handleError(error, 'DashboardSettings.loadNavigationContext');

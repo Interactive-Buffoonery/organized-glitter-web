@@ -450,15 +450,12 @@ describe('v3 packer', () => {
     );
   });
   it('serializes each logical item once during partition measurement', async () => {
-    const items = Array.from(
-      { length: 3000 },
-      (_, index): ArchiveSourceItemV3 => ({
-        itemId: `coloring-medium:${String(index).padStart(4, '0')}`,
-        kind: 'coloring-medium',
-        metadata: { name: `Medium ${index}`, type: 'other' },
-        assets: [],
-      })
-    );
+    const items = Array.from({ length: 3000 }, (_, index): ArchiveSourceItemV3 => ({
+      itemId: `coloring-medium:${String(index).padStart(4, '0')}`,
+      kind: 'coloring-medium',
+      metadata: { name: `Medium ${index}`, type: 'other' },
+      assets: [],
+    }));
     const serialized: string[] = [];
     const plan = await prepareArchivePlan(items, {
       backupId,

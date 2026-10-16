@@ -6,6 +6,9 @@ import StarterKit from '@tiptap/starter-kit';
 import { sanitizeMarkdownUrl } from './markdown-url';
 
 const ManualOrderedList = OrderedList.extend({
+  addProseMirrorPlugins() {
+    return [];
+  },
   addInputRules() {
     return [];
   },

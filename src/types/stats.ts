@@ -5,11 +5,7 @@ import type {
 } from '@/types/pocketbase.types';
 
 type StatsMetricKey =
-  | 'totalKits'
-  | 'completedThisYear'
-  | 'inProgress'
-  | 'allTimeCompleted'
-  | 'wishlistSize';
+  'totalKits' | 'completedThisYear' | 'inProgress' | 'allTimeCompleted' | 'wishlistSize';
 
 type StatsSummaryMetrics = Record<StatsMetricKey, number> & { inStash?: number };
 

@@ -300,7 +300,16 @@ describe('AnalyticsProvider lifecycle with the real SDK', () => {
       disable_product_tours: true,
       disable_conversations: true,
       disable_web_experiments: true,
+      advanced_disable_flags: true,
+      advanced_disable_feature_flags: true,
+      disable_surveys: true,
+      capture_exceptions: false,
+      mask_all_element_attributes: true,
+      mask_all_text: true,
+      mask_personal_data_properties: true,
     });
+    expect(posthog.config.capture_webmcp).toBeFalsy();
+    expect(posthog.config.logs?.captureConsoleLogs).toBeFalsy();
     Object.defineProperty(navigator, 'doNotTrack', { configurable: true, value: '1' });
     try {
       expect(posthog.capture('project_created')).toBeUndefined();

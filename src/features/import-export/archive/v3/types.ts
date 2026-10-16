@@ -107,13 +107,7 @@ export interface ColoringBookMetadata {
   notes?: string;
   isMystery: boolean;
   status:
-    | 'wishlist'
-    | 'purchased'
-    | 'in_stash'
-    | 'in_progress'
-    | 'completed'
-    | 'archived'
-    | 'destashed';
+    'wishlist' | 'purchased' | 'in_stash' | 'in_progress' | 'completed' | 'archived' | 'destashed';
   totalPages: number;
   completedPages?: number;
   completionPercentage?: number;

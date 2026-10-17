@@ -85,10 +85,55 @@ describe('RichTextEditor', () => {
 
     render(<RichTextEditor value="" onChange={onChange} />);
 
-    await user.click(screen.getByLabelText('Progress note content'));
+    const editor = screen.getByLabelText('Progress note content');
+    await user.click(editor);
     await user.paste('1. purchased in a destash');
 
+    expect(editor.querySelector('ol, li')).toBeNull();
     expect(onChange).toHaveBeenLastCalledWith('1. purchased in a destash');
+  });
+
+  it('keeps multiline numbered text from a native paste as paragraphs', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const text = '1. purchased in a destash\n2. started today';
+
+    render(<RichTextEditor value="" onChange={onChange} />);
+
+    const editor = screen.getByLabelText('Progress note content');
+    await user.click(editor);
+    fireEvent.paste(editor, {
+      clipboardData: {
+        getData: (format: string) => (format === 'text/plain' ? text : ''),
+      },
+    });
+
+    expect(editor.querySelector('ol, li')).toBeNull();
+    expect(editor.querySelectorAll('p')).toHaveLength(2);
+    expect(onChange).toHaveBeenLastCalledWith('1. purchased in a destash\n\n2. started today');
+  });
+
+  it('preserves ordered lists pasted as rich HTML', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(<RichTextEditor value="" onChange={onChange} />);
+
+    const editor = screen.getByLabelText('Progress note content');
+    await user.click(editor);
+    fireEvent.paste(editor, {
+      clipboardData: {
+        getData: (format: string) =>
+          format === 'text/html'
+            ? '<ol><li><p>purchased in a destash</p></li></ol>'
+            : format === 'text/plain'
+              ? '1. purchased in a destash'
+              : '',
+      },
+    });
+
+    expect(editor.querySelector('ol > li')).toHaveTextContent('purchased in a destash');
+    expect(onChange).toHaveBeenLastCalledWith(expect.stringContaining('1. purchased in a destash'));
   });
 
   it('keeps toolbar buttons from submitting the parent form', async () => {

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 import { libraryPageHeading } from '../libraryPage';
@@ -15,6 +15,14 @@ const holdMainModule = async (page: Page) => {
     await route.continue();
   });
   return release;
+};
+
+const reloadBeforeRemovingRoutes = async (page: Page, button: Locator) => {
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'commit' }),
+    button.click({ noWaitAfter: true }),
+  ]);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 };
 
 test.describe('private app startup', () => {
@@ -57,8 +65,7 @@ test.describe('private app startup', () => {
         const slowScan = await new AxeBuilder({ page }).include('#app-loading').analyze();
         expect(slowScan.violations).toEqual([]);
         if (theme === 'light') {
-          await button.click({ noWaitAfter: true });
-          await page.unrouteAll({ behavior: 'ignoreErrors' });
+          await reloadBeforeRemovingRoutes(page, button);
           release();
           await expect(libraryPageHeading(page)).toBeVisible();
           await expect(page.locator('#app-loading')).toHaveCount(0);
@@ -176,10 +183,10 @@ test.describe('private app startup', () => {
         'You can wait or reload'
       );
       await page.screenshot({ path: testInfo.outputPath('slow-project-data.png') });
-      await page.getByRole('button', { name: 'Reload', exact: true }).click({
-        noWaitAfter: true,
-      });
-      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await reloadBeforeRemovingRoutes(
+        page,
+        page.getByRole('button', { name: 'Reload', exact: true })
+      );
       await expect(page.getByRole('heading', { level: 1, name: 'Local Active Kit' })).toBeVisible();
     } finally {
       release();
@@ -216,8 +223,10 @@ test.describe('private app startup', () => {
       await page.clock.fastForward(5_500);
       await expect(page.getByRole('status', { name: 'Slow page loading' })).toBeVisible();
       await page.screenshot({ path: testInfo.outputPath('slow-library-settings.png') });
-      await page.getByRole('button', { name: 'Reload', exact: true }).click({ noWaitAfter: true });
-      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await reloadBeforeRemovingRoutes(
+        page,
+        page.getByRole('button', { name: 'Reload', exact: true })
+      );
       await expect(page.getByRole('status', { name: 'Loading page content' })).toHaveCount(0);
       await expect(libraryPageHeading(page)).toBeVisible();
     } finally {
@@ -236,10 +245,10 @@ test.describe('private app startup', () => {
       await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
       await expect(page.locator('#root')).toHaveAttribute('inert', '');
       await expect(page.locator('#root')).not.toHaveAttribute('data-app-ready', 'true');
-      await page.getByRole('button', { name: 'Try again', exact: true }).click({
-        noWaitAfter: true,
-      });
-      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await reloadBeforeRemovingRoutes(
+        page,
+        page.getByRole('button', { name: 'Try again', exact: true })
+      );
       await expect(libraryPageHeading(page)).toBeVisible();
     } finally {
       release();

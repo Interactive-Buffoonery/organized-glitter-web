@@ -187,7 +187,7 @@
   },
   "devDependencies": {
     "@astrojs/rss": "^4.0.19",
-    "@axe-core/playwright": "^4.11.3",
+    "@axe-core/playwright": "^4.13.0",
     "@babel/core": "^7.29.7",
     "@babel/preset-env": "^7.29.7",
     "@babel/preset-react": "^7.29.7",

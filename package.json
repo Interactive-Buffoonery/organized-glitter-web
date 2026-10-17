@@ -169,7 +169,7 @@
     "react": "^19.2.5",
     "react-aria-components": "^1.17.0",
     "react-dom": "^19.2.5",
-    "react-easy-crop": "^5.0.8",
+    "react-easy-crop": "^6.2.4",
     "react-hook-form": "^7.73.1",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.3",

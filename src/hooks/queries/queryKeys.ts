@@ -36,13 +36,7 @@ const createUserKeyHash = (userId: string): string => {
 };
 
 type QueryKeyValue =
-  | string
-  | number
-  | boolean
-  | null
-  | undefined
-  | QueryKeyValue[]
-  | { [key: string]: QueryKeyValue };
+  string | number | boolean | null | undefined | QueryKeyValue[] | { [key: string]: QueryKeyValue };
 
 const normalizeQueryKeyValue = (value: unknown): QueryKeyValue => {
   if (Array.isArray(value)) {

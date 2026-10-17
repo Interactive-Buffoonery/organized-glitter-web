@@ -349,7 +349,13 @@ export default defineConfig(({ mode }) => {
     },
 
     optimizeDeps: {
-      include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
+      include: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        '@tanstack/react-query',
+        'workbox-window',
+      ],
       exclude: ['pocketbase'],
     },
 

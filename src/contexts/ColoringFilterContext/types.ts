@@ -10,11 +10,7 @@ import type { ColoringBooksStatusOptions } from '@/types/pocketbase.types';
 import { LIBRARY_PAGE_SIZES } from '@/constants/pagination';
 
 export type ColoringSortField =
-  | 'date_added'
-  | 'title'
-  | 'publisher'
-  | 'completion'
-  | 'last_activity';
+  'date_added' | 'title' | 'publisher' | 'completion' | 'last_activity';
 
 export type ColoringSortDirection = 'asc' | 'desc';
 

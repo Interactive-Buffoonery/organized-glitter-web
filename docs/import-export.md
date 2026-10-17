@@ -129,8 +129,8 @@ Matching order:
 
 1. Manifest match
 2. Exact record ID or ref in filename or folder
-3. Exact title match from folder name
-4. Coloring page number from filename or folder path
+3. Coloring page number from filename or folder path
+4. Exact title match from folder name
 5. Filename token match against title
 6. Unmatched
 

@@ -80,11 +80,17 @@ function disambiguateTargetLabels(options: BulkTargetOption[]): BulkTargetOption
     labelCounts.set(option.label, (labelCounts.get(option.label) ?? 0) + 1);
   }
 
-  return options.map(option =>
-    (labelCounts.get(option.label) ?? 0) > 1
-      ? { ...option, label: `${option.label} (ID: ${option.id})` }
-      : option
-  );
+  const usedLabels = new Set(labelCounts.keys());
+  return options.map(option => {
+    if ((labelCounts.get(option.label) ?? 0) <= 1) return option;
+
+    let label = option.label;
+    do {
+      label = `${label} (ID: ${option.id})`;
+    } while (usedLabels.has(label));
+    usedLabels.add(label);
+    return { ...option, label };
+  });
 }
 
 interface DataImportExportState {

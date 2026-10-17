@@ -483,6 +483,66 @@ describe('DataImportExportSections', () => {
     }
   );
 
+  it('avoids generated label collisions and retains the selected target identity', () => {
+    const row: BulkPhotoReviewRow = {
+      id: 'row-1',
+      file: new File(['image'], 'photo.jpg', { type: 'image/jpeg' }),
+      path: 'photo.jpg',
+      targetType: 'project-cover',
+      confidence: 'unmatched',
+      reason: 'Choose a target',
+      confirmed: false,
+      excluded: true,
+      overwrite: false,
+    };
+    const suffix = ' (ID: project-1)';
+    const selectedLabel = `A${suffix}${suffix}${suffix}`;
+    mocks.bulkRows = [row];
+    mocks.bulkLibrary = {
+      diamondProjects: [
+        { id: 'project-1', title: 'A', imageUrl: '' },
+        { id: 'project-2', title: 'A', imageUrl: '' },
+        { id: 'project-3', title: `A${suffix}`, imageUrl: '' },
+        { id: 'project-4', title: `A${suffix}${suffix}`, imageUrl: '' },
+      ],
+      coloringBooks: [],
+      coloringPages: [],
+    };
+
+    const { rerender } = renderDataSections();
+    for (const selector of screen.getAllByRole('combobox', { name: 'Target record' })) {
+      const labels = within(selector)
+        .getAllByRole('option')
+        .map(option => option.textContent);
+      expect(new Set(labels).size).toBe(labels.length);
+      expect(labels).toEqual([
+        'Choose target',
+        selectedLabel,
+        'A (ID: project-2)',
+        `A${suffix}`,
+        `A${suffix}${suffix}`,
+      ]);
+    }
+
+    fireEvent.change(screen.getAllByRole('combobox', { name: 'Target record' })[0], {
+      target: { value: 'project-1' },
+    });
+    expect(mocks.updateRow).toHaveBeenLastCalledWith(
+      'row-1',
+      expect.objectContaining({ targetId: 'project-1', targetLabel: selectedLabel })
+    );
+    const patch = mocks.updateRow.mock.lastCall![1] as Partial<BulkPhotoReviewRow>;
+    mocks.bulkRows = [{ ...row, ...patch }];
+    rerender(<DataImportExportSections />);
+
+    for (const selector of screen.getAllByRole('combobox', { name: 'Target record' })) {
+      expect(selector).toHaveValue('project-1');
+      expect(within(selector).getByRole('option', { selected: true })).toHaveTextContent(
+        selectedLabel
+      );
+    }
+  });
+
   it('keeps unique labels unchanged when other target kinds share the same label', () => {
     mocks.bulkRows = [
       {

@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { ESLint } from 'eslint';
+import { Linter } from 'eslint';
 
-const eslint = new ESLint();
+import { queryLintConfigs, refetchDefaultsRule } from '../../config/eslint-query-rules.js';
 
-const lint = async (code, filePath) => {
-  const [result] = await eslint.lintText(code, { filePath });
-  return result.messages.filter(message => message.ruleId === 'no-restricted-syntax');
-};
+// These use only the shared query rule blocks from eslint.config.js. Loading the full config and
+// its plugins takes seconds, so scripts/check-query-lint-placement.mjs checks the real config's
+// file placement in the static phase.
+const linter = new Linter();
+const config = [
+  { files: ['**/*.{ts,tsx}'], languageOptions: { sourceType: 'module' } },
+  ...queryLintConfigs,
+];
+
+const lint = (code, filePath) => linter.verify(code, config, { filename: filePath });
 
 describe('refetch defaults lint guard', () => {
   const cases = [
@@ -19,15 +25,21 @@ describe('refetch defaults lint guard', () => {
     )
   );
 
-  it.each(cases)('%s rejects %s: false', async (filePath, key) => {
-    expect(await lint(`export const options = { ${key}: false };`, filePath)).toHaveLength(1);
+  it.each(cases)('%s rejects %s: false', (filePath, key) => {
+    expect(lint(`export const options = { ${key}: false };`, filePath)).toEqual([
+      expect.objectContaining({
+        ruleId: 'no-restricted-syntax',
+        severity: 2,
+        message: refetchDefaultsRule.message,
+      }),
+    ]);
   });
 
-  it('allows inherited defaults and explicit enabled refetching', async () => {
-    const messages = await lint(
+  it('allows inherited defaults and explicit enabled refetching', () => {
+    const messages = lint(
       'export const options = { refetchOnWindowFocus: true, refetchOnMount: "always" };',
       'src/hooks/useExample.ts'
     );
-    expect(messages).toHaveLength(0);
+    expect(messages).toEqual([]);
   });
 });

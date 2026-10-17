@@ -58,7 +58,8 @@ export const useAccessibilityAnnouncements = () => {
   /** Reference to the assertive live region */
   const statusRef = useRef<HTMLDivElement>(null);
   /** Reference to track announcement timeouts */
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const repopulationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Make an announcement to screen readers
@@ -75,7 +76,13 @@ export const useAccessibilityAnnouncements = () => {
       timeoutRef.current = null;
     }
 
+    if (repopulationTimeoutRef.current !== null) {
+      clearTimeout(repopulationTimeoutRef.current);
+      repopulationTimeoutRef.current = null;
+    }
+
     const makeAnnouncement = () => {
+      timeoutRef.current = null;
       const targetRef = priority === 'assertive' ? statusRef : liveRegionRef;
 
       if (targetRef.current) {
@@ -83,7 +90,8 @@ export const useAccessibilityAnnouncements = () => {
         if (clearPrevious) {
           targetRef.current.textContent = '';
           // Small delay to ensure screen readers notice the change
-          setTimeout(() => {
+          repopulationTimeoutRef.current = setTimeout(() => {
+            repopulationTimeoutRef.current = null;
             if (targetRef.current) {
               targetRef.current.textContent = message;
             }
@@ -137,13 +145,11 @@ export const useAccessibilityAnnouncements = () => {
   );
 
   /**
-   * Announce spin result with project details
+   * Announce the selected spin target
    */
   const announceSpinResult = useCallback(
-    (projectTitle: string, projectDetails?: string) => {
-      const message = projectDetails
-        ? `Spin complete! Selected project: ${projectTitle} by ${projectDetails}`
-        : `Spin complete! Selected project: ${projectTitle}`;
+    (itemTitle: string) => {
+      const message = `Spin complete! Selected: ${itemTitle}`;
 
       announce(message, { priority: 'assertive', clearPrevious: true, delay: 100 });
     },
@@ -174,6 +180,11 @@ export const useAccessibilityAnnouncements = () => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      if (repopulationTimeoutRef.current !== null) {
+        clearTimeout(repopulationTimeoutRef.current);
+        repopulationTimeoutRef.current = null;
       }
     };
   }, []);

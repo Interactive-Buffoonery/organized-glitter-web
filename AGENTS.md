@@ -44,7 +44,7 @@ React + TypeScript + Vite with a PocketBase backend.
 | App        | `pnpm dev:local`, `pnpm dev:lan`                                                                 |
 | PocketBase | `pnpm pb:local`, `pnpm pb:bootstrap:local -- --seed`                                             |
 | Checks     | `pnpm typecheck`, `pnpm lint`, `pnpm lint:pb-boundary`, `pnpm format:check`                      |
-| Tests      | `pnpm test`; pre-PR: `pnpm test:pr`                                                              |
+| Tests      | `pnpm test`; pre-PR: `pnpm test:pr`; cloud draft: `pnpm test:cloud`                              |
 | Build      | `pnpm build`, `pnpm preview`                                                                     |
 | PB types   | `pnpm pb:types`, `pnpm pb:types:local`, `pnpm pb:validate:schema`, `pnpm pb:validate:migrations` |
 
@@ -66,6 +66,31 @@ For changes to `pb_hooks/`, `pb_migrations/`, or the canonical schema:
 The local instance may be updated or recreated. The example library can be
 seeded with `pnpm pb:bootstrap:local -- --seed-examples`. Synthetic edge-case
 fixtures remain required in addition to the shared sample projects.
+
+## Codex Cloud drafts and merge acceptance
+
+In Codex Cloud, run `VALIDATION_BASE_REF=origin/dev pnpm test:cloud` before
+opening a draft PR. This reuses the backend, static, unit, React, build and
+publication phases. Its report explicitly delegates all six browser phases to
+CI; it is not a passing `test:pr` result. Include the exact head/base SHAs and
+passed, failed, blocked or not-run outcomes. A cloud limitation may be recorded
+as blocked with evidence and the draft opened to obtain hosted proof. This
+exception also applies to the local browser requirement above; backend source
+changes still require the backend run and its report before a draft.
+
+Before merge, require `CI result` and `Complete PR validation` to succeed on the
+latest PR commit. The latter runs strict `pnpm test:pr` on GitHub-hosted Ubuntu,
+including checksum-verified disposable PocketBase, migration/upgrade checks and
+all browser phases. `pnpm test:pr` and `pnpm pr:create` remain strict. Do not
+merge with failing or incomplete backend/browser phases. Report baseline
+comparisons and genuine application failures without weakening tests.
+
+For changes to validation orchestration, write regression tests before the
+implementation. Verify phase preservation, cloud delegation reporting, failure
+reporting, and fail-closed CI aggregation. Use fresh independent reviewers when
+available; state when only self-review was possible. Keep runtime data, auth
+state, traces, databases and private artifacts out of this public repository
+and Actions uploads.
 
 ## Code
 

@@ -1,8 +1,9 @@
-import { ProjectType, ProjectStatus } from '@/types/project';
+import { ProjectType } from '@/types/project';
 import Papa from 'papaparse';
+import { EXPECTED_COLUMNS } from '@/utils/csv/csvColumns';
 import { logger } from '@/utils/logger';
 import { safeDateString } from '@/utils/date/dateHelpers';
-import { validateKitCategoryValue } from '@/utils/csv/csvValidation';
+import { normalizeStatus, validateKitCategoryValue } from '@/utils/csv/csvValidation';
 import { restoreCsvFormulaTextField } from '@/utils/csv/csvFormulaSafety';
 
 export interface ParsedCsvData {
@@ -19,31 +20,31 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
   const project: Partial<ProjectType> = {};
 
   // Map values to project object using flexible header matching
-  const title = getTextFieldValue(row, ['title', 'name', 'project name', 'project title']);
+  const title = getTextFieldValue(row, EXPECTED_COLUMNS.title.aliases);
   if (!title) {
     // Skip projects without a title (required field)
     return null;
   }
   project.title = title;
 
-  const status = getTextFieldValue(row, ['status', 'state', 'project status']);
+  const status = getTextFieldValue(row, EXPECTED_COLUMNS.status.aliases);
   if (status) {
-    project.status = validateStatus(status);
+    project.status = normalizeStatus(status).normalized;
   }
 
-  const company = getTextFieldValue(row, ['company', 'manufacturer', 'brand']);
+  const company = getTextFieldValue(row, EXPECTED_COLUMNS.company.aliases);
   if (company) {
     project.company = company;
   }
 
-  const artist = getTextFieldValue(row, ['artist', 'creator', 'designer']);
+  const artist = getTextFieldValue(row, EXPECTED_COLUMNS.artist.aliases);
   if (artist) {
     project.artist = artist;
   }
 
   // Handle dimensions - support both separate width/height and combined dimensions
   // Also support legacy "Length" header for backward compatibility
-  const width = getFieldValue(row, ['width']);
+  const width = getFieldValue(row, EXPECTED_COLUMNS.width.aliases);
   if (width) {
     const widthValue = parseFloat(width);
     if (!isNaN(widthValue)) {
@@ -51,7 +52,7 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
     }
   }
 
-  const height = getFieldValue(row, ['height', 'length']); // Support legacy "Length" header
+  const height = getFieldValue(row, EXPECTED_COLUMNS.height.aliases); // Support legacy "Length" header
   if (height) {
     const heightValue = parseFloat(height);
     if (!isNaN(heightValue)) {
@@ -60,7 +61,7 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
   }
 
   // Backwards compatibility: if dimensions column exists but width/height don't
-  const dimensions = getFieldValue(row, ['dimensions']);
+  const dimensions = getFieldValue(row, EXPECTED_COLUMNS.dimensions.aliases);
   if (dimensions && !project.width && !project.height) {
     // Match the complete pair so malformed values cannot supply partial dimensions.
     const match = dimensions.match(/^(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)$/);
@@ -76,27 +77,22 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
     }
   }
 
-  const drillShape = getTextFieldValue(row, ['drill shape', 'shape']);
+  const drillShape = getTextFieldValue(row, EXPECTED_COLUMNS.drillShape.aliases);
   if (drillShape) {
     project.drillShape = drillShape;
   }
 
-  const canvasType = getTextFieldValue(row, ['canvas type', 'canvas']);
+  const canvasType = getTextFieldValue(row, EXPECTED_COLUMNS.canvasType.aliases);
   if (canvasType) {
     project.canvasType = canvasType;
   }
 
-  const drillType = getTextFieldValue(row, ['drill type', 'drilltype']);
+  const drillType = getTextFieldValue(row, EXPECTED_COLUMNS.drillType.aliases);
   if (drillType) {
     project.drillType = drillType;
   }
 
-  const kitCategory = getTextFieldValue(row, [
-    'type of kit',
-    'kit category',
-    'category',
-    'kit_category',
-  ]);
+  const kitCategory = getTextFieldValue(row, EXPECTED_COLUMNS.kitCategory.aliases);
   if (kitCategory) {
     const validatedCategory = validateKitCategoryValue(kitCategory);
     if (validatedCategory) {
@@ -104,45 +100,32 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
     }
   }
 
-  const datePurchased = getFieldValue(row, ['date purchased']);
+  const datePurchased = getFieldValue(row, EXPECTED_COLUMNS.datePurchased.aliases);
   if (datePurchased) {
     project.datePurchased = validateDate(datePurchased);
   }
 
-  const dateStarted = getFieldValue(row, ['date started']);
+  const dateStarted = getFieldValue(row, EXPECTED_COLUMNS.dateStarted.aliases);
   if (dateStarted) {
     project.dateStarted = validateDate(dateStarted);
   }
 
-  const dateCompleted = getFieldValue(row, ['date completed']);
+  const dateCompleted = getFieldValue(row, EXPECTED_COLUMNS.dateCompleted.aliases);
   if (dateCompleted) {
     project.dateCompleted = validateDate(dateCompleted);
   }
 
-  const notes = getTextFieldValue(row, ['notes', 'general notes']);
+  const notes = getTextFieldValue(row, EXPECTED_COLUMNS.generalNotes.aliases);
   if (notes) {
     project.generalNotes = notes;
   }
 
-  const sourceUrl = getTextFieldValue(row, [
-    'source url',
-    'project url',
-    'source_url',
-    'project_url',
-    'url',
-    'source',
-    'link',
-  ]);
+  const sourceUrl = getTextFieldValue(row, EXPECTED_COLUMNS.sourceUrl.aliases);
   if (sourceUrl) {
     project.sourceUrl = sourceUrl;
   }
 
-  const totalDiamonds = getFieldValue(row, [
-    'total diamonds',
-    'diamond count',
-    'diamonds',
-    'count',
-  ]);
+  const totalDiamonds = getFieldValue(row, EXPECTED_COLUMNS.totalDiamonds.aliases);
   if (totalDiamonds) {
     // Remove commas and other formatting characters, then parse as integer.
     // Only accept strictly positive integers; the create-time zod schema
@@ -155,12 +138,7 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
     }
   }
 
-  const colorCount = getFieldValue(row, [
-    '# of colors',
-    'number of colors',
-    'color count',
-    'colors',
-  ]);
+  const colorCount = getFieldValue(row, EXPECTED_COLUMNS.colorCount.aliases);
   if (colorCount) {
     const cleanedValue = colorCount.replace(/[,\s]/g, '');
     if (/^\d+$/.test(cleanedValue)) {
@@ -171,13 +149,13 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
     }
   }
 
-  const dateReceived = getFieldValue(row, ['date received']);
+  const dateReceived = getFieldValue(row, EXPECTED_COLUMNS.dateReceived.aliases);
   if (dateReceived) {
     project.dateReceived = validateDate(dateReceived);
   }
 
   // Handle tags - parse semicolon-separated tag names
-  const tagsString = getTextFieldValue(row, ['tags', 'tag', 'labels']);
+  const tagsString = getTextFieldValue(row, EXPECTED_COLUMNS.tags.aliases);
   if (tagsString) {
     // Split by semicolon and clean up tag names
     const tagNames = tagsString
@@ -210,32 +188,28 @@ export const parseCsvToProjects = (
       return;
     }
 
+    const projects: Partial<ProjectType>[] = [];
+    const parsingWarnings: Papa.ParseError[] = [];
+
     Papa.parse(csvContent, {
       header: true,
       skipEmptyLines: true,
       transformHeader: (header: string) => header.toLowerCase().trim(),
-      step: onProgress
-        ? (_results, parser) => {
-            // Calculate progress based on bytes processed
-            const progress = Math.round((parser.getCharIndex() / csvContent.length) * 100);
-            onProgress(progress);
-          }
-        : undefined,
-      complete: results => {
+      step: results => {
+        parsingWarnings.push(...results.errors);
+        const project = parseProjectFromRow(results.data as Record<string, string>);
+        if (project) projects.push(project);
+        if (onProgress) {
+          const progress = Math.round((results.meta.cursor / csvContent.length) * 100);
+          onProgress(Math.min(progress, 99));
+        }
+      },
+      complete: () => {
         try {
-          if (results.errors.length > 0) {
-            logger.warn('CSV parsing warnings:', results.errors);
+          if (parsingWarnings.length > 0) {
+            logger.warn('CSV parsing warnings:', parsingWarnings);
           }
-
-          const projects: Partial<ProjectType>[] = [];
-
-          for (let i = 0; i < results.data.length; i++) {
-            const row = results.data[i] as Record<string, string>;
-            const project = parseProjectFromRow(row);
-            if (project) {
-              projects.push(project);
-            }
-          }
+          onProgress?.(100);
 
           const allTagNamesArrays = projects.map(p => p.tagNames || []);
           const allUniqueTagNames = Array.from(new Set(allTagNamesArrays.flat()));
@@ -271,7 +245,7 @@ export const parseCsvFileToProjects = (
       header: true,
       skipEmptyLines: true,
       transformHeader: (header: string) => header.toLowerCase().trim(),
-      step: (results, parser) => {
+      step: results => {
         // Process each row as it's parsed (streaming)
         const row = results.data as Record<string, string>;
 
@@ -285,7 +259,7 @@ export const parseCsvFileToProjects = (
           // Report progress every 100 rows
           if (onProgress && rowCount % 100 === 0) {
             // Approximate progress based on bytes read vs file size
-            const progress = Math.round((parser.getCharIndex() / file.size) * 100);
+            const progress = Math.round((results.meta.cursor / file.size) * 100);
             onProgress(Math.min(progress, 99)); // Cap at 99% until complete
           }
         } catch (error) {
@@ -313,7 +287,7 @@ export const parseCsvFileToProjects = (
  */
 const getFieldValue = (
   row: Record<string, string>,
-  possibleHeaders: string[]
+  possibleHeaders: readonly string[]
 ): string | undefined => {
   for (const header of possibleHeaders) {
     const value = row[header];
@@ -326,38 +300,11 @@ const getFieldValue = (
 
 const getTextFieldValue = (
   row: Record<string, string>,
-  possibleHeaders: string[]
+  possibleHeaders: readonly string[]
 ): string | undefined => {
   const value = getFieldValue(row, possibleHeaders);
   return value ? restoreCsvFormulaTextField(value) : undefined;
 };
-
-/**
- * Validate and normalize the status field
- */
-const STATUS_ALIASES: Record<string, ProjectStatus> = {
-  wishlist: 'wishlist',
-  purchased: 'purchased',
-  stash: 'stash',
-  kitted: 'kitted',
-  'kitted up': 'kitted',
-  'kitted up, not started': 'kitted',
-  'ready to start': 'kitted',
-  progress: 'progress',
-  'in progress': 'progress',
-  onhold: 'onhold',
-  'on hold': 'onhold',
-  on_hold: 'onhold',
-  paused: 'onhold',
-  waiting: 'onhold',
-  suspended: 'onhold',
-  completed: 'completed',
-  archived: 'archived',
-  destashed: 'destashed',
-};
-
-const validateStatus = (status: string): ProjectStatus =>
-  STATUS_ALIASES[status.toLowerCase().trim()] ?? 'wishlist';
 
 /**
  * Validate and format a date string

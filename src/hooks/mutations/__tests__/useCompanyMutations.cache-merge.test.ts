@@ -61,6 +61,38 @@ describe('mergeUpdatedCompanyIntoCompanyQueriesCache', () => {
       foo: 1,
     });
   });
+
+  it('preserves the paginated cache reference when the updated row is absent', () => {
+    const data = {
+      companies: [{ id: 'a', name: 'Alpha', website_url: '' }],
+      totalItems: 20,
+      totalPages: 2,
+    };
+    expect(
+      mergeUpdatedCompanyIntoCompanyQueriesCache(data, 'missing', {
+        name: 'Zulu',
+        website_url: '',
+      })
+    ).toBe(data);
+  });
+
+  it('preserves source rows and pagination metadata while reordering a renamed row', () => {
+    const first = Object.freeze({ id: 'a', name: 'Alpha', website_url: '' });
+    const second = Object.freeze({ id: 'b', name: 'Bravo', website_url: '' });
+    const companies = Object.freeze([first, second]);
+    const data = Object.freeze({ companies, totalItems: 20, totalPages: 2 });
+    const next = mergeUpdatedCompanyIntoCompanyQueriesCache(data, 'b', {
+      name: 'Aardvark',
+      website_url: 'https://b.example',
+    }) as typeof data;
+
+    expect(next.companies.map(company => company.id)).toEqual(['b', 'a']);
+    expect(next.companies[1]).toBe(first);
+    expect(second.name).toBe('Bravo');
+    expect(companies).toEqual([first, second]);
+    expect(next.totalItems).toBe(20);
+    expect(next.totalPages).toBe(2);
+  });
 });
 
 describe('insertCreatedCompanyIntoCompanyQueriesCache', () => {

@@ -42,13 +42,7 @@ Services throw `ServiceError` (public name, SDK-agnostic):
 
 ```typescript
 type ServiceErrorType =
-  | 'network'
-  | 'validation'
-  | 'auth'
-  | 'permission'
-  | 'not_found'
-  | 'server'
-  | 'cancelled';
+  'network' | 'validation' | 'auth' | 'permission' | 'not_found' | 'server' | 'cancelled';
 
 interface ServiceError {
   type: ServiceErrorType;

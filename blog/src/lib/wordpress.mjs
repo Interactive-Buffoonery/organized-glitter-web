@@ -1,7 +1,7 @@
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_MAX_PAGES = 50;
 
-export const DEFAULT_WORDPRESS_API_URL = undefined;
+const DEFAULT_WORDPRESS_API_URL = undefined;
 export const PUBLIC_PAGE_SLUGS = ['privacy-policy', 'subscription-confirmed'];
 
 export function isSafeSourceUrl(url) {

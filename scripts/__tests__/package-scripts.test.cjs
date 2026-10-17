@@ -35,7 +35,7 @@ describe('package scripts', () => {
   it('exposes complete local CI phases through stable package scripts', () => {
     assert.equal(
       packageJson.scripts['test:ci:static'],
-      'node scripts/generate-not-found.mjs --check && pnpm typecheck && pnpm format:check && pnpm lint && pnpm lint:pb-boundary && pnpm lint:workflows && node --test e2e/ci/browser-inventory.test.mjs'
+      'node scripts/generate-not-found.mjs --check && pnpm typecheck && pnpm format:check && pnpm lint && node scripts/check-query-lint-placement.mjs && pnpm lint:pb-boundary && pnpm lint:workflows && node --test e2e/ci/browser-inventory.test.mjs && node scripts/check-browser-discovery.mjs'
     );
     assert.equal(
       packageJson.scripts['test:ci:backend'],

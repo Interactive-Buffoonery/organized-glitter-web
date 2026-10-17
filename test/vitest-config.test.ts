@@ -1,9 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+
+import { nodeLogicTestFiles } from './node-logic-test-files';
 
 const vitestConfig = readFileSync(resolve(process.cwd(), 'vitest.config.ts'), 'utf8');
 const sourceFile = ts.createSourceFile(
@@ -46,6 +48,16 @@ describe('Vitest config', () => {
 
     const testFileExcludes = excludeEntries?.filter(entry => entry.includes('.test.'));
     expect(testFileExcludes).toEqual([]);
+  });
+
+  it('lists audited Node logic tests as unique, existing files rather than globs', () => {
+    expect(nodeLogicTestFiles.length).toBeGreaterThan(0);
+    expect(new Set(nodeLogicTestFiles).size).toBe(nodeLogicTestFiles.length);
+    for (const file of nodeLogicTestFiles) {
+      expect(file).toMatch(/\.test\.tsx?$/);
+      expect(file).not.toMatch(/[*?{}[\]]/);
+      expect(existsSync(resolve(process.cwd(), file)), file).toBe(true);
+    }
   });
 
   it('does not discover feedback test copies under .tmp', () => {

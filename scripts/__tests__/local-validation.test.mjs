@@ -13,16 +13,64 @@ import {
   publicBuildEnvironmentDigest,
   recordPhaseFailure,
   formatValidationReport,
+  hostLoadAdvisory,
+  hostLoadSnapshot,
   validationEnvironment,
 } from '../run-local-validation.mjs';
 
 describe('local validation orchestrator', () => {
-  it('writes a failed run report before exiting when the base cannot resolve', () => {
+  it('records only host load and CPU capacity at gate start', () => {
+    expect(
+      hostLoadSnapshot({
+        platform: 'linux',
+        loadavg: () => [6.734, 5.1, 2],
+        availableParallelism: () => 4,
+      })
+    ).toEqual({ loadAverage: [6.73, 5.1, 2], availableParallelism: 4 });
+  });
+
+  it('treats an all-zero Windows load average as unavailable', () => {
+    const snapshot = hostLoadSnapshot({
+      platform: 'win32',
+      loadavg: () => [0, 0, 0],
+      availableParallelism: () => 8,
+    });
+    expect(snapshot).toEqual({ loadAverage: null, availableParallelism: 8 });
+    expect(hostLoadAdvisory(snapshot)).toBeNull();
+  });
+
+  it('advises without blocking when the host is already busy', () => {
+    expect(hostLoadAdvisory({ loadAverage: [3.9, 2, 1], availableParallelism: 4 })).toBeNull();
+    const advisory = hostLoadAdvisory({ loadAverage: [9.95, 9.7, 6.9], availableParallelism: 4 });
+    expect(advisory).toMatch(/9\.95.*4 available CPU threads/);
+    expect(advisory).toMatch(/builds|browser/i);
+    expect(advisory).toMatch(/continues/i);
+  });
+
+  it('reports the host load snapshot without undefined values', () => {
+    const summary = {
+      outcome: 'passed',
+      platform: { operatingSystem: 'linux', architecture: 'x64' },
+      repository: { base: { ref: 'origin/dev', sha: 'abc' }, head: { commit: 'def' } },
+      phases: [],
+    };
+    expect(formatValidationReport(summary)).not.toContain('Host load');
+    const report = formatValidationReport({
+      ...summary,
+      host: { loadAverage: [9.95, 9.7, 6.9], availableParallelism: 4 },
+    });
+    expect(report).toContain('Host load at start: 9.95, 9.7, 6.9 (4 CPU threads)');
+    expect(
+      formatValidationReport({ ...summary, host: { loadAverage: null, availableParallelism: 4 } })
+    ).toContain('Host load at start: unavailable (4 CPU threads)');
+  });
+
+  it.each(['backend', 'cloud'])('reports every phase if the %s base cannot resolve', profile => {
     const result = spawnSync(
       process.execPath,
       [
         new URL('../run-local-validation.mjs', import.meta.url).pathname,
-        '--profile=backend',
+        `--profile=${profile}`,
         '--base=refs/heads/missing-validation-regression-base',
       ],
       { encoding: 'utf8' }
@@ -34,7 +82,16 @@ describe('local validation orchestrator', () => {
     expect(reportPath).toBeDefined();
     const summary = JSON.parse(readFileSync(summaryPath, 'utf8'));
     expect(summary.outcome).toBe('failed');
-    expect(summary.phases).toEqual([]);
+    expect(summary.phases[0]).toMatchObject({ name: 'backend', outcome: 'not-run' });
+    if (profile === 'cloud') {
+      expect(summary.phases).toHaveLength(12);
+      expect(summary.phases.slice(0, 6).every(phase => phase.outcome === 'not-run')).toBe(true);
+      expect(summary.phases.slice(6).every(phase => phase.outcome === 'delegated-to-ci')).toBe(
+        true
+      );
+    } else {
+      expect(summary.phases).toHaveLength(1);
+    }
     expect(summary.finishedAt).toBeDefined();
     expect(summary.repository.base.ref).toBe('refs/heads/missing-validation-regression-base');
     const report = readFileSync(reportPath, 'utf8');
@@ -57,6 +114,26 @@ describe('local validation orchestrator', () => {
       ['protected-file-browser', 'test:protected-file-rotation-browser'],
       ['blog-browser', 'qa:blog'],
     ]);
+  });
+
+  it('cloud checks retain every non-browser PR phase and delegate every browser phase', () => {
+    const pr = buildPhasePlan('pr');
+    const cloud = buildPhasePlan('cloud');
+    expect(cloud).toEqual(pr.slice(0, 6));
+    const report = formatValidationReport({
+      profile: 'cloud',
+      outcome: 'cloud-checks-passed',
+      platform: { operatingSystem: 'linux', architecture: 'x64' },
+      repository: { base: { sha: 'abc' }, head: { commit: 'def' } },
+      phases: pr.map(([name], index) => ({
+        name,
+        outcome: index < 6 ? 'passed' : 'delegated-to-ci',
+      })),
+    });
+    for (const [name] of pr.slice(6)) expect(report).toContain(`| ${name} | delegated-to-ci |`);
+    expect(report).toContain('Browser coverage: delegated to CI, not passed locally.');
+    expect(report).toContain('Complete PR validation: not established by this cloud profile.');
+    expect(parseArgs(['--profile=cloud', '--base=origin/dev']).profile).toBe('cloud');
   });
 
   it('runs cold-load through the dedicated built-artifact config', () => {

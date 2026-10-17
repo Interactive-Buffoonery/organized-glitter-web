@@ -24,6 +24,22 @@ import { isSessionChangedError } from '@/services/auth/sessionRecovery';
 
 const logger = createLogger('CompanyMutations');
 
+function mergeUpdatedCompanyIntoList(
+  companies: CompanyListItem[],
+  id: string,
+  patch: Pick<CompanyListItem, 'name' | 'website_url'>
+): CompanyListItem[] {
+  let changed = false;
+  const next = companies.map(item => {
+    if (item.id === id) {
+      changed = true;
+      return { ...item, ...patch };
+    }
+    return item;
+  });
+  return changed ? next.sort((a, b) => a.name.localeCompare(b.name)) : companies;
+}
+
 /**
  * Merges an updated company into React Query cache entries shaped like
  * `CompanyListItem[]` (e.g. `useAllCompanies`) or `{ companies: CompanyListItem[] }`
@@ -43,16 +59,7 @@ export function mergeUpdatedCompanyIntoCompanyQueriesCache(
   patch: Pick<CompanyListItem, 'name' | 'website_url'>
 ): unknown {
   if (Array.isArray(data)) {
-    let changed = false;
-    const next = (data as CompanyListItem[]).map(item => {
-      if (item.id === id) {
-        changed = true;
-        return { ...item, ...patch };
-      }
-      return item;
-    });
-    if (!changed) return data;
-    return next.sort((a, b) => a.name.localeCompare(b.name));
+    return mergeUpdatedCompanyIntoList(data as CompanyListItem[], id, patch);
   }
 
   if (
@@ -66,18 +73,11 @@ export function mergeUpdatedCompanyIntoCompanyQueriesCache(
       totalItems: number;
       totalPages: number;
     };
-    let changed = false;
-    const nextCompanies = typed.companies.map(item => {
-      if (item.id === id) {
-        changed = true;
-        return { ...item, ...patch };
-      }
-      return item;
-    });
-    if (!changed) return data;
+    const companies = mergeUpdatedCompanyIntoList(typed.companies, id, patch);
+    if (companies === typed.companies) return data;
     return {
       ...typed,
-      companies: nextCompanies.sort((a, b) => a.name.localeCompare(b.name)),
+      companies,
     };
   }
 

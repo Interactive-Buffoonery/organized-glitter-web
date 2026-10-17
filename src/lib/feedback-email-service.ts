@@ -75,8 +75,6 @@ const isClientValidationError = (error: unknown): boolean => {
 const getFallbackResponseMessage = (response: Response) =>
   `HTTP ${response.status}: ${response.statusText || 'Request failed'}`;
 
-export { getContactEmail as FEEDBACK_CONTACT_EMAIL };
-
 const readFeedbackResponse = async (response: Response): Promise<FeedbackResponse> => {
   try {
     return (await response.json()) as FeedbackResponse;

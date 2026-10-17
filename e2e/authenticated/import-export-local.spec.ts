@@ -273,6 +273,149 @@ test.describe('local import/export workflows', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
+  for (const scenario of [
+    {
+      name: 'advertised column aliases',
+      headers: 'project_name,project_status,date_purchased,total_diamonds,color_count',
+      values: 'done,2024-06-15,1234,42',
+      expected: {
+        status: 'completed',
+        date_purchased: '2024-06-15 00:00:00.000Z',
+        total_diamonds: 1234,
+        color_count: 42,
+      },
+    },
+    {
+      name: 'whole diamond counts',
+      headers: 'Title,Status,Total Diamonds,# of Colors',
+      values: 'stash,12.5,42',
+      expected: { status: 'stash', total_diamonds: 12, color_count: 42 },
+    },
+    {
+      name: 'inherited enum property names',
+      headers: 'Title,Status,Drill Shape,Type of Kit',
+      values: 'constructor,__proto__,constructor',
+      expected: { status: 'wishlist', drill_shape: '', kit_category: 'full' },
+    },
+  ]) {
+    test(`preserves CSV import integrity for ${scenario.name}`, async ({ page }) => {
+      const title = `${runPrefix} ${scenario.name}`;
+      const csvPath = path.join(tempDir, 'integrity.csv');
+      await writeFile(csvPath, `${scenario.headers}\n${title},${scenario.values}\n`);
+
+      await openDataSettings(page);
+      await uploadFile(page, 'Organized Glitter CSV file', csvPath);
+      await page.getByRole('button', { name: /^Import CSV$/ }).click();
+      await expect(page.getByText(/Imported 1, failed 0/i)).toBeVisible({ timeout: 30_000 });
+      const project = await getProjectByTitle(pb, title);
+      expect(project).toMatchObject(scenario.expected);
+    });
+  }
+
+  test('preserves status aliases and reserved tag names during CSV import', async ({ page }) => {
+    const reservedName = 'constructor';
+    const existing = await pb.collection('tags').getFullList<{ id: string }>({
+      filter: pb.filter('user = {:user} && name = {:name}', {
+        user: pb.authStore.record?.id,
+        name: reservedName,
+      }),
+    });
+    const csvPath = path.join(tempDir, 'aliases.csv');
+    const cases = [
+      { alias: 'done', status: 'completed' },
+      { alias: 'owned', status: 'stash' },
+      { alias: 'in_progress', status: 'progress' },
+    ];
+    await writeFile(
+      csvPath,
+      [
+        'Title,Status,Tags',
+        ...cases.map(({ alias }) => `${runPrefix} ${alias},${alias},${reservedName}`),
+      ].join('\n')
+    );
+    try {
+      await openDataSettings(page);
+      await uploadFile(page, 'Organized Glitter CSV file', csvPath);
+      await page.getByRole('button', { name: /^Import CSV$/ }).click();
+      await expect(page.getByText(/Imported 3, failed 0/i)).toBeVisible({ timeout: 30_000 });
+      for (const { alias, status } of cases) {
+        const project = await getProjectByTitle(pb, `${runPrefix} ${alias}`);
+        expect(project.status).toBe(status);
+        const relations = await pb.collection('project_tags').getFullList<{ tag: string }>({
+          filter: pb.filter('project = {:project}', { project: project.id }),
+        });
+        expect(relations).toHaveLength(1);
+        const tag = await pb.collection('tags').getOne<{ name: string }>(relations[0].tag);
+        expect(tag.name).toBe(reservedName);
+      }
+    } finally {
+      await cleanupRunRecords(pb);
+      if (existing.length === 0) {
+        const created = await pb.collection('tags').getFullList<{ id: string }>({
+          filter: pb.filter('user = {:user} && name = {:name}', {
+            user: pb.authStore.record?.id,
+            name: reservedName,
+          }),
+        });
+        for (const tag of created) await deleteRecord(pb, 'tags', tag.id);
+      }
+    }
+  });
+
+  test('requires manual selection for ambiguous photo titles', async ({ page }) => {
+    const title = `${runPrefix} Duplicate title`;
+    for (let i = 0; i < 2; i++) {
+      await pb.collection('projects').create({
+        user: pb.authStore.record?.id,
+        title,
+        status: 'stash',
+        kit_category: 'full',
+      });
+    }
+    const zip = new JSZip();
+    zip.file('photo-import.json', JSON.stringify([{ path: 'cover.jpg', title }]));
+    zip.file('cover.jpg', await readFile(portraitFixture));
+    const zipPath = path.join(tempDir, 'ambiguous.zip');
+    await writeFile(zipPath, await zip.generateAsync({ type: 'nodebuffer' }));
+    await openDataSettings(page);
+    await uploadFile(page, 'Bulk photo ZIP file', zipPath);
+    await expect(page.getByText(/1 photo ready for review/i)).toBeVisible({ timeout: 30_000 });
+    await expect(
+      page
+        .getByText(/ambiguous/i)
+        .filter({ visible: true })
+        .last()
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Import confirmed photos' })).toBeDisabled();
+    const projects = await getProjectsByPrefix(pb);
+    expect(projects).toHaveLength(2);
+    expect(projects.every(project => !project.image)).toBe(true);
+  });
+
+  test('rejects invalid numeric paste without clearing the current value', async ({ page }) => {
+    await page.goto('/projects/new');
+    const width = page.getByLabel('Width (cm)', { exact: true });
+    await width.fill('42');
+    for (const text of ['abc', 'Infinity', '1e999']) {
+      await width.evaluate((input, value) => {
+        const clipboardData = new DataTransfer();
+        clipboardData.setData('text', value);
+        input.dispatchEvent(
+          new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true })
+        );
+      }, text);
+      await expect(width).toHaveValue('42');
+    }
+    await width.evaluate(input => {
+      const clipboardData = new DataTransfer();
+      clipboardData.setData('text', '1,234.5');
+      input.dispatchEvent(
+        new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true })
+      );
+    });
+    await expect(width).toHaveValue('1234.5');
+  });
+
   test('imports CSV and DAC data, attaches bulk photos, exports and restores an archive', async ({
     browser,
     page,

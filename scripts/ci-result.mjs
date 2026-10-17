@@ -7,6 +7,7 @@ export const requiredJobs = [
   'unit-tests',
   'react-doctor',
   'publication-security',
+  'complete-pr',
 ];
 
 export function evaluateCiResult(needs) {

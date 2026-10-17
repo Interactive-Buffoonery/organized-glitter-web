@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const fixtureDirectory = fileURLToPath(new URL('./fixtures/example-library/', import.meta.url));
-export const exampleLibrary = JSON.parse(
+const exampleLibrary = JSON.parse(
   readFileSync(path.join(fixtureDirectory, 'library.json'), 'utf8')
 );
 

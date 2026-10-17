@@ -55,7 +55,7 @@ const COLORING_BOOK_STATUS_FILL: Record<ColoringBooksStatusOptions, string> = {
 export const COLORING_BOOK_STATUS_LABEL: Record<ColoringBooksStatusOptions, string> = {
   wishlist: 'Wishlist',
   purchased: 'Purchased',
-  in_stash: 'On Bookshelf (Not Started)',
+  in_stash: 'In library',
   in_progress: 'In progress',
   completed: 'Completed',
   archived: 'Archived',

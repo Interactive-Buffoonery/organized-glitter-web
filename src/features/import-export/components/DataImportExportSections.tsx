@@ -74,6 +74,25 @@ interface BulkTargetOption {
   hasCover: boolean;
 }
 
+function disambiguateTargetLabels(options: BulkTargetOption[]): BulkTargetOption[] {
+  const labelCounts = new Map<string, number>();
+  for (const option of options) {
+    labelCounts.set(option.label, (labelCounts.get(option.label) ?? 0) + 1);
+  }
+
+  const usedLabels = new Set(labelCounts.keys());
+  return options.map(option => {
+    if ((labelCounts.get(option.label) ?? 0) <= 1) return option;
+
+    let label = option.label;
+    do {
+      label = `${label} (ID: ${option.id})`;
+    } while (usedLabels.has(label));
+    usedLabels.add(label);
+    return { ...option, label };
+  });
+}
+
 interface DataImportExportState {
   organizedCsvFile: File | null;
   dacCsvFile: File | null;
@@ -1287,7 +1306,11 @@ export function DataImportExportSections({ disabled = false }: DataImportExportS
       types: targetTypesByKind['coloring-page'],
       hasCover: false,
     }));
-    return [...projectOptions, ...bookOptions, ...pageOptions];
+    return [
+      ...disambiguateTargetLabels(projectOptions),
+      ...disambiguateTargetLabels(bookOptions),
+      ...disambiguateTargetLabels(pageOptions),
+    ];
   }, [bulkPhotoImport.library]);
 
   const selectFile = (kind: FileInputKind) => inputRefs[kind].current?.click();

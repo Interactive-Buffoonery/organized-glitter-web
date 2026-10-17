@@ -1,7 +1,9 @@
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import {
+  assertArchiveCentralDirectoryLimits,
   assertArchiveV3RecordLimits,
+  assertArchiveZipMetadataLimits,
   MAX_ARCHIVE_CENTRAL_DIRECTORY_BYTES,
   MAX_ARCHIVE_ENTRY_BYTES,
 } from '@/features/import-export/archive/archiveImportLimits';
@@ -181,88 +183,55 @@ describe('v3 canonical format', () => {
   });
 });
 
-describe('v3 packer', () => {
-  it('rejects an asset that the ZIP importer cannot read', async () => {
-    const chunk = new Uint8Array(1024 * 1024);
-    const largeAsset: ArchiveAssetSource = {
-      assetId: 'large',
-      path: 'assets/large/photo.jpg',
-      role: 'coloring-page-photo',
-      field: 'photos',
-      open: async () =>
-        new ReadableStream({
-          start(controller) {
-            for (let index = 0; index <= MAX_ARCHIVE_ENTRY_BYTES / chunk.byteLength; index++)
-              controller.enqueue(chunk);
-            controller.close();
-          },
-        }),
+// archive-v3-limits.test.ts exercises the packer against KiB-sized copies of these limits. These
+// checks keep the importer's real 64 MiB and 16 MiB boundaries covered through declared ZIP
+// metadata, without allocating archives of that size.
+describe('v3 restore limits shared with the packer', () => {
+  function zipDeclaring(name: string, size: number): JSZip {
+    return {
+      files: {
+        [name]: { name, dir: false, _data: { compressedSize: size, uncompressedSize: size } },
+      },
+    } as unknown as JSZip;
+  }
+
+  it('accepts declared entries at the real entry and manifest limits and rejects one byte more', () => {
+    const asset = 'assets/a1/photo.jpg';
+    expect(() =>
+      assertArchiveZipMetadataLimits(zipDeclaring(asset, MAX_ARCHIVE_ENTRY_BYTES))
+    ).not.toThrow();
+    expect(() =>
+      assertArchiveZipMetadataLimits(zipDeclaring(asset, MAX_ARCHIVE_ENTRY_BYTES + 1))
+    ).toThrow(/assets\/a1\/photo\.jpg is too large/);
+    expect(() =>
+      assertArchiveZipMetadataLimits(zipDeclaring('manifest.json', MAX_ARCHIVE_MANIFEST_BYTES))
+    ).not.toThrow();
+    expect(() =>
+      assertArchiveZipMetadataLimits(zipDeclaring('manifest.json', MAX_ARCHIVE_MANIFEST_BYTES + 1))
+    ).toThrow(/manifest\.json is too large/);
+  });
+
+  it('checks a declared central directory against the real limit before reading it', async () => {
+    const zip = new JSZip();
+    zip.file('manifest.json', '{}');
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const declare = (directoryBytes: number) => {
+      const copy = bytes.slice();
+      new DataView(copy.buffer).setUint32(copy.length - 22 + 12, directoryBytes, true);
+      return new File([copy], 'declared.zip');
     };
 
     await expect(
-      prepareArchivePlan([item('asset:large', [largeAsset])], { backupId, exportedAt })
-    ).rejects.toThrow(/asset large.*too large/i);
+      assertArchiveCentralDirectoryLimits(declare(MAX_ARCHIVE_CENTRAL_DIRECTORY_BYTES + 1))
+    ).rejects.toThrow(/central directory is too large/);
+    // At the cap the size check passes and the forged offset is what fails.
+    await expect(
+      assertArchiveCentralDirectoryLimits(declare(MAX_ARCHIVE_CENTRAL_DIRECTORY_BYTES))
+    ).rejects.toThrow(/invalid central directory/);
   });
+});
 
-  it('stops a changed asset above the entry limit during the second pass', async () => {
-    const chunk = new Uint8Array(1024 * 1024);
-    let opens = 0;
-    const changingAsset: ArchiveAssetSource = {
-      assetId: 'changing',
-      path: 'assets/changing/photo.jpg',
-      role: 'coloring-page-photo',
-      field: 'photos',
-      open: async () => {
-        opens += 1;
-        return new ReadableStream({
-          start(controller) {
-            if (opens === 1) controller.enqueue(new Uint8Array([1]));
-            else {
-              for (let index = 0; index <= MAX_ARCHIVE_ENTRY_BYTES / chunk.byteLength; index++)
-                controller.enqueue(chunk);
-            }
-            controller.close();
-          },
-        });
-      },
-    };
-    const plan = await prepareArchivePlan([item('asset:changing', [changingAsset])], {
-      backupId,
-      exportedAt,
-    });
-
-    await expect(buildArchivePart(plan, 0)).rejects.toThrow(/asset changing.*too large/i);
-  });
-
-  it('splits before a part exceeds the ZIP central-directory limit', async () => {
-    const longName = 'x'.repeat(17 * 1024);
-    const items: ArchiveSourceItemV3[] = Array.from({ length: 1_000 }, (_, index) => {
-      const assetId = `a${index}`;
-      return item(`asset:${index}`, [
-        {
-          assetId,
-          path: `assets/${assetId}/${longName}.jpg`,
-          role: 'coloring-page-photo',
-          field: 'photos',
-          open: async () => stream(new Uint8Array()),
-        },
-      ]);
-    });
-
-    const plan = await prepareArchivePlan(items, { backupId, exportedAt });
-
-    expect(plan.parts.length).toBeGreaterThan(1);
-    expect(
-      plan.parts.every(
-        part =>
-          46 * (part.assets.length + 1) +
-            'manifest.json'.length +
-            part.assets.reduce((sum, asset) => sum + asset.descriptor.path.length, 0) <=
-          MAX_ARCHIVE_CENTRAL_DIRECTORY_BYTES
-      )
-    ).toBe(true);
-  });
-
+describe('v3 packer', () => {
   it('rejects warnings above the restore count without dropping any', async () => {
     const warnings = Array.from({ length: 10_001 }, (_, index) => ({
       code: 'test',
@@ -295,38 +264,6 @@ describe('v3 packer', () => {
 
     await expect(prepareArchivePlan(items, { backupId, exportedAt })).rejects.toThrow(
       /too many tags/i
-    );
-  });
-
-  it('splits metadata-heavy items before a manifest exceeds the restore limit', async () => {
-    const largeTitle = 'a'.repeat(MAX_ARCHIVE_MANIFEST_BYTES / 2);
-    const items: ArchiveSourceItemV3[] = [1, 2].map(index => ({
-      itemId: `diamond-project:${index}`,
-      kind: 'diamond-project',
-      metadata: { title: largeTitle, status: 'wishlist', tags: [] },
-      assets: [],
-    }));
-
-    const plan = await prepareArchivePlan(items, { backupId, exportedAt });
-
-    expect(plan.parts).toHaveLength(2);
-    expect(
-      plan.parts.every(part => part.manifestBytes.byteLength <= MAX_ARCHIVE_MANIFEST_BYTES)
-    ).toBe(true);
-  });
-
-  it('rejects one atom whose manifest exceeds the restore limit', async () => {
-    const items: ArchiveSourceItemV3[] = [
-      {
-        itemId: 'diamond-project:oversized',
-        kind: 'diamond-project',
-        metadata: { title: 'a'.repeat(MAX_ARCHIVE_MANIFEST_BYTES), status: 'wishlist', tags: [] },
-        assets: [],
-      },
-    ];
-
-    await expect(prepareArchivePlan(items, { backupId, exportedAt })).rejects.toThrow(
-      /diamond-project:oversized.*manifest.*limit/
     );
   });
 
@@ -513,15 +450,12 @@ describe('v3 packer', () => {
     );
   });
   it('serializes each logical item once during partition measurement', async () => {
-    const items = Array.from(
-      { length: 3000 },
-      (_, index): ArchiveSourceItemV3 => ({
-        itemId: `coloring-medium:${String(index).padStart(4, '0')}`,
-        kind: 'coloring-medium',
-        metadata: { name: `Medium ${index}`, type: 'other' },
-        assets: [],
-      })
-    );
+    const items = Array.from({ length: 3000 }, (_, index): ArchiveSourceItemV3 => ({
+      itemId: `coloring-medium:${String(index).padStart(4, '0')}`,
+      kind: 'coloring-medium',
+      metadata: { name: `Medium ${index}`, type: 'other' },
+      assets: [],
+    }));
     const serialized: string[] = [];
     const plan = await prepareArchivePlan(items, {
       backupId,

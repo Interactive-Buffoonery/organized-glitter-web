@@ -76,12 +76,10 @@ describe('RandomizerControlsPanel', () => {
     expect(onModeChange).toHaveBeenCalledWith('coloring-page');
   });
 
-  it('uses bookshelf copy for the coloring book not-started status filter', () => {
+  it('uses library copy for the coloring book not-started status filter', () => {
     renderControls({ mode: 'coloring-book' });
 
-    expect(
-      screen.getByRole('checkbox', { name: 'On Bookshelf (Not Started)' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'In library' })).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'In stash' })).not.toBeInTheDocument();
   });
 });

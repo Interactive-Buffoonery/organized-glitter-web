@@ -17,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const summaryRoot = path.join(rootDir, '.tmp', 'local-validation');
-const profiles = new Set(['pr', 'release', 'backend']);
+const profiles = new Set(['pr', 'release', 'backend', 'cloud']);
 
 const sharedPhases = [
   ['backend', 'test:ci:backend'],
@@ -39,6 +39,7 @@ const trailingBrowserPhases = [
 export function buildPhasePlan(profile) {
   if (!profiles.has(profile)) throw new Error(`Unknown validation profile: ${profile}`);
   if (profile === 'backend') return [['backend', 'test:ci:backend']];
+  if (profile === 'cloud') return sharedPhases.slice(0, 6);
   return [
     ...sharedPhases,
     profile === 'release' ? ['browser-full', 'qa:browser:full'] : ['browser-smoke', 'qa:browser'],
@@ -198,14 +199,52 @@ const toolIdentity = () => ({
   ),
 });
 
+const round = value => Math.round(value * 100) / 100;
+
+/** Host load and CPU capacity only; no process list, arguments, or environment. */
+export function hostLoadSnapshot({
+  platform = process.platform,
+  loadavg = os.loadavg,
+  availableParallelism = os.availableParallelism,
+} = {}) {
+  const loadAverage = loadavg().map(round);
+  return {
+    loadAverage:
+      platform === 'win32' && loadAverage.every(value => value === 0) ? null : loadAverage,
+    availableParallelism: availableParallelism(),
+  };
+}
+
+/** A non-blocking note when the host is already busy before the gate starts. */
+export function hostLoadAdvisory({ loadAverage, availableParallelism }) {
+  if (!loadAverage || loadAverage[0] < availableParallelism) return null;
+  return (
+    `Advisory: the 1-minute load average is ${loadAverage[0]} with ${availableParallelism} ` +
+    'available CPU threads. Concurrent builds, browser validation, or another test run can push ' +
+    'unit tests toward their timeouts. Validation continues.'
+  );
+}
+
 export function formatValidationReport(summary) {
   return [
     '# Local PocketBase and CI results',
     '',
     `Result: ${summary.outcome}`,
+    ...(summary.profile === 'cloud'
+      ? [
+          'Browser coverage: delegated to CI, not passed locally.',
+          'Complete PR validation: not established by this cloud profile.',
+        ]
+      : []),
     `Computer: ${summary.platform.operatingSystem}/${summary.platform.architecture}`,
     `Source: ${summary.repository.head?.commit ?? 'unavailable'}`,
     `Comparison baseline: ${summary.repository.base.sha ?? summary.repository.base.ref}`,
+    ...(summary.host
+      ? [
+          `Host load at start: ${summary.host.loadAverage?.join(', ') ?? 'unavailable'} ` +
+            `(${summary.host.availableParallelism} CPU threads)`,
+        ]
+      : []),
     ...(summary.failure ? ['', `Failure: ${summary.failure}`] : []),
     '',
     '| Phase | Result | Seconds | Exit code |',
@@ -286,14 +325,24 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
       operatingSystem: process.platform,
       release: os.release(),
     },
+    host: hostLoadSnapshot(),
     tools: null,
     inputs: null,
     nativeSync: { outcome: 'not-run', reason: 'PocketBase validation must pass first.' },
-    phases: [],
+    phases: buildPhasePlan(profile === 'cloud' ? 'pr' : profile).map(([name, script]) => ({
+      name,
+      script,
+      outcome:
+        profile === 'cloud' && !buildPhasePlan('cloud').some(([phase]) => phase === name)
+          ? 'delegated-to-ci'
+          : 'not-run',
+    })),
   };
   writeSummary(summaryPath, summary);
   process.stdout.write(`Local validation summary: ${summaryPath}\n`);
   process.stdout.write(`Local validation report: ${path.join(runDir, 'report.md')}\n`);
+  const loadAdvisory = hostLoadAdvisory(summary.host);
+  if (loadAdvisory) process.stdout.write(`${loadAdvisory}\n`);
 
   let initialization = 'repository identity';
   try {
@@ -327,13 +376,8 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
   for (const [name, script] of buildPhasePlan(profile)) {
     const startedAt = new Date();
-    const phase = {
-      name,
-      script,
-      startedAt: startedAt.toISOString(),
-      outcome: 'running',
-    };
-    summary.phases.push(phase);
+    const phase = summary.phases.find(phase => phase.name === name);
+    Object.assign(phase, { startedAt: startedAt.toISOString(), outcome: 'running' });
     writeSummary(summaryPath, summary);
     process.stdout.write(`\n[local-validation] ${name}: pnpm ${script}\n`);
     let result;
@@ -367,7 +411,7 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
     }
   }
 
-  summary.outcome = 'passed';
+  summary.outcome = profile === 'cloud' ? 'cloud-checks-passed' : 'passed';
   summary.finishedAt = new Date().toISOString();
   writeSummary(summaryPath, summary);
   return 0;

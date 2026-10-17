@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {
@@ -111,6 +111,7 @@ vi.mock('@/services/analytics-escape-hatch', () => ({
 
 import { DataImportExportSections } from '../DataImportExportSections';
 import { AnalyticsEvent } from '@/services/analytics-events';
+import type { BulkPhotoReviewRow } from '@/features/import-export/bulk-photos/types';
 
 function renderDataSections() {
   return render(<DataImportExportSections />);
@@ -393,6 +394,127 @@ describe('DataImportExportSections', () => {
     expect(mocks.updateRow).toHaveBeenLastCalledWith(
       'row-1',
       expect.objectContaining({ targetId: 'shared-id', targetLabel: 'Diamond project' })
+    );
+  });
+
+  it.each([
+    ['project-cover', 'project', 'Shared title'],
+    ['project-progress-note', 'project', 'Shared title'],
+    ['coloring-book-cover', 'book', 'Shared title'],
+    ['coloring-page-photo', 'page', 'Shared title, page 1'],
+    ['coloring-page-progress-note', 'page', 'Shared title, page 1'],
+  ] as const)(
+    'distinguishes duplicate labels for %s and retains the chosen identity',
+    (targetType, kind, label) => {
+      const row: BulkPhotoReviewRow = {
+        id: 'row-1',
+        file: new File(['image'], 'photo.jpg', { type: 'image/jpeg' }),
+        path: 'photo.jpg',
+        targetType,
+        confidence: 'unmatched',
+        reason: 'Choose a target',
+        confirmed: false,
+        excluded: true,
+        overwrite: false,
+      };
+      mocks.bulkRows = [row];
+      mocks.bulkLibrary = {
+        diamondProjects: [
+          { id: 'project-1', title: 'Shared title', imageUrl: '' },
+          { id: 'project-2', title: 'Shared title', imageUrl: '' },
+          { id: 'project-3', title: 'Unique title', imageUrl: '' },
+        ],
+        coloringBooks: [
+          { id: 'book-1', title: 'Shared title', coverImage: '' },
+          { id: 'book-2', title: 'Shared title', coverImage: '' },
+          { id: 'book-3', title: 'Unique title', coverImage: '' },
+        ],
+        coloringPages: [
+          { id: 'page-1', bookId: 'book-1', bookTitle: 'Shared title', pageNumber: 1 },
+          { id: 'page-2', bookId: 'book-2', bookTitle: 'Shared title', pageNumber: 1 },
+          { id: 'page-3', bookId: 'book-1', bookTitle: 'Shared title', pageNumber: 2 },
+        ],
+      };
+
+      const { rerender } = renderDataSections();
+      const selectors = screen.getAllByRole('combobox', { name: 'Target record' });
+      for (const selector of selectors) {
+        expect(selector).toHaveValue('');
+        expect(
+          within(selector)
+            .getAllByRole('option')
+            .map(option => option.textContent)
+        ).toEqual([
+          'Choose target',
+          `${label} (ID: ${kind}-1)`,
+          `${label} (ID: ${kind}-2)`,
+          kind === 'page' ? 'Shared title, page 2' : 'Unique title',
+        ]);
+      }
+      expect(mocks.updateRow).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: /import confirmed photos/i })).toBeDisabled();
+
+      fireEvent.change(selectors[0], { target: { value: `${kind}-2` } });
+
+      expect(mocks.updateRow).toHaveBeenLastCalledWith(
+        'row-1',
+        expect.objectContaining({
+          targetId: `${kind}-2`,
+          targetLabel: `${label} (ID: ${kind}-2)`,
+          confirmed: true,
+          excluded: false,
+        })
+      );
+      const patch = mocks.updateRow.mock.lastCall![1] as Partial<BulkPhotoReviewRow>;
+      mocks.bulkRows = [{ ...row, ...patch }];
+      rerender(<DataImportExportSections />);
+
+      for (const selector of screen.getAllByRole('combobox', { name: 'Target record' })) {
+        expect(selector).toHaveValue(`${kind}-2`);
+        expect(within(selector).getByRole('option', { selected: true })).toHaveTextContent(
+          `${label} (ID: ${kind}-2)`
+        );
+      }
+      fireEvent.click(screen.getByRole('button', { name: /import confirmed photos/i }));
+      expect(mocks.importConfirmed).toHaveBeenCalledTimes(1);
+      expect(mocks.bulkRows).toEqual([
+        expect.objectContaining({ targetId: `${kind}-2`, targetLabel: `${label} (ID: ${kind}-2)` }),
+      ]);
+    }
+  );
+
+  it('keeps unique labels unchanged when other target kinds share the same label', () => {
+    mocks.bulkRows = [
+      {
+        id: 'row-1',
+        file: new File(['image'], 'photo.jpg', { type: 'image/jpeg' }),
+        path: 'photo.jpg',
+        targetType: 'project-cover',
+        confidence: 'unmatched',
+        reason: 'Choose a target',
+        confirmed: false,
+        excluded: true,
+        overwrite: false,
+      },
+    ];
+    mocks.bulkLibrary = {
+      diamondProjects: [{ id: 'project-1', title: 'Shared title, page 1', imageUrl: '' }],
+      coloringBooks: [{ id: 'book-1', title: 'Shared title, page 1', coverImage: '' }],
+      coloringPages: [{ id: 'page-1', bookTitle: 'Shared title', pageNumber: 1 }],
+    };
+
+    renderDataSections();
+
+    const selector = screen.getAllByRole('combobox', { name: 'Target record' })[0];
+    expect(
+      within(selector)
+        .getAllByRole('option')
+        .map(option => option.textContent)
+    ).toEqual(['Choose target', 'Shared title, page 1']);
+    fireEvent.change(selector, { target: { value: 'project-1' } });
+    expect(mocks.updateRow).toHaveBeenLastCalledWith(
+      'row-1',
+      expect.objectContaining({ targetId: 'project-1', targetLabel: 'Shared title, page 1' })
     );
   });
 

@@ -115,9 +115,12 @@ If an explicit reference or title cannot be resolved, or its target type is
 incompatible, the photo appears as an unmatched, skipped row with a reason. It
 does not fall through to filename matching. Choose a valid target type and record
 in the review step to include it.
-If multiple eligible records share a matching normalized title, the photo remains unmatched
-until you choose a target. Use an explicit target reference in the manifest to
-distinguish records with the same title.
+For exact title matches and title-only manifest matches, if multiple eligible
+records share the matching normalized title, the photo remains unmatched until
+you choose a target. Use an explicit target reference in the manifest to
+distinguish records with the same title. The manual target selector shows record
+IDs beside duplicate project titles, book titles, or book-and-page labels and
+retains that identity after selection. Unique labels remain unchanged.
 For a cover target with no existing image, selected photos are tried in order.
 After one uploads successfully, later photos for that target are skipped unless
 overwrite is enabled.
@@ -126,10 +129,14 @@ Matching order:
 
 1. Manifest match
 2. Exact record ID or ref in filename or folder
-3. Exact title match from folder name
-4. Coloring page number from filename or folder path
+3. Coloring page number from filename or folder path
+4. Exact title match from folder name
 5. Filename token match against title
 6. Unmatched
+
+Filename token matches are suggestions and still require confirmation in the
+review step. The duplicate-title guarantee above applies to exact title and
+manifest matching, not filename token suggestions.
 
 Unmatched files are skipped by default. Existing project and coloring book covers are also skipped by default. The review table lets the user change target type, choose a different target record, include or exclude a row, and explicitly allow cover overwrites.
 

@@ -95,11 +95,11 @@ test.describe('active session through protected file token rotation', () => {
     });
 
     // Exercise the counter boundary with an earlier authenticated document.
-    const earlierStartup = page.waitForRequest(
-      request => new URL(request.url()).pathname === '/api/files/token'
+    const earlierStartup = page.waitForResponse(
+      response => new URL(response.url()).pathname === '/api/files/token'
     );
     await page.goto('/overview', { waitUntil: 'domcontentloaded' });
-    await earlierStartup;
+    await (await earlierStartup).finished();
     await page.goto(`/projects/${project.id}`, { waitUntil: 'domcontentloaded' });
     await page
       .getByRole('button', { name: `View larger image: ${project.title}` })
@@ -161,49 +161,78 @@ test.describe('active session through protected file token rotation', () => {
     let missingRequests = 0;
     let missingTokenRequests = 0;
     let missingDocumentRequests = 0;
+    let measuringMissingRecovery = false;
     missingPage.on('request', request => {
       if (request.isNavigationRequest() && request.frame() === missingPage.mainFrame()) {
         missingDocumentRequests += 1;
-        missingTokenRequests = 0;
       }
       const pathname = new URL(request.url()).pathname;
-      if (pathname === '/api/files/token') missingTokenRequests += 1;
-      if (pathname.startsWith('/api/files/projects/')) {
+      if (measuringMissingRecovery && pathname === '/api/files/token') missingTokenRequests += 1;
+      if (measuringMissingRecovery && pathname.startsWith('/api/files/projects/')) {
         missingRequests += 1;
       }
     });
-    let documentsBeforeMissingRecovery: number | undefined;
     await missingPage.route('**/api/files/projects/**', route => {
-      documentsBeforeMissingRecovery ??= missingDocumentRequests;
       return route.fulfill({ status: 404, body: '' });
     });
-    const earlierMissingStartup = missingPage.waitForRequest(
-      request => new URL(request.url()).pathname === '/api/files/token'
+    const earlierMissingStartup = missingPage.waitForResponse(
+      response => new URL(response.url()).pathname === '/api/files/token'
     );
     await missingPage.goto('/overview', { waitUntil: 'domcontentloaded' });
-    await earlierMissingStartup;
-    await missingPage.goto(`/projects/${project.id}`);
-    const missingCoverContainer = missingPage
-      .getByRole('button', { name: `View larger image: ${project.title}` })
-      .locator('..');
-    await expect(missingCoverContainer.getByRole('status')).toBeVisible();
-    await expect.poll(() => missingRequests).toBeGreaterThanOrEqual(1);
-    await missingPage.waitForTimeout(2_000);
-    expect(missingRequests).toBeLessThanOrEqual(2);
-    const missingRequestsAfterFailure = missingRequests;
-    const tokenRequestsAfterFailure = missingTokenRequests;
-    expect(missingDocumentRequests, 'missing-file recovery stays in the active document').toBe(
-      documentsBeforeMissingRecovery
-    );
-    expect(tokenRequestsAfterFailure).toBeLessThanOrEqual(2);
-    await missingPage.waitForTimeout(2_000);
-    expect(missingRequests, 'a permanently missing image stops retrying').toBe(
-      missingRequestsAfterFailure
-    );
-    expect(missingDocumentRequests).toBe(documentsBeforeMissingRecovery);
-    expect(
-      missingTokenRequests,
-      'a permanently missing image does not keep refreshing tokens'
-    ).toBe(tokenRequestsAfterFailure);
+    await (await earlierMissingStartup).finished();
+    let releaseDeferredImage: () => void = () => {};
+    const deferredImage = new Promise<void>(resolve => {
+      releaseDeferredImage = resolve;
+    });
+    await missingPage.route('**/__e2e_deferred_image__', async route => {
+      await deferredImage;
+      await route.fulfill({ status: 404, body: '' });
+    });
+    await missingPage.addInitScript(() => {
+      if (!location.pathname.startsWith('/projects/')) return;
+      document.addEventListener('DOMContentLoaded', () => {
+        const image = document.createElement('img');
+        image.src = '/__e2e_deferred_image__';
+        image.hidden = true;
+        document.body.append(image);
+      });
+    });
+    const documentsBeforeMissingRecovery = missingDocumentRequests + 1;
+    measuringMissingRecovery = true;
+    try {
+      await missingPage.goto(`/projects/${project.id}`, { waitUntil: 'domcontentloaded' });
+      const missingCoverContainer = missingPage
+        .getByRole('button', { name: `View larger image: ${project.title}` })
+        .locator('..');
+      await missingCoverContainer.scrollIntoViewIfNeeded();
+      await expect(missingCoverContainer.getByRole('status')).toHaveText('Image failed to load');
+      await expect.poll(() => missingRequests).toBeGreaterThanOrEqual(1);
+      await missingPage.waitForTimeout(2_000);
+      expect(missingRequests).toBeLessThanOrEqual(2);
+      const missingRequestsAfterFailure = missingRequests;
+      const tokenRequestsAfterFailure = missingTokenRequests;
+      expect(missingDocumentRequests, 'missing-file recovery stays in the active document').toBe(
+        documentsBeforeMissingRecovery
+      );
+      expect(tokenRequestsAfterFailure).toBeLessThanOrEqual(2);
+      await missingPage.waitForTimeout(2_000);
+      expect(missingRequests, 'a permanently missing image stops retrying').toBe(
+        missingRequestsAfterFailure
+      );
+      expect(missingDocumentRequests).toBe(documentsBeforeMissingRecovery);
+      expect(
+        missingTokenRequests,
+        'a permanently missing image does not keep refreshing tokens'
+      ).toBe(tokenRequestsAfterFailure);
+      await missingPage.getByRole('button', { name: 'Edit project', exact: true }).click();
+      await expect(
+        missingPage.getByRole('heading', { name: 'Edit project', exact: true })
+      ).toBeVisible();
+      expect(await missingPage.evaluate(() => document.readyState)).toBe('interactive');
+      releaseDeferredImage();
+      await missingPage.waitForLoadState('load');
+    } finally {
+      releaseDeferredImage();
+    }
   });
 });

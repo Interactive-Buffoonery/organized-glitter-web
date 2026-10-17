@@ -5,6 +5,21 @@ import StarterKit from '@tiptap/starter-kit';
 
 import { sanitizeMarkdownUrl } from './markdown-url';
 
+const NoteStarterKit = StarterKit.extend({
+  addExtensions() {
+    return (this.parent?.() ?? []).map(extension =>
+      extension.name === 'paragraph'
+        ? extension.extend({
+            renderMarkdown(node, helpers, context) {
+              const markdown = this.parent?.(node, helpers, context) ?? '';
+              return markdown.replace(/^( {0,3}\d{1,9})([.)])(?=[\t ]|$)/gm, '$1\\$2');
+            },
+          })
+        : extension
+    );
+  },
+});
+
 const ManualOrderedList = OrderedList.extend({
   addProseMirrorPlugins() {
     return [];
@@ -18,7 +33,7 @@ const ManualOrderedList = OrderedList.extend({
 });
 
 export const progressNoteEditorExtensions = [
-  StarterKit.configure({
+  NoteStarterKit.configure({
     blockquote: false,
     code: false,
     codeBlock: false,

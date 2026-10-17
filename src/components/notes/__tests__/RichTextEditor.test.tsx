@@ -55,6 +55,22 @@ describe('RichTextEditor', () => {
     editor.destroy();
   });
 
+  it('saves and reopens an explicit numbered list from the toolbar', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { unmount } = render(<RichTextEditor value="Explicit item" onChange={onChange} />);
+
+    await user.click(screen.getByRole('textbox'));
+    await user.click(screen.getByRole('button', { name: 'Numbered list' }));
+
+    const saved = onChange.mock.lastCall?.[0] as string;
+    expect(saved.trim()).toBe('1. Explicit item');
+    unmount();
+    render(<RichTextEditor value={saved} onChange={vi.fn()} />);
+
+    expect(screen.getByRole('textbox').querySelector('ol > li')).toHaveTextContent('Explicit item');
+  });
+
   it('keeps version-like note text as plain Markdown', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -67,16 +83,23 @@ describe('RichTextEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith('v1. purchased in a destash');
   });
 
-  it('keeps typed numbered markers as plain text', async () => {
+  it('keeps typed numbered markers as paragraphs after saving and reopening', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
 
-    render(<RichTextEditor value="" onChange={onChange} />);
+    const { unmount } = render(<RichTextEditor value="" onChange={onChange} />);
 
     await user.click(screen.getByLabelText('Progress note content'));
-    await user.keyboard('1. purchased in a destash');
+    await user.keyboard('1. Keep this as ordinary text');
 
-    expect(onChange).toHaveBeenLastCalledWith('1. purchased in a destash');
+    expect(screen.getByRole('textbox').querySelector('ol, li')).toBeNull();
+    const saved = onChange.mock.lastCall?.[0] as string;
+    unmount();
+    render(<RichTextEditor value={saved} onChange={vi.fn()} />);
+    const reopened = screen.getByRole('textbox');
+    expect(reopened.querySelector('ol, li')).toBeNull();
+    expect(reopened.querySelector('p')).toHaveTextContent('1. Keep this as ordinary text');
+    expect(saved).toBe('1\\. Keep this as ordinary text');
   });
 
   it('keeps pasted numbered markers as plain text', async () => {
@@ -90,7 +113,7 @@ describe('RichTextEditor', () => {
     await user.paste('1. purchased in a destash');
 
     expect(editor.querySelector('ol, li')).toBeNull();
-    expect(onChange).toHaveBeenLastCalledWith('1. purchased in a destash');
+    expect(onChange).toHaveBeenLastCalledWith('1\\. purchased in a destash');
   });
 
   it('keeps multiline numbered text from a native paste as paragraphs', async () => {
@@ -98,7 +121,7 @@ describe('RichTextEditor', () => {
     const onChange = vi.fn();
     const text = '1. purchased in a destash\n2. started today';
 
-    render(<RichTextEditor value="" onChange={onChange} />);
+    const { unmount } = render(<RichTextEditor value="" onChange={onChange} />);
 
     const editor = screen.getByLabelText('Progress note content');
     await user.click(editor);
@@ -110,7 +133,15 @@ describe('RichTextEditor', () => {
 
     expect(editor.querySelector('ol, li')).toBeNull();
     expect(editor.querySelectorAll('p')).toHaveLength(2);
-    expect(onChange).toHaveBeenLastCalledWith('1. purchased in a destash\n\n2. started today');
+    const saved = onChange.mock.lastCall?.[0] as string;
+    unmount();
+    render(<RichTextEditor value={saved} onChange={vi.fn()} />);
+    const reopened = screen.getByRole('textbox');
+    expect(reopened.querySelector('ol, li')).toBeNull();
+    expect(reopened.querySelectorAll('p')).toHaveLength(2);
+    expect(reopened).toHaveTextContent('1. purchased in a destash');
+    expect(reopened).toHaveTextContent('2. started today');
+    expect(saved).toBe('1\\. purchased in a destash\n\n2\\. started today');
   });
 
   it('preserves ordered lists pasted as rich HTML', async () => {

@@ -10,6 +10,17 @@ describe('MarkdownContent', () => {
     expect(screen.getByText('A plain progress note')).toBeInTheDocument();
   });
 
+  it('renders escaped numbered paragraphs alongside legacy ordered lists', () => {
+    const { container } = render(
+      <MarkdownContent content={'1\\. Plain paragraph\n\n1. Explicit item\n\n2\\) Plain again'} />
+    );
+
+    expect(container.querySelectorAll('ol')).toHaveLength(1);
+    expect(container.querySelector('ol > li')).toHaveTextContent('Explicit item');
+    expect(screen.getByText('1. Plain paragraph').tagName).toBe('P');
+    expect(screen.getByText('2) Plain again').tagName).toBe('P');
+  });
+
   it('renders supported Markdown formatting', () => {
     render(<MarkdownContent content={'### Section\n\nA **bold** and ~~finished~~ note.'} />);
 

@@ -219,3 +219,29 @@ Align mobile repositories with `src/services/CONTRACTS.md`:
 
 Launch clients should refresh records after successful writes. This keeps PWA and
 mobile behavior compatible without requiring realtime or custom conflict merging.
+
+## Coloring Color Keys and Symbol Requests
+
+`coloring_page_color_keys` and `coloring_symbol_requests` are additive standard
+collection APIs. Their field contract is [Coloring Color Keys](coloring-color-keys.md).
+Both require verified owner access. A key also requires ownership of its page's
+book. Create requires `position` (zero is valid) and the caller's `user` ID;
+updates must omit immutable `user` and `page`. Omitted `tried` defaults to `[]`
+on create; supplied values must be arrays of up to 20 strings of 100 characters.
+
+Requests allow owner create/list/view only; update/delete require a superuser.
+Any optional page must be owned. Status and resolution are server-controlled on
+create. The photo is protected, including thumbnails; use an owner file token.
+Five create attempts per user per 15 minutes are allowed, then HTTP 429. The
+in-memory quota resets on server restart. Superuser creates bypass that quota.
+
+After commit, new requests notify `FEEDBACK_TO_EMAIL`; missing configuration or
+mail delivery failure is logged without failing the saved request. Resolving to
+`added` or `matched` requires a valid `u:` or `c:` ID, updates only the requester's
+placeholder keys atomically, and emails the request's contact address after
+commit. Repeating an unchanged resolution does not resend mail or rewrite
+already-resolved keys. `declined` leaves keys unchanged. Delivery has no retry
+queue. Placeholder `r:` IDs are not checked against request records.
+
+These collections are online-only in mobile sync v1 and are absent from its
+snapshot and apply allowlist. Released native builds can ignore them.

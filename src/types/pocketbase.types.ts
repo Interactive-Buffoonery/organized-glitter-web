@@ -23,9 +23,11 @@ export const Collections = {
 	ColoringBookTags: "coloring_book_tags",
 	ColoringBooks: "coloring_books",
 	ColoringMediums: "coloring_mediums",
+	ColoringPageColorKeys: "coloring_page_color_keys",
 	ColoringPageColorReferences: "coloring_page_color_references",
 	ColoringPageProgressNotes: "coloring_page_progress_notes",
 	ColoringPages: "coloring_pages",
+	ColoringSymbolRequests: "coloring_symbol_requests",
 	ColoringTags: "coloring_tags",
 	Companies: "companies",
 	MobileSyncReceipts: "mobile_sync_receipts",
@@ -342,6 +344,21 @@ export type ColoringMediumsRecord = {
 	user: RecordIdString
 }
 
+export type ColoringPageColorKeysRecord<Ttried = unknown> = {
+	code?: string
+	color_name?: string
+	created: IsoAutoDateString
+	id: string
+	note?: string
+	page: RecordIdString
+	position?: number
+	swatch?: string
+	symbol: string
+	tried?: null | Ttried
+	updated: IsoAutoDateString
+	user: RecordIdString
+}
+
 export type ColoringPageColorReferencesRecord<Tupload_receipts = unknown> = {
 	created: IsoAutoDateString
 	id: string
@@ -386,6 +403,27 @@ export type ColoringPagesRecord = {
 	started_at?: IsoDateString
 	status: ColoringPagesStatusOptions
 	updated: IsoAutoDateString
+}
+
+export const ColoringSymbolRequestsStatusOptions = {
+	"open": "open",
+	"added": "added",
+	"matched": "matched",
+	"declined": "declined",
+} as const
+export type ColoringSymbolRequestsStatusOptions = typeof ColoringSymbolRequestsStatusOptions[keyof typeof ColoringSymbolRequestsStatusOptions]
+export type ColoringSymbolRequestsRecord = {
+	book_label: string
+	created: IsoAutoDateString
+	description?: string
+	email: string
+	id: string
+	page?: RecordIdString
+	photo: FileNameString
+	resolved_symbol?: string
+	status?: ColoringSymbolRequestsStatusOptions
+	updated: IsoAutoDateString
+	user: RecordIdString
 }
 
 export type ColoringTagsRecord = {
@@ -621,9 +659,11 @@ export type BookPublishersResponse<Texpand = unknown> = Required<BookPublishersR
 export type ColoringBookTagsResponse<Texpand = unknown> = Required<ColoringBookTagsRecord> & BaseSystemFields<Texpand>
 export type ColoringBooksResponse<Texpand = unknown> = Required<ColoringBooksRecord> & BaseSystemFields<Texpand>
 export type ColoringMediumsResponse<Texpand = unknown> = Required<ColoringMediumsRecord> & BaseSystemFields<Texpand>
+export type ColoringPageColorKeysResponse<Ttried = unknown, Texpand = unknown> = Required<ColoringPageColorKeysRecord<Ttried>> & BaseSystemFields<Texpand>
 export type ColoringPageColorReferencesResponse<Tupload_receipts = unknown, Texpand = unknown> = Required<ColoringPageColorReferencesRecord<Tupload_receipts>> & BaseSystemFields<Texpand>
 export type ColoringPageProgressNotesResponse<Texpand = unknown> = Required<ColoringPageProgressNotesRecord> & BaseSystemFields<Texpand>
 export type ColoringPagesResponse<Texpand = unknown> = Required<ColoringPagesRecord> & BaseSystemFields<Texpand>
+export type ColoringSymbolRequestsResponse<Texpand = unknown> = Required<ColoringSymbolRequestsRecord> & BaseSystemFields<Texpand>
 export type ColoringTagsResponse<Texpand = unknown> = Required<ColoringTagsRecord> & BaseSystemFields<Texpand>
 export type CompaniesResponse<Texpand = unknown> = Required<CompaniesRecord> & BaseSystemFields<Texpand>
 export type MobileSyncReceiptsResponse<Texpand = unknown> = Required<MobileSyncReceiptsRecord> & BaseSystemFields<Texpand>
@@ -693,9 +733,11 @@ export type CollectionRecords = {
 	coloring_book_tags: ColoringBookTagsRecord
 	coloring_books: ColoringBooksRecord
 	coloring_mediums: ColoringMediumsRecord
+	coloring_page_color_keys: ColoringPageColorKeysRecord
 	coloring_page_color_references: ColoringPageColorReferencesRecord
 	coloring_page_progress_notes: ColoringPageProgressNotesRecord
 	coloring_pages: ColoringPagesRecord
+	coloring_symbol_requests: ColoringSymbolRequestsRecord
 	coloring_tags: ColoringTagsRecord
 	companies: CompaniesRecord
 	mobile_sync_receipts: MobileSyncReceiptsRecord
@@ -728,9 +770,11 @@ export type CollectionResponses = {
 	coloring_book_tags: ColoringBookTagsResponse
 	coloring_books: ColoringBooksResponse
 	coloring_mediums: ColoringMediumsResponse
+	coloring_page_color_keys: ColoringPageColorKeysResponse
 	coloring_page_color_references: ColoringPageColorReferencesResponse
 	coloring_page_progress_notes: ColoringPageProgressNotesResponse
 	coloring_pages: ColoringPagesResponse
+	coloring_symbol_requests: ColoringSymbolRequestsResponse
 	coloring_tags: ColoringTagsResponse
 	companies: CompaniesResponse
 	mobile_sync_receipts: MobileSyncReceiptsResponse

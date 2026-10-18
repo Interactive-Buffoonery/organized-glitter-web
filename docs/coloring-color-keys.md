@@ -111,7 +111,13 @@ app vendors a copy. Shape:
 
 Index on `page`. API rules mirror `coloring_pages`: the caller must be verified,
 own the record (`user`), and own the page's book. `user` and `page` cannot be
-changed after create. A server hook validates `tried`.
+changed after create. A server hook validates `tried` and `swatch`; omitted
+`tried` defaults to `[]` on create. Position presence is enforced by the create
+hook rather than PocketBase's numeric `required` flag, which rejects zero.
+Update payloads must omit `user` and `page`, even when unchanged.
+
+Known limit: `r:` IDs are validated syntactically but are not cross-checked
+against symbol request existence or ownership.
 
 ### `coloring_symbol_requests`
 
@@ -129,12 +135,17 @@ changed after create. A server hook validates `tried`.
 
 - Users can create and read their own requests. Only superusers update or
   delete them. Clients cannot set `status` or `resolved_symbol`.
-- Creating a request is rate limited per user and emails the maintainer
-  (`FEEDBACK_TO_EMAIL`). A mail failure does not fail the request.
+- Creating a request is limited to five attempts per user per 15 minutes
+  (in-memory, reset on restart; superuser creates bypass the quota) and emails the maintainer
+  (`FEEDBACK_TO_EMAIL`). A mail failure does not fail the request. Missing configuration skips mail
+  and logs the reason. Notifications run after commit without a retry queue.
 - When a superuser sets `status` to `added` or `matched` with a
   `resolved_symbol`, the server replaces `r:<request id>` with that symbol on
   every one of the requester's color keys, then emails the requester. Clients
   pick up the change on their next fetch.
+- Resolution and key replacements commit atomically. Repeating an unchanged
+  resolution does not resend mail or rewrite resolved keys. Declining leaves
+  keys unchanged.
 - Adding a brand new custom shape also needs a catalog update in both apps.
   New Unicode symbols render everywhere immediately.
 

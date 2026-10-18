@@ -137,6 +137,71 @@ describe('useCreateProject redirect flow', () => {
     });
   });
 
+  it('does not dispatch or clear the draft when the account signs back in before mutation execution', async () => {
+    const queryClient = createTestQueryClient();
+    queryClient.getMutationCache().config.onMutate = () => {
+      sessionGeneration += 1;
+    };
+    const onConfirmedSave = vi.fn();
+    const { result } = renderHookWithProviders(() => useCreateProject({ onConfirmedSave }), {
+      queryClient,
+    });
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({ userId: 'user-123', title: 'Galaxy Garden' })
+      ).rejects.toMatchObject({ reason: 'session_changed' });
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(onConfirmedSave).not.toHaveBeenCalled();
+  });
+
+  it('keeps concurrent calls with the same input separate and preserves public callbacks', async () => {
+    const queryClient = createTestQueryClient();
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>(resolve => {
+      releaseFirst = resolve;
+    });
+    let calls = 0;
+    queryClient.getMutationCache().config.onMutate = () => {
+      calls += 1;
+      if (calls === 1) return firstGate;
+    };
+    const onConfirmedSave = vi.fn();
+    const onSuccess = vi.fn();
+    const onSettled = vi.fn();
+    const { result } = renderHookWithProviders(() => useCreateProject({ onConfirmedSave }), {
+      queryClient,
+    });
+    const input = { userId: 'user-123', title: 'Galaxy Garden' };
+    const first = result.current.mutateAsync(input);
+    const firstRejected = expect(first).rejects.toMatchObject({ reason: 'session_changed' });
+    await waitFor(() => expect(calls).toBe(1));
+    sessionGeneration += 1;
+    await act(async () => {
+      await result.current.mutateAsync(input, { onSuccess, onSettled });
+    });
+    expect(result.current.variables).toBe(input);
+    expect(onSuccess).toHaveBeenCalledWith(
+      expect.any(Object),
+      input,
+      expect.any(Object),
+      expect.any(Object)
+    );
+    expect(onSettled).toHaveBeenCalledWith(
+      expect.any(Object),
+      null,
+      input,
+      expect.any(Object),
+      expect.any(Object)
+    );
+    await act(async () => {
+      releaseFirst();
+      await firstRejected;
+    });
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(onConfirmedSave).toHaveBeenCalledTimes(1);
+  });
+
   it('does not dispatch a create after the session changes while preparing the form', async () => {
     let finishPreparation!: (value: FormData) => void;
     mockBuildFormData.mockImplementation(

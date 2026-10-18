@@ -5,7 +5,7 @@
  * Pass `{ redirect: true }` for the standard create-and-open-detail flow.
  */
 import { notify } from '@/lib/notifications';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type MutateOptions } from '@tanstack/react-query';
 
 import { normalizeError, isValidationError } from '@/services/errors';
 import { TagService } from '@/services/pocketbase/tags.service';
@@ -75,10 +75,14 @@ const addTagsToProject = async (projectId: string, tagIds: string[]) => {
 
 const createProject = async (
   input: CreateProjectInput,
+  sessionIdentity: SessionIdentity,
   onConfirmedSave?: () => void
 ): Promise<ProjectCreationResult> => {
-  const sessionIdentity = captureSessionIdentity();
-  if (!sessionIdentity.accountId || sessionIdentity.accountId !== input.userId) {
+  if (
+    !isCurrentSessionIdentity(sessionIdentity) ||
+    !sessionIdentity.accountId ||
+    sessionIdentity.accountId !== input.userId
+  ) {
     throw new SessionChangedError();
   }
   const createToken = getAuthToken() ?? '';
@@ -117,6 +121,32 @@ const createProject = async (
   return { project, failedTagIds, sessionIdentity };
 };
 
+interface SessionCreateInput {
+  input: CreateProjectInput;
+  sessionIdentity: SessionIdentity;
+}
+
+type CreateCallbacks = MutateOptions<
+  ProjectCreationResult,
+  Error,
+  CreateProjectInput,
+  SessionIdentity
+>;
+
+function adaptCreateCallbacks(
+  options?: CreateCallbacks
+): MutateOptions<ProjectCreationResult, Error, SessionCreateInput, SessionIdentity> | undefined {
+  if (!options) return undefined;
+  return {
+    onSuccess: (data, variables, context, mutationContext) =>
+      options.onSuccess?.(data, variables.input, context, mutationContext),
+    onError: (error, variables, context, mutationContext) =>
+      options.onError?.(error, variables.input, context, mutationContext),
+    onSettled: (data, error, variables, context, mutationContext) =>
+      options.onSettled?.(data, error, variables.input, context, mutationContext),
+  };
+}
+
 interface UseCreateProjectOptions {
   redirect?: boolean;
   onConfirmedSave?: () => void;
@@ -129,9 +159,10 @@ export const useCreateProject = ({
   const queryClient = useQueryClient();
   const navigateToProject = useNavigateToProject();
 
-  return useMutation<ProjectCreationResult, Error, CreateProjectInput, SessionIdentity>({
-    onMutate: () => captureSessionIdentity(),
-    mutationFn: input => createProject(input, onConfirmedSave),
+  const mutation = useMutation<ProjectCreationResult, Error, SessionCreateInput, SessionIdentity>({
+    onMutate: variables => variables.sessionIdentity,
+    mutationFn: ({ input, sessionIdentity }) =>
+      createProject(input, sessionIdentity, onConfirmedSave),
     onSuccess: async (
       { project: data, failedTagIds, sessionIdentity },
       _variables,
@@ -230,7 +261,7 @@ export const useCreateProject = ({
         });
       }
     },
-    onError: (error, variables, sessionIdentity) => {
+    onError: (error, { input: variables }, sessionIdentity) => {
       if (sessionIdentity && !isCurrentSessionIdentity(sessionIdentity)) return;
       const normalized = normalizeError(error, 'Project creation');
       logger.error('Project creation failed', {
@@ -288,4 +319,20 @@ export const useCreateProject = ({
     },
     retry: false,
   });
+
+  return {
+    ...mutation,
+    variables: mutation.variables?.input,
+    mutate: (input: CreateProjectInput, options?: CreateCallbacks) => {
+      mutation.mutate(
+        { input, sessionIdentity: captureSessionIdentity() },
+        adaptCreateCallbacks(options)
+      );
+    },
+    mutateAsync: (input: CreateProjectInput, options?: CreateCallbacks) =>
+      mutation.mutateAsync(
+        { input, sessionIdentity: captureSessionIdentity() },
+        adaptCreateCallbacks(options)
+      ),
+  };
 };

@@ -32,12 +32,12 @@ if (typeof window !== 'undefined') {
     if (event.storageArea && event.storageArea !== window.localStorage) return;
     const previous = storedSession(event.oldValue);
     const next = storedSession(event.newValue);
+    if (previous?.accountId && previous.token) {
+      retainSignedOutCreateTokens(previous.accountId, [previous.token]);
+    }
     // The SDK reads current storage, which can skip queued logout transitions.
     if (previous && next && previous.accountId !== next.accountId) {
       generation += 1;
-      if (previous.accountId && previous.token) {
-        retainSignedOutCreateTokens(previous.accountId, [previous.token]);
-      }
     }
   });
 }

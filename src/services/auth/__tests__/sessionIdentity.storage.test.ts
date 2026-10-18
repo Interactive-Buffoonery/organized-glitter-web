@@ -52,6 +52,20 @@ describe('session identity across queued storage events', () => {
     expect(isCurrentSessionIdentity(identity)).toBe(true);
   });
 
+  it('retains the original create token through a queued refresh before logout', () => {
+    pb.authStore.save('original-before-refresh', account);
+    const identity = captureSessionIdentity();
+    localStorage.setItem(authKey, session('new-login-token-a'));
+    deliverStorageEvent(session('original-before-refresh'), session('refreshed-token-a'));
+    deliverStorageEvent(session('refreshed-token-a'), null);
+    deliverStorageEvent(null, session('new-login-token-a'));
+    expect(isCurrentSessionIdentity(identity)).toBe(false);
+    recordCompletedSessionCreate('original-before-refresh', 'projects', 'late-refreshed-create');
+    expect(takeCompletedSessionDestinations('account-a', '/projects/')).toEqual([
+      '/projects/late-refreshed-create',
+    ]);
+  });
+
   it('ignores changes to unrelated browser storage', () => {
     const identity = captureSessionIdentity();
     window.dispatchEvent(

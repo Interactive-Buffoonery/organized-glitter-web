@@ -34,6 +34,7 @@ import TestWrapper from '@/test-utils/TestWrapper';
 const navigateMock = vi.fn();
 const {
   toastMock,
+  sessionState,
   deleteCompany,
   deleteArtist,
   findCompany,
@@ -42,6 +43,7 @@ const {
   useCreateArtistMock,
 } = vi.hoisted(() => ({
   toastMock: vi.fn(),
+  sessionState: { generation: 0, accountId: 'abc123def456ghi' as string | null },
   deleteCompany: vi.fn(),
   deleteArtist: vi.fn(),
   findCompany: vi.fn(),
@@ -85,6 +87,13 @@ vi.mock('@/components/layout/MainLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="main-layout">{children}</div>
   ),
+}));
+
+vi.mock('@/services/auth/sessionIdentity', () => ({
+  captureSessionIdentity: () => ({ ...sessionState }),
+  isCurrentSessionIdentity: (identity: { generation: number; accountId: string | null }) =>
+    identity.generation === sessionState.generation &&
+    identity.accountId === sessionState.accountId,
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
@@ -210,6 +219,8 @@ import NewProject from '../NewProject';
 describe('NewProject page', () => {
   beforeEach(() => {
     clearSessionDrafts();
+    sessionState.generation = 0;
+    sessionState.accountId = 'abc123def456ghi';
     localStorage.clear();
     navigateMock.mockReset();
     toastMock.mockReset();
@@ -524,6 +535,131 @@ describe('NewProject page', () => {
 
     expect(await screen.findByText(/new company may still exist/)).toBeInTheDocument();
     expect(createProjectMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps metadata after a project response reports a session change', async () => {
+    createProjectMutateAsync.mockRejectedValueOnce(new SessionChangedError());
+    const user = userEvent.setup();
+    renderWithProviders(<NewProject />);
+
+    await user.click(screen.getByRole('button', { name: 'Fill sections' }));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+
+    await waitFor(() => expect(createProjectMutateAsync).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Create project' })).toBeEnabled()
+    );
+    expect(deleteCompany).not.toHaveBeenCalled();
+    expect(deleteArtist).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('ignores a stale rendered account before preparing project metadata', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NewProject />);
+    await user.click(screen.getByRole('button', { name: 'Fill sections' }));
+
+    sessionState.accountId = 'newaccount12345';
+    sessionState.generation += 1;
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+
+    expect(findCompany).not.toHaveBeenCalled();
+    expect(createCompanyMutateAsync).not.toHaveBeenCalled();
+    expect(findArtist).not.toHaveBeenCalled();
+    expect(createArtistMutateAsync).not.toHaveBeenCalled();
+    expect(createProjectMutateAsync).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('stops metadata preparation when the session changes during company lookup', async () => {
+    findCompany.mockImplementationOnce(async () => {
+      sessionState.generation += 1;
+      return null;
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<NewProject />);
+
+    await user.click(screen.getByRole('button', { name: 'Fill sections' }));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+
+    await waitFor(() => expect(findCompany).toHaveBeenCalledOnce());
+    expect(createCompanyMutateAsync).not.toHaveBeenCalled();
+    expect(findArtist).not.toHaveBeenCalled();
+    expect(createProjectMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not roll back or show stale errors after the session changes', async () => {
+    createProjectMutateAsync.mockImplementationOnce(async () => {
+      sessionState.generation += 1;
+      throw Object.assign(new Error('Invalid old project'), {
+        type: 'validation',
+        status: 400,
+        retryable: false,
+        fieldErrors: { title: 'Old title error' },
+      });
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<NewProject />);
+
+    await user.click(screen.getByRole('button', { name: 'Fill sections' }));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+
+    await waitFor(() => expect(createProjectMutateAsync).toHaveBeenCalledOnce());
+    expect(deleteCompany).not.toHaveBeenCalled();
+    expect(deleteArtist).not.toHaveBeenCalled();
+    expect(screen.queryByText('Old title error')).not.toBeInTheDocument();
+  });
+
+  it('stops rollback between deletes when the session changes', async () => {
+    createProjectMutateAsync.mockRejectedValueOnce(
+      Object.assign(new Error('Invalid project'), {
+        type: 'validation',
+        status: 400,
+        retryable: false,
+      })
+    );
+    deleteArtist.mockImplementationOnce(async () => {
+      sessionState.generation += 1;
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<NewProject />);
+
+    await user.click(screen.getByRole('button', { name: 'Fill sections' }));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+
+    await waitFor(() => expect(deleteArtist).toHaveBeenCalledWith('artist-123'));
+    expect(deleteCompany).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps a new account submission busy when an old submission fails', async () => {
+    let rejectOld!: (error: Error) => void;
+    createProjectMutateAsync.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectOld = reject;
+        })
+    );
+    createProjectMutateAsync.mockImplementationOnce(() => new Promise(() => {}));
+    const user = userEvent.setup();
+    const { rerender } = renderWithProviders(<NewProject />);
+    await user.click(screen.getByRole('button', { name: 'Fill sections' }));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+    await waitFor(() => expect(createProjectMutateAsync).toHaveBeenCalledOnce());
+
+    sessionState.generation += 1;
+    sessionState.accountId = 'newaccount12345';
+    authState.user = { id: 'newaccount12345', email: 'new@example.com', username: 'new' };
+    rerender(<NewProject />);
+    await user.click(screen.getByRole('button', { name: 'Fill sections' }));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+    await waitFor(() => expect(createProjectMutateAsync).toHaveBeenCalledTimes(2));
+
+    await act(async () => rejectOld(new Error('Old submission failed')));
+    expect(screen.getByRole('button', { name: 'Creating...' })).toBeDisabled();
+    expect(deleteCompany).not.toHaveBeenCalled();
+    expect(deleteArtist).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('removes newly created metadata when relation lookup fails before the project write', async () => {

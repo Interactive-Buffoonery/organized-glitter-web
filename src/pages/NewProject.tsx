@@ -49,6 +49,7 @@ import { useAppReady } from '@/hooks/useAppReady';
 import { isUncertainProjectSaveError } from '@/utils/project/projectSaveError';
 import { sessionDraftKeys } from '@/services/auth/sessionDraftKeys';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
+import { captureSessionIdentity, isCurrentSessionIdentity } from '@/services/auth/sessionIdentity';
 import {
   DraftPhotoReminder,
   DraftRecoveryPanel,
@@ -130,6 +131,7 @@ const NewProject = () => {
   const navigate = useNavigate();
 
   const [submitting, setSubmitting] = useState(false);
+  const submissionSequence = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<ProjectFormFieldErrors>({});
   const [imageCompatError, setImageCompatError] = useState<IncompatibleImageDetails | null>(null);
@@ -197,6 +199,13 @@ const NewProject = () => {
   });
   const photoChoicePending = missingPhoto && !formData.imageFile && !formData.imageRemoved;
 
+  useEffect(() => {
+    setSubmitting(false);
+    setError(null);
+    setFieldErrors({});
+    setImageCompatError(null);
+  }, [user?.id]);
+
   // Update userId when user becomes available
   useEffect(() => {
     if (user?.id && formData.userId !== user.id) {
@@ -235,6 +244,9 @@ const NewProject = () => {
       return;
     }
 
+    const submissionSession = captureSessionIdentity();
+    if (submissionSession.accountId !== user.id) return;
+
     const validation = validateProjectFormValues(
       data,
       getCurrentDateInUserTimezone(userTimezone),
@@ -245,6 +257,8 @@ const NewProject = () => {
       return;
     }
 
+    const submissionId = ++submissionSequence.current;
+    const isCurrentSubmission = () => isCurrentSessionIdentity(submissionSession);
     setSubmitting(true);
     setError(null);
 
@@ -252,6 +266,7 @@ const NewProject = () => {
     const rollbackCreatedMetadata = async () => {
       const failed: string[] = [];
       for (const record of [...createdMetadata].reverse()) {
+        if (!isCurrentSubmission()) break;
         try {
           if (record.kind === 'company') {
             await CompaniesService.delete(record.id);
@@ -268,6 +283,7 @@ const NewProject = () => {
           continue;
         }
 
+        if (!isCurrentSubmission()) break;
         try {
           await queryClient.invalidateQueries({
             queryKey: record.kind === 'company' ? queryKeys.companies.all : queryKeys.artists.all,
@@ -293,14 +309,17 @@ const NewProject = () => {
       if (data.company && data.company !== 'other' && !companyNames.includes(data.company)) {
         try {
           const existing = await CompaniesService.findByName(data.company, user.id);
+          if (!isCurrentSubmission()) return;
           if (!existing) {
             const draft = draftMetadata.current.companies.get(data.company);
             const created = await createCompanyMutation.mutateAsync(
               draft?.name === data.company ? draft : { name: data.company }
             );
+            if (!isCurrentSubmission()) return;
             createdMetadata.push({ kind: 'company', id: created.id });
           }
         } catch (error) {
+          if (!isCurrentSubmission()) return;
           if (isSessionChangedError(error)) {
             notify({
               kind: 'warning',
@@ -324,14 +343,17 @@ const NewProject = () => {
       ) {
         try {
           const existing = await ArtistsService.findByName(data.artist, user.id);
+          if (!isCurrentSubmission()) return;
           if (!existing) {
             const draft = draftMetadata.current.artists.get(data.artist);
             const created = await createArtistMutation.mutateAsync(
               draft?.name === data.artist ? draft : { name: data.artist }
             );
+            if (!isCurrentSubmission()) return;
             createdMetadata.push({ kind: 'artist', id: created.id });
           }
         } catch (error) {
+          if (!isCurrentSubmission()) return;
           if (isSessionChangedError(error)) {
             notify({
               kind: 'warning',
@@ -341,6 +363,7 @@ const NewProject = () => {
             return;
           }
           const rollbackFailures = await rollbackCreatedMetadata();
+          if (!isCurrentSubmission()) return;
           setError(
             rollbackFailures.length > 0
               ? `Project not saved. Failed to create artist "${data.artist}". The new ${rollbackFailures.join(' and ')} may still exist. Check your metadata before trying again.`
@@ -361,8 +384,10 @@ const NewProject = () => {
       // Success toast and navigation are handled by the mutation hook
       // No manual navigation needed - the hook handles redirect before cache invalidation
     } catch (error) {
+      if (!isCurrentSubmission() || isSessionChangedError(error)) return;
       if (createdMetadata.length > 0 && !isUncertainProjectSaveError(error)) {
         const rollbackFailures = await rollbackCreatedMetadata();
+        if (!isCurrentSubmission()) return;
         if (rollbackFailures.length > 0) {
           setError(
             `Project not saved. The new ${rollbackFailures.join(' and ')} may still exist. Check your metadata before trying again.`
@@ -388,7 +413,7 @@ const NewProject = () => {
         });
       }
     } finally {
-      setSubmitting(false);
+      if (submissionSequence.current === submissionId) setSubmitting(false);
     }
   };
 

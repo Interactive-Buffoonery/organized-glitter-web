@@ -85,7 +85,7 @@ describe('symbol request side effects', () => {
   });
   it('rejects invalid resolved IDs and does not resolve declined requests', () => {
     const h = helpers();
-    for (const symbol of ['', 'r:abc123def456ghi', 'u:abcd', 'c:UPPER']) {
+    for (const symbol of ['', 'r:abc123def456ghi', 'u:abcd', 'c:UPPER', 'u:00041', 'u:DFFF']) {
       expect(() =>
         h.validateResolution(record({ status: 'added', resolved_symbol: symbol }))
       ).toThrow();

@@ -63,7 +63,9 @@ function validateResolution(record) {
   const symbol = record.getString('resolved_symbol');
   if (
     symbol.length > 64 ||
-    !/^(u:[0-9A-F]{4,6}(-[0-9A-F]{4,6})*|c:[a-z0-9-]{1,48})$/.test(symbol)
+    !/^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48})$/.test(
+      symbol
+    )
   ) {
     throw new BadRequestError('Resolution requires a valid Unicode or custom symbol ID.');
   }

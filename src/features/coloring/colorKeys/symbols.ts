@@ -88,5 +88,5 @@ export const DEFAULT_SETUP_SYMBOLS = Array.from(
 // Display only: asks for text presentation so emoji-capable symbols do not
 // render as color emoji. Never store the result in an ID or copy text.
 export function symbolDisplayText(text: string): string {
-  return text.replace(/(?![\x00-\x7F])(\p{Emoji})(?![\uFE0E\uFE0F])/gu, '$1\uFE0E');
+  return text.replace(/(?!\p{ASCII})(\p{Emoji})(?![\uFE0E\uFE0F])/gu, '$1\uFE0E');
 }

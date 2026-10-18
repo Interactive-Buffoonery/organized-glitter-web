@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
-import PocketBase, { type SendOptions } from 'pocketbase';
+import PocketBase, { LocalAuthStore, type SendOptions } from 'pocketbase';
 
 const { mockCapture } = vi.hoisted(() => ({
   mockCapture: vi.fn(),
@@ -264,6 +264,234 @@ describe('src/lib/pocketbase', () => {
           status: 401,
         });
         expect(listener).toHaveBeenCalledWith('revoked-token');
+      } finally {
+        unsubscribe();
+        pb.authStore.clear();
+        Reflect.deleteProperty(pb.authStore, 'isValid');
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('stops a rate-limited request when its session retires before dispatch', async () => {
+      const { createSessionIdentityTracker } = await import('@/services/auth/sessionEpoch');
+      const { isSessionChangedError } = await import('@/services/auth/sessionRecovery');
+      const account = { id: 'account-a', collectionName: 'users' };
+      pb.authStore.save('reused-token', account);
+      Object.defineProperty(pb.authStore, 'isValid', { configurable: true, get: () => true });
+      const otherTabStore = new LocalAuthStore();
+      createSessionIdentityTracker(otherTabStore, localStorage);
+      const fetchSpy = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+      vi.stubGlobal('fetch', fetchSpy);
+
+      pb.afterSend!(new Response('{}', { status: 429 }), {});
+      pb.afterSend!(new Response('{}', { status: 429 }), {});
+      pb.afterSend!(new Response('{}', { status: 429 }), {});
+      await pb.beforeSend!('https://example.test/api/prime', buildGetOptions());
+      const request = pb.send('/api/collections/projects/records', {
+        method: 'POST',
+        body: { title: 'Old session' },
+      });
+      otherTabStore.clear();
+      otherTabStore.save('reused-token', account);
+
+      try {
+        await expect(request).rejects.toSatisfy(isSessionChangedError);
+        expect(fetchSpy).not.toHaveBeenCalled();
+      } finally {
+        pb.afterSend!(new Response('{}', { status: 200 }), {});
+        pb.authStore.clear();
+        Reflect.deleteProperty(pb.authStore, 'isValid');
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('retires a successful write before delayed storage events for a reused token', async () => {
+      const { createSessionIdentityTracker } = await import('@/services/auth/sessionEpoch');
+      const { isSessionChangedError, takeCompletedSessionOtherCreate } =
+        await import('@/services/auth/sessionRecovery');
+      const account = { id: 'account-a', collectionName: 'users' };
+      pb.authStore.save('reused-token', account);
+      Object.defineProperty(pb.authStore, 'isValid', { configurable: true, get: () => true });
+      const otherTabStore = new LocalAuthStore();
+      const otherTabTracker = createSessionIdentityTracker(otherTabStore, localStorage);
+      let finishRequest: ((response: Response) => void) | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          () =>
+            new Promise<Response>(resolve => {
+              finishRequest = resolve;
+            })
+        )
+      );
+
+      const request = pb.send('/api/collections/progress_notes/records', {
+        method: 'POST',
+        body: { content: 'Old session' },
+      });
+      await vi.waitFor(() => expect(finishRequest).toBeTypeOf('function'));
+      otherTabStore.clear();
+      otherTabStore.save('reused-token', { id: 'account-b', collectionName: 'users' });
+      otherTabTracker.capture();
+      const response = new Response('{"id":"note-epoch"}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+      Object.defineProperty(response, 'url', {
+        value: 'https://data.organizedglitter.app/api/collections/progress_notes/records',
+      });
+      finishRequest?.(response);
+
+      try {
+        await expect(request).rejects.toSatisfy(isSessionChangedError);
+        expect(takeCompletedSessionOtherCreate('account-b')).toEqual([]);
+        expect(takeCompletedSessionOtherCreate('account-a')).toEqual(['progress_notes']);
+      } finally {
+        pb.authStore.clear();
+        Reflect.deleteProperty(pb.authStore, 'isValid');
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('allows an in-flight write through a same-account token refresh', async () => {
+      const { createSessionIdentityTracker } = await import('@/services/auth/sessionEpoch');
+      const account = { id: 'account-a', collectionName: 'users' };
+      pb.authStore.save('original-token', account);
+      Object.defineProperty(pb.authStore, 'isValid', { configurable: true, get: () => true });
+      const otherTabStore = new LocalAuthStore();
+      createSessionIdentityTracker(otherTabStore, localStorage);
+      let finishRequest: ((response: Response) => void) | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          () =>
+            new Promise<Response>(resolve => {
+              finishRequest = resolve;
+            })
+        )
+      );
+
+      const request = pb.send('/api/collections/projects/records/project-1', {
+        method: 'PATCH',
+        body: { title: 'Same session' },
+      });
+      await vi.waitFor(() => expect(finishRequest).toBeTypeOf('function'));
+      otherTabStore.save('refreshed-token', account);
+      finishRequest?.(
+        new Response('{"id":"project-1","title":"Same session"}', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      try {
+        await expect(request).resolves.toMatchObject({ id: 'project-1', title: 'Same session' });
+      } finally {
+        pb.authStore.clear();
+        Reflect.deleteProperty(pb.authStore, 'isValid');
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('allows a current signed-out login response to establish a session', async () => {
+      pb.authStore.clear();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              token: 'login-token',
+              record: { id: 'account-a', collectionName: 'users' },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+        )
+      );
+
+      try {
+        await expect(
+          pb.collection('users').authWithPassword('person@example.com', 'password')
+        ).resolves.toMatchObject({ token: 'login-token', record: { id: 'account-a' } });
+        expect(pb.authStore.token).toBe('login-token');
+        expect(pb.authStore.record?.id).toBe('account-a');
+      } finally {
+        pb.authStore.clear();
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('prevents a stale authenticated auth response from replacing the live session', async () => {
+      const { createSessionIdentityTracker } = await import('@/services/auth/sessionEpoch');
+      const { isSessionChangedError } = await import('@/services/auth/sessionRecovery');
+      const account = { id: 'account-a', collectionName: 'users' };
+      pb.authStore.save('reused-token', account);
+      Object.defineProperty(pb.authStore, 'isValid', { configurable: true, get: () => true });
+      const otherTabStore = new LocalAuthStore();
+      createSessionIdentityTracker(otherTabStore, localStorage);
+      let finishRequest: ((response: Response) => void) | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          () =>
+            new Promise<Response>(resolve => {
+              finishRequest = resolve;
+            })
+        )
+      );
+
+      const request = pb.collection('users').authRefresh();
+      await vi.waitFor(() => expect(finishRequest).toBeTypeOf('function'));
+      otherTabStore.clear();
+      otherTabStore.save('reused-token', account);
+      const response = new Response(
+        JSON.stringify({ token: 'stale-refreshed-token', record: account }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+      Object.defineProperty(response, 'url', {
+        value: 'https://data.organizedglitter.app/api/collections/users/auth-refresh',
+      });
+      finishRequest?.(response);
+
+      try {
+        await expect(request).rejects.toSatisfy(isSessionChangedError);
+        expect(pb.authStore.token).toBe('reused-token');
+      } finally {
+        pb.authStore.clear();
+        Reflect.deleteProperty(pb.authStore, 'isValid');
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('does not invalidate a replacement session from a stale same-token 401', async () => {
+      const { createSessionIdentityTracker } = await import('@/services/auth/sessionEpoch');
+      const { subscribeToInvalidSession } = await import('@/services/auth/sessionRecovery');
+      const account = { id: 'account-a', collectionName: 'users' };
+      pb.authStore.save('reused-token', account);
+      Object.defineProperty(pb.authStore, 'isValid', { configurable: true, get: () => true });
+      const otherTabStore = new LocalAuthStore();
+      createSessionIdentityTracker(otherTabStore, localStorage);
+      const invalidSessionListener = vi.fn();
+      const unsubscribe = subscribeToInvalidSession(invalidSessionListener);
+      let finishRequest: ((response: Response) => void) | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          () =>
+            new Promise<Response>(resolve => {
+              finishRequest = resolve;
+            })
+        )
+      );
+
+      const request = pb.send('/api/collections/projects/records', { method: 'GET' });
+      await vi.waitFor(() => expect(finishRequest).toBeTypeOf('function'));
+      otherTabStore.clear();
+      otherTabStore.save('reused-token', account);
+      finishRequest?.(new Response('{}', { status: 401 }));
+
+      try {
+        await expect(request).rejects.toMatchObject({ status: 401 });
+        expect(invalidSessionListener).not.toHaveBeenCalled();
       } finally {
         unsubscribe();
         pb.authStore.clear();

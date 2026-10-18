@@ -6,6 +6,7 @@
  */
 
 import { vi } from 'vitest';
+import { ClientResponseError } from 'pocketbase';
 
 const mockNotify = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/notifications', () => ({ notify: mockNotify }));
@@ -131,6 +132,7 @@ import {
 } from '@/services/auth/sessionRecovery';
 import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 import { getDraftGeneration, readFormDraft, writeFormDraft } from '@/hooks/drafts/formDraftStorage';
+import { UsersService } from '@/services/pocketbase/users.service';
 
 const renderUseAuthHook = () =>
   renderHook((): AuthContextType => useAuth() as AuthContextType, {
@@ -347,6 +349,75 @@ describe('useAuth Integration Tests', () => {
   });
 
   describe('Auth State Changes', () => {
+    it('does not restore a refresh response after a same-token session replacement', async () => {
+      const account = createMockUser({ id: 'refresh-race-account' });
+      setupMockAuthState(true, account);
+      let finishRefresh: ((value: { token: string; record: PocketBaseUser }) => void) | undefined;
+      vi.spyOn(UsersService, 'refreshDetachedSession').mockImplementation(
+        () =>
+          new Promise(resolve => {
+            finishRefresh = resolve;
+          }) as ReturnType<typeof UsersService.refreshDetachedSession>
+      );
+
+      const { result } = renderUseAuthHook();
+      await waitFor(() => expect(finishRefresh).toBeTypeOf('function'));
+      const epochKey = 'og:session-identity:v1:pocketbase_auth';
+      localStorage.setItem(
+        epochKey,
+        JSON.stringify({ accountId: account.id, epoch: 'replacement-session' })
+      );
+      finishRefresh?.({ token: 'refreshed-old-token', record: account });
+
+      await act(async () => Promise.resolve());
+      expect(result.current.user?.id).toBe(account.id);
+      expect(pocketBaseMock.authStore.save).not.toHaveBeenCalled();
+    });
+
+    it('does not clear a replacement session from a stale same-token refresh failure', async () => {
+      const account = createMockUser({ id: 'refresh-failure-race-account' });
+      setupMockAuthState(true, account);
+      let failRefresh: ((error: unknown) => void) | undefined;
+      vi.spyOn(UsersService, 'refreshDetachedSession').mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            failRefresh = reject;
+          }) as ReturnType<typeof UsersService.refreshDetachedSession>
+      );
+
+      renderUseAuthHook();
+      await waitFor(() => expect(failRefresh).toBeTypeOf('function'));
+      const epochKey = 'og:session-identity:v1:pocketbase_auth';
+      localStorage.setItem(
+        epochKey,
+        JSON.stringify({ accountId: account.id, epoch: 'replacement-session' })
+      );
+      failRefresh?.(new ClientResponseError({ status: 401 }));
+
+      await act(async () => Promise.resolve());
+      expect(pocketBaseMock.authStore.clear).not.toHaveBeenCalled();
+    });
+
+    it('applies a refresh response during a same-account token refresh', async () => {
+      const account = createMockUser({ id: 'refresh-current-account' });
+      setupMockAuthState(true, account);
+      let finishRefresh: ((value: { token: string; record: PocketBaseUser }) => void) | undefined;
+      vi.spyOn(UsersService, 'refreshDetachedSession').mockImplementation(
+        () =>
+          new Promise(resolve => {
+            finishRefresh = resolve;
+          }) as ReturnType<typeof UsersService.refreshDetachedSession>
+      );
+
+      renderUseAuthHook();
+      await waitFor(() => expect(finishRefresh).toBeTypeOf('function'));
+      finishRefresh?.({ token: 'refreshed-token', record: account });
+
+      await waitFor(() =>
+        expect(pocketBaseMock.authStore.save).toHaveBeenCalledWith('refreshed-token', account)
+      );
+    });
+
     it('guards every refreshed token when the session ends', async () => {
       let onChange: ((token: string | null, record: unknown) => void) | undefined;
       const account = createMockUser({ id: 'refreshed-account' });

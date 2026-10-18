@@ -7,8 +7,10 @@ import {
   isSessionTokenInactive,
   recordCompletedSessionCreate,
   reportInvalidSession,
+  retainSignedOutCreateTokens,
   SessionChangedError,
 } from '@/services/auth/sessionRecovery';
+import { getSessionIdentityTracker, type SessionIdentity } from '@/services/auth/sessionEpoch';
 import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 
 const pbLogger = createLogger('PocketBase');
@@ -29,6 +31,13 @@ pbLogger.debug('PocketBase Environment:', {
 
 // Create and configure PocketBase client
 export const pb = new PocketBase(POCKETBASE_URL) as TypedPocketBase;
+const sessionIdentityTracker = getSessionIdentityTracker(pb.authStore);
+const requestSessionIdentity = Symbol('requestSessionIdentity');
+
+type SessionTrackedOptions = RequestInit &
+  Record<string, unknown> & {
+    [requestSessionIdentity]?: SessionIdentity;
+  };
 
 // Disable PocketBase SDK auto-cancellation in all environments.
 // React Query coordinates request lifecycle (caching, dedup, AbortSignal).
@@ -110,11 +119,13 @@ const getMinRequestInterval = () => {
   return Math.min(baseInterval * multiplier * Math.pow(2, consecutiveRateLimits - 1), maxDelay);
 };
 
-pb.beforeSend = function (url: string, options: RequestInit & Record<string, unknown>) {
+pb.beforeSend = function (url: string, options: SessionTrackedOptions) {
   const pathname = new URL(url).pathname;
   const isAuthRequest =
     pathname.includes('/auth-') || pathname.includes('/request-') || pathname.includes('/confirm-');
   const token = pb.authStore.token;
+  const sessionIdentity = sessionIdentityTracker.capture();
+  options[requestSessionIdentity] = sessionIdentity;
   if (!isAuthRequest && token && !pb.authStore.isValid) {
     reportInvalidSession(token);
     throw new Error('Your session expired. Sign in and try again.');
@@ -131,8 +142,12 @@ pb.beforeSend = function (url: string, options: RequestInit & Record<string, unk
       const isAuth = pb.authStore.isValid;
       pbLogger.debug(`Rate limiting delay: ${delay}ms for ${url} (auth: ${isAuth})`);
     }
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       setTimeout(() => {
+        if (!sessionIdentityTracker.isCurrent(sessionIdentity)) {
+          reject(new SessionChangedError());
+          return;
+        }
         lastRequestTime = Date.now();
         resolve({ url, options });
       }, delay);
@@ -146,23 +161,30 @@ pb.beforeSend = function (url: string, options: RequestInit & Record<string, unk
 pb.afterSend = function (
   response: Response,
   data: unknown,
-  options?: { headers?: HeadersInit; method?: string }
+  options?: SessionTrackedOptions
 ): unknown {
   const requestToken = new Headers(options?.headers)
     .get('Authorization')
     ?.replace(/^Bearer\s+/i, '');
+  const originatingIdentity = options?.[requestSessionIdentity];
+  const identityIsCurrent = originatingIdentity
+    ? sessionIdentityTracker.isCurrent(originatingIdentity)
+    : true;
+  const method = options?.method?.toUpperCase();
   if (
     response.ok &&
-    requestToken &&
-    isSessionTokenInactive(requestToken) &&
-    options?.method?.toUpperCase() !== 'GET'
+    method !== 'GET' &&
+    (!identityIsCurrent || (requestToken && isSessionTokenInactive(requestToken)))
   ) {
-    if (options?.method?.toUpperCase() === 'POST') {
+    if (method === 'POST' && requestToken) {
       const collection = new URL(response.url || '/', pb.baseURL).pathname.match(
         /^\/api\/collections\/([^/]+)\/records$/
       )?.[1];
       const id = typeof data === 'object' && data !== null && 'id' in data ? data.id : undefined;
       if (collection && typeof id === 'string') {
+        if (originatingIdentity?.accountId) {
+          retainSignedOutCreateTokens(originatingIdentity.accountId, [requestToken]);
+        }
         recordCompletedSessionCreate(requestToken, collection, id);
       }
     }
@@ -171,6 +193,7 @@ pb.afterSend = function (
   if (
     response.status === 401 &&
     requestToken &&
+    identityIsCurrent &&
     requestToken === pb.authStore.token &&
     !new URL(response.url || '/', pb.baseURL).pathname.includes('/auth-')
   ) {

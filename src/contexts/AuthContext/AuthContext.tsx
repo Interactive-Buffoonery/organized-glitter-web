@@ -45,6 +45,7 @@ import {
 } from '@/hooks/queries/shared/queryOptionsFactory';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
+import { getSessionIdentityTracker } from '@/services/auth/sessionEpoch';
 
 const authLogger = createLogger('AuthProvider');
 
@@ -280,6 +281,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       pb.authStore.clear();
     });
     const removeListener = initializeAuth();
+    const sessionIdentityTracker = getSessionIdentityTracker(pb.authStore);
 
     let refreshPromise: Promise<void> | null = null;
     const checkSession = () => {
@@ -291,9 +293,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       if (!isTokenExpired(token, 120)) return;
       const generation = sessionGenerationRef.current;
+      const sessionIdentity = sessionIdentityTracker.capture();
       refreshPromise = UsersService.refreshDetachedSession(token, pb.authStore.record)
         .then(result => {
-          if (token === pb.authStore.token && generation === sessionGenerationRef.current) {
+          if (
+            token === pb.authStore.token &&
+            generation === sessionGenerationRef.current &&
+            sessionIdentityTracker.isCurrent(sessionIdentity)
+          ) {
             pb.authStore.save(result.token, result.record);
           }
         })
@@ -301,6 +308,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (
             token === pb.authStore.token &&
             generation === sessionGenerationRef.current &&
+            sessionIdentityTracker.isCurrent(sessionIdentity) &&
             ((error instanceof ClientResponseError && error.status === 401) ||
               !pb.authStore.isValid)
           ) {

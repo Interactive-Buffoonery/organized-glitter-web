@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { devices, expect, test, type Page, type TestInfo } from '@playwright/test';
 import PocketBase from 'pocketbase';
 
 import { assertLocalE2ETargets } from '../fixtures/local-safety';
@@ -41,7 +41,7 @@ test('colors used: set up symbols, record a color, and keep it after reload', as
     await page.getByRole('button', { name: /^One,/ }).click();
     const entry = page.getByRole('dialog');
     await entry.getByRole('combobox', { name: 'Code' }).fill('654');
-    await entry.getByRole('textbox', { name: 'Color name' }).fill('Lilac');
+    await entry.getByRole('textbox', { name: /^Color name/ }).fill('Lilac');
     await entry.getByRole('textbox', { name: 'Swatch hex' }).fill('#B79AD6');
     await entry.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(entry).toHaveCount(0);
@@ -58,4 +58,125 @@ test('colors used: set up symbols, record a color, and keep it after reload', as
   } finally {
     await pb.collection('coloring_books').delete(book.id);
   }
+});
+
+async function seededPage(page: Page, baseURL: string | undefined, testInfo: TestInfo) {
+  const backend = process.env.VITE_POCKETBASE_URL!;
+  assertLocalE2ETargets({
+    appUrl: baseURL ?? process.env.E2E_APP_URL,
+    pocketBaseUrl: backend,
+    specName: 'Color keys',
+  });
+  const pb = new PocketBase(backend);
+  await pb
+    .collection('users')
+    .authWithPassword(process.env.E2E_TEST_EMAIL!, process.env.E2E_TEST_PASSWORD!);
+  const user = pb.authStore.record!.id;
+  const book = await pb.collection('coloring_books').create({
+    title: `Color key flow ${testInfo.project.name} ${Date.now()}`,
+    user,
+    total_pages: 2,
+    status: 'in_stash',
+  });
+  const [first, second] = await pb
+    .collection('coloring_pages')
+    .getFullList({ filter: pb.filter('book = {:book}', { book: book.id }), sort: 'page_number' });
+  const keys = pb.collection('coloring_page_color_keys');
+  // History for the Code suggestions lives on the other page.
+  await keys.create({ user, page: second.id, symbol: 'u:2605', position: 0, code: 'Q650' });
+  for (const [position, symbol] of ['u:2660', 'u:2663'].entries())
+    await keys.create({ user, page: first.id, symbol, position });
+  await page.goto(`/coloring/${book.id}/pages/${first.id}`);
+  return {
+    pb,
+    book,
+    pageId: first.id,
+    cleanup: () => pb.collection('coloring_books').delete(book.id),
+  };
+}
+
+test('colors used: keyboard flow keeps the sheet, focus and drafts', async ({
+  page,
+  baseURL,
+  context,
+}, testInfo) => {
+  test.setTimeout(90000);
+  const { pb, pageId, cleanup } = await seededPage(page, baseURL, testInfo);
+  try {
+    await page.getByRole('button', { name: /^Black spade suit,/ }).click();
+    const entry = page.getByRole('dialog', { name: 'Edit color: Black spade suit' });
+    const code = entry.getByRole('combobox', { name: 'Code' });
+    await code.fill('Q65');
+    await expect(entry.getByRole('listbox')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(entry.getByRole('listbox')).toHaveCount(0);
+    await expect(entry).toBeVisible();
+
+    await code.fill('Q651');
+    await entry.getByRole('textbox', { name: 'Add a code you tried' }).fill('Q649');
+    await entry.getByRole('button', { name: 'Save and next: Black club suit' }).click();
+
+    const nextEntry = page.getByRole('dialog', { name: 'Edit color: Black club suit' });
+    await expect(nextEntry).toBeVisible();
+    await expect(nextEntry.getByRole('combobox', { name: 'Code' })).toBeFocused();
+    await page.keyboard.type('Q700');
+    await nextEntry.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(nextEntry).toHaveCount(0);
+
+    const saved = await pb.collection('coloring_page_color_keys').getFullList({
+      filter: pb.filter('page = {:page}', { page: pageId }),
+      sort: 'position',
+    });
+    expect(saved.map(row => [row.symbol, row.code, row.tried])).toEqual([
+      ['u:2660', 'Q651', ['Q649']],
+      ['u:2663', 'Q700', []],
+    ]);
+
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.getByRole('button', { name: 'Copy', exact: true }).click();
+    await expect(page.getByText('Copied the colors for this page.')).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      '\u2660 Q651\n\u2663 Q700'
+    );
+  } finally {
+    await cleanup();
+  }
+});
+
+test.describe('on a phone', () => {
+  const { viewport, isMobile, hasTouch, userAgent } = devices['Pixel 7'];
+  test.use({ viewport, isMobile, hasTouch, userAgent });
+
+  test('colors used: pick a symbol and record it in the drawer', async ({
+    page,
+    baseURL,
+  }, testInfo) => {
+    test.setTimeout(90000);
+    const { pb, pageId, cleanup } = await seededPage(page, baseURL, testInfo);
+    try {
+      await page.getByRole('button', { name: 'Add symbol' }).tap();
+      const picker = page.getByRole('dialog', { name: 'Add a symbol' });
+      await picker.getByRole('searchbox', { name: 'Search symbols' }).fill('yen');
+      await expect(picker.getByRole('status')).toHaveText(/^\d+ symbols?$/);
+      await picker.getByRole('option', { name: 'Yen sign' }).tap();
+
+      const entry = page.getByRole('dialog', { name: 'Add a color: Yen sign' });
+      await entry.getByRole('combobox', { name: 'Code' }).fill('Q800');
+      await entry.getByRole('textbox', { name: 'Swatch hex' }).fill('b79ad6');
+      await entry.getByRole('textbox', { name: /^Color name/ }).tap();
+      await expect(entry.getByRole('textbox', { name: 'Swatch hex' })).toHaveValue('#B79AD6');
+      await entry.getByRole('button', { name: 'Save', exact: true }).tap();
+      await expect(entry).toHaveCount(0);
+
+      await expect(page.getByRole('button', { name: /^Yen sign, Q800/ })).toBeVisible();
+      const saved = await pb
+        .collection('coloring_page_color_keys')
+        .getFirstListItem(
+          pb.filter('page = {:page} && symbol = {:symbol}', { page: pageId, symbol: 'u:00A5' })
+        );
+      expect(saved).toMatchObject({ code: 'Q800', swatch: '#B79AD6', position: 2 });
+    } finally {
+      await cleanup();
+    }
+  });
 });

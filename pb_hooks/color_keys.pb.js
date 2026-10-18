@@ -1,5 +1,19 @@
 /// <reference path="../pb_data/types.d.ts" />
 
+routerAdd(
+  'POST',
+  '/api/coloring/color-keys/setup',
+  e => {
+    const items = require(`${__hooks}/color_keys.js`).setupKeys(
+      e.app,
+      e.auth,
+      e.requestInfo().body
+    );
+    return e.json(200, { items });
+  },
+  $apis.requireAuth('users')
+);
+
 onRecordCreateRequest(e => {
   const helpers = require(`${__hooks}/color_keys.js`);
   helpers.prepareKeyCreate(e.requestInfo().body);

@@ -41,6 +41,61 @@ function validateKey(record, app) {
   }
 }
 
+const SYMBOL_PATTERN =
+  /^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$/;
+
+function setupKeys(app, auth, body) {
+  if (!auth.getBool('verified')) throw new ForbiddenError('Email verification is required.');
+  let symbols;
+  try {
+    symbols = JSON.parse(JSON.stringify(body.symbols));
+  } catch {
+    symbols = null;
+  }
+  if (
+    !Array.isArray(symbols) ||
+    symbols.length < 1 ||
+    symbols.length > 100 ||
+    symbols.some(symbol => typeof symbol !== 'string' || !SYMBOL_PATTERN.test(symbol)) ||
+    new Set(symbols).size !== symbols.length
+  ) {
+    throw new BadRequestError('Choose 1 to 100 different, valid symbols.');
+  }
+  const pageId = typeof body.page === 'string' ? body.page : '';
+  const rows = [];
+  app.runInTransaction(txApp => {
+    let page;
+    try {
+      page = txApp.findRecordById('coloring_pages', pageId);
+    } catch {
+      throw new NotFoundError('This page was not found.');
+    }
+    const book = txApp.findRecordById('coloring_books', page.getString('book'));
+    if (book.getString('user') !== auth.id) throw new ForbiddenError();
+    const existing = txApp.findRecordsByFilter(
+      'coloring_page_color_keys',
+      'page = {:page} && user = {:user}',
+      '',
+      1,
+      0,
+      { page: pageId, user: auth.id }
+    );
+    if (existing.length) throw new ApiError(409, 'This page already has symbols.');
+    const collection = txApp.findCollectionByNameOrId('coloring_page_color_keys');
+    symbols.forEach((symbol, position) => {
+      const record = new Record(collection);
+      record.set('user', auth.id);
+      record.set('page', pageId);
+      record.set('symbol', symbol);
+      record.set('position', position);
+      record.set('tried', []);
+      txApp.save(record);
+      rows.push(record);
+    });
+  });
+  return rows;
+}
+
 function prepareKeyCreate(body) {
   if (typeof body.position !== 'number' || !Number.isInteger(body.position) || body.position < 0) {
     throw new BadRequestError('Position must be a non-negative integer.');
@@ -191,6 +246,7 @@ function notify(app, record, resolved) {
 }
 
 module.exports = {
+  setupKeys,
   validateKey,
   prepareKeyCreate,
   rateLimit,

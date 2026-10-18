@@ -1,7 +1,7 @@
 import catalog from './symbolCatalog.json';
 
 export const SYMBOL_ID_PATTERN =
-  /^(u:[0-9A-F]{4,6}(-[0-9A-F]{4,6})*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$/;
+  /^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$/;
 
 export type CatalogSymbol = (typeof catalog.symbols)[number];
 export type ParsedSymbolId =
@@ -19,7 +19,6 @@ export function parseSymbolId(id: string): ParsedSymbolId | null {
   if (id.startsWith('c:')) return { kind: 'custom', slug: value };
   if (id.startsWith('r:')) return { kind: 'request', requestId: value };
   const points = value.split('-').map(hex => parseInt(hex, 16));
-  if (!points.every(isUnicodeScalar)) return null;
   return { kind: 'unicode', text: String.fromCodePoint(...points) };
 }
 

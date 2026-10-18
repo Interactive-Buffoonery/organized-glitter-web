@@ -92,7 +92,7 @@ describe('symbol catalog contract', () => {
 describe('symbol IDs', () => {
   it('preserves the exact shared validation pattern', () => {
     expect(SYMBOL_ID_PATTERN.source).toBe(
-      '^(u:[0-9A-F]{4,6}(-[0-9A-F]{4,6})*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$'
+      '^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$'
     );
   });
 
@@ -115,6 +115,10 @@ describe('symbol IDs', () => {
     'u:110000',
     'u:D800',
     'u:DFFF',
+    'u:00041',
+    'u:000041',
+    'u:041',
+    'u:0FFFFF',
     'u:0041-',
     'c:Upper',
     'c:' + 'a'.repeat(49),

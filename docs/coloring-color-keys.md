@@ -32,7 +32,12 @@ Every stored symbol is a string ID in one of three forms:
 | `r:<id>`             | `r:abc123def456ghi` | Placeholder for a symbol request (15-char PocketBase record ID).            |
 
 Validation pattern:
-`^(u:[0-9A-F]{4,6}(-[0-9A-F]{4,6})*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$`
+`^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$`
+
+Each `u:` code point is a Unicode scalar value written in its shortest
+uppercase form with at least 4 digits, so every symbol has exactly one ID. The
+pattern must match the entire string; in Swift or ICU use `\A...\z` or a
+whole-string match, because `$` can match before a trailing line break.
 
 Rendering rules for clients:
 

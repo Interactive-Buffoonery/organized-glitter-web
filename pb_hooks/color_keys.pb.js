@@ -12,7 +12,12 @@ onRecordValidate(e => {
 }, 'coloring_page_color_keys');
 
 onRecordCreateRequest(e => {
-  const photos = e.findUploadedFiles('photo');
+  let photos = [];
+  try {
+    photos = e.findUploadedFiles('photo');
+  } catch {
+    photos = [];
+  }
   if (photos.length > 1) throw new BadRequestError('A symbol request accepts exactly one photo.');
   if (!e.hasSuperuserAuth()) {
     if (!e.auth || !e.auth.getBool('verified'))

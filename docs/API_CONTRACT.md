@@ -250,7 +250,9 @@ placeholder keys atomically, and emails the request's contact address after
 commit. Mail is sent to the typed contact address only when at least one key
 was rewritten or the status entered `added` or `matched` from an unresolved
 state. Repeat saves and `added`/`matched` transitions send nothing without
-rewrites. A nonempty `resolved_symbol` cannot be changed or cleared (HTTP 400).
+rewrites. Every nonempty `resolved_symbol` must be canonical, including while open or
+declined. It may be changed or cleared until the previous status is `added` or
+`matched`; after that, changes are rejected (HTTP 400).
 A propagation failure rolls back and names the failed key in the error.
 `declined` leaves keys unchanged. Delivery has no retry queue.
 

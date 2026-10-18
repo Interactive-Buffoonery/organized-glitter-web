@@ -79,8 +79,9 @@ function rateLimit(app, user) {
 }
 
 function validateResolution(record) {
-  if (!['added', 'matched'].includes(record.getString('status'))) return false;
+  const resolving = ['added', 'matched'].includes(record.getString('status'));
   const symbol = record.getString('resolved_symbol');
+  if (!symbol && !resolving) return false;
   if (
     symbol.length > 64 ||
     !/^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48})$/.test(
@@ -89,7 +90,7 @@ function validateResolution(record) {
   ) {
     throw new BadRequestError('Resolution requires a valid Unicode or custom symbol ID.');
   }
-  return true;
+  return resolving;
 }
 
 function resolveRequest(e) {
@@ -99,7 +100,10 @@ function resolveRequest(e) {
     try {
       const before = app.findRecordById('coloring_symbol_requests', e.record.id);
       const previousSymbol = before.getString('resolved_symbol');
-      if (previousSymbol && previousSymbol !== e.record.getString('resolved_symbol')) {
+      if (
+        ['added', 'matched'].includes(before.getString('status')) &&
+        previousSymbol !== e.record.getString('resolved_symbol')
+      ) {
         throw new BadRequestError('Resolved symbol cannot be changed after resolution');
       }
       const resolving = validateResolution(e.record);
@@ -125,7 +129,8 @@ function resolveRequest(e) {
             row.set('symbol', e.record.getString('resolved_symbol'));
             try {
               app.save(row);
-            } catch {
+            } catch (error) {
+              app.logger().error('Color key resolution failed', 'key_id', row.id, 'error', error);
               throw new BadRequestError(`Failed to resolve color key ${row.id}.`);
             }
             rewritten++;
@@ -156,9 +161,14 @@ function notify(app, record, resolved) {
   }
   try {
     const sender = app.settings().meta;
-    const accountEmail = resolved
-      ? ''
-      : app.findRecordById('users', record.getString('user')).getString('email');
+    let accountEmail = '';
+    if (!resolved) {
+      try {
+        accountEmail = app.findRecordById('users', record.getString('user')).getString('email');
+      } catch {
+        accountEmail = '';
+      }
+    }
     const singleLine = value => value.replace(/[\r\n]/g, ' ');
     const text = resolved
       ? `Your symbol request ${record.id} was resolved as ${record.getString('resolved_symbol')}. Your color keys have been updated.`

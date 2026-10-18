@@ -399,7 +399,7 @@ limit. Both timestamps are autodates. Index: `user`.
 
 Verified users create/read their own requests; an attached page must be theirs.
 Only superusers update/delete. Creation forces `open` and an empty resolution.
-Resolution validates a Unicode/custom symbol, freezes it once set, and
+Resolution validates a Unicode/custom symbol, freezes it after resolution, and
 atomically replaces the request placeholder only on that requester's keys.
 Notifications run after commit and never fail a saved request. See the feature
 contract for rate limiting, notification behavior, and known limits.

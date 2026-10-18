@@ -123,6 +123,9 @@ instead. Unknown, unresolved, and other users' request IDs remain placeholders.
 Known limit: syntactically valid `r:` IDs do not require an existing or owned
 request.
 
+Known concurrency limit: a key saved concurrently with a resolution may keep
+`r:<id>` until either the key or the request is saved again.
+
 ### `coloring_symbol_requests`
 
 | Field                | Type                                                                                    | Notes                                                     |
@@ -152,7 +155,9 @@ request.
   `resolved_symbol`, the server replaces `r:<request id>` with that symbol on
   every one of the requester's color keys, then emails the requester. Clients
   pick up the change on their next fetch.
-- Once `resolved_symbol` is nonempty, it cannot be changed or cleared. A
+- Every nonempty `resolved_symbol` must be a canonical Unicode or custom ID,
+  including while open or declined. It can be changed or cleared until the
+  previous status is `added` or `matched`, when it becomes immutable. A
   superuser attempt returns 400. Only matching `r:<request id>` rows are
   rewritten, so previously resolved choices are not silently reassigned.
 - Resolution and key replacements commit atomically. A failed key save rolls

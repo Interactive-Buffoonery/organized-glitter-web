@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
 import PocketBase from 'pocketbase';
@@ -14,8 +14,7 @@ const hooksDir = path.join(directory, 'hooks');
 const migrationsDir = path.join(directory, 'migrations');
 mkdirSync(hooksDir);
 mkdirSync(migrationsDir);
-for (const file of ['color_keys.pb.js', 'color_keys.js'])
-  copyFileSync(path.join(root, 'pb_hooks', file), path.join(hooksDir, file));
+cpSync(path.join(root, 'pb_hooks'), hooksDir, { recursive: true });
 // Force delivery failure after recording the mail handoff, without contacting SMTP.
 writeFileSync(
   path.join(hooksDir, 'test-mail.pb.js'),
@@ -139,10 +138,48 @@ try {
       .create({ user: user.id, title: name, total_pages: 2, status: 'in_progress' });
     const page = await admin
       .collection('coloring_pages')
-      .create({ book: book.id, page_number: 1, status: 'not_started' });
+      .getFirstListItem(`book = '${book.id}' && page_number = 1`);
     return { user, client, book, page };
   };
   const a = await account('owner');
+  for (const path of ['batched', 'direct']) {
+    const keyBook = await a.client.collection('coloring_books').create({
+      title: `Color key reduction ${path}`,
+      user: a.user.id,
+      total_pages: 2,
+      status: 'in_progress',
+    });
+    const keyPage = await a.client
+      .collection('coloring_pages')
+      .getFirstListItem(`book = '${keyBook.id}' && page_number = 2`);
+    assert.equal(keyPage.status, 'not_started');
+    const key = await a.client.collection('coloring_page_color_keys').create({
+      user: a.user.id,
+      page: keyPage.id,
+      position: 0,
+      symbol: 'u:0031',
+      tried: [],
+    });
+    const reduction =
+      path === 'direct'
+        ? a.client.collection('coloring_books').update(keyBook.id, { total_pages: 1 })
+        : a.client.send(`/api/coloring/books/${keyBook.id}/reduce-pages`, {
+            method: 'POST',
+            body: { targetTotalPages: 1 },
+          });
+    await assert.rejects(
+      reduction,
+      error =>
+        error.status === 400 && error.response.data.total_pages.code === 'validation_worked_pages'
+    );
+    assert.equal((await a.client.collection('coloring_books').getOne(keyBook.id)).total_pages, 2);
+    assert.equal((await a.client.collection('coloring_pages').getOne(keyPage.id)).id, keyPage.id);
+    assert.equal(
+      (await a.client.collection('coloring_page_color_keys').getOne(key.id)).symbol,
+      'u:0031'
+    );
+    await admin.collection('coloring_books').delete(keyBook.id);
+  }
   const b = await account('other');
   const unverified = await account('unverified');
   await admin.collection('users').update(unverified.user.id, { verified: false });
@@ -185,11 +222,9 @@ try {
   ]) {
     assert.equal((await a.client.collection(keys).update(key.id, same)).id, key.id);
   }
-  const sameOwnerPage = await a.client.collection('coloring_pages').create({
-    book: a.book.id,
-    page_number: 2,
-    status: 'not_started',
-  });
+  const sameOwnerPage = await a.client
+    .collection('coloring_pages')
+    .getFirstListItem(`book = '${a.book.id}' && page_number = 2`);
   for (const change of [{ user: b.user.id }, { page: b.page.id }, { page: sameOwnerPage.id }]) {
     await reject(a.client.collection(keys).update(key.id, change), 404);
   }
@@ -278,7 +313,11 @@ try {
   ]) {
     await assert.rejects(
       admin.collection(requests).create(requestData(a, fields)),
-      error => error.status === 400,
+      error =>
+        error.status === 400 &&
+        (label !== 'two files' ||
+          error.message === 'A symbol request accepts exactly one photo.') &&
+        (label !== 'missing photo' || error.response.data.photo?.code === 'validation_required'),
       label
     );
   }
@@ -292,6 +331,24 @@ try {
   await reject(b.client.collection(requests).create(requestData(a)), 400);
   await reject(unverified.client.collection(requests).create(requestData(unverified)), 400);
   await reject(a.client.collection(requests).create(requestData(a, { page: b.page.id })), 400);
+  const draft = await admin
+    .collection(requests)
+    .create(requestData(a, { email: 'draft@example.test' }));
+  for (const status of ['open', 'declined']) {
+    await admin.collection(requests).update(draft.id, { status });
+    await reject(admin.collection(requests).update(draft.id, { resolved_symbol: 'u:typo' }), 400);
+    await admin.collection(requests).update(draft.id, { resolved_symbol: 'u:0041' });
+    await admin.collection(requests).update(draft.id, { resolved_symbol: 'u:0042' });
+    assert.equal(
+      (await admin.collection(requests).update(draft.id, { resolved_symbol: '' })).resolved_symbol,
+      ''
+    );
+  }
+  await admin.collection(requests).update(draft.id, { status: 'added', resolved_symbol: 'u:0041' });
+  await assert.rejects(
+    admin.collection(requests).update(draft.id, { resolved_symbol: 'u:0042' }),
+    error => error.status === 400 && error.message.includes('Resolved symbol cannot be changed')
+  );
   const request = await a.client
     .collection(requests)
     .create(requestData(a, { status: 'invalid-client-status', resolved_symbol: 'x'.repeat(100) }));

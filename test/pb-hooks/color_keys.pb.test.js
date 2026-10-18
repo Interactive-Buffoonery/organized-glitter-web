@@ -220,3 +220,58 @@ describe('symbol notification contents', () => {
     );
   });
 });
+
+it('validates nonempty symbols before a request is resolved', () => {
+  for (const status of ['open', 'declined']) {
+    expect(() =>
+      helpers().validateResolution(record({ status, resolved_symbol: 'u:typo' }))
+    ).toThrow();
+    expect(helpers().validateResolution(record({ status, resolved_symbol: 'u:0041' }))).toBe(false);
+    expect(helpers().validateResolution(record({ status, resolved_symbol: '' }))).toBe(false);
+  }
+});
+
+it('still sends maintainer mail when the account lookup fails', () => {
+  const send = vi.fn();
+  const app = {
+    findRecordById: () => {
+      throw new Error('lookup failure');
+    },
+    settings: () => ({ meta: {} }),
+    newMailClient: () => ({ send }),
+    logger: () => ({ error: vi.fn() }),
+  };
+  helpers({ recipient: 'maintainer@example.test' }).notify(
+    app,
+    record({ email: 'typed@example.test' }),
+    false
+  );
+  expect(send).toHaveBeenCalledOnce();
+  expect(send.mock.calls[0][0].text).toContain(
+    'Account email: \nContact email (typed): typed@example.test'
+  );
+});
+
+it('logs the original propagation failure before reporting the key ID', () => {
+  const failure = new Error('controlled storage failure');
+  const error = vi.fn();
+  const app = {
+    runInTransaction: run => run(app),
+    findRecordById: () => record({ status: 'open' }),
+    findRecordsByFilter: () => [record({ id: 'failedkey000001' })],
+    save: () => {
+      throw failure;
+    },
+    logger: () => ({ error }),
+  };
+  const e = { app, record: record({ status: 'added', resolved_symbol: 'u:0041' }), next: vi.fn() };
+  expect(() => helpers().resolveRequest(e)).toThrow('failedkey000001');
+  expect(error).toHaveBeenCalledWith(
+    expect.any(String),
+    'key_id',
+    'failedkey000001',
+    'error',
+    failure
+  );
+  expect(e.next).not.toHaveBeenCalled();
+});

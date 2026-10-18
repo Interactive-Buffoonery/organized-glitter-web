@@ -269,9 +269,9 @@ const NewProject = () => {
         if (!isCurrentSubmission()) break;
         try {
           if (record.kind === 'company') {
-            await CompaniesService.delete(record.id);
+            await CompaniesService.delete(record.id, submissionSession);
           } else {
-            await ArtistsService.delete(record.id);
+            await ArtistsService.delete(record.id, submissionSession);
           }
         } catch (rollbackError) {
           logger.error('Failed to roll back project metadata', {

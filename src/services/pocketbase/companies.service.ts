@@ -197,11 +197,18 @@ export class CompaniesService {
   }
 
   /** Delete a company (verifies ownership) */
-  static async delete(id: string): Promise<void> {
+  static async delete(
+    id: string,
+    sessionIdentity: SessionIdentity = captureSessionIdentity()
+  ): Promise<void> {
     const userId = requireUserId();
+    if (!isCurrentSessionIdentity(sessionIdentity) || sessionIdentity.accountId !== userId) {
+      throw new SessionChangedError();
+    }
 
-    return ErrorHandler.handleAsync(async () => {
+    try {
       const existing = await pb.collection(Collections.Companies).getOne(id, { fields: 'id,user' });
+      if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
       if (existing.user !== userId) {
         throw ErrorHandler.createError(
           'permission',
@@ -211,7 +218,10 @@ export class CompaniesService {
       }
 
       await pb.collection(Collections.Companies).delete(id);
-    }, 'Companies.delete');
+    } catch (error) {
+      if (isSessionChangedError(error)) throw error;
+      throw ErrorHandler.handleError(error, 'Companies.delete');
+    }
   }
 
   /** Get project count for a specific company */

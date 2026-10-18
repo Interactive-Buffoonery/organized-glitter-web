@@ -519,7 +519,12 @@ describe('NewProject page', () => {
     await user.click(screen.getByRole('button', { name: 'Fill sections' }));
     await user.click(screen.getByRole('button', { name: 'Create project' }));
 
-    await waitFor(() => expect(deleteCompany).toHaveBeenCalledWith('company-123'));
+    await waitFor(() =>
+      expect(deleteCompany).toHaveBeenCalledWith('company-123', {
+        accountId: 'abc123def456ghi',
+        generation: 0,
+      })
+    );
     expect(createProjectMutateAsync).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
@@ -627,7 +632,12 @@ describe('NewProject page', () => {
     await user.click(screen.getByRole('button', { name: 'Fill sections' }));
     await user.click(screen.getByRole('button', { name: 'Create project' }));
 
-    await waitFor(() => expect(deleteArtist).toHaveBeenCalledWith('artist-123'));
+    await waitFor(() =>
+      expect(deleteArtist).toHaveBeenCalledWith('artist-123', {
+        accountId: 'abc123def456ghi',
+        generation: 0,
+      })
+    );
     expect(deleteCompany).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -673,8 +683,14 @@ describe('NewProject page', () => {
     await user.click(screen.getByRole('button', { name: 'Create project' }));
 
     await waitFor(() => {
-      expect(deleteArtist).toHaveBeenCalledWith('artist-123');
-      expect(deleteCompany).toHaveBeenCalledWith('company-123');
+      expect(deleteArtist).toHaveBeenCalledWith('artist-123', {
+        accountId: 'abc123def456ghi',
+        generation: 0,
+      });
+      expect(deleteCompany).toHaveBeenCalledWith('company-123', {
+        accountId: 'abc123def456ghi',
+        generation: 0,
+      });
     });
     expect(createProjectMutateAsync).toHaveBeenCalledOnce();
   });
@@ -694,8 +710,14 @@ describe('NewProject page', () => {
     await user.click(screen.getByRole('button', { name: 'Create project' }));
 
     await waitFor(() => {
-      expect(deleteArtist).toHaveBeenCalledWith('artist-123');
-      expect(deleteCompany).toHaveBeenCalledWith('company-123');
+      expect(deleteArtist).toHaveBeenCalledWith('artist-123', {
+        accountId: 'abc123def456ghi',
+        generation: 0,
+      });
+      expect(deleteCompany).toHaveBeenCalledWith('company-123', {
+        accountId: 'abc123def456ghi',
+        generation: 0,
+      });
     });
   });
 

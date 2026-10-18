@@ -187,11 +187,18 @@ export class ArtistsService {
   }
 
   /** Delete an artist (verifies ownership) */
-  static async delete(id: string): Promise<void> {
+  static async delete(
+    id: string,
+    sessionIdentity: SessionIdentity = captureSessionIdentity()
+  ): Promise<void> {
     const userId = requireUserId();
+    if (!isCurrentSessionIdentity(sessionIdentity) || sessionIdentity.accountId !== userId) {
+      throw new SessionChangedError();
+    }
 
-    return ErrorHandler.handleAsync(async () => {
+    try {
       const existing = await pb.collection(Collections.Artists).getOne(id, { fields: 'id,user' });
+      if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
       if (existing.user !== userId) {
         throw ErrorHandler.createError(
           'permission',
@@ -201,7 +208,10 @@ export class ArtistsService {
       }
 
       await pb.collection(Collections.Artists).delete(id);
-    }, 'Artists.delete');
+    } catch (error) {
+      if (isSessionChangedError(error)) throw error;
+      throw ErrorHandler.handleError(error, 'Artists.delete');
+    }
   }
 
   /** Get project counts for all artists owned by the current user. */

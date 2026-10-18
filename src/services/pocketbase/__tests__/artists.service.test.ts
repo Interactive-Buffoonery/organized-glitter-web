@@ -193,6 +193,27 @@ describe('ArtistsService', () => {
   });
 
   describe('delete()', () => {
+    it('does not delete after logout and relogin during ownership lookup', async () => {
+      let finishLookup!: (value: { id: string; user: string }) => void;
+      pbMock.collectionMethods.getOne.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            finishLookup = resolve;
+          })
+      );
+      const pending = ArtistsService.delete('metadata-1');
+      sessionState.generation += 2;
+      finishLookup({ id: 'metadata-1', user: 'user-123' });
+      await expect(pending).rejects.toMatchObject({ reason: 'session_changed' });
+      expect(pbMock.collectionMethods.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes an owned record while the originating session is current', async () => {
+      pbMock.collectionMethods.getOne.mockResolvedValueOnce({ id: 'metadata-1', user: 'user-123' });
+      await ArtistsService.delete('metadata-1');
+      expect(pbMock.collectionMethods.delete).toHaveBeenCalledWith('metadata-1');
+    });
+
     it('throws permission ServiceError when user does not own the record', async () => {
       pbMock.collectionMethods.getOne.mockResolvedValue({ id: 'a1', user: 'other-user' });
 

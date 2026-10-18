@@ -270,7 +270,7 @@ describe('NewProject page', () => {
   });
 
   it('keeps restored edits visible after a late create and offers the created record', async () => {
-    const unregister = registerSessionDraft('/projects/new:diamond', () => ({
+    const unregister = registerSessionDraft('/projects/new:diamond', 'abc123def456ghi', () => ({
       formData: { title: 'Original draft', tags: [{ id: 'tag-1' }] },
       companies: new Map(),
       artists: new Map(),
@@ -308,7 +308,7 @@ describe('NewProject page', () => {
   });
 
   it('checkpoints an unchanged recovered project before leaving the form', async () => {
-    const unregister = registerSessionDraft('/projects/new:diamond', () => ({
+    const unregister = registerSessionDraft('/projects/new:diamond', 'abc123def456ghi', () => ({
       formData: {
         title: 'Recovered project',
         userId: 'abc123def456ghi',
@@ -356,7 +356,7 @@ describe('NewProject page', () => {
   });
 
   it('keeps the missing photo reminder after session recovery', () => {
-    const unregister = registerSessionDraft('/projects/new:diamond', () => ({
+    const unregister = registerSessionDraft('/projects/new:diamond', 'abc123def456ghi', () => ({
       formData: {
         title: 'Recovered project',
         userId: 'abc123def456ghi',
@@ -376,7 +376,7 @@ describe('NewProject page', () => {
   });
 
   it('restores the project when auth resolves after the page mounts', async () => {
-    const unregister = registerSessionDraft('/projects/new:diamond', () => ({
+    const unregister = registerSessionDraft('/projects/new:diamond', 'abc123def456ghi', () => ({
       formData: {
         title: 'Recovered after login',
         userId: 'abc123def456ghi',

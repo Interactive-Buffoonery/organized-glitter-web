@@ -120,7 +120,7 @@ describe('ColoringBookForm', () => {
     expect(saved).toBeDefined();
     first.unmount();
 
-    const unregister = registerSessionDraft('coloring-missing-photo', () => ({
+    const unregister = registerSessionDraft('coloring-missing-photo', 'user-1', () => ({
       ...saved,
       missingPhoto: true,
     }));

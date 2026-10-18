@@ -53,7 +53,7 @@ describe('session recovery', () => {
 
   it('captures an active draft before auth clears and restores it only for the same account', () => {
     const draft = { title: 'Unsent project', image: new File(['image'], 'cover.png') };
-    const unregister = registerSessionDraft('/projects/new:diamond', () => draft);
+    const unregister = registerSessionDraft('/projects/new:diamond', 'account-a', () => draft);
 
     captureSessionDrafts('account-a', 'token-a');
     unregister();
@@ -61,10 +61,26 @@ describe('session recovery', () => {
     expect(takeSessionDraft('/projects/new:diamond', 'account-b')).toBeUndefined();
     expect(takeSessionDraft('/projects/new:diamond', 'account-a')).toBeUndefined();
 
-    registerSessionDraft('/projects/new:diamond', () => draft);
+    registerSessionDraft('/projects/new:diamond', 'account-a', () => draft);
     captureSessionDrafts('account-a', 'token-a');
     expect(takeSessionDraft('/projects/new:diamond', 'account-a')).toEqual(draft);
     expect(takeSessionDraft('/projects/new:diamond', 'account-a')).toBeUndefined();
+  });
+
+  it('only captures forms registered for the invalidated account', () => {
+    const captureFirst = vi.fn(() => ({ title: 'Private first account draft' }));
+    const captureSecond = vi.fn(() => ({ title: 'Second account draft' }));
+    const unregisterFirst = registerSessionDraft('first-form', 'account-a', captureFirst);
+    const unregisterSecond = registerSessionDraft('second-form', 'account-b', captureSecond);
+
+    captureSessionDrafts('account-b', 'token-b');
+
+    expect(captureFirst).not.toHaveBeenCalled();
+    expect(captureSecond).toHaveBeenCalledOnce();
+    expect(takeSessionDraft('first-form', 'account-b')).toBeUndefined();
+    expect(takeSessionDraft('second-form', 'account-b')).toEqual({ title: 'Second account draft' });
+    unregisterFirst();
+    unregisterSecond();
   });
 
   it('reports the failed token once for concurrent invalid requests', () => {
@@ -92,7 +108,7 @@ describe('session recovery', () => {
   });
 
   it('discards the previous account draft when a different account signs in', () => {
-    registerSessionDraft('project-edit:one:page', () => ({ title: 'Private draft' }));
+    registerSessionDraft('project-edit:one:page', 'account-a', () => ({ title: 'Private draft' }));
     captureSessionDrafts('account-a', 'token-a');
 
     completeSessionRecovery('account-b');
@@ -101,7 +117,7 @@ describe('session recovery', () => {
   });
 
   it('keeps a create draft when a base record may still need tags', () => {
-    registerSessionDraft('/projects/new:diamond', () => ({ title: 'Created' }));
+    registerSessionDraft('/projects/new:diamond', 'account-a', () => ({ title: 'Created' }));
     captureSessionDrafts('account-a', 'token-a');
     recordCompletedSessionCreate('token-a', 'projects', 'record-1');
     completeSessionRecovery('account-a');
@@ -425,7 +441,7 @@ describe('session recovery', () => {
   });
 
   it('keeps a confirmed feedback draft available to match its late delivery', () => {
-    registerSessionDraft('feedback-dialog', () => ({ message: 'Sent' }));
+    registerSessionDraft('feedback-dialog', 'account-a', () => ({ message: 'Sent' }));
     captureSessionDrafts('account-a', 'token-a');
     recordCompletedSessionFeedback('token-a', {
       message: 'Sent',
@@ -436,7 +452,7 @@ describe('session recovery', () => {
   });
 
   it('reports a confirmed late create even after the draft was restored', () => {
-    registerSessionDraft('/projects/new:diamond', () => ({ title: 'Created' }));
+    registerSessionDraft('/projects/new:diamond', 'account-a', () => ({ title: 'Created' }));
     captureSessionDrafts('account-a', 'token-a');
     completeSessionRecovery('account-a');
     expect(takeSessionDraft('/projects/new:diamond', 'account-a')).toEqual({ title: 'Created' });
@@ -457,7 +473,7 @@ describe('session recovery', () => {
   });
 
   it('reports confirmed feedback after its draft has already been restored', () => {
-    registerSessionDraft('feedback-dialog', () => ({ message: 'Sent message' }));
+    registerSessionDraft('feedback-dialog', 'account-a', () => ({ message: 'Sent message' }));
     captureSessionDrafts('account-a', 'token-a');
     takeSessionDraft('feedback-dialog', 'account-a');
     completeSessionRecovery('account-a');

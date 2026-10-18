@@ -36,7 +36,7 @@ afterEach(clearSessionDrafts);
 describe('ProjectNotes rich text', () => {
   it('restores and re-registers unsaved notes for the same account under StrictMode', () => {
     const key = 'project-notes:one';
-    const unregister = registerSessionDraft(key, () => 'Unsent **note**');
+    const unregister = registerSessionDraft(key, 'account-a', () => 'Unsent **note**');
     captureSessionDrafts('account-a', 'token-a');
     unregister();
 
@@ -54,7 +54,7 @@ describe('ProjectNotes rich text', () => {
 
   it('does not restore another account’s unsaved notes', () => {
     const key = 'project-notes:one';
-    const unregister = registerSessionDraft(key, () => 'Private note');
+    const unregister = registerSessionDraft(key, 'account-a', () => 'Private note');
     captureSessionDrafts('account-a', 'token-a');
     unregister();
 
@@ -67,7 +67,7 @@ describe('ProjectNotes rich text', () => {
 
   it('opens unsent notes when the account arrives after mount', () => {
     const key = 'project-notes:late-account';
-    const unregister = registerSessionDraft(key, () => 'Unsent after login');
+    const unregister = registerSessionDraft(key, 'account-a', () => 'Unsent after login');
     captureSessionDrafts('account-a', 'late-account-token');
     unregister();
 

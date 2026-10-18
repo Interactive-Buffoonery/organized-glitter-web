@@ -63,7 +63,7 @@ interface CompletedFeedback {
   email: string;
 }
 
-const activeDrafts = new Map<string, DraftCapture>();
+const activeDrafts = new Map<string, { accountId: string; capture: DraftCapture }>();
 const savedDrafts = new Map<string, unknown>();
 const invalidSessionListeners = new Set<(token: string) => void>();
 const completedCreateListeners = new Set<(accountId: string, destination: string) => void>();
@@ -258,10 +258,15 @@ function onCompletedOtherStorage(event: StorageEvent): void {
   for (const listener of completedOtherCreateListeners) listener(accountId, collection);
 }
 
-export function registerSessionDraft(key: string, capture: DraftCapture): () => void {
-  activeDrafts.set(key, capture);
+export function registerSessionDraft(
+  key: string,
+  accountId: string,
+  capture: DraftCapture
+): () => void {
+  const registration = { accountId, capture };
+  activeDrafts.set(key, registration);
   return () => {
-    if (activeDrafts.get(key) === capture) activeDrafts.delete(key);
+    if (activeDrafts.get(key) === registration) activeDrafts.delete(key);
   };
 }
 
@@ -270,9 +275,10 @@ export function captureSessionDrafts(accountId: string, token: string): void {
   savedAccountId = accountId;
   recoveryToken = token;
   recoveryPending = true;
-  for (const [key, capture] of activeDrafts) {
+  for (const [key, registration] of activeDrafts) {
+    if (registration.accountId !== accountId) continue;
     try {
-      const draft = capture();
+      const draft = registration.capture();
       if (draft !== undefined) savedDrafts.set(key, draft);
     } catch {
       // A broken form snapshot must not prevent invalid credentials being cleared.

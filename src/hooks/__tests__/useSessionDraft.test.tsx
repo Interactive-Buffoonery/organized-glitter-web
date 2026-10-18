@@ -15,7 +15,7 @@ afterEach(clearSessionDrafts);
 describe('useSessionDraft', () => {
   it('restores through StrictMode double initialization before consuming the draft', () => {
     const key = 'project-edit:one:page';
-    const unregister = registerSessionDraft(key, () => ({ title: 'Unsent work' }));
+    const unregister = registerSessionDraft(key, 'account-a', () => ({ title: 'Unsent work' }));
     captureSessionDrafts('account-a', 'token-a');
     unregister();
 
@@ -37,7 +37,7 @@ describe('useSessionDraft', () => {
 
   it('restores a draft when the account becomes available after mount', () => {
     const key = 'project-edit:one:page';
-    const unregister = registerSessionDraft(key, () => ({ title: 'Unsent work' }));
+    const unregister = registerSessionDraft(key, 'account-a', () => ({ title: 'Unsent work' }));
     captureSessionDrafts('account-a', 'token-b');
     unregister();
 

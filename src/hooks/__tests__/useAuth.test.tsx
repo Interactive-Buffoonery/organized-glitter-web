@@ -111,6 +111,7 @@ import {
   userEvent,
 } from '../../test-utils';
 import { useAuth } from '../useAuth';
+import { useSessionDraft } from '../useSessionDraft';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { AuthContextType, PocketBaseUser } from '../../contexts/AuthContext';
 import { pb } from '../../lib/pocketbase';
@@ -125,6 +126,8 @@ import {
   recordCompletedSessionCreate,
   takeCompletedSessionDestination,
   completeSessionRecovery,
+  reportInvalidSession,
+  peekSessionDraft,
 } from '@/services/auth/sessionRecovery';
 import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 import { getDraftGeneration, readFormDraft, writeFormDraft } from '@/hooks/drafts/formDraftStorage';
@@ -216,7 +219,9 @@ describe('useAuth Integration Tests', () => {
     it('captures active drafts when the initial stored token has expired', async () => {
       setupMockAuthState(false, createMockUser({ id: 'account-a' }));
       pocketBaseMock.authStore.token = 'expired-token';
-      const unregister = registerSessionDraft('project-edit', () => ({ title: 'Unsaved' }));
+      const unregister = registerSessionDraft('project-edit', 'account-a', () => ({
+        title: 'Unsaved',
+      }));
 
       const { result } = renderUseAuthHook();
 
@@ -412,6 +417,45 @@ describe('useAuth Integration Tests', () => {
       expect(takeCompletedSessionDestination(account.id)).toBe('/projects/project-2');
     });
 
+    it('does not capture the previous account form when a new session expires before React commits', async () => {
+      let onChange: ((token: string | null, record: unknown) => void) | undefined;
+      const first = createMockUser({ id: 'draft-first-account' });
+      const restoreDraft = vi.fn();
+      setupMockAuthState(true, first, callback => {
+        onChange = callback;
+        return vi.fn();
+      });
+      const { result } = renderHook(
+        () => {
+          const auth = useAuth() as AuthContextType;
+          useSessionDraft(
+            'switching-account-form',
+            auth.user?.id,
+            () => ({ title: 'First account private draft' }),
+            restoreDraft
+          );
+          return auth;
+        },
+        {
+          wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+        }
+      );
+      await waitFor(() => expect(result.current.user?.id).toBe(first.id));
+
+      let capturedForNextAccount: unknown;
+      act(() => {
+        const next = createMockUser({ id: 'draft-second-account' });
+        pocketBaseMock.authStore.token = 'draft-second-token';
+        pocketBaseMock.authStore.record = next;
+        onChange?.('draft-second-token', next);
+        reportInvalidSession('draft-second-token');
+        capturedForNextAccount = peekSessionDraft('switching-account-form', next.id);
+      });
+
+      expect(capturedForNextAccount).toBeUndefined();
+      expect(restoreDraft).not.toHaveBeenCalled();
+    });
+
     it('does not assign an old account’s create to a new expired account', async () => {
       let onChange: ((token: string | null, record: unknown) => void) | undefined;
       const first = createMockUser({ id: 'first-account' });
@@ -421,7 +465,9 @@ describe('useAuth Integration Tests', () => {
       });
       const { result } = renderUseAuthHook();
       await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
-      const unregister = registerSessionDraft('project-form', () => ({ title: 'First account' }));
+      const unregister = registerSessionDraft('project-form', first.id, () => ({
+        title: 'First account',
+      }));
 
       act(() => {
         const authStore = pb.authStore as {
@@ -504,7 +550,9 @@ describe('useAuth Integration Tests', () => {
       };
       const generation = getDraftGeneration(identity)!;
       writeFormDraft(identity, generation, { title: 'Unfinished' });
-      const unregister = registerSessionDraft('/projects/new:diamond', () => ({ title: 'Unsent' }));
+      const unregister = registerSessionDraft('/projects/new:diamond', mockUser.id, () => ({
+        title: 'Unsent',
+      }));
       captureSessionDrafts(mockUser.id, 'mock-token');
       unregister();
       pocketBaseMock.authStore.clear.mockImplementation(() => {

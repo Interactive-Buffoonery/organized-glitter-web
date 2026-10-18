@@ -2,6 +2,7 @@ import { ClientResponseError } from 'pocketbase';
 import { pb } from '@/lib/pocketbase';
 import type { PocketBaseUser } from '@/contexts/AuthContext';
 import { ErrorHandler } from '@/services/pocketbase/base/ErrorHandler';
+import { captureSessionIdentity, isCurrentSessionIdentity } from './sessionIdentity';
 import type { AuthResult, LoginData, RegisterData } from './types';
 import {
   authLogger,
@@ -37,6 +38,7 @@ const isEmailVerificationRequired = ({
 };
 
 export const loginWithPassword = async (data: LoginData): Promise<AuthResult> => {
+  const initiatingSession = captureSessionIdentity();
   const normalizedEmail = normalizeEmail(data.email);
 
   authLogger.debug('Starting password login');
@@ -70,6 +72,14 @@ export const loginWithPassword = async (data: LoginData): Promise<AuthResult> =>
     authLogger.warn('Proceeding with password login despite a connectivity warning');
   }
 
+  if (!isCurrentSessionIdentity(initiatingSession)) {
+    authLogger.warn('Skipping password login because the session changed');
+    return {
+      success: false,
+      error: 'Your session changed. Please try signing in again.',
+    };
+  }
+
   try {
     authLogger.debug('Attempting password authentication');
 
@@ -81,7 +91,9 @@ export const loginWithPassword = async (data: LoginData): Promise<AuthResult> =>
 
     if (isEmailVerificationRequired({ record: userRecord })) {
       authLogger.warn('Password login requires email verification');
-      pb.authStore.clear();
+      if (pb.authStore.token === authData.token && pb.authStore.record?.id === authData.record.id) {
+        pb.authStore.clear();
+      }
       return emailVerificationRequired(normalizedEmail);
     }
 
@@ -94,7 +106,7 @@ export const loginWithPassword = async (data: LoginData): Promise<AuthResult> =>
   } catch (error) {
     if (isEmailVerificationRequired({ error })) {
       authLogger.warn('Password login requires email verification');
-      pb.authStore.clear();
+      if (isCurrentSessionIdentity(initiatingSession)) pb.authStore.clear();
       return emailVerificationRequired(normalizedEmail);
     }
 

@@ -4,6 +4,7 @@ import type { PocketBaseUser } from '@/contexts/AuthContext';
 import type { AuthResult, OAuthProvider } from './types';
 import { authLogger } from './shared';
 import { getStructuredErrorReason } from '@/utils/error/structuredErrorReason';
+import { captureSessionIdentity, isCurrentSessionIdentity } from './sessionIdentity';
 
 const OAUTH_PROVIDERS: readonly OAuthProvider[] = ['apple', 'google', 'discord'];
 
@@ -357,8 +358,14 @@ export async function requestOAuthSignInMethodProof(
   userId: string
 ): Promise<StepUpResult> {
   const value = createProofValue();
+  const sessionIdentity = captureSessionIdentity();
   const authToken = pb.authStore.token;
-  if (!authToken || pb.authStore.record?.id !== userId) {
+  if (
+    !authToken ||
+    pb.authStore.record?.id !== userId ||
+    sessionIdentity.accountId !== userId ||
+    !isCurrentSessionIdentity(sessionIdentity)
+  ) {
     return {
       success: false,
       reason: 'account_changed',
@@ -379,7 +386,11 @@ export async function requestOAuthSignInMethodProof(
       },
     });
     const authData = await authPromise;
-    if (authData.record.id !== userId || pb.authStore.token !== authToken) {
+    if (
+      authData.record.id !== userId ||
+      pb.authStore.token !== authToken ||
+      !isCurrentSessionIdentity(sessionIdentity)
+    ) {
       return {
         success: false,
         reason: 'account_changed',

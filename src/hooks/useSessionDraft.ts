@@ -26,7 +26,7 @@ export function useSessionDraft<T>(
     mounted.current = true;
     if (!key || !accountId) return;
     const draft = peekSessionDraft<T>(key, accountId);
-    const unregister = registerSessionDraft(key, () => snapshot.current());
+    const unregister = registerSessionDraft(key, accountId, () => snapshot.current());
     if (wasMounted && draft !== undefined) restore.current?.(draft);
     takeSessionDraft(key, accountId);
     return unregister;

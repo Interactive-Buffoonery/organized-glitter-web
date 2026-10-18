@@ -10,6 +10,12 @@ import { CompanyDTO } from '@/services/types';
 import { ErrorHandler } from './base/ErrorHandler';
 import { isAuthenticated, getCurrentUserId } from '@/services/auth';
 import { FilterBuilder } from '@/services/pocketbase/base/filterBuilder';
+import {
+  captureSessionIdentity,
+  isCurrentSessionIdentity,
+  type SessionIdentity,
+} from '@/services/auth/sessionIdentity';
+import { SessionChangedError, isSessionChangedError } from '@/services/auth/sessionRecovery';
 
 function requireUserId(): string {
   if (!isAuthenticated()) {
@@ -111,13 +117,20 @@ export class CompaniesService {
   }
 
   /** Create a company for the current user */
-  static async create(data: { name: string; website_url?: string }): Promise<CompanyDTO> {
+  static async create(
+    data: { name: string; website_url?: string },
+    sessionIdentity: SessionIdentity = captureSessionIdentity()
+  ): Promise<CompanyDTO> {
     const userId = requireUserId();
+    if (!isCurrentSessionIdentity(sessionIdentity) || sessionIdentity.accountId !== userId) {
+      throw new SessionChangedError();
+    }
 
-    return ErrorHandler.handleAsync(async () => {
+    try {
       // Check for duplicates
       const trimmed = data.name.trim();
       const existing = await this.findByName(trimmed, userId);
+      if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
       if (existing) {
         throw ErrorHandler.createError(
           'validation',
@@ -132,8 +145,12 @@ export class CompaniesService {
         name: trimmed,
         user: userId,
       });
+      if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
       return toCompanyDTO(record);
-    }, 'Companies.create');
+    } catch (error) {
+      if (isSessionChangedError(error)) throw error;
+      throw ErrorHandler.handleError(error, 'Companies.create');
+    }
   }
 
   /** Update a company (verifies ownership) */
@@ -180,11 +197,18 @@ export class CompaniesService {
   }
 
   /** Delete a company (verifies ownership) */
-  static async delete(id: string): Promise<void> {
+  static async delete(
+    id: string,
+    sessionIdentity: SessionIdentity = captureSessionIdentity()
+  ): Promise<void> {
     const userId = requireUserId();
+    if (!isCurrentSessionIdentity(sessionIdentity) || sessionIdentity.accountId !== userId) {
+      throw new SessionChangedError();
+    }
 
-    return ErrorHandler.handleAsync(async () => {
+    try {
       const existing = await pb.collection(Collections.Companies).getOne(id, { fields: 'id,user' });
+      if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
       if (existing.user !== userId) {
         throw ErrorHandler.createError(
           'permission',
@@ -194,7 +218,10 @@ export class CompaniesService {
       }
 
       await pb.collection(Collections.Companies).delete(id);
-    }, 'Companies.delete');
+    } catch (error) {
+      if (isSessionChangedError(error)) throw error;
+      throw ErrorHandler.handleError(error, 'Companies.delete');
+    }
   }
 
   /** Get project count for a specific company */

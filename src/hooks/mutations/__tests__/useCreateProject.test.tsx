@@ -55,6 +55,11 @@ vi.doMock('../projectMutationAdapters', () => ({
   }),
 }));
 
+vi.doMock('@/services/auth/sessionIdentity', () => ({
+  captureSessionIdentity: () => ({ accountId: 'user-123', generation: 0 }),
+  isCurrentSessionIdentity: () => true,
+}));
+
 const { useCreateProject } = await import('../useCreateProject');
 
 describe('useCreateProject', () => {

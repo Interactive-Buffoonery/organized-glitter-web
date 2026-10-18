@@ -35,6 +35,7 @@ const {
   captureMock,
   authState,
   projectData,
+  projectQueryState,
   baseProjectData,
   progressNotesState,
   editProjectState,
@@ -77,6 +78,7 @@ const {
     },
     baseProjectData,
     projectData: { ...baseProjectData },
+    projectQueryState: { available: true },
     progressNotesState: {
       data: [] as Array<{
         id: string;
@@ -160,7 +162,7 @@ vi.mock('@/hooks/use-mobile', () => ({
 
 vi.mock('@/hooks/queries/useProjectDetailQuery', () => ({
   useProjectDetailQuery: () => ({
-    data: projectData,
+    data: projectQueryState.available ? projectData : undefined,
     isLoading: false,
     isError: false,
     error: null,
@@ -286,6 +288,7 @@ vi.mock('@/services/analytics-events', () => ({
 
 beforeEach(() => {
   guard.reset();
+  projectQueryState.available = true;
   navigateMock.mockReset();
   useParamsMock.mockReset().mockReturnValue({ id: 'project-123' });
   useLocationMock.mockReset().mockReturnValue({
@@ -342,6 +345,36 @@ describe('ProjectDetail route mount (real detail view)', () => {
 });
 
 describe('ProjectDetail behavior', () => {
+  it('does not display navigation data belonging to another account', async () => {
+    projectQueryState.available = false;
+    useLocationMock.mockReturnValue({
+      pathname: '/projects/project-123',
+      state: {
+        fromNavigation: true,
+        projectId: 'project-123',
+        projectData: {
+          ...baseProjectData,
+          userId: 'another-account',
+          title: 'Private old project',
+        },
+      },
+    } as ReturnType<typeof useLocationMock>);
+    const { default: ProjectDetail } = await import('../ProjectDetail');
+    renderWithProviders(<ProjectDetail />);
+    expect(screen.queryByText('Private old project')).not.toBeInTheDocument();
+  });
+
+  it('displays navigation data belonging to the current account', async () => {
+    projectQueryState.available = false;
+    useLocationMock.mockReturnValue({
+      pathname: '/projects/project-123',
+      state: { fromNavigation: true, projectId: 'project-123', projectData: baseProjectData },
+    } as ReturnType<typeof useLocationMock>);
+    const { default: ProjectDetail } = await import('../ProjectDetail');
+    renderWithProviders(<ProjectDetail />);
+    expect(await screen.findByRole('heading', { name: 'Aurora Wolves' })).toBeInTheDocument();
+  });
+
   it('renders project title, status, and description from project data', async () => {
     const { default: ProjectDetail } = await import('../ProjectDetail');
 

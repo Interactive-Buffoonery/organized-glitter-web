@@ -1,13 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { authWithOAuth2Mock, listAuthMethodsMock, listExternalAuthsMock, sendMock, saveMock } =
-  vi.hoisted(() => ({
-    authWithOAuth2Mock: vi.fn(),
-    listAuthMethodsMock: vi.fn(),
-    listExternalAuthsMock: vi.fn(),
-    sendMock: vi.fn(),
-    saveMock: vi.fn(),
-  }));
+const {
+  authWithOAuth2Mock,
+  listAuthMethodsMock,
+  listExternalAuthsMock,
+  sendMock,
+  sessionState,
+  saveMock,
+  verificationAuthWithOAuth2Mock,
+  verificationClearMock,
+} = vi.hoisted(() => ({
+  authWithOAuth2Mock: vi.fn(),
+  listAuthMethodsMock: vi.fn(),
+  listExternalAuthsMock: vi.fn(),
+  sendMock: vi.fn(),
+  sessionState: {
+    current: { accountId: 'user-1' as string | null, generation: 0, epoch: 'epoch-a' },
+  },
+  saveMock: vi.fn(),
+  verificationAuthWithOAuth2Mock: vi.fn(),
+  verificationClearMock: vi.fn(),
+}));
+
+vi.mock('pocketbase', async importOriginal => {
+  const actual = await importOriginal<typeof import('pocketbase')>();
+  return {
+    ...actual,
+    default: class {
+      authStore = { clear: verificationClearMock };
+
+      collection() {
+        return { authWithOAuth2: verificationAuthWithOAuth2Mock };
+      }
+    },
+  };
+});
 
 vi.mock('@/lib/pocketbase', () => ({
   pb: {
@@ -34,16 +61,26 @@ vi.mock('@/utils/logger', () => ({
   }),
 }));
 
+vi.mock('@/services/auth/sessionIdentity', () => ({
+  captureSessionIdentity: () => ({ ...sessionState.current }),
+  isCurrentSessionIdentity: (identity: typeof sessionState.current) =>
+    identity.accountId === sessionState.current.accountId &&
+    identity.generation === sessionState.current.generation &&
+    identity.epoch === sessionState.current.epoch,
+}));
+
 import {
   connectOAuthProvider,
   listAccountSignInMethods,
   listConfiguredOAuthProviders,
+  requestOAuthSignInMethodProof,
   unlinkOAuthProvider,
 } from '../providers';
 
 describe('OAuth provider service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionState.current = { accountId: 'user-1', generation: 0, epoch: 'epoch-a' };
   });
 
   it('normalizes modern providers in product order and ignores unknown entries', async () => {
@@ -138,5 +175,26 @@ describe('OAuth provider service', () => {
 
     expect(result).toMatchObject({ success: false, reason: 'account_changed' });
     expect(authWithOAuth2Mock).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a detached OAuth proof after the session is replaced', async () => {
+    let resolveVerification!: (value: { record: { id: string } }) => void;
+    verificationAuthWithOAuth2Mock.mockReturnValue(
+      new Promise(resolve => {
+        resolveVerification = resolve;
+      })
+    );
+
+    const resultPromise = requestOAuthSignInMethodProof('google', 'link', 'discord', 'user-1');
+    expect(verificationAuthWithOAuth2Mock).toHaveBeenCalledOnce();
+
+    sessionState.current = { accountId: 'user-1', generation: 1, epoch: 'epoch-b' };
+    resolveVerification({ record: { id: 'user-1' } });
+
+    await expect(resultPromise).resolves.toMatchObject({
+      success: false,
+      reason: 'account_changed',
+    });
+    expect(verificationClearMock).toHaveBeenCalledOnce();
   });
 });

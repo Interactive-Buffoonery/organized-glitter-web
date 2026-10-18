@@ -11,6 +11,7 @@ const { requestPasswordResetMock, confirmPasswordResetMock, updateMock, authStor
       isValid: true,
       token: 'mock-token',
       record: { id: 'user-1' } as { id: string } | null,
+      onChange: vi.fn(() => () => undefined),
     },
   })
 );

@@ -22,6 +22,10 @@ Orientation for humans and agents before touching unfamiliar areas. Commands and
 
 ### Web session recovery
 
+[`sessionIdentity.ts`](../../src/services/auth/sessionIdentity.ts) exposes session
+capture and comparison backed by the live cross-tab epoch and auth-write barrier
+in [`sessionEpoch.ts`](../../src/services/auth/sessionEpoch.ts).
+
 [`src/contexts/AuthContext/AuthContext.tsx`](../../src/contexts/AuthContext/AuthContext.tsx)
 owns token refresh, invalid-session cleanup, and auth state. The PocketBase
 request boundary in [`src/lib/pocketbase.ts`](../../src/lib/pocketbase.ts)

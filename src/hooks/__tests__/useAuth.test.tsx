@@ -6,6 +6,7 @@
  */
 
 import { vi } from 'vitest';
+import { ClientResponseError } from 'pocketbase';
 
 const mockNotify = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/notifications', () => ({ notify: mockNotify }));
@@ -111,6 +112,7 @@ import {
   userEvent,
 } from '../../test-utils';
 import { useAuth } from '../useAuth';
+import { useSessionDraft } from '../useSessionDraft';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { AuthContextType, PocketBaseUser } from '../../contexts/AuthContext';
 import { pb } from '../../lib/pocketbase';
@@ -125,9 +127,12 @@ import {
   recordCompletedSessionCreate,
   takeCompletedSessionDestination,
   completeSessionRecovery,
+  reportInvalidSession,
+  peekSessionDraft,
 } from '@/services/auth/sessionRecovery';
 import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 import { getDraftGeneration, readFormDraft, writeFormDraft } from '@/hooks/drafts/formDraftStorage';
+import { UsersService } from '@/services/pocketbase/users.service';
 
 const renderUseAuthHook = () =>
   renderHook((): AuthContextType => useAuth() as AuthContextType, {
@@ -216,7 +221,9 @@ describe('useAuth Integration Tests', () => {
     it('captures active drafts when the initial stored token has expired', async () => {
       setupMockAuthState(false, createMockUser({ id: 'account-a' }));
       pocketBaseMock.authStore.token = 'expired-token';
-      const unregister = registerSessionDraft('project-edit', () => ({ title: 'Unsaved' }));
+      const unregister = registerSessionDraft('project-edit', 'account-a', () => ({
+        title: 'Unsaved',
+      }));
 
       const { result } = renderUseAuthHook();
 
@@ -342,6 +349,75 @@ describe('useAuth Integration Tests', () => {
   });
 
   describe('Auth State Changes', () => {
+    it('does not restore a refresh response after a same-token session replacement', async () => {
+      const account = createMockUser({ id: 'refresh-race-account' });
+      setupMockAuthState(true, account);
+      let finishRefresh: ((value: { token: string; record: PocketBaseUser }) => void) | undefined;
+      vi.spyOn(UsersService, 'refreshDetachedSession').mockImplementation(
+        () =>
+          new Promise(resolve => {
+            finishRefresh = resolve;
+          }) as ReturnType<typeof UsersService.refreshDetachedSession>
+      );
+
+      const { result } = renderUseAuthHook();
+      await waitFor(() => expect(finishRefresh).toBeTypeOf('function'));
+      const epochKey = 'og:session-identity:v1:pocketbase_auth';
+      localStorage.setItem(
+        epochKey,
+        JSON.stringify({ accountId: account.id, epoch: 'replacement-session' })
+      );
+      finishRefresh?.({ token: 'refreshed-old-token', record: account });
+
+      await act(async () => Promise.resolve());
+      expect(result.current.user?.id).toBe(account.id);
+      expect(pocketBaseMock.authStore.save).not.toHaveBeenCalled();
+    });
+
+    it('does not clear a replacement session from a stale same-token refresh failure', async () => {
+      const account = createMockUser({ id: 'refresh-failure-race-account' });
+      setupMockAuthState(true, account);
+      let failRefresh: ((error: unknown) => void) | undefined;
+      vi.spyOn(UsersService, 'refreshDetachedSession').mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            failRefresh = reject;
+          }) as ReturnType<typeof UsersService.refreshDetachedSession>
+      );
+
+      renderUseAuthHook();
+      await waitFor(() => expect(failRefresh).toBeTypeOf('function'));
+      const epochKey = 'og:session-identity:v1:pocketbase_auth';
+      localStorage.setItem(
+        epochKey,
+        JSON.stringify({ accountId: account.id, epoch: 'replacement-session' })
+      );
+      failRefresh?.(new ClientResponseError({ status: 401 }));
+
+      await act(async () => Promise.resolve());
+      expect(pocketBaseMock.authStore.clear).not.toHaveBeenCalled();
+    });
+
+    it('applies a refresh response during a same-account token refresh', async () => {
+      const account = createMockUser({ id: 'refresh-current-account' });
+      setupMockAuthState(true, account);
+      let finishRefresh: ((value: { token: string; record: PocketBaseUser }) => void) | undefined;
+      vi.spyOn(UsersService, 'refreshDetachedSession').mockImplementation(
+        () =>
+          new Promise(resolve => {
+            finishRefresh = resolve;
+          }) as ReturnType<typeof UsersService.refreshDetachedSession>
+      );
+
+      renderUseAuthHook();
+      await waitFor(() => expect(finishRefresh).toBeTypeOf('function'));
+      finishRefresh?.({ token: 'refreshed-token', record: account });
+
+      await waitFor(() =>
+        expect(pocketBaseMock.authStore.save).toHaveBeenCalledWith('refreshed-token', account)
+      );
+    });
+
     it('guards every refreshed token when the session ends', async () => {
       let onChange: ((token: string | null, record: unknown) => void) | undefined;
       const account = createMockUser({ id: 'refreshed-account' });
@@ -412,6 +488,45 @@ describe('useAuth Integration Tests', () => {
       expect(takeCompletedSessionDestination(account.id)).toBe('/projects/project-2');
     });
 
+    it('does not capture the previous account form when a new session expires before React commits', async () => {
+      let onChange: ((token: string | null, record: unknown) => void) | undefined;
+      const first = createMockUser({ id: 'draft-first-account' });
+      const restoreDraft = vi.fn();
+      setupMockAuthState(true, first, callback => {
+        onChange = callback;
+        return vi.fn();
+      });
+      const { result } = renderHook(
+        () => {
+          const auth = useAuth() as AuthContextType;
+          useSessionDraft(
+            'switching-account-form',
+            auth.user?.id,
+            () => ({ title: 'First account private draft' }),
+            restoreDraft
+          );
+          return auth;
+        },
+        {
+          wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+        }
+      );
+      await waitFor(() => expect(result.current.user?.id).toBe(first.id));
+
+      let capturedForNextAccount: unknown;
+      act(() => {
+        const next = createMockUser({ id: 'draft-second-account' });
+        pocketBaseMock.authStore.token = 'draft-second-token';
+        pocketBaseMock.authStore.record = next;
+        onChange?.('draft-second-token', next);
+        reportInvalidSession('draft-second-token');
+        capturedForNextAccount = peekSessionDraft('switching-account-form', next.id);
+      });
+
+      expect(capturedForNextAccount).toBeUndefined();
+      expect(restoreDraft).not.toHaveBeenCalled();
+    });
+
     it('does not assign an old account’s create to a new expired account', async () => {
       let onChange: ((token: string | null, record: unknown) => void) | undefined;
       const first = createMockUser({ id: 'first-account' });
@@ -421,7 +536,9 @@ describe('useAuth Integration Tests', () => {
       });
       const { result } = renderUseAuthHook();
       await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
-      const unregister = registerSessionDraft('project-form', () => ({ title: 'First account' }));
+      const unregister = registerSessionDraft('project-form', first.id, () => ({
+        title: 'First account',
+      }));
 
       act(() => {
         const authStore = pb.authStore as {
@@ -504,7 +621,9 @@ describe('useAuth Integration Tests', () => {
       };
       const generation = getDraftGeneration(identity)!;
       writeFormDraft(identity, generation, { title: 'Unfinished' });
-      const unregister = registerSessionDraft('/projects/new:diamond', () => ({ title: 'Unsent' }));
+      const unregister = registerSessionDraft('/projects/new:diamond', mockUser.id, () => ({
+        title: 'Unsent',
+      }));
       captureSessionDrafts(mockUser.id, 'mock-token');
       unregister();
       pocketBaseMock.authStore.clear.mockImplementation(() => {

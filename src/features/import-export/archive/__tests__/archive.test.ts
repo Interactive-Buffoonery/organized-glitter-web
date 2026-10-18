@@ -77,6 +77,7 @@ vi.mock('@/services/analytics-escape-hatch', () => ({
 }));
 
 vi.mock('@/lib/pocketbase', () => ({
+  pb: { authStore: { token: '', record: null, onChange: vi.fn(() => vi.fn()) } },
   resolveFileUrl: serviceMocks.pocketbase.resolveFileUrl,
 }));
 

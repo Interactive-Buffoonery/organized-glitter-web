@@ -13,6 +13,8 @@ import { vi } from 'vitest';
 
 const {
   mockCreate,
+  mockRecordCompletedCreate,
+  mockBuildFormData,
   mockAddTagToProject,
   mockNavigateToProject,
   mockToast,
@@ -21,12 +23,20 @@ const {
   mockNormalizeError,
 } = vi.hoisted(() => ({
   mockCreate: vi.fn(),
+  mockRecordCompletedCreate: vi.fn(),
+  mockBuildFormData: vi.fn(),
   mockAddTagToProject: vi.fn(),
   mockNavigateToProject: vi.fn(),
   mockToast: vi.fn(),
   mockCapture: vi.fn(),
   mockIsValidationError: vi.fn(() => false),
   mockNormalizeError: vi.fn(),
+}));
+
+vi.doMock('@/services/auth', () => ({ getAuthToken: () => 'original-token' }));
+vi.doMock('@/services/auth/sessionRecovery', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/services/auth/sessionRecovery')>()),
+  recordCompletedSessionCreate: mockRecordCompletedCreate,
 }));
 
 vi.doMock('@/services/pocketbase/projects.service', () => ({
@@ -43,11 +53,7 @@ vi.doMock('@/services/pocketbase/tags.service', () => ({
 }));
 
 vi.doMock('../projectMutationAdapters', () => ({
-  buildCreateProjectFormData: vi.fn(async () => {
-    const formData = new FormData();
-    formData.append('title', 'Galaxy Garden');
-    return formData;
-  }),
+  buildCreateProjectFormData: mockBuildFormData,
 }));
 
 vi.doMock('@/hooks/useNavigateToProject', () => ({
@@ -80,15 +86,27 @@ vi.doMock('@/services/errors', async importOriginal => {
   };
 });
 
+let sessionGeneration = 0;
+let sessionAccountId: string | null = 'user-123';
+vi.doMock('@/services/auth/sessionIdentity', () => ({
+  captureSessionIdentity: () => ({ accountId: sessionAccountId, generation: sessionGeneration }),
+  isCurrentSessionIdentity: (identity: { generation: number }) =>
+    identity.generation === sessionGeneration,
+}));
+
 const { useCreateProject } = await import('../useCreateProject');
 
 describe('useCreateProject redirect flow', () => {
   beforeEach(() => {
+    sessionGeneration = 0;
+    sessionAccountId = 'user-123';
     vi.clearAllMocks();
     mockCapture.mockReset();
+    mockBuildFormData.mockImplementation(async () => new FormData());
     mockNavigateToProject.mockReturnValue({ success: true, projectId: 'project-123' });
     mockCreate.mockResolvedValue({
       id: 'project-123',
+      userId: 'user-123',
       title: 'Galaxy Garden',
       image: 'cover.jpg',
     });
@@ -104,6 +122,213 @@ describe('useCreateProject redirect flow', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+
+  it('does not navigate or invalidate navigation caches after the session changes during the toast delay', async () => {
+    vi.useFakeTimers();
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHookWithProviders(() => useCreateProject({ redirect: true }), {
+      queryClient,
+    });
+    const onSuccess = vi.fn();
+    const onSettled = vi.fn();
+    const pending = result.current.mutateAsync({ userId: 'user-123', title: 'Galaxy Garden' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    sessionGeneration += 1;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+      await pending;
+    });
+    expect(mockNavigateToProject).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onSettled).not.toHaveBeenCalled();
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
+      queryKey: ['projects', 'detail', 'project-123'],
+    });
+  });
+
+  it('does not dispatch or clear the draft when the account signs back in before mutation execution', async () => {
+    const queryClient = createTestQueryClient();
+    queryClient.getMutationCache().config.onMutate = () => {
+      sessionGeneration += 1;
+    };
+    const onConfirmedSave = vi.fn();
+    const { result } = renderHookWithProviders(() => useCreateProject({ onConfirmedSave }), {
+      queryClient,
+    });
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({ userId: 'user-123', title: 'Galaxy Garden' })
+      ).rejects.toMatchObject({ reason: 'session_changed' });
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(onConfirmedSave).not.toHaveBeenCalled();
+  });
+
+  it('keeps concurrent calls with the same input separate and preserves public callbacks', async () => {
+    const queryClient = createTestQueryClient();
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>(resolve => {
+      releaseFirst = resolve;
+    });
+    let calls = 0;
+    queryClient.getMutationCache().config.onMutate = () => {
+      calls += 1;
+      if (calls === 1) return firstGate;
+    };
+    const onConfirmedSave = vi.fn();
+    const onSuccess = vi.fn();
+    const onSettled = vi.fn();
+    const { result } = renderHookWithProviders(() => useCreateProject({ onConfirmedSave }), {
+      queryClient,
+    });
+    const input = { userId: 'user-123', title: 'Galaxy Garden' };
+    const first = result.current.mutateAsync(input);
+    const firstRejected = expect(first).rejects.toMatchObject({ reason: 'session_changed' });
+    await waitFor(() => expect(calls).toBe(1));
+    sessionGeneration += 1;
+    await act(async () => {
+      await result.current.mutateAsync(input, { onSuccess, onSettled });
+    });
+    expect(result.current.variables).toBe(input);
+    expect(onSuccess).toHaveBeenCalledWith(
+      expect.any(Object),
+      input,
+      expect.any(Object),
+      expect.any(Object)
+    );
+    expect(onSettled).toHaveBeenCalledWith(
+      expect.any(Object),
+      null,
+      input,
+      expect.any(Object),
+      expect.any(Object)
+    );
+    await act(async () => {
+      releaseFirst();
+      await firstRejected;
+    });
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(onConfirmedSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses per-call callbacks after retirement while retaining a completed create for its original token', async () => {
+    let resolveCreate!: (value: { id: string; userId: string; title: string }) => void;
+    mockCreate.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveCreate = resolve;
+        })
+    );
+    const onConfirmedSave = vi.fn();
+    const onSuccess = vi.fn();
+    const onError = vi.fn();
+    const onSettled = vi.fn();
+    const { result } = renderHookWithProviders(() =>
+      useCreateProject({ redirect: true, onConfirmedSave })
+    );
+    const pending = result.current.mutateAsync(
+      { userId: 'user-123', title: 'Galaxy Garden', tagIds: ['tag-1'] },
+      { onSuccess, onError, onSettled }
+    );
+    const rejected = expect(pending).rejects.toMatchObject({ reason: 'session_changed' });
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    sessionGeneration += 1;
+    await act(async () => {
+      resolveCreate({ id: 'project-123', userId: 'user-123', title: 'Galaxy Garden' });
+      await rejected;
+    });
+    expect(onConfirmedSave).not.toHaveBeenCalled();
+    expect(mockAddTagToProject).not.toHaveBeenCalled();
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(mockRecordCompletedCreate).toHaveBeenCalledWith(
+      'original-token',
+      'projects',
+      'project-123'
+    );
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(onSettled).not.toHaveBeenCalled();
+  });
+
+  it('passes the originating session guard into tag linking', async () => {
+    let guard!: () => boolean;
+    mockAddTagToProject.mockImplementation(async (_projectId, _tagId, isSessionCurrent) => {
+      guard = isSessionCurrent;
+      expect(guard()).toBe(true);
+      return { status: 'success' };
+    });
+    const { result } = renderHookWithProviders(() => useCreateProject());
+    await act(async () => {
+      await result.current.mutateAsync({
+        userId: 'user-123',
+        title: 'Galaxy Garden',
+        tagIds: ['tag-1'],
+      });
+    });
+    expect(mockAddTagToProject).toHaveBeenCalledWith('project-123', 'tag-1', expect.any(Function));
+    sessionGeneration += 1;
+    expect(guard()).toBe(false);
+  });
+
+  it('does not dispatch a create after the session changes while preparing the form', async () => {
+    let finishPreparation!: (value: FormData) => void;
+    mockBuildFormData.mockImplementation(
+      () =>
+        new Promise<FormData>(resolve => {
+          finishPreparation = resolve;
+        })
+    );
+    const { result } = renderHookWithProviders(() => useCreateProject({ redirect: true }));
+    const pending = result.current.mutateAsync({ userId: 'user-123', title: 'Galaxy Garden' });
+    const rejected = expect(pending).rejects.toMatchObject({ reason: 'session_changed' });
+    await waitFor(() => expect(mockBuildFormData).toHaveBeenCalled());
+    sessionGeneration += 1;
+    await act(async () => {
+      finishPreparation(new FormData());
+      await rejected;
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it('does not publish create errors after the session changes', async () => {
+    let rejectCreate!: (reason: Error) => void;
+    mockCreate.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectCreate = reject;
+        })
+    );
+    const { result } = renderHookWithProviders(() => useCreateProject({ redirect: true }));
+    const pending = result.current.mutateAsync({ userId: 'user-123', title: 'Galaxy Garden' });
+    const rejected = expect(pending).rejects.toThrow('old failure');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    sessionGeneration += 1;
+    await act(async () => {
+      rejectCreate(new Error('old failure'));
+      await rejected;
+    });
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it.each([null, 'another-account'])(
+    'rejects stale form ownership in session %s',
+    async accountId => {
+      sessionAccountId = accountId;
+      const { result } = renderHookWithProviders(() => useCreateProject({ redirect: true }));
+      await act(async () => {
+        await expect(
+          result.current.mutateAsync({ userId: 'user-123', title: 'Galaxy Garden' })
+        ).rejects.toMatchObject({ reason: 'session_changed' });
+      });
+      expect(mockBuildFormData).not.toHaveBeenCalled();
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockToast).not.toHaveBeenCalled();
+    }
+  );
 
   it('navigates after the redirect-enabled create mutation succeeds', async () => {
     const { result } = renderHookWithProviders(() => useCreateProject({ redirect: true }));
@@ -401,54 +626,59 @@ describe('useCreateProject redirect flow', () => {
     );
   });
 
-  it('shows a Navigation Warning and falls back to window.location when navigation fails', async () => {
-    vi.useFakeTimers();
-    mockNavigateToProject.mockReturnValue({ success: false, error: 'boom' });
+  it.each([false, true])(
+    'only runs the hard redirect fallback in its originating session (retired=%s)',
+    async retired => {
+      vi.useFakeTimers();
+      mockNavigateToProject.mockReturnValue({ success: false, error: 'boom' });
 
-    const hrefSetter = vi.fn();
-    const originalLocation = window.location;
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: {
-        ...originalLocation,
-        set href(value: string) {
-          hrefSetter(value);
-        },
-      },
-    });
-
-    try {
-      const { result } = renderHookWithProviders(() => useCreateProject({ redirect: true }));
-
-      const mutatePromise = result.current.mutateAsync({
-        userId: 'user-123',
-        title: 'Galaxy Garden',
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(300);
-        await mutatePromise;
-      });
-
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          kind: 'info',
-          title: 'Navigation Warning',
-        })
-      );
-
-      expect(hrefSetter).not.toHaveBeenCalled();
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1100);
-      });
-
-      expect(hrefSetter).toHaveBeenCalledWith('/projects/project-123');
-    } finally {
+      const hrefSetter = vi.fn();
+      const originalLocation = window.location;
       Object.defineProperty(window, 'location', {
         configurable: true,
-        value: originalLocation,
+        value: {
+          ...originalLocation,
+          set href(value: string) {
+            hrefSetter(value);
+          },
+        },
       });
+
+      try {
+        const { result } = renderHookWithProviders(() => useCreateProject({ redirect: true }));
+
+        const mutatePromise = result.current.mutateAsync({
+          userId: 'user-123',
+          title: 'Galaxy Garden',
+        });
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(300);
+          await mutatePromise;
+        });
+
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            kind: 'info',
+            title: 'Navigation Warning',
+          })
+        );
+
+        expect(hrefSetter).not.toHaveBeenCalled();
+        if (retired) sessionGeneration += 1;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1100);
+        });
+
+        if (retired) expect(hrefSetter).not.toHaveBeenCalled();
+        else expect(hrefSetter).toHaveBeenCalledWith('/projects/project-123');
+      } finally {
+        Object.defineProperty(window, 'location', {
+          configurable: true,
+          value: originalLocation,
+        });
+      }
     }
-  });
+  );
 });

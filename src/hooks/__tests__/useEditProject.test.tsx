@@ -278,6 +278,7 @@ describe('useEditProject', () => {
     const restored = { ...baseProject, title: 'Recovered edit' } as ProjectFormValues;
     const unregister = registerSessionDraft(
       sessionDraftKeys.projectEdit('project-123', 'page'),
+      'abc123def456ghi',
       () => ({ formData: restored, statusBeforeDateChange: 'progress', missingPhoto: true })
     );
     captureSessionDrafts('abc123def456ghi', 'expired-project-token');

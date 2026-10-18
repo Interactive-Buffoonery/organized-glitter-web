@@ -5,7 +5,7 @@
  * Pass `{ redirect: true }` for the standard create-and-open-detail flow.
  */
 import { notify } from '@/lib/notifications';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type MutateOptions } from '@tanstack/react-query';
 
 import { normalizeError, isValidationError } from '@/services/errors';
 import { TagService } from '@/services/pocketbase/tags.service';
@@ -18,11 +18,17 @@ import { useNavigateToProject } from '@/hooks/useNavigateToProject';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { invalidateStatsQueries } from './statsInvalidation';
 import {
+  SessionChangedError,
   ensureCurrentSessionAfterCreate,
   isSessionChangedError,
   recordCompletedSessionCreate,
 } from '@/services/auth/sessionRecovery';
 import { getAuthToken } from '@/services/auth';
+import {
+  captureSessionIdentity,
+  isCurrentSessionIdentity,
+  type SessionIdentity,
+} from '@/services/auth/sessionIdentity';
 
 import {
   getProjectSaveErrorMessage,
@@ -43,11 +49,18 @@ const FALLBACK_HARD_REDIRECT_MS = 1000;
 interface ProjectCreationResult {
   project: ProjectDTO;
   failedTagIds: string[];
+  sessionIdentity: SessionIdentity;
 }
 
-const addTagsToProject = async (projectId: string, tagIds: string[]) => {
+const addTagsToProject = async (
+  projectId: string,
+  tagIds: string[],
+  sessionIdentity: SessionIdentity
+) => {
   const results = await Promise.allSettled(
-    tagIds.map(tagId => TagService.addTagToProject(projectId, tagId))
+    tagIds.map(tagId =>
+      TagService.addTagToProject(projectId, tagId, () => isCurrentSessionIdentity(sessionIdentity))
+    )
   );
 
   const failedTagIds: string[] = [];
@@ -68,22 +81,32 @@ const addTagsToProject = async (projectId: string, tagIds: string[]) => {
 
 const createProject = async (
   input: CreateProjectInput,
+  sessionIdentity: SessionIdentity,
   onConfirmedSave?: () => void
 ): Promise<ProjectCreationResult> => {
+  if (
+    !isCurrentSessionIdentity(sessionIdentity) ||
+    !sessionIdentity.accountId ||
+    sessionIdentity.accountId !== input.userId
+  ) {
+    throw new SessionChangedError();
+  }
   const createToken = getAuthToken() ?? '';
   const formData = await buildCreateProjectFormData(input);
+  if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
   const project = await projectsService.create(formData);
   try {
-    onConfirmedSave?.();
+    if (isCurrentSessionIdentity(sessionIdentity)) onConfirmedSave?.();
   } catch (error) {
     logger.error('Local draft cleanup failed after project creation', error);
   }
   let failedTagIds: string[] = [];
 
   try {
+    if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
     ensureCurrentSessionAfterCreate(createToken, 'projects', project.id);
     if (input.tagIds?.length) {
-      failedTagIds = await addTagsToProject(project.id, input.tagIds);
+      failedTagIds = await addTagsToProject(project.id, input.tagIds, sessionIdentity);
 
       if (failedTagIds.length > 0) {
         logger.warn('Some tags failed to link after project creation', {
@@ -93,6 +116,7 @@ const createProject = async (
         });
       }
     }
+    if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
     ensureCurrentSessionAfterCreate(createToken, 'projects', project.id);
   } catch (error) {
     if (isSessionChangedError(error))
@@ -100,8 +124,40 @@ const createProject = async (
     throw error;
   }
 
-  return { project, failedTagIds };
+  return { project, failedTagIds, sessionIdentity };
 };
+
+interface SessionCreateInput {
+  input: CreateProjectInput;
+  sessionIdentity: SessionIdentity;
+}
+
+type CreateCallbacks = MutateOptions<
+  ProjectCreationResult,
+  Error,
+  CreateProjectInput,
+  SessionIdentity
+>;
+
+function adaptCreateCallbacks(
+  options?: CreateCallbacks
+): MutateOptions<ProjectCreationResult, Error, SessionCreateInput, SessionIdentity> | undefined {
+  if (!options) return undefined;
+  return {
+    onSuccess: (data, variables, context, mutationContext) =>
+      isCurrentSessionIdentity(variables.sessionIdentity)
+        ? options.onSuccess?.(data, variables.input, context, mutationContext)
+        : undefined,
+    onError: (error, variables, context, mutationContext) =>
+      isCurrentSessionIdentity(variables.sessionIdentity)
+        ? options.onError?.(error, variables.input, context, mutationContext)
+        : undefined,
+    onSettled: (data, error, variables, context, mutationContext) =>
+      isCurrentSessionIdentity(variables.sessionIdentity)
+        ? options.onSettled?.(data, error, variables.input, context, mutationContext)
+        : undefined,
+  };
+}
 
 interface UseCreateProjectOptions {
   redirect?: boolean;
@@ -115,9 +171,17 @@ export const useCreateProject = ({
   const queryClient = useQueryClient();
   const navigateToProject = useNavigateToProject();
 
-  return useMutation<ProjectCreationResult, Error, CreateProjectInput>({
-    mutationFn: input => createProject(input, onConfirmedSave),
-    onSuccess: async ({ project: data, failedTagIds }) => {
+  const mutation = useMutation<ProjectCreationResult, Error, SessionCreateInput, SessionIdentity>({
+    onMutate: variables => variables.sessionIdentity,
+    mutationFn: ({ input, sessionIdentity }) =>
+      createProject(input, sessionIdentity, onConfirmedSave),
+    onSuccess: async (
+      { project: data, failedTagIds, sessionIdentity },
+      _variables,
+      initiatingIdentity
+    ) => {
+      if (initiatingIdentity && !isCurrentSessionIdentity(initiatingIdentity)) return;
+      if (!isCurrentSessionIdentity(sessionIdentity)) return;
       runPostWriteEffect(logger, 'Project Stats refresh failed after creation', () => {
         invalidateStatsQueries(queryClient, 'diamond');
       });
@@ -154,6 +218,8 @@ export const useCreateProject = ({
 
         await new Promise(resolve => setTimeout(resolve, POST_SUCCESS_TOAST_SETTLE_MS));
 
+        if (!isCurrentSessionIdentity(sessionIdentity)) return;
+
         const navigationResult = navigateToProject(data.id, {
           projectData: data,
           replace: true,
@@ -173,11 +239,13 @@ export const useCreateProject = ({
           });
 
           setTimeout(() => {
+            if (!isCurrentSessionIdentity(sessionIdentity)) return;
             window.location.href = `/projects/${data.id}`;
           }, FALLBACK_HARD_REDIRECT_MS);
         }
 
         setTimeout(() => {
+          if (!isCurrentSessionIdentity(sessionIdentity)) return;
           const invalidations = [
             queryClient.invalidateQueries({ queryKey: queryKeys.projects.lists() }),
             queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(data.id) }),
@@ -205,7 +273,9 @@ export const useCreateProject = ({
         });
       }
     },
-    onError: (error, variables) => {
+    onError: (error, { input: variables }, sessionIdentity) => {
+      if (isSessionChangedError(error)) return;
+      if (sessionIdentity && !isCurrentSessionIdentity(sessionIdentity)) return;
       const normalized = normalizeError(error, 'Project creation');
       logger.error('Project creation failed', {
         type: normalized.type,
@@ -262,4 +332,20 @@ export const useCreateProject = ({
     },
     retry: false,
   });
+
+  return {
+    ...mutation,
+    variables: mutation.variables?.input,
+    mutate: (input: CreateProjectInput, options?: CreateCallbacks) => {
+      mutation.mutate(
+        { input, sessionIdentity: captureSessionIdentity() },
+        adaptCreateCallbacks(options)
+      );
+    },
+    mutateAsync: (input: CreateProjectInput, options?: CreateCallbacks) =>
+      mutation.mutateAsync(
+        { input, sessionIdentity: captureSessionIdentity() },
+        adaptCreateCallbacks(options)
+      ),
+  };
 };

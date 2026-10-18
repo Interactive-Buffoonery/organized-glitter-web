@@ -195,7 +195,64 @@ describe('FeedbackDialog', () => {
     expect(screen.getByLabelText('Message')).toHaveValue('Feedback from the original session');
     expect(screen.queryByText('Thank you for your message!')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Submit Feedback' })).toBeEnabled()
+    );
     expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('does not let an old session-changed result stop a newer submission', async () => {
+    let resolveOld!: (value: { success: false; reason: string }) => void;
+    let resolveNew!: (value: { success: false; reason: string }) => void;
+    sendFeedbackEmailMock
+      .mockReturnValueOnce(
+        new Promise(resolve => {
+          resolveOld = resolve;
+        })
+      )
+      .mockReturnValueOnce(
+        new Promise(resolve => {
+          resolveNew = resolve;
+        })
+      );
+
+    function Harness() {
+      const [isOpen, setIsOpen] = useState(true);
+      return (
+        <>
+          <button type="button" onClick={() => setIsOpen(true)}>
+            Open feedback
+          </button>
+          <FeedbackDialog isOpen={isOpen} onOpenChange={setIsOpen} />
+        </>
+      );
+    }
+
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText('Message'), {
+      target: { value: 'Message from the old session' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Feedback' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open feedback' }));
+    fireEvent.change(screen.getByLabelText('Message'), {
+      target: { value: 'Message from the new session' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Feedback' }));
+
+    await act(async () => {
+      resolveOld({ success: false, reason: 'session_changed' });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: 'Submit Feedback' })).toBeDisabled();
+    expect(screen.getByLabelText('Message')).toHaveValue('Message from the new session');
+
+    await act(async () => {
+      resolveNew({ success: false, reason: 'session_changed' });
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Submit Feedback' })).toBeEnabled();
   });
 
   it('shows matching completion recorded before same-account recovery renders', async () => {

@@ -55,6 +55,7 @@ type FeedbackDialogAction =
   | { type: 'userNameChanged'; userName: string; draftId: string }
   | { type: 'userEmailChanged'; userEmail: string; draftId: string }
   | { type: 'submitStarted' }
+  | { type: 'submitStopped' }
   | { type: 'submitSucceeded' }
   | { type: 'submitFailed'; error: string };
 
@@ -117,6 +118,8 @@ function feedbackDialogReducer(
       return { ...state, draftId: action.draftId, userEmail: action.userEmail };
     case 'submitStarted':
       return { ...state, isSubmitting: true, submitError: null };
+    case 'submitStopped':
+      return { ...state, isSubmitting: false };
     case 'submitSucceeded':
       return { ...state, isSubmitting: false, isSubmitted: true };
     case 'submitFailed':
@@ -252,7 +255,12 @@ function FeedbackDialog({
       });
 
       if (!result.success) {
-        if (result.reason === 'session_changed') return;
+        if (result.reason === 'session_changed') {
+          if (sessionVersion === sessionVersionRef.current) {
+            dispatch({ type: 'submitStopped' });
+          }
+          return;
+        }
         throw new Error(result.error || 'Failed to send feedback');
       }
 

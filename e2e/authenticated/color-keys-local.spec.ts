@@ -3,7 +3,12 @@ import PocketBase from 'pocketbase';
 
 import { assertLocalE2ETargets } from '../fixtures/local-safety';
 
-test.use({ serviceWorkers: 'block' });
+// E2E_COLOR_KEYS_BROWSER=webkit runs every test as Mobile Safari on an iPhone.
+const browserName = process.env.E2E_COLOR_KEYS_BROWSER === 'webkit' ? 'webkit' : 'chromium';
+test.use({
+  serviceWorkers: 'block',
+  ...(browserName === 'webkit' ? { ...devices['iPhone 13'], browserName } : {}),
+});
 
 test('colors used: set up symbols, record a color, and keep it after reload', async ({
   page,
@@ -98,9 +103,17 @@ async function seededPage(page: Page, baseURL: string | undefined, testInfo: Tes
 test('colors used: keyboard flow keeps the sheet, focus and drafts', async ({
   page,
   baseURL,
-  context,
 }, testInfo) => {
   test.setTimeout(90000);
+  // WebKit has no clipboard permissions to grant, so record what Copy writes.
+  await page.addInitScript(() => {
+    const copied: string[] = [];
+    Object.assign(window, { __copied: copied });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (text: string) => void copied.push(text) },
+    });
+  });
   const { pb, pageId, cleanup } = await seededPage(page, baseURL, testInfo);
   try {
     await page.getByRole('button', { name: /^Black spade suit,/ }).click();
@@ -132,20 +145,21 @@ test('colors used: keyboard flow keeps the sheet, focus and drafts', async ({
       ['u:2663', 'Q700', []],
     ]);
 
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.getByRole('button', { name: 'Copy', exact: true }).click();
     await expect(page.getByText('Copied the colors for this page.')).toBeVisible();
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-      '\u2660 Q651\n\u2663 Q700'
-    );
+    expect(
+      await page.evaluate(() => (window as unknown as { __copied: string[] }).__copied)
+    ).toEqual(['\u2660 Q651\n\u2663 Q700']);
   } finally {
     await cleanup();
   }
 });
 
 test.describe('on a phone', () => {
-  const { viewport, isMobile, hasTouch, userAgent } = devices['Pixel 7'];
-  test.use({ viewport, isMobile, hasTouch, userAgent });
+  if (browserName === 'chromium') {
+    const { viewport, isMobile, hasTouch, userAgent } = devices['Pixel 7'];
+    test.use({ viewport, isMobile, hasTouch, userAgent });
+  }
 
   test('colors used: pick a symbol and record it in the drawer', async ({
     page,

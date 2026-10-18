@@ -1,3 +1,4 @@
+import { ClientResponseError } from 'pocketbase';
 import { pb } from '@/lib/pocketbase';
 import { getCurrentUserId } from '@/services/auth';
 import { parseColorKeyInput, type ColorKeyInput } from '@/schemas/colorKeySchema';
@@ -6,10 +7,6 @@ import {
   type ColoringPageColorKeysResponse,
   type ColoringSymbolRequestsResponse,
 } from '@/types/pocketbase.types';
-import { createLogger } from '@/utils/logger';
-
-const logger = createLogger('ColorKeysService');
-
 export type ColorKey = ColoringPageColorKeysResponse<string[]>;
 export type { ColorKeyInput };
 export type ColorCodeHistoryEntry = { code: string; color_name: string; swatch: string };
@@ -49,26 +46,23 @@ export const ColorKeysService = {
 
   async remove(id: string, userId: string): Promise<void> {
     requireOwner(userId);
-    await keys().delete(id, { requestKey: null });
+    try {
+      await keys().delete(id, { requestKey: null });
+    } catch (error) {
+      // A color already removed elsewhere is the outcome the user asked for.
+      if (!(error instanceof ClientResponseError && error.status === 404)) throw error;
+    }
   },
 
-  /** Creates setup rows at positions 0..n-1. Rolls back what it created if any row fails. */
-  async createMany(pageId: string, userId: string, symbols: string[]): Promise<ColorKey[]> {
+  /** Creates the page's starting rows in one transaction; 409 if the page already has keys. */
+  async setup(pageId: string, userId: string, symbols: string[]): Promise<ColorKey[]> {
     requireOwner(userId);
-    // ponytail: client-side batch; the PocketBase batch API is not enabled on this backend.
-    const results = await Promise.allSettled(
-      symbols.map((symbol, position) => this.create(pageId, userId, { symbol, position }))
-    );
-    const failure = results.find(result => result.status === 'rejected');
-    const created = results.flatMap(result =>
-      result.status === 'fulfilled' ? [result.value] : []
-    );
-    if (!failure) return created;
-    await Promise.allSettled(created.map(row => this.remove(row.id, userId))).then(cleanup => {
-      if (cleanup.some(result => result.status === 'rejected'))
-        logger.warn('Some setup rows could not be removed after a failed setup.');
+    const { items } = await pb.send<{ items: ColorKey[] }>('/api/coloring/color-keys/setup', {
+      method: 'POST',
+      body: { page: pageId, symbols },
+      requestKey: null,
     });
-    throw failure.reason;
+    return items;
   },
 
   async history(userId: string): Promise<ColorCodeHistoryEntry[]> {
@@ -77,6 +71,7 @@ export const ColorKeysService = {
       filter: pb.filter('user = {:user} && code != ""', { user: userId }),
       sort: '-updated',
       fields: 'code,color_name,swatch',
+      skipTotal: true,
     });
     const seen = new Map<string, ColorCodeHistoryEntry>();
     for (const item of items) {

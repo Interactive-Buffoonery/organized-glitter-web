@@ -1,3 +1,4 @@
+import { ClientResponseError } from 'pocketbase';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ColorKeysService } from '../colorKeys.service';
 
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   delete: vi.fn(),
   getURL: vi.fn(),
+  send: vi.fn(),
   collection: vi.fn(),
   userId: 'owner',
 }));
@@ -16,6 +18,7 @@ vi.mock('@/lib/pocketbase', () => ({
     collection: mocks.collection,
     filter: (raw: string, params: Record<string, unknown>) => `${raw} ${JSON.stringify(params)}`,
     files: { getURL: mocks.getURL },
+    send: mocks.send,
   },
 }));
 vi.mock('@/services/auth', () => ({ getCurrentUserId: () => mocks.userId }));
@@ -112,29 +115,27 @@ describe('ColorKeysService', () => {
     );
   });
 
-  it('batch-creates setup rows in order without auto-cancelling requests', async () => {
-    mocks.create.mockImplementation(async (body: { position: number }) => ({
-      id: `key-${body.position}`,
-      ...body,
-    }));
-    const rows = await ColorKeysService.createMany('page-1', 'owner', ['u:0031', 'u:0061']);
-    expect(rows.map(row => row.id)).toEqual(['key-0', 'key-1']);
-    expect(mocks.create).toHaveBeenCalledWith(
-      expect.objectContaining({ symbol: 'u:0061', position: 1, page: 'page-1', user: 'owner' }),
-      { requestKey: null }
-    );
+  it('sets up a page with one server call and returns the created rows', async () => {
+    mocks.send.mockResolvedValue({ items: [{ id: 'key-0' }, { id: 'key-1' }] });
+    await expect(ColorKeysService.setup('page-1', 'owner', ['u:0031', 'u:0061'])).resolves.toEqual([
+      { id: 'key-0' },
+      { id: 'key-1' },
+    ]);
+    expect(mocks.send).toHaveBeenCalledWith('/api/coloring/color-keys/setup', {
+      method: 'POST',
+      body: { page: 'page-1', symbols: ['u:0031', 'u:0061'] },
+      requestKey: null,
+    });
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 
-  it('removes the created rows when part of setup fails', async () => {
-    mocks.create.mockImplementation(async (body: { position: number }) => {
-      if (body.position === 1) throw new Error('offline');
-      return { id: `key-${body.position}` };
-    });
-    mocks.delete.mockResolvedValue(true);
-    await expect(
-      ColorKeysService.createMany('page-1', 'owner', ['u:0031', 'u:0032', 'u:0033'])
-    ).rejects.toThrow('offline');
-    expect(mocks.delete.mock.calls.map(([id]) => id).sort()).toEqual(['key-0', 'key-2']);
+  it('treats deleting a color that is already gone as done', async () => {
+    mocks.delete.mockRejectedValue(new ClientResponseError({ status: 404 }));
+    await expect(ColorKeysService.remove('key-1', 'owner')).resolves.toBeUndefined();
+    mocks.delete.mockRejectedValue(new ClientResponseError({ status: 500 }));
+    await expect(ColorKeysService.remove('key-1', 'owner')).rejects.toBeInstanceOf(
+      ClientResponseError
+    );
   });
 
   it('builds code history from recent keys, newest use per code wins', async () => {
@@ -154,6 +155,7 @@ describe('ColorKeysService', () => {
     expect(perPage).toBeLessThanOrEqual(500);
     expect(options.sort).toBe('-updated');
     expect(options.filter).toContain('code != ""');
+    expect(options.skipTotal).toBe(true);
   });
 
   it('reads symbol requests with a 96x96f thumbnail and description', async () => {

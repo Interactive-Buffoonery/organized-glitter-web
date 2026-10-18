@@ -14,7 +14,7 @@ const service = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   remove: vi.fn(),
-  createMany: vi.fn(),
+  setup: vi.fn(),
 }));
 vi.mock('@/services/pocketbase/colorKeys.service', () => ({ ColorKeysService: service }));
 vi.mock('@/services/auth', () => ({ getCurrentUserId: () => 'owner' }));
@@ -86,10 +86,42 @@ describe('color key mutations', () => {
 
   it('fills an empty page with the setup rows', async () => {
     client.setQueryData(listKey, []);
-    service.createMany.mockResolvedValue([row('a', 0), row('b', 1)]);
+    client.setQueryData(historyKey, []);
+    service.setup.mockResolvedValue([row('a', 0), row('b', 1)]);
     const { result } = renderHook(() => useSetupColorKeys('page', 'owner'), { wrapper });
     await act(() => result.current.mutateAsync(['u:0031', 'u:0032']));
-    expect(service.createMany).toHaveBeenCalledWith('page', 'owner', ['u:0031', 'u:0032']);
+    expect(service.setup).toHaveBeenCalledWith('page', 'owner', ['u:0031', 'u:0032']);
     expect(client.getQueryData<unknown[]>(listKey)).toHaveLength(2);
+    expect(client.getQueryState(historyKey)?.isInvalidated).toBe(false);
+  });
+
+  it('reloads the page after a failed setup so it shows what the server has', async () => {
+    client.setQueryData(listKey, []);
+    service.setup.mockRejectedValue(new Error('This page already has symbols.'));
+    const { result } = renderHook(() => useSetupColorKeys('page', 'owner'), { wrapper });
+    await act(() => result.current.mutateAsync(['u:0031']).catch(() => {}));
+    expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
+  });
+
+  it('reloads the page after a failed update', async () => {
+    client.setQueryData(listKey, [row('a', 0)]);
+    service.update.mockRejectedValue(new Error('offline'));
+    const { result } = renderHook(() => useUpdateColorKey('page', 'owner'), { wrapper });
+    await act(() => result.current.mutateAsync({ id: 'a', input: { code: '1' } }).catch(() => {}));
+    expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
+  });
+
+  it('refreshes code history only when the code, name or swatch changed', async () => {
+    client.setQueryData(listKey, [row('a', 0, { code: '654', color_name: '', swatch: '' })]);
+    client.setQueryData(historyKey, []);
+    service.update.mockResolvedValue(
+      row('a', 0, { code: '654', color_name: '', swatch: '', note: 'soft' })
+    );
+    const { result } = renderHook(() => useUpdateColorKey('page', 'owner'), { wrapper });
+    await act(() => result.current.mutateAsync({ id: 'a', input: { note: 'soft' } }));
+    expect(client.getQueryState(historyKey)?.isInvalidated).toBe(false);
+    service.update.mockResolvedValue(row('a', 0, { code: '655', color_name: '', swatch: '' }));
+    await act(() => result.current.mutateAsync({ id: 'a', input: { code: '655' } }));
+    expect(client.getQueryState(historyKey)?.isInvalidated).toBe(true);
   });
 });

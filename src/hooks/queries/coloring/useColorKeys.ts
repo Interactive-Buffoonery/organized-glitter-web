@@ -12,6 +12,7 @@ export function useColorKeys(pageId: string, userId: string) {
     queryKey: colorKeysKey(userId, pageId),
     queryFn: () => ColorKeysService.list(pageId, userId),
     enabled: Boolean(pageId && userId),
+    ...queryFreshness('frequent'),
   });
 }
 

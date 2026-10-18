@@ -14,18 +14,20 @@ const logger = createLogger('ColorKeyMutations');
 const byStripOrder = (a: ColorKey, b: ColorKey) =>
   a.position - b.position || a.created.localeCompare(b.created);
 
+const historyFields = ['code', 'color_name', 'swatch'] as const;
+
 function settle(
   client: QueryClient,
   userId: string,
   pageId: string,
-  update?: (rows: ColorKey[]) => ColorKey[]
+  { update, history }: { update?: (rows: ColorKey[]) => ColorKey[]; history?: boolean } = {}
 ) {
   if (getCurrentUserId() !== userId) return;
   const key = colorKeysKey(userId, pageId);
   if (update) client.setQueryData<ColorKey[]>(key, rows => update(rows ?? []).sort(byStripOrder));
   void Promise.all([
     client.invalidateQueries({ queryKey: key }),
-    client.invalidateQueries({ queryKey: queryKeys.coloring.colorKeys.history(userId) }),
+    history && client.invalidateQueries({ queryKey: queryKeys.coloring.colorKeys.history(userId) }),
   ]).catch(() => logger.warn('Color key saved; cache refresh failed.'));
 }
 
@@ -34,10 +36,10 @@ export function useCreateColorKey(pageId: string, userId: string) {
   return useMutation({
     mutationFn: (input: ColorKeyInput) => ColorKeysService.create(pageId, userId, input),
     onSuccess: created =>
-      settle(client, userId, pageId, rows => [
-        ...rows.filter(row => row.id !== created.id),
-        created,
-      ]),
+      settle(client, userId, pageId, {
+        update: rows => [...rows.filter(row => row.id !== created.id), created],
+        history: true,
+      }),
     retry: false,
   });
 }
@@ -47,8 +49,16 @@ export function useUpdateColorKey(pageId: string, userId: string) {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: Partial<ColorKeyInput> }) =>
       ColorKeysService.update(id, userId, input),
-    onSuccess: saved =>
-      settle(client, userId, pageId, rows => rows.map(row => (row.id === saved.id ? saved : row))),
+    onSuccess: saved => {
+      const before = client
+        .getQueryData<ColorKey[]>(colorKeysKey(userId, pageId))
+        ?.find(row => row.id === saved.id);
+      settle(client, userId, pageId, {
+        update: rows => rows.map(row => (row.id === saved.id ? saved : row)),
+        history: !before || historyFields.some(field => before[field] !== saved[field]),
+      });
+    },
+    onError: () => settle(client, userId, pageId),
     retry: false,
   });
 }
@@ -67,7 +77,7 @@ export function useDeleteColorKey(pageId: string, userId: string) {
     onError: (_error, _id, context) => {
       if (context?.previous) client.setQueryData(key, context.previous);
     },
-    onSettled: () => settle(client, userId, pageId),
+    onSettled: () => settle(client, userId, pageId, { history: true }),
     retry: false,
   });
 }
@@ -75,8 +85,9 @@ export function useDeleteColorKey(pageId: string, userId: string) {
 export function useSetupColorKeys(pageId: string, userId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (symbols: string[]) => ColorKeysService.createMany(pageId, userId, symbols),
-    onSuccess: created => settle(client, userId, pageId, rows => [...rows, ...created]),
+    mutationFn: (symbols: string[]) => ColorKeysService.setup(pageId, userId, symbols),
+    onSuccess: created => settle(client, userId, pageId, { update: () => created }),
+    onError: () => settle(client, userId, pageId),
     retry: false,
   });
 }

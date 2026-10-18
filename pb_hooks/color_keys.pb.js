@@ -2,16 +2,18 @@
 
 onRecordCreateRequest(e => {
   const helpers = require(`${__hooks}/color_keys.js`);
-  e.record.set('tried', helpers.prepareKeyCreate(e.requestInfo().body));
+  helpers.prepareKeyCreate(e.requestInfo().body);
   e.next();
 }, 'coloring_page_color_keys');
 
 onRecordValidate(e => {
-  require(`${__hooks}/color_keys.js`).validateKey(e.record);
+  require(`${__hooks}/color_keys.js`).validateKey(e.record, e.app);
   e.next();
 }, 'coloring_page_color_keys');
 
 onRecordCreateRequest(e => {
+  const photos = e.findUploadedFiles('photo');
+  if (photos.length > 1) throw new BadRequestError('A symbol request accepts exactly one photo.');
   if (!e.hasSuperuserAuth()) {
     if (!e.auth || !e.auth.getBool('verified'))
       throw new ForbiddenError('Email verification is required.');

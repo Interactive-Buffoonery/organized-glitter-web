@@ -226,22 +226,37 @@ mobile behavior compatible without requiring realtime or custom conflict merging
 collection APIs. Their field contract is [Coloring Color Keys](coloring-color-keys.md).
 Both require verified owner access. A key also requires ownership of its page's
 book. Create requires `position` (zero is valid) and the caller's `user` ID;
-updates must omit immutable `user` and `page`. Omitted `tried` defaults to `[]`
-on create; supplied values must be arrays of up to 20 strings of 100 characters.
+updates may resend unchanged `user` and `page` values, but `:changed` rules
+reject actual changes. Omitted, empty, or null `tried` defaults to `[]` on
+API and internal saves; other supplied values must be arrays of up to 20
+strings of 100 characters.
 
 Requests allow owner create/list/view only; update/delete require a superuser.
 Any optional page must be owned. Status and resolution are server-controlled on
 create. The photo is protected, including thumbnails; use an owner file token.
 Five create attempts per user per 15 minutes are allowed, then HTTP 429. The
-in-memory quota resets on server restart. Superuser creates bypass that quota.
+in-memory quota resets on server restart. At 10,000 tracked windows, a new
+user window returns HTTP 503 until a window expires. Superuser creates bypass
+both limits; status and resolution are still forced on create.
 
-After commit, new requests notify `FEEDBACK_TO_EMAIL`; missing configuration or
-mail delivery failure is logged without failing the saved request. Resolving to
+After commit, new requests go to the same `FEEDBACK_TO_EMAIL` inbox as in-app
+feedback (`contact@organizedglitter.app` in production), with no new environment
+variable. Maintainer mail shows the account ID, account email from the user
+record, and the typed contact email separately. User-written book and description
+text appears last with CR/LF replaced by spaces. Missing configuration or mail
+delivery failure is logged without failing the saved request. Resolving to
 `added` or `matched` requires a valid `u:` or `c:` ID, updates only the requester's
 placeholder keys atomically, and emails the request's contact address after
-commit. Repeating an unchanged resolution does not resend mail or rewrite
-already-resolved keys. `declined` leaves keys unchanged. Delivery has no retry
-queue. Placeholder `r:` IDs are not checked against request records.
+commit. Mail is sent to the typed contact address only when at least one key
+was rewritten or the status entered `added` or `matched` from an unresolved
+state. Repeat saves and `added`/`matched` transitions send nothing without
+rewrites. A nonempty `resolved_symbol` cannot be changed or cleared (HTTP 400).
+A propagation failure rolls back and names the failed key in the error.
+`declined` leaves keys unchanged. Delivery has no retry queue.
+
+On key saves, a placeholder for the same user's already resolved request is
+stored as its resolved symbol. Unknown, unresolved, and other users' request
+IDs remain placeholders; their existence or ownership is not required.
 
 These collections are online-only in mobile sync v1 and are absent from its
 snapshot and apply allowlist. Released native builds can ignore them.

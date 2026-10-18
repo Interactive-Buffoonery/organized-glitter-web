@@ -63,6 +63,13 @@ describe('package scripts', () => {
     );
   });
 
+  it('exposes the color key PocketBase integration check', () => {
+    assert.equal(
+      packageJson.scripts['pb:test:color-keys'],
+      'node scripts/test-color-keys-pocketbase.mjs'
+    );
+  });
+
   it('exposes the stats PocketBase integration check', () => {
     assert.equal(packageJson.scripts['pb:test:stats'], 'node scripts/test-stats-pocketbase.mjs');
   });

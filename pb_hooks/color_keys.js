@@ -1,7 +1,9 @@
-function validateKey(record) {
+function validateKey(record, app) {
   let tried;
   try {
-    tried = JSON.parse(record.getString('tried'));
+    const raw = record.getString('tried');
+    tried = raw ? JSON.parse(raw) : [];
+    if (tried === null || tried === '') tried = [];
   } catch {
     throw new BadRequestError('Tried codes must be an array of strings.');
   }
@@ -14,6 +16,25 @@ function validateKey(record) {
       'Tried codes must contain at most 20 strings of at most 100 characters.'
     );
   }
+  record.set('tried', tried);
+  const position = record.get('position');
+  if (!Number.isInteger(position) || position < 0) {
+    throw new BadRequestError('Position must be a non-negative integer.');
+  }
+  const symbol = record.getString('symbol');
+  if (symbol.startsWith('r:')) {
+    const requests = app.findRecordsByFilter(
+      'coloring_symbol_requests',
+      'id = {:id} && user = {:user} && (status = "added" || status = "matched")',
+      '',
+      1,
+      0,
+      { id: symbol.slice(2), user: record.getString('user') }
+    );
+    if (requests.length && validateResolution(requests[0])) {
+      record.set('symbol', requests[0].getString('resolved_symbol'));
+    }
+  }
   const swatch = record.getString('swatch');
   if (swatch && !/^#[0-9a-fA-F]{6}$/.test(swatch)) {
     throw new BadRequestError('Swatch must be empty or #RRGGBB.');
@@ -24,7 +45,6 @@ function prepareKeyCreate(body) {
   if (typeof body.position !== 'number' || !Number.isInteger(body.position) || body.position < 0) {
     throw new BadRequestError('Position must be a non-negative integer.');
   }
-  return Object.prototype.hasOwnProperty.call(body, 'tried') ? body.tried : [];
 }
 
 function rateLimit(app, user) {
@@ -73,16 +93,19 @@ function validateResolution(record) {
 }
 
 function resolveRequest(e) {
-  const resolving = validateResolution(e.record);
   const originalApp = e.app;
   originalApp.runInTransaction(app => {
     e.app = app;
     try {
       const before = app.findRecordById('coloring_symbol_requests', e.record.id);
-      const changed =
-        resolving &&
-        (before.getString('status') !== e.record.getString('status') ||
-          before.getString('resolved_symbol') !== e.record.getString('resolved_symbol'));
+      const previousSymbol = before.getString('resolved_symbol');
+      if (previousSymbol && previousSymbol !== e.record.getString('resolved_symbol')) {
+        throw new BadRequestError('Resolved symbol cannot be changed after resolution');
+      }
+      const resolving = validateResolution(e.record);
+      const enteredResolution =
+        resolving && !['added', 'matched'].includes(before.getString('status'));
+      let rewritten = 0;
       if (resolving) {
         // Fetch from offset zero after each batch because saved rows no longer match.
         for (;;) {
@@ -100,11 +123,16 @@ function resolveRequest(e) {
           if (!rows.length) break;
           for (const row of rows) {
             row.set('symbol', e.record.getString('resolved_symbol'));
-            app.save(row);
+            try {
+              app.save(row);
+            } catch {
+              throw new BadRequestError(`Failed to resolve color key ${row.id}.`);
+            }
+            rewritten++;
           }
         }
       }
-      e.record.set('_colorKeyResolutionNotify', changed);
+      e.record.set('_colorKeyResolutionNotify', enteredResolution || rewritten > 0);
       e.next();
     } finally {
       e.app = originalApp;
@@ -128,16 +156,18 @@ function notify(app, record, resolved) {
   }
   try {
     const sender = app.settings().meta;
+    const accountEmail = resolved
+      ? ''
+      : app.findRecordById('users', record.getString('user')).getString('email');
+    const singleLine = value => value.replace(/[\r\n]/g, ' ');
     const text = resolved
       ? `Your symbol request ${record.id} was resolved as ${record.getString('resolved_symbol')}. Your color keys have been updated.`
-      : `Symbol request: ${record.id}\nRequester email: ${record.getString('email')}\nBook: ${record.getString('book_label')}\nDescription: ${record.getString('description')}\nPage: ${record.getString('page')}`;
+      : `Symbol request: ${record.id}\nAccount ID: ${record.getString('user')}\nAccount email: ${accountEmail}\nContact email (typed): ${record.getString('email')}\nPage: ${record.getString('page')}\nBook: ${singleLine(record.getString('book_label'))}\nDescription: ${singleLine(record.getString('description'))}`;
     app.newMailClient().send(
       new MailerMessage({
         from: { address: sender.senderAddress, name: sender.senderName },
         to: [{ address: recipient }],
-        subject: resolved
-          ? 'Your coloring symbol request is resolved'
-          : 'New coloring symbol request',
+        subject: resolved ? 'Your coloring symbol request is resolved' : 'New symbol request',
         text,
       })
     );

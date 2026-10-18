@@ -171,7 +171,10 @@ migrate(
           type: 'autodate',
         },
       ],
-      indexes: ['CREATE INDEX idx_color_keys_page ON coloring_page_color_keys (page)'],
+      indexes: [
+        'CREATE INDEX idx_color_keys_page ON coloring_page_color_keys (page)',
+        'CREATE INDEX idx_color_keys_user_symbol ON coloring_page_color_keys (user, symbol)',
+      ],
       listRule:
         '@request.auth.verified = true && user = @request.auth.id && page.book.user = @request.auth.id',
       viewRule:
@@ -181,7 +184,7 @@ migrate(
       createRule:
         '@request.auth.verified = true && user = @request.auth.id && page.book.user = @request.auth.id && @request.body.user = @request.auth.id',
       updateRule:
-        '@request.auth.verified = true && user = @request.auth.id && page.book.user = @request.auth.id && @request.body.user:isset = false && @request.body.page:isset = false',
+        '@request.auth.verified = true && user = @request.auth.id && page.book.user = @request.auth.id && @request.body.user:changed = false && @request.body.page:changed = false',
     });
     return app.save(collection);
   },

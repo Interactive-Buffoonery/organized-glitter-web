@@ -155,7 +155,7 @@ migrate(
           type: 'autodate',
         },
       ],
-      indexes: [],
+      indexes: ['CREATE INDEX idx_symbol_requests_user ON coloring_symbol_requests (user)'],
       listRule: '@request.auth.verified = true && user = @request.auth.id',
       viewRule: '@request.auth.verified = true && user = @request.auth.id',
       createRule:

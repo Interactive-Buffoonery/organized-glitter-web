@@ -19,7 +19,7 @@ for (const file of ['color_keys.pb.js', 'color_keys.js'])
 // Force delivery failure after recording the mail handoff, without contacting SMTP.
 writeFileSync(
   path.join(hooksDir, 'test-mail.pb.js'),
-  `onMailerSend(e => { console.log('COLOR_KEYS_MAIL:' + e.message.to[0].address); throw new Error('Controlled mail failure'); });\n`
+  `onMailerSend(e => { console.log('COLOR_KEYS_MAIL:' + JSON.stringify({ to: e.message.to[0].address, text: e.message.text })); throw new Error('Controlled mail failure'); });\n`
 );
 
 writeFileSync(
@@ -32,6 +32,30 @@ onRecordUpdate(e => {
 `
 );
 
+writeFileSync(
+  path.join(hooksDir, 'test-internal.pb.js'),
+  `
+routerAdd('GET', '/api/test/color-keys/barrier/{marker}', e => {
+  console.log('COLOR_KEYS_BARRIER:' + e.request.pathValue('marker'));
+  return e.noContent(204);
+}, $apis.requireAuth('_superusers'));
+routerAdd('POST', '/api/test/color-keys/internal', e => {
+  const record = new Record(e.app.findCollectionByNameOrId('coloring_page_color_keys'));
+  const body = e.requestInfo().body;
+  for (const field of ['user', 'page', 'symbol', 'position', 'tried']) {
+    if (Object.prototype.hasOwnProperty.call(body, field)) record.set(field, body[field]);
+  }
+  e.app.save(record);
+  return e.json(200, record.publicExport());
+}, $apis.requireAuth('_superusers'));
+routerAdd('POST', '/api/test/color-keys/restore-placeholder', e => {
+  const body = e.requestInfo().body;
+  e.app.db().newQuery('UPDATE coloring_page_color_keys SET symbol = {:symbol} WHERE id = {:id}').bind({ id: body.id, symbol: body.symbol }).execute();
+  return e.noContent(204);
+}, $apis.requireAuth('_superusers'));
+`
+);
+
 const binary = await installPocketBase({
   destination: path.join(root, '.tmp/test-tools/pocketbase'),
 });
@@ -40,8 +64,8 @@ await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
 const port = socket.address().port;
 await new Promise(resolve => socket.close(resolve));
 const url = `http://127.0.0.1:${port}`;
-const password = 'feedback-smoke-password-123';
-const adminEmail = 'feedback-admin@example.test';
+const password = 'color-keys-smoke-password-123';
+const adminEmail = 'color-keys-admin@example.test';
 const setup = spawnSync(binary, ['superuser', 'upsert', adminEmail, password, `--dir=${dataDir}`], {
   encoding: 'utf8',
 });
@@ -59,7 +83,7 @@ const server = spawn(
   ],
   {
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, FEEDBACK_TO_EMAIL: 'feedback@example.test' },
+    env: { ...process.env, FEEDBACK_TO_EMAIL: 'color-keys-maintainer@example.test' },
   }
 );
 server.stdout.on('data', chunk => (output += chunk.toString()));
@@ -82,6 +106,23 @@ try {
     JSON.parse(readFileSync('docs/pocketbase/collections.schema.json', 'utf8')),
     false
   );
+  const logLines = () =>
+    output.split(/\r?\n/).map(line => line.replace(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2} /, ''));
+  let barrierId = 0;
+  const flushOutput = async () => {
+    const marker = String(++barrierId);
+    await admin.send(`/api/test/color-keys/barrier/${marker}`, { method: 'GET' });
+    const deadline = Date.now() + 3000;
+    while (!logLines().includes(`COLOR_KEYS_BARRIER:${marker}`)) {
+      if (Date.now() >= deadline) throw new Error('PocketBase stdout barrier did not arrive');
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  };
+  const mails = email =>
+    logLines()
+      .filter(line => line.startsWith('COLOR_KEYS_MAIL:'))
+      .map(line => JSON.parse(line.slice('COLOR_KEYS_MAIL:'.length)))
+      .filter(mail => mail.to === email);
   const account = async name => {
     const user = await admin.collection('users').create({
       email: `${name}@example.test`,
@@ -137,12 +178,19 @@ try {
   await reject(b.client.collection(keys).create(keyData(a)), 400);
   await reject(a.client.collection(keys).create(keyData(a, { page: b.page.id })), 400);
   await reject(unverified.client.collection(keys).create(keyData(unverified)), 400);
-  for (const change of [
+  for (const same of [
     { user: a.user.id },
-    { user: b.user.id },
     { page: a.page.id },
-    { page: b.page.id },
+    { user: a.user.id, page: a.page.id },
   ]) {
+    assert.equal((await a.client.collection(keys).update(key.id, same)).id, key.id);
+  }
+  const sameOwnerPage = await a.client.collection('coloring_pages').create({
+    book: a.book.id,
+    page_number: 2,
+    status: 'not_started',
+  });
+  for (const change of [{ user: b.user.id }, { page: b.page.id }, { page: sameOwnerPage.id }]) {
     await reject(a.client.collection(keys).update(key.id, change), 404);
   }
   for (const fields of [
@@ -153,7 +201,6 @@ try {
     { symbol: 'u:00041' },
     { symbol: 'u:D800' },
     { symbol: 'u:110000' },
-    { tried: null },
     { tried: {} },
     { tried: [1] },
     { tried: Array(21).fill('a') },
@@ -168,6 +215,24 @@ try {
   ]) {
     await reject(a.client.collection(keys).create(keyData(a, fields)), 400);
     await reject(a.client.collection(keys).update(key.id, fields), 400);
+  }
+  assert.deepEqual(
+    (await a.client.collection(keys).getFullList()).map(row => row.id),
+    [key.id]
+  );
+  assert.deepEqual((await a.client.collection(keys).update(key.id, { tried: null })).tried, []);
+  const internal = await admin.send('/api/test/color-keys/internal', {
+    method: 'POST',
+    body: { user: a.user.id, page: a.page.id, symbol: 'u:0031' },
+  });
+  assert.equal(internal.position, 0);
+  assert.deepEqual(internal.tried, []);
+  for (const tried of [null, '']) {
+    const defaulted = await admin.send('/api/test/color-keys/internal', {
+      method: 'POST',
+      body: { user: a.user.id, page: a.page.id, symbol: 'u:0031', position: 0, tried },
+    });
+    assert.deepEqual(defaulted.tried, []);
   }
   const absentPosition = keyData(a);
   delete absentPosition.position;
@@ -185,6 +250,45 @@ try {
     photo: new File([png], 'symbol.png', { type: 'image/png' }),
     ...extra,
   });
+  for (const [label, fields] of [
+    ['wrong MIME', { photo: new File(['plain text'], 'symbol.txt', { type: 'text/plain' }) }],
+    [
+      'over 10 MB',
+      {
+        photo: new File([png, new Uint8Array(10 * 1024 * 1024)], 'large.png', {
+          type: 'image/png',
+        }),
+      },
+    ],
+    [
+      'two files',
+      {
+        photo: [
+          new File([png], 'one.png', { type: 'image/png' }),
+          new File([png], 'two.png', { type: 'image/png' }),
+        ],
+      },
+    ],
+    ['missing photo', { photo: undefined }],
+    ['missing email', { email: undefined }],
+    ['invalid email', { email: 'not-an-email' }],
+    ['missing book label', { book_label: undefined }],
+    ['long book label', { book_label: 'x'.repeat(201) }],
+    ['long description', { description: 'x'.repeat(501) }],
+  ]) {
+    await assert.rejects(
+      admin.collection(requests).create(requestData(a, fields)),
+      error => error.status === 400,
+      label
+    );
+  }
+  for (let n = 0; n < 6; n++) {
+    const created = await admin
+      .collection(requests)
+      .create(requestData(a, { status: 'added', resolved_symbol: 'u:03C8' }));
+    assert.equal(created.status, 'open');
+    assert.equal(created.resolved_symbol, '');
+  }
   await reject(b.client.collection(requests).create(requestData(a)), 400);
   await reject(unverified.client.collection(requests).create(requestData(unverified)), 400);
   await reject(a.client.collection(requests).create(requestData(a, { page: b.page.id })), 400);
@@ -193,7 +297,10 @@ try {
     .create(requestData(a, { status: 'invalid-client-status', resolved_symbol: 'x'.repeat(100) }));
   assert.equal(request.status, 'open');
   assert.equal(request.resolved_symbol, '');
-  assert.match(output, /COLOR_KEYS_MAIL:feedback@example.test/);
+  await flushOutput();
+  assert.ok(
+    mails('color-keys-maintainer@example.test').some(mail => mail.text.includes(request.id))
+  );
   assert.equal((await a.client.collection(requests).getOne(request.id)).id, request.id);
   for (const client of [b.client, unverified.client]) {
     assert.equal((await client.collection(requests).getList()).items.length, 0);
@@ -207,6 +314,11 @@ try {
   assert.equal((await fetch(`${fileUrl}?token=${token}`)).status, 200);
   const otherToken = await b.client.files.getToken();
   assert.equal((await fetch(`${fileUrl}?token=${otherToken}`)).status, 404);
+  const unrelatedRequest = await admin.collection(requests).create(requestData(a));
+  const unrelated = await a.client
+    .collection(keys)
+    .create(keyData(a, { symbol: `r:${unrelatedRequest.id}` }));
+  const ordinary = await a.client.collection(keys).create(keyData(a, { symbol: 'u:0041' }));
   const placeholder = `r:${request.id}`;
   const ownKeys = await Promise.all(
     [0, 1].map(position =>
@@ -222,19 +334,17 @@ try {
   );
   await admin.collection(requests).update(request.id, { status: 'declined' });
   assert.equal((await admin.collection(keys).getOne(ownKeys[0].id)).symbol, placeholder);
-  ownKeys.sort((left, right) => left.id.localeCompare(right.id));
+  ownKeys.sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
   await a.client.collection(keys).update(ownKeys[1].id, { code: 'fail-resolution' });
-  await reject(
+  await assert.rejects(
     admin.collection(requests).update(request.id, { status: 'added', resolved_symbol: 'u:03C8' }),
-    400
+    error => error.status === 400 && error.message.includes(ownKeys[1].id)
   );
   assert.equal((await admin.collection(requests).getOne(request.id)).status, 'declined');
   for (const item of ownKeys)
     assert.equal((await admin.collection(keys).getOne(item.id)).symbol, placeholder);
-  assert.ok(
-    !output.includes('COLOR_KEYS_MAIL:owner@example.test'),
-    'Rolled-back resolution must not notify'
-  );
+  await flushOutput();
+  assert.equal(mails('owner@example.test').length, 0, 'Rolled-back resolution must not notify');
   await a.client.collection(keys).update(ownKeys[1].id, { code: '' });
   await admin
     .collection(requests)
@@ -243,13 +353,81 @@ try {
   for (const item of ownKeys)
     assert.equal((await admin.collection(keys).getOne(item.id)).symbol, 'c:linked-circles');
   assert.equal((await admin.collection(keys).getOne(foreign.id)).symbol, placeholder);
-  assert.match(output, /COLOR_KEYS_MAIL:owner@example.test/);
-  const mailCount = output.split('COLOR_KEYS_MAIL:owner@example.test').length;
+  assert.equal(
+    (await admin.collection(keys).getOne(unrelated.id)).symbol,
+    `r:${unrelatedRequest.id}`
+  );
+  assert.equal((await admin.collection(keys).getOne(ordinary.id)).symbol, 'u:0041');
+  await flushOutput();
+  assert.equal(mails('owner@example.test').length, 1);
+  const mailCount = mails('owner@example.test').length;
   await admin
     .collection(requests)
     .update(request.id, { status: 'matched', resolved_symbol: 'c:linked-circles' });
   assert.equal((await admin.collection(keys).getOne(ownKeys[0].id)).updated, resolved.updated);
-  assert.equal(output.split('COLOR_KEYS_MAIL:owner@example.test').length, mailCount);
+  await flushOutput();
+  assert.equal(mails('owner@example.test').length, mailCount);
+  await admin.collection(requests).update(request.id, { status: 'added' });
+  await admin.collection(requests).update(request.id, { status: 'matched' });
+  await flushOutput();
+  assert.equal(
+    mails('owner@example.test').length,
+    mailCount,
+    'Changes between resolved statuses do not notify'
+  );
+  for (const resolved_symbol of ['u:0042', '']) {
+    await assert.rejects(
+      admin.collection(requests).update(request.id, { resolved_symbol }),
+      error =>
+        error.status === 400 &&
+        error.message.includes('Resolved symbol cannot be changed after resolution')
+    );
+  }
+  assert.equal(
+    (await admin.collection(requests).getOne(request.id)).resolved_symbol,
+    'c:linked-circles'
+  );
+  assert.equal(
+    (await a.client.collection(keys).create(keyData(a, { symbol: placeholder }))).symbol,
+    'c:linked-circles'
+  );
+  assert.equal(
+    (await a.client.collection(keys).update(ordinary.id, { symbol: placeholder })).symbol,
+    'c:linked-circles'
+  );
+  assert.equal(
+    (await b.client.collection(keys).update(foreign.id, { symbol: placeholder })).symbol,
+    placeholder
+  );
+  const unresolved = await a.client
+    .collection(keys)
+    .create(keyData(a, { symbol: `r:${unrelatedRequest.id}` }));
+  assert.equal(unresolved.symbol, `r:${unrelatedRequest.id}`);
+  const unknown = await a.client
+    .collection(keys)
+    .create(keyData(a, { symbol: 'r:unknown00000000' }));
+  assert.equal(unknown.symbol, 'r:unknown00000000');
+  // Simulate an older stored placeholder to exercise rewrites without a status transition.
+  await admin.send('/api/test/color-keys/restore-placeholder', {
+    method: 'POST',
+    body: { id: ordinary.id, symbol: placeholder },
+  });
+  await admin.collection(requests).update(request.id, { status: 'matched' });
+  assert.equal((await admin.collection(keys).getOne(ordinary.id)).symbol, 'c:linked-circles');
+  await flushOutput();
+  assert.equal(mails('owner@example.test').length, mailCount + 1);
+  const emptyRequest = await admin
+    .collection(requests)
+    .create(requestData(a, { email: 'empty@example.test' }));
+  await admin
+    .collection(requests)
+    .update(emptyRequest.id, { status: 'added', resolved_symbol: 'u:0042' });
+  await flushOutput();
+  assert.equal(
+    mails('empty@example.test').length,
+    1,
+    'Entering a resolved status notifies even without keys'
+  );
   const addedRequest = await b.client
     .collection(requests)
     .create(requestData(b, { email: 'contact@example.test' }));
@@ -265,7 +443,13 @@ try {
     .update(addedRequest.id, { status: 'added', resolved_symbol: 'u:03C8' });
   const batchRows = await b.client.collection(keys).getFullList({ filter: "symbol = 'u:03C8'" });
   assert.equal(batchRows.length, batchKeys.length, 'Propagation traverses more than one batch');
-  assert.match(output, /COLOR_KEYS_MAIL:contact@example.test/);
+  assert.equal(
+    (await b.client.collection(keys).getFullList({ filter: `symbol = 'r:${addedRequest.id}'` }))
+      .length,
+    0
+  );
+  await flushOutput();
+  assert.equal(mails('contact@example.test').length, 1);
   // A fresh account proves the quota exactly, independent of invalid submissions above.
   const quota = await account('quota');
   const results = await Promise.all(

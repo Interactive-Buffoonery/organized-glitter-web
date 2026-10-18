@@ -5,6 +5,14 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const sessionState = vi.hoisted(() => ({ accountId: 'user-123', generation: 0 }));
+vi.mock('@/services/auth/sessionIdentity', () => ({
+  captureSessionIdentity: () => ({ ...sessionState }),
+  isCurrentSessionIdentity: (identity: { accountId: string; generation: number }) =>
+    identity.accountId === sessionState.accountId &&
+    identity.generation === sessionState.generation,
+}));
+
 const pbMock = vi.hoisted(() => {
   const createListResult = (items: unknown[] = []) => ({
     page: 1,
@@ -60,6 +68,8 @@ import { ErrorHandler } from '../base/ErrorHandler';
 describe('CompaniesService', () => {
   beforeEach(() => {
     pbMock.reset();
+    sessionState.accountId = 'user-123';
+    sessionState.generation = 0;
   });
 
   describe('list()', () => {
@@ -108,6 +118,21 @@ describe('CompaniesService', () => {
   });
 
   describe('create()', () => {
+    it('does not write after logout and relogin during duplicate lookup', async () => {
+      let finishLookup!: (reason: unknown) => void;
+      pbMock.collectionMethods.getFirstListItem.mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            finishLookup = reject;
+          })
+      );
+      const pending = CompaniesService.create({ name: 'New metadata' });
+      sessionState.generation += 2;
+      finishLookup({ type: 'not_found', message: 'Not found', retryable: false });
+      await expect(pending).rejects.toMatchObject({ reason: 'session_changed' });
+      expect(pbMock.collectionMethods.create).not.toHaveBeenCalled();
+    });
+
     it('throws normalized validation ServiceError on duplicate name', async () => {
       // findByName returns an existing record
       pbMock.collectionMethods.getFirstListItem.mockResolvedValue({ id: 'existing', name: 'DMC' });

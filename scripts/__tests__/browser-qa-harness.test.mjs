@@ -242,10 +242,13 @@ describe('browser QA harness safeguards', () => {
       files: 23,
       tests: 83,
     });
-    expect(parseListedInventory('Total: 297 tests in 40 files', 'full')).toEqual({
+    expect(parseListedInventory('Total: 298 tests in 40 files', 'full')).toEqual({
       files: 40,
-      tests: 297,
+      tests: 298,
     });
+    expect(() => parseListedInventory('Total: 297 tests in 40 files', 'full')).toThrow(
+      /expected 298 tests in 40 files/i
+    );
     expect(() => parseListedInventory('Total: 76 tests in 23 files', 'smoke')).toThrow(
       /expected 83 tests in 23 files/i
     );
@@ -298,7 +301,7 @@ describe('browser QA harness safeguards', () => {
   });
 
   it('allows only the exact conditional full-suite skip', () => {
-    const passing = Array.from({ length: 296 }, (_, index) => ({
+    const passing = Array.from({ length: 297 }, (_, index) => ({
       projectName: 'authenticated-chromium-full',
       expectedStatus: 'passed',
       status: 'expected',
@@ -343,13 +346,13 @@ describe('browser QA harness safeguards', () => {
         },
       ],
       errors: [],
-      stats: { expected: 296, unexpected: 0, flaky: 0, skipped: 1 },
+      stats: { expected: 297, unexpected: 0, flaky: 0, skipped: 1 },
     };
 
     expect(validateManagedPlaywrightReport(report, 'full')).toEqual({
-      expected: 296,
+      expected: 297,
       skipped: 1,
-      total: 297,
+      total: 298,
     });
 
     allowedSkip.annotations[0].description = 'different reason';

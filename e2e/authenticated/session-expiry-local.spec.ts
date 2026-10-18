@@ -248,6 +248,98 @@ test('does not open a saved project after its account is replaced during the suc
   await expect(page.getByRole('heading', { name: privateTitle, exact: true })).toHaveCount(0);
 });
 
+test('ignores a saved project after same-account sign-in before storage events arrive', async ({
+  page,
+  context,
+}) => {
+  await page.addInitScript(() => {
+    const addEventListener = window.addEventListener.bind(window);
+    window.addEventListener = ((type, listener, options) => {
+      if (type !== 'storage' || !listener) {
+        return addEventListener(type, listener, options);
+      }
+      // Keep storage current while delaying only the app's storage callbacks.
+      return addEventListener(type, () => {}, options);
+    }) as typeof window.addEventListener;
+  });
+  await page.goto('/projects/new');
+  const draftTitle = 'Draft awaiting same-account session confirmation';
+  await page.getByLabel('Project title').fill(draftTitle);
+
+  let releaseCreate: () => void = () => {};
+  const createGate = new Promise<void>(resolve => {
+    releaseCreate = resolve;
+  });
+  let createAttempts = 0;
+  let savedProjectId: string | undefined;
+  await page.route('**/api/collections/projects/records', async route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    createAttempts += 1;
+    const response = await route.fetch();
+    expect(response.status()).toBe(200);
+    savedProjectId = (await response.json()).id;
+    await createGate;
+    await route.fulfill({ response });
+  });
+
+  const otherTab = await context.newPage();
+  await otherTab.goto('/projects/new');
+  await expect(otherTab.getByRole('heading', { name: 'New project' })).toBeVisible();
+
+  await page.clock.install({ time: new Date() });
+  await page.clock.pauseAt(new Date(Date.now() + 1_000));
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect.poll(() => savedProjectId).toBeTruthy();
+
+  try {
+    await otherTab.evaluate(() => {
+      const authStore = (
+        window as Window & {
+          pb?: {
+            authStore: {
+              token: string;
+              record: Record<string, unknown> | null;
+              clear: () => void;
+              save: (token: string, record: unknown) => void;
+            };
+          };
+        }
+      ).pb?.authStore;
+      if (!authStore?.record) throw new Error('PocketBase auth debug hook is unavailable');
+      const token = authStore.token;
+      const record = authStore.record;
+      authStore.clear();
+      authStore.save(token, record);
+    });
+
+    const createResponse = page.waitForResponse(
+      response =>
+        response.request().method() === 'POST' &&
+        response.url().endsWith('/api/collections/projects/records')
+    );
+    releaseCreate();
+    await (await createResponse).finished();
+    await expect
+      .poll(async () => {
+        await page.clock.runFor(1_000);
+        return (
+          !page.url().endsWith('/projects/new') ||
+          (await page.getByRole('button', { name: 'Create project', exact: true }).isEnabled())
+        );
+      })
+      .toBe(true);
+    await page.clock.runFor(2_000);
+
+    await expect(page).toHaveURL(/\/projects\/new$/);
+    await expect(page.getByLabel('Project title')).toHaveValue(draftTitle);
+    await expect(page.getByText('Project created', { exact: true })).toHaveCount(0);
+    expect(createAttempts, 'the confirmed write is never replayed').toBe(1);
+  } finally {
+    releaseCreate();
+    await otherTab.close();
+  }
+});
+
 test('offers a confirmed create that finishes after sign-in', async ({ page }) => {
   await page.goto('/projects/new');
   await page.getByLabel('Project title').fill('Late confirmed session create');

@@ -52,9 +52,15 @@ interface ProjectCreationResult {
   sessionIdentity: SessionIdentity;
 }
 
-const addTagsToProject = async (projectId: string, tagIds: string[]) => {
+const addTagsToProject = async (
+  projectId: string,
+  tagIds: string[],
+  sessionIdentity: SessionIdentity
+) => {
   const results = await Promise.allSettled(
-    tagIds.map(tagId => TagService.addTagToProject(projectId, tagId))
+    tagIds.map(tagId =>
+      TagService.addTagToProject(projectId, tagId, () => isCurrentSessionIdentity(sessionIdentity))
+    )
   );
 
   const failedTagIds: string[] = [];
@@ -100,7 +106,7 @@ const createProject = async (
     if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
     ensureCurrentSessionAfterCreate(createToken, 'projects', project.id);
     if (input.tagIds?.length) {
-      failedTagIds = await addTagsToProject(project.id, input.tagIds);
+      failedTagIds = await addTagsToProject(project.id, input.tagIds, sessionIdentity);
 
       if (failedTagIds.length > 0) {
         logger.warn('Some tags failed to link after project creation', {
@@ -262,6 +268,7 @@ export const useCreateProject = ({
       }
     },
     onError: (error, { input: variables }, sessionIdentity) => {
+      if (isSessionChangedError(error)) return;
       if (sessionIdentity && !isCurrentSessionIdentity(sessionIdentity)) return;
       const normalized = normalizeError(error, 'Project creation');
       logger.error('Project creation failed', {

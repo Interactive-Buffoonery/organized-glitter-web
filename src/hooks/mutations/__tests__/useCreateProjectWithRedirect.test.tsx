@@ -255,6 +255,7 @@ describe('useCreateProject redirect flow', () => {
       });
       expect(mockBuildFormData).not.toHaveBeenCalled();
       expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockToast).not.toHaveBeenCalled();
     }
   );
 

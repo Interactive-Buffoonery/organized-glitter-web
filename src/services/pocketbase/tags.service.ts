@@ -25,6 +25,7 @@ import { isAuthenticated, getCurrentUserId } from '@/services/auth';
 import { createFilter } from '@/services/pocketbase/base/filterBuilder';
 import { createLogger } from '@/utils/logger';
 import { generateSlug } from '@/utils/ui/slugify';
+import { SessionChangedError } from '@/services/auth/sessionRecovery';
 
 const logger = createLogger('TagService');
 
@@ -336,15 +337,24 @@ export class TagService {
   /**
    * Add tag to project with security validation
    */
-  static async addTagToProject(projectId: string, tagId: string): Promise<ServiceResponse<void>> {
+  static async addTagToProject(
+    projectId: string,
+    tagId: string,
+    isSessionCurrent?: () => boolean
+  ): Promise<ServiceResponse<void>> {
+    const ensureSessionCurrent = () => {
+      if (isSessionCurrent && !isSessionCurrent()) throw new SessionChangedError();
+    };
     return withAuthentication(async (userId: string) => {
       try {
+        ensureSessionCurrent();
         // Verify both project and tag belong to the current user
         const [project, tag] = await Promise.all([
           pb.collection(Collections.Projects).getOne(projectId, { fields: 'id,user' }),
           pb.collection(Collections.Tags).getOne(tagId, { fields: 'id,user' }),
         ]);
 
+        ensureSessionCurrent();
         if (project.user !== userId || tag.user !== userId) {
           return createErrorResponse(new Error('Unauthorized access'));
         }
@@ -354,6 +364,7 @@ export class TagService {
           filter: pb.filter('project = {:projectId} && tag = {:tagId}', { projectId, tagId }),
         });
 
+        ensureSessionCurrent();
         if (existing.items.length === 0) {
           await pb.collection(Collections.ProjectTags).create({
             project: projectId,
@@ -361,6 +372,7 @@ export class TagService {
           });
         }
 
+        ensureSessionCurrent();
         return createSuccessResponse(undefined);
       } catch (error) {
         logger.error('Error adding tag to project:', error);

@@ -127,6 +127,7 @@ export async function sendFeedbackEmail({
   currentPage,
 }: SendFeedbackEmailParams): Promise<SendFeedbackEmailResult> {
   const normalizedMessage = typeof message === 'string' ? message.trim() : '';
+  let sessionIdentity: ReturnType<typeof captureSessionIdentity> | undefined;
   try {
     // Input validation
     if (!message || typeof message !== 'string') {
@@ -148,7 +149,7 @@ export async function sendFeedbackEmail({
       }
     }
 
-    const sessionIdentity = captureSessionIdentity();
+    sessionIdentity = captureSessionIdentity();
     const token = getAuthToken();
     if (!token) {
       throw new FeedbackApiError(
@@ -236,6 +237,10 @@ export async function sendFeedbackEmail({
       emailId: 'feedback-api-sent',
     };
   } catch (error) {
+    if (sessionIdentity && !isCurrentSessionIdentity(sessionIdentity)) {
+      return getSessionChangedResult();
+    }
+
     if (safeEnv.isDev) {
       safeEnv.log('Failed to send feedback email:', error);
     } else {

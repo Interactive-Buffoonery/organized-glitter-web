@@ -249,6 +249,56 @@ describe('sendFeedbackEmail', () => {
     expect(openMock).not.toHaveBeenCalled();
   });
 
+  it('suppresses a rejected request after the originating session changes', async () => {
+    let rejectRequest!: (error: Error) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((_resolve, reject) => {
+            rejectRequest = reject;
+          })
+      )
+    );
+    const openMock = vi.fn();
+    vi.stubGlobal('window', {
+      ...window,
+      location: { ...window.location, hostname: 'app.example.test' },
+      open: openMock,
+    });
+
+    const resultPromise = sendFeedbackEmail({
+      message: 'Feedback from the original session.',
+      name: 'Original Account',
+    });
+    authState.isCurrentSession = false;
+    rejectRequest(new TypeError('Failed to fetch'));
+
+    await expect(resultPromise).resolves.toMatchObject({
+      success: false,
+      reason: 'session_changed',
+    });
+    expect(openMock).not.toHaveBeenCalled();
+  });
+
+  it('uses the mailto fallback for a current-session network failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    const openMock = vi.fn().mockReturnValue(null);
+    vi.stubGlobal('window', {
+      ...window,
+      location: { ...window.location, hostname: 'app.example.test' },
+      open: openMock,
+    });
+
+    await expect(
+      sendFeedbackEmail({ message: 'Feedback from the current session.' })
+    ).resolves.toMatchObject({
+      success: false,
+      reason: 'mailto_fallback',
+    });
+    expect(openMock).toHaveBeenCalledOnce();
+  });
+
   it('attributes stale successful feedback to its originating account', async () => {
     let resolveResponse!: (response: Response) => void;
     vi.stubGlobal(

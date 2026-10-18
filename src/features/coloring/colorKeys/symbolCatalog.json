@@ -1544,7 +1544,7 @@
     {
       "id": "u:22A8",
       "char": "⊨",
-      "name": "True",
+      "name": "Models (true)",
       "group": "math",
       "keywords": ["true"]
     },
@@ -1621,7 +1621,7 @@
     {
       "id": "u:1D11E",
       "char": "𝄞",
-      "name": "Musical symbol g clef",
+      "name": "Treble clef",
       "group": "music",
       "keywords": ["musical symbol g clef", "treble clef", "g clef", "curled s"]
     },
@@ -2020,7 +2020,7 @@
     {
       "id": "u:2721",
       "char": "✡",
-      "name": "Star of david",
+      "name": "Star of David",
       "group": "signs",
       "keywords": ["star of david", "star"]
     },
@@ -4848,7 +4848,7 @@
     {
       "id": "u:23E6",
       "char": "⏦",
-      "name": "Ac current",
+      "name": "AC current",
       "group": "shapes",
       "keywords": ["ac current"]
     },
@@ -4920,7 +4920,7 @@
       "name": "Curled triangle",
       "group": "shapes",
       "keywords": ["triangle", "curl", "swirl"],
-      "path": "M12 3 L22 21 H2 L12 3 M6 18 Q17 20 17 14 Q17 9 12 11 Q9 13 12 15"
+      "path": "M12 3 L22 21 H2 Z M7 18 Q15 19 15 15 Q15 11 12 12 Q10 13 12 15"
     },
     {
       "id": "c:spiral-square",

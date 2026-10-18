@@ -16,8 +16,16 @@ export interface ArchiveColorKeysRestoreResult {
   refMap: Partial<Record<ArchiveColorKey['ref'], string>>;
 }
 
-function requireOwner(userId: string, message = 'Your account changed. Reopen this page.') {
-  if (!userId || getCurrentUserId() !== userId) throw new Error(message);
+export class ArchiveRestoreSignInError extends Error {
+  constructor() {
+    super('Sign in again to continue the restore.');
+    this.name = 'ArchiveRestoreSignInError';
+  }
+}
+
+function requireOwner(userId: string) {
+  if (!userId || getCurrentUserId() !== userId)
+    throw new Error('Your account changed. Reopen this page.');
 }
 
 export const ArchiveColorKeysService = {
@@ -39,12 +47,11 @@ export const ArchiveColorKeysService = {
     keys: ArchiveColorKey[],
     archiveFingerprint: string
   ): Promise<ArchiveColorKeysRestoreResult> {
-    requireOwner(userId, 'Sign in again to continue the restore.');
+    if (!userId || getCurrentUserId() !== userId) throw new ArchiveRestoreSignInError();
     const result = await pb.send<ArchiveColorKeysRestoreResult>('/api/archive/restore-color-keys', {
       method: 'POST',
       body: { pageId, pageRef, keys, archiveFingerprint },
     });
-    requireOwner(userId, 'Sign in again to continue the restore.');
     return result;
   },
 };

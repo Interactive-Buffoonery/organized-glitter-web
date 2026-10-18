@@ -719,6 +719,23 @@ try {
     ),
     204
   );
+  for (let position = 250; position < 550; position++) {
+    expectStatus(
+      await json(
+        fetch(`${baseUrl}/api/collections/coloring_page_color_keys/records`, {
+          method: 'POST',
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...keyMetadata,
+            user: userId,
+            page: manyPage.record.id,
+            position,
+          }),
+        })
+      ),
+      200
+    );
+  }
   const afterDeletion = expectStatus(
     await restoreLegacyKeys(manyPage.record.id, manyKeys, manyOptions),
     200

@@ -614,17 +614,15 @@ routerAdd(
         { user: authId, backup: backupId, item: itemId }
       );
       if (receipts.length && receipts[0].getString('item_digest') !== digest) throw conflict();
-      const existing = app.findRecordsByFilter(
-        'coloring_page_color_keys',
-        'page = {:page}',
-        '',
-        500,
-        0,
-        { page: page.id }
-      );
       if (receipts.length) {
+        const existing = app.findRecordsByIds(
+          'coloring_page_color_keys',
+          body.keys.map(key => keyId(key.ref))
+        );
         const ownedIds = new Set(
-          existing.filter(row => row.getString('user') === authId).map(row => row.id)
+          existing
+            .filter(row => row.getString('user') === authId && row.getString('page') === page.id)
+            .map(row => row.id)
         );
         result = {
           outcome: 'already_applied',
@@ -636,6 +634,14 @@ routerAdd(
         };
         return;
       }
+      const existing = app.findRecordsByFilter(
+        'coloring_page_color_keys',
+        'page = {:page}',
+        '',
+        1,
+        0,
+        { page: page.id }
+      );
       if (existing.length) {
         result = { outcome: 'skipped', refMap: {} };
         return;

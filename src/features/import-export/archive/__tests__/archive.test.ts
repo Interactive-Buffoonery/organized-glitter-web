@@ -1,3 +1,4 @@
+import { ArchiveRestoreSignInError } from '@/services/pocketbase/archiveColorKeys.service';
 import JSZip from 'jszip';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -82,7 +83,8 @@ vi.mock('@/lib/pocketbase', () => ({
   resolveFileUrl: serviceMocks.pocketbase.resolveFileUrl,
 }));
 
-vi.mock('@/services/pocketbase/archiveColorKeys.service', () => ({
+vi.mock('@/services/pocketbase/archiveColorKeys.service', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/services/pocketbase/archiveColorKeys.service')>()),
   ArchiveColorKeysService: serviceMocks.archiveColorKeysService,
 }));
 
@@ -4172,9 +4174,12 @@ describe('color key archives', () => {
       'Color keys for page 1 in Swatch fixture could not be restored. Export again and retry.',
     ]);
     expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Invalid or duplicate archive color key.' }),
+      expect.objectContaining({ message: 'Import/export operation failed' }),
       expect.objectContaining({ operation: 'restore_coloring_color_key' })
     );
+    restore.mockRejectedValueOnce(new ArchiveRestoreSignInError());
+    const signedOut = await importArchiveBundle(bundle, adapter);
+    expect(signedOut.errors).toEqual(['Sign in again to continue the restore.']);
     vi.mocked(adapter.listExistingColoringBooks).mockResolvedValue([]);
     const secondPage = {
       ...parsed.coloringBooks[0].pages[0],

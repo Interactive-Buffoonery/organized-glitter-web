@@ -1,6 +1,7 @@
 import { createLogger } from '@/utils/logger';
 import {
   ArchiveColorKeysService,
+  ArchiveRestoreSignInError,
   type ArchiveColorKeysRestoreResult,
 } from '@/services/pocketbase/archiveColorKeys.service';
 import type { ArchiveColorKey } from './types';
@@ -1324,7 +1325,9 @@ export async function importArchiveBundle(
               warning_count: warnings.length,
             });
             result.errors.push(
-              `Color keys for page ${page.pageNumber} in ${book.title} could not be restored. Export again and retry.`
+              error instanceof ArchiveRestoreSignInError
+                ? error.message
+                : `Color keys for page ${page.pageNumber} in ${book.title} could not be restored. Export again and retry.`
             );
           }
         }

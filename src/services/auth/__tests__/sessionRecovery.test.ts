@@ -19,6 +19,7 @@ import {
   SessionChangedError,
   ensureCurrentSessionAfterCreate,
   recordCompletedSessionFeedback,
+  recordCompletedSessionFeedbackForAccount,
   takeCompletedSessionFeedback,
   subscribeToCompletedSessionFeedback,
   retainSignedOutCreateTokens,
@@ -487,5 +488,76 @@ describe('session recovery', () => {
     expect(takeCompletedSessionFeedback('account-a')).toEqual(feedback);
     expect(takeCompletedSessionFeedback('account-a')).toBeUndefined();
     unsubscribe();
+  });
+
+  it('keeps confirmed feedback for its original account before recovery starts', () => {
+    const feedback = {
+      draftId: 'feedback-draft-a',
+      message: 'Delivered before the auth event',
+      name: 'Sarah',
+      email: 'sarah@example.test',
+    };
+
+    recordCompletedSessionFeedbackForAccount('account-a', feedback);
+    captureSessionDrafts('account-a', 'reused-token');
+    completeSessionRecovery('account-a');
+
+    expect(takeCompletedSessionFeedback('account-b')).toBeUndefined();
+    expect(takeCompletedSessionFeedback('account-a')).toEqual(feedback);
+  });
+
+  it('keeps completed feedback isolated across account recovery', () => {
+    const feedbackA = {
+      message: 'Delivered for account A',
+      name: 'Account A',
+      email: 'a@example.test',
+    };
+    const feedbackB = {
+      message: 'Delivered for account B',
+      name: 'Account B',
+      email: 'b@example.test',
+    };
+    captureSessionDrafts('account-a', 'token-a');
+    recordCompletedSessionFeedbackForAccount('account-a', feedbackA);
+
+    completeSessionRecovery('account-b');
+    recordCompletedSessionFeedbackForAccount('account-b', feedbackB);
+
+    expect(takeCompletedSessionFeedback('account-a')).toEqual(feedbackA);
+    expect(takeCompletedSessionFeedback('account-b')).toEqual(feedbackB);
+  });
+
+  it('keeps another account completion when the current account signs out', () => {
+    const feedbackA = {
+      message: 'Delivered for account A',
+      name: 'Account A',
+      email: 'a@example.test',
+    };
+    recordCompletedSessionFeedbackForAccount('account-a', feedbackA);
+    recordCompletedSessionFeedbackForAccount('account-b', {
+      message: 'Delivered for account B',
+      name: 'Account B',
+      email: 'b@example.test',
+    });
+
+    clearSessionDrafts('account-b');
+
+    expect(takeCompletedSessionFeedback('account-b')).toBeUndefined();
+    expect(takeCompletedSessionFeedback('account-a')).toEqual(feedbackA);
+  });
+
+  it('bounds retained feedback completions by account', () => {
+    for (let index = 0; index < 129; index += 1) {
+      recordCompletedSessionFeedbackForAccount(`account-${index}`, {
+        message: `Delivered for account ${index}`,
+        name: `Account ${index}`,
+        email: '',
+      });
+    }
+
+    expect(takeCompletedSessionFeedback('account-0')).toBeUndefined();
+    expect(takeCompletedSessionFeedback('account-128')).toMatchObject({
+      message: 'Delivered for account 128',
+    });
   });
 });

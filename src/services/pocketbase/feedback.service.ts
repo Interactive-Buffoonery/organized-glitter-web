@@ -1,4 +1,9 @@
 import { pb } from '@/lib/pocketbase';
+import {
+  captureSessionIdentity,
+  isCurrentSessionIdentity,
+  type SessionIdentity,
+} from '@/services/auth/sessionIdentity';
 import { reportInvalidSession } from '@/services/auth/sessionRecovery';
 
 interface FeedbackRequest {
@@ -9,7 +14,8 @@ interface FeedbackRequest {
 
 export async function sendFeedbackRequest(
   payload: FeedbackRequest,
-  token: string
+  token: string,
+  sessionIdentity: SessionIdentity = captureSessionIdentity()
 ): Promise<Response> {
   const response = await fetch(`${pb.baseURL}/api/organized-glitter/feedback`, {
     method: 'POST',
@@ -19,6 +25,12 @@ export async function sendFeedbackRequest(
     },
     body: JSON.stringify(payload),
   });
-  if (response.status === 401 && pb.authStore.token === token) reportInvalidSession(token);
+  if (
+    response.status === 401 &&
+    pb.authStore.token === token &&
+    isCurrentSessionIdentity(sessionIdentity)
+  ) {
+    reportInvalidSession(token);
+  }
   return response;
 }

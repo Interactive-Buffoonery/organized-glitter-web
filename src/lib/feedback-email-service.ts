@@ -3,7 +3,10 @@ import { sendFeedbackRequest } from '@/services/pocketbase/feedback.service';
 import {
   isSessionTokenInactive,
   recordCompletedSessionFeedback,
+  recordCompletedSessionFeedbackForAccount,
+  SessionChangedError,
 } from '@/services/auth/sessionRecovery';
+import { captureSessionIdentity, isCurrentSessionIdentity } from '@/services/auth/sessionIdentity';
 import { logger } from '@/utils/logger';
 import { safeEnv } from '@/utils/safe-env';
 import { getContactEmail, getMailtoFallbackMessage } from '@/lib/contactConfig';
@@ -61,6 +64,11 @@ class FeedbackApiError extends Error {
     this.name = 'FeedbackApiError';
   }
 }
+
+const getSessionChangedResult = (): SendFeedbackEmailResult => {
+  const error = new SessionChangedError();
+  return { success: false, error: error.message, reason: error.reason };
+};
 
 const isClientValidationError = (error: unknown): boolean => {
   if (!(error instanceof Error)) return false;
@@ -140,6 +148,7 @@ export async function sendFeedbackEmail({
       }
     }
 
+    const sessionIdentity = captureSessionIdentity();
     const token = getAuthToken();
     if (!token) {
       throw new FeedbackApiError(
@@ -147,6 +156,9 @@ export async function sendFeedbackEmail({
         false,
         'session_required'
       );
+    }
+    if (!isCurrentSessionIdentity(sessionIdentity)) {
+      return getSessionChangedResult();
     }
 
     // In local development, just log the feedback
@@ -183,11 +195,28 @@ export async function sendFeedbackEmail({
     };
 
     // PocketBase owns feedback for both the web and native app.
-    const response = await sendFeedbackRequest(feedbackData, token);
+    const response = await sendFeedbackRequest(feedbackData, token, sessionIdentity);
 
     const responseData = await readFeedbackResponse(response);
 
     logger.log('Feedback API response:', responseData);
+
+    if (isSessionTokenInactive(token) || !isCurrentSessionIdentity(sessionIdentity)) {
+      if (response.ok && responseData.success) {
+        const completedFeedback = {
+          draftId,
+          message: message.trim(),
+          name,
+          email: contactEmail || '',
+        };
+        if (sessionIdentity.accountId) {
+          recordCompletedSessionFeedbackForAccount(sessionIdentity.accountId, completedFeedback);
+        } else {
+          recordCompletedSessionFeedback(token, completedFeedback);
+        }
+      }
+      return getSessionChangedResult();
+    }
 
     if (!response.ok) {
       throw getFeedbackResponseError(response, responseData);
@@ -196,15 +225,6 @@ export async function sendFeedbackEmail({
     if (!responseData.success) {
       // Handle specific error cases
       throw getFeedbackResponseError(response, responseData);
-    }
-
-    if (isSessionTokenInactive(token)) {
-      recordCompletedSessionFeedback(token, {
-        draftId,
-        message: message.trim(),
-        name,
-        email: contactEmail || '',
-      });
     }
 
     if (safeEnv.isDev) {

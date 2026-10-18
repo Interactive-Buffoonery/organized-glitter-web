@@ -361,7 +361,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       authLogout();
       retireSessionTokens(sessionTokensRef.current, departingUserId ?? null);
       sessionGenerationRef.current += 1;
-      clearSessionDrafts();
+      clearSessionDrafts(departingUserId);
       activeUserIdRef.current = null;
       setUser(null);
       setIsAuthenticated(false);

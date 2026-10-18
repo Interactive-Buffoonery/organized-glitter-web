@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const authState = vi.hoisted(() => ({
+  accountId: 'account-a',
   isAuthenticated: true,
+  isCurrentSession: true,
   token: 'session-token',
 }));
 
@@ -18,8 +20,18 @@ vi.mock('@/lib/pocketbase', () => ({
     },
   },
 }));
+vi.mock('@/services/auth/sessionIdentity', () => ({
+  captureSessionIdentity: () => ({
+    accountId: authState.accountId,
+    generation: 1,
+    epoch: 'request-epoch',
+  }),
+  isCurrentSessionIdentity: () => authState.isCurrentSession,
+}));
 
 const { sendFeedbackEmail } = await import('../feedback-email-service');
+const { clearSessionDrafts, takeCompletedSessionFeedback } =
+  await import('@/services/auth/sessionRecovery');
 
 describe('sendFeedbackEmail', () => {
   afterEach(() => {
@@ -27,8 +39,11 @@ describe('sendFeedbackEmail', () => {
     vi.unstubAllEnvs();
   });
   beforeEach(() => {
+    authState.accountId = 'account-a';
     authState.isAuthenticated = true;
+    authState.isCurrentSession = true;
     authState.token = 'session-token';
+    clearSessionDrafts();
     vi.restoreAllMocks();
     vi.stubEnv('VITE_CONTACT_EMAIL', 'contact@example.test');
   });
@@ -194,6 +209,87 @@ describe('sendFeedbackEmail', () => {
       reason: 'session_required',
     });
     expect(openMock).not.toHaveBeenCalled();
+  });
+
+  it('suppresses response errors after the originating session changes', async () => {
+    let resolveResponse!: (response: Response) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>(resolve => {
+            resolveResponse = resolve;
+          })
+      )
+    );
+    const openMock = vi.fn();
+    vi.stubGlobal('window', {
+      ...window,
+      location: { ...window.location, hostname: 'app.example.test' },
+      open: openMock,
+    });
+
+    const resultPromise = sendFeedbackEmail({
+      draftId: 'feedback-draft-a',
+      message: 'Feedback rejected after the original session ended.',
+    });
+    authState.isCurrentSession = false;
+    resolveResponse(
+      new Response(JSON.stringify({ error: 'Please sign in again to send feedback.' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(resultPromise).resolves.toMatchObject({
+      success: false,
+      reason: 'session_changed',
+    });
+    expect(takeCompletedSessionFeedback('account-a')).toBeUndefined();
+    expect(openMock).not.toHaveBeenCalled();
+  });
+
+  it('attributes stale successful feedback to its originating account', async () => {
+    let resolveResponse!: (response: Response) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>(resolve => {
+            resolveResponse = resolve;
+          })
+      )
+    );
+    vi.stubGlobal('window', {
+      ...window,
+      location: { ...window.location, hostname: 'app.example.test' },
+    });
+
+    const resultPromise = sendFeedbackEmail({
+      draftId: 'feedback-draft-a',
+      message: 'Feedback delivered by the original session.',
+      name: 'Sarah',
+      email: 'sarah@example.test',
+    });
+    authState.isCurrentSession = false;
+    resolveResponse(
+      new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await expect(resultPromise).resolves.toMatchObject({
+      success: false,
+      reason: 'session_changed',
+    });
+    expect(takeCompletedSessionFeedback('account-b')).toBeUndefined();
+    expect(takeCompletedSessionFeedback('account-a')).toEqual({
+      draftId: 'feedback-draft-a',
+      message: 'Feedback delivered by the original session.',
+      name: 'Sarah',
+      email: 'sarah@example.test',
+    });
   });
 
   it('returns an account rate-limit reason without opening the mailto fallback', async () => {

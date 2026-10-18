@@ -74,6 +74,7 @@ const completedFeedbackListeners = new Set<
 const inactiveTokens = new Set<string>();
 const signedOutCreateAccounts = new Map<string, string>();
 const MAX_RETAINED_CREATE_TOKENS = 128;
+const MAX_RETAINED_COMPLETED_FEEDBACK = 128;
 const completedOtherCreates = new Map<string, Set<string>>();
 let savedAccountId: string | null = null;
 let recoveryToken: string | null = null;
@@ -82,7 +83,15 @@ let recoveryPending = false;
 const pendingCompletedCreateWrites = new Map<string, Map<string, number>>();
 const pendingCompletedCreateRemovals = new Map<string, Set<string>>();
 const completedCreateSnapshots = new Map<string, Map<string, number>>();
-let completedFeedback: (CompletedFeedback & { accountId: string }) | null = null;
+const completedFeedbackByAccount = new Map<string, CompletedFeedback>();
+
+function clearCapturedSessionDrafts(): void {
+  savedDrafts.clear();
+  savedAccountId = null;
+  recoveryToken = null;
+  lastReportedToken = null;
+  recoveryPending = false;
+}
 
 function pendingFor(map: Map<string, Set<string>>, accountId: string): Set<string> {
   const pending = map.get(accountId) ?? new Set<string>();
@@ -288,7 +297,7 @@ export function captureSessionDrafts(accountId: string, token: string): void {
 
 export function takeSessionDraft<T>(key: string, accountId: string): T | undefined {
   if (savedAccountId !== accountId) {
-    if (savedAccountId) clearSessionDrafts();
+    if (savedAccountId) clearCapturedSessionDrafts();
     return undefined;
   }
   const draft = savedDrafts.get(key) as T | undefined;
@@ -309,19 +318,18 @@ export function hasPendingSessionRecovery(): boolean {
 }
 
 export function completeSessionRecovery(accountId: string): void {
-  if (savedAccountId && savedAccountId !== accountId) clearSessionDrafts();
-  if (completedFeedback && completedFeedback.accountId !== accountId) completedFeedback = null;
+  if (savedAccountId && savedAccountId !== accountId) clearCapturedSessionDrafts();
   recoveryPending = false;
   lastReportedToken = null;
 }
 
-export function clearSessionDrafts(): void {
-  savedDrafts.clear();
-  savedAccountId = null;
-  recoveryToken = null;
-  lastReportedToken = null;
-  recoveryPending = false;
-  completedFeedback = null;
+export function clearSessionDrafts(accountId?: string): void {
+  clearCapturedSessionDrafts();
+  if (accountId) {
+    completedFeedbackByAccount.delete(accountId);
+  } else {
+    completedFeedbackByAccount.clear();
+  }
 }
 
 export function retainSignedOutCreateTokens(accountId: string, tokens: Iterable<string>): void {
@@ -337,19 +345,32 @@ export function retainSignedOutCreateTokens(accountId: string, tokens: Iterable<
 
 export function recordCompletedSessionFeedback(token: string, feedback: CompletedFeedback): void {
   if (token !== recoveryToken || !savedAccountId) return;
-  completedFeedback = { accountId: savedAccountId, ...feedback };
-  for (const listener of completedFeedbackListeners) listener(savedAccountId, feedback);
+  recordCompletedSessionFeedbackForAccount(savedAccountId, feedback);
+}
+
+export function recordCompletedSessionFeedbackForAccount(
+  accountId: string,
+  feedback: CompletedFeedback
+): void {
+  completedFeedbackByAccount.delete(accountId);
+  completedFeedbackByAccount.set(accountId, feedback);
+  while (completedFeedbackByAccount.size > MAX_RETAINED_COMPLETED_FEEDBACK) {
+    const oldestAccountId = completedFeedbackByAccount.keys().next().value;
+    if (oldestAccountId) completedFeedbackByAccount.delete(oldestAccountId);
+  }
+  for (const listener of completedFeedbackListeners) listener(accountId, feedback);
 }
 
 export function takeCompletedSessionFeedback(accountId: string): CompletedFeedback | undefined {
   const feedback = peekCompletedSessionFeedback(accountId);
   if (!feedback) return undefined;
-  completedFeedback = null;
+  completedFeedbackByAccount.delete(accountId);
   return feedback;
 }
 
 export function peekCompletedSessionFeedback(accountId: string): CompletedFeedback | undefined {
-  if (completedFeedback?.accountId !== accountId) return undefined;
+  const completedFeedback = completedFeedbackByAccount.get(accountId);
+  if (!completedFeedback) return undefined;
   const { draftId, message, name, email } = completedFeedback;
   return { ...(draftId ? { draftId } : {}), message, name, email };
 }

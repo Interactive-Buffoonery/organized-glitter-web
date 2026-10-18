@@ -11,6 +11,7 @@ import { ArtistDTO } from '@/services/types';
 import { ArtistsService, type ArtistListItem } from '@/services/pocketbase/artists.service';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
+import { adaptSessionScopedCallbacks } from '@/hooks/mutations/adaptSessionScopedCallbacks';
 import { isRecordInUseError, isServiceError } from '@/services/errors';
 import { createLogger } from '@/utils/logger';
 import { capture } from '@/services/analytics-escape-hatch';
@@ -71,23 +72,6 @@ export function useCreateArtist({ notifyOnSuccess = true }: { notifyOnSuccess?: 
 
   type Variables = { data: CreateArtistData; sessionIdentity: SessionIdentity };
   type Callbacks = MutateOptions<ArtistDTO, Error, CreateArtistData>;
-  const adaptCallbacks = (
-    options?: Callbacks
-  ): MutateOptions<ArtistDTO, Error, Variables, SessionIdentity> | undefined =>
-    options && {
-      onSuccess: (data, variables, context, mutationContext) => {
-        if (isCurrentSessionIdentity(variables.sessionIdentity))
-          return options.onSuccess?.(data, variables.data, context, mutationContext);
-      },
-      onError: (error, variables, context, mutationContext) => {
-        if (isCurrentSessionIdentity(variables.sessionIdentity))
-          return options.onError?.(error, variables.data, context, mutationContext);
-      },
-      onSettled: (data, error, variables, context, mutationContext) => {
-        if (isCurrentSessionIdentity(variables.sessionIdentity))
-          return options.onSettled?.(data, error, variables.data, context, mutationContext);
-      },
-    };
   const mutation = useMutation<ArtistDTO, Error, Variables, SessionIdentity>({
     onMutate: variables => variables.sessionIdentity,
     mutationFn: async ({ data, sessionIdentity }): Promise<ArtistDTO> => {
@@ -128,11 +112,14 @@ export function useCreateArtist({ notifyOnSuccess = true }: { notifyOnSuccess?: 
     ...mutation,
     variables: mutation.variables?.data,
     mutate: (data: CreateArtistData, options?: Callbacks) =>
-      mutation.mutate({ data, sessionIdentity: captureSessionIdentity() }, adaptCallbacks(options)),
+      mutation.mutate(
+        { data, sessionIdentity: captureSessionIdentity() },
+        adaptSessionScopedCallbacks(options, variables => variables.data)
+      ),
     mutateAsync: (data: CreateArtistData, options?: Callbacks) =>
       mutation.mutateAsync(
         { data, sessionIdentity: captureSessionIdentity() },
-        adaptCallbacks(options)
+        adaptSessionScopedCallbacks(options, variables => variables.data)
       ),
   } as UseMutationResult<ArtistDTO, Error, CreateArtistData>;
 }

@@ -16,6 +16,7 @@ import { CompanyDTO } from '@/services/types';
 import { CompaniesService, type CompanyListItem } from '@/services/pocketbase/companies.service';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
+import { adaptSessionScopedCallbacks } from '@/hooks/mutations/adaptSessionScopedCallbacks';
 import { isRecordInUseError, isServiceError } from '@/services/errors';
 import { createLogger } from '@/utils/logger';
 import { capture } from '@/services/analytics-escape-hatch';
@@ -185,23 +186,6 @@ export function useCreateCompany({ notifyOnSuccess = true }: { notifyOnSuccess?:
 
   type Variables = { data: CreateCompanyData; sessionIdentity: SessionIdentity };
   type Callbacks = MutateOptions<CompanyDTO, Error, CreateCompanyData>;
-  const adaptCallbacks = (
-    options?: Callbacks
-  ): MutateOptions<CompanyDTO, Error, Variables, SessionIdentity> | undefined =>
-    options && {
-      onSuccess: (data, variables, context, mutationContext) => {
-        if (isCurrentSessionIdentity(variables.sessionIdentity))
-          return options.onSuccess?.(data, variables.data, context, mutationContext);
-      },
-      onError: (error, variables, context, mutationContext) => {
-        if (isCurrentSessionIdentity(variables.sessionIdentity))
-          return options.onError?.(error, variables.data, context, mutationContext);
-      },
-      onSettled: (data, error, variables, context, mutationContext) => {
-        if (isCurrentSessionIdentity(variables.sessionIdentity))
-          return options.onSettled?.(data, error, variables.data, context, mutationContext);
-      },
-    };
   const mutation = useMutation<CompanyDTO, Error, Variables, SessionIdentity>({
     onMutate: variables => variables.sessionIdentity,
     mutationFn: async ({ data, sessionIdentity }): Promise<CompanyDTO> => {
@@ -237,11 +221,14 @@ export function useCreateCompany({ notifyOnSuccess = true }: { notifyOnSuccess?:
     ...mutation,
     variables: mutation.variables?.data,
     mutate: (data: CreateCompanyData, options?: Callbacks) =>
-      mutation.mutate({ data, sessionIdentity: captureSessionIdentity() }, adaptCallbacks(options)),
+      mutation.mutate(
+        { data, sessionIdentity: captureSessionIdentity() },
+        adaptSessionScopedCallbacks(options, variables => variables.data)
+      ),
     mutateAsync: (data: CreateCompanyData, options?: Callbacks) =>
       mutation.mutateAsync(
         { data, sessionIdentity: captureSessionIdentity() },
-        adaptCallbacks(options)
+        adaptSessionScopedCallbacks(options, variables => variables.data)
       ),
   } as UseMutationResult<CompanyDTO, Error, CreateCompanyData>;
 }

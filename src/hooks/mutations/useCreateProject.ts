@@ -37,6 +37,7 @@ import {
 } from '@/utils/project/projectSaveError';
 
 import { buildCreateProjectFormData } from './projectMutationAdapters';
+import { adaptSessionScopedCallbacks } from './adaptSessionScopedCallbacks';
 import type { CreateProjectInput } from './projectCommands';
 import { runPostWriteEffect } from './runPostWriteEffect';
 
@@ -138,26 +139,6 @@ type CreateCallbacks = MutateOptions<
   CreateProjectInput,
   SessionIdentity
 >;
-
-function adaptCreateCallbacks(
-  options?: CreateCallbacks
-): MutateOptions<ProjectCreationResult, Error, SessionCreateInput, SessionIdentity> | undefined {
-  if (!options) return undefined;
-  return {
-    onSuccess: (data, variables, context, mutationContext) =>
-      isCurrentSessionIdentity(variables.sessionIdentity)
-        ? options.onSuccess?.(data, variables.input, context, mutationContext)
-        : undefined,
-    onError: (error, variables, context, mutationContext) =>
-      isCurrentSessionIdentity(variables.sessionIdentity)
-        ? options.onError?.(error, variables.input, context, mutationContext)
-        : undefined,
-    onSettled: (data, error, variables, context, mutationContext) =>
-      isCurrentSessionIdentity(variables.sessionIdentity)
-        ? options.onSettled?.(data, error, variables.input, context, mutationContext)
-        : undefined,
-  };
-}
 
 interface UseCreateProjectOptions {
   redirect?: boolean;
@@ -339,13 +320,13 @@ export const useCreateProject = ({
     mutate: (input: CreateProjectInput, options?: CreateCallbacks) => {
       mutation.mutate(
         { input, sessionIdentity: captureSessionIdentity() },
-        adaptCreateCallbacks(options)
+        adaptSessionScopedCallbacks(options, variables => variables.input)
       );
     },
     mutateAsync: (input: CreateProjectInput, options?: CreateCallbacks) =>
       mutation.mutateAsync(
         { input, sessionIdentity: captureSessionIdentity() },
-        adaptCreateCallbacks(options)
+        adaptSessionScopedCallbacks(options, variables => variables.input)
       ),
   };
 };

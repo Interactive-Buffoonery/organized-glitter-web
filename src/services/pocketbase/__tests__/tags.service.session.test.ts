@@ -8,9 +8,9 @@ const { store, methods } = vi.hoisted(() => {
       record: { id: 'account-a' } as { id: string } | null,
       onChange: (listener: (token: string, record: { id: string } | null) => void) =>
         listeners.push(listener),
-      save(token: string, id: string | null) {
+      save(token: string, record: { id: string } | null) {
         this.token = token;
-        this.record = id ? { id } : null;
+        this.record = record;
         listeners.forEach(listener => listener(token, this.record));
       },
     },
@@ -36,7 +36,7 @@ import { captureSessionIdentity, isCurrentSessionIdentity } from '@/services/aut
 describe('tag linking originating session', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    store.save('token-a', 'account-a');
+    store.save('token-a', { id: 'account-a' });
     methods.getOne.mockResolvedValue({ user: 'account-a' });
     methods.getList.mockResolvedValue({ items: [] });
     methods.create.mockResolvedValue({ id: 'relation-a' });
@@ -56,7 +56,7 @@ describe('tag linking originating session', () => {
     );
     await vi.waitFor(() => expect(methods.getList).toHaveBeenCalled());
     store.save('', null);
-    store.save('new-token-a', 'account-a');
+    store.save('new-token-a', { id: 'account-a' });
     release({ items: [] });
     const result = await pending;
     expect(methods.create).not.toHaveBeenCalled();
@@ -75,7 +75,7 @@ describe('tag linking originating session', () => {
     );
     await vi.waitFor(() => expect(methods.getOne).toHaveBeenCalledTimes(2));
     store.save('', null);
-    store.save('new-token-a', 'account-a');
+    store.save('new-token-a', { id: 'account-a' });
     release({ user: 'account-a' });
     expect(await pending).toMatchObject({ status: 'error', error: { reason: 'session_changed' } });
     expect(methods.getList).not.toHaveBeenCalled();
@@ -84,7 +84,7 @@ describe('tag linking originating session', () => {
 
   it('permits same-account token refresh during the relation lookup', async () => {
     methods.getList.mockImplementation(async () => {
-      store.save('refreshed-token-a', 'account-a');
+      store.save('refreshed-token-a', { id: 'account-a' });
       return { items: [] };
     });
     const identity = captureSessionIdentity();

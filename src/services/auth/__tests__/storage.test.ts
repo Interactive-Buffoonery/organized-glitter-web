@@ -8,6 +8,9 @@ const { clearMock } = vi.hoisted(() => ({
 vi.mock('@/lib/pocketbase', () => ({
   pb: {
     authStore: {
+      token: '',
+      record: null,
+      onChange: vi.fn(() => () => undefined),
       clear: clearMock,
     },
   },

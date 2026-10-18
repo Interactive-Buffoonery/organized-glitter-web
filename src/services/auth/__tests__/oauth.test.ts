@@ -13,6 +13,7 @@ vi.mock('@/lib/pocketbase', () => ({
       token: 'token-1',
       record: { id: 'user-1' },
       save: authStoreSaveMock,
+      onChange: vi.fn(() => () => undefined),
     },
     collection: vi.fn(() => ({
       authWithOAuth2: authWithOAuth2Mock,

@@ -21,6 +21,11 @@ const {
 
 vi.mock('@/lib/pocketbase', () => ({
   pb: {
+    authStore: {
+      token: '',
+      record: null,
+      onChange: vi.fn(() => () => undefined),
+    },
     collection: vi.fn(() => ({
       confirmVerification: confirmVerificationMock,
       requestEmailChange: requestEmailChangeMock,

@@ -75,6 +75,14 @@ try {
     path.join(root, 'pb_hooks', 'archive_restore_v3.pb.js'),
     path.join(hooksDir, 'archive_restore_v3.pb.js')
   );
+  for (const name of [
+    'archive_restore.pb.js',
+    'color_keys.pb.js',
+    'color_keys.js',
+    'archive_color_keys.js',
+  ]) {
+    copyFileSync(path.join(root, 'pb_hooks', name), path.join(hooksDir, name));
+  }
   // Exercise the production main-photo route without the other coloring hooks,
   // which create blank pages and alter the archive fixture's page inventory.
   const coloringHook = readFileSync(path.join(root, 'pb_hooks', 'coloring.pb.js'), 'utf8');

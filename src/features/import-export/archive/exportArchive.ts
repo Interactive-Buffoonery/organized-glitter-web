@@ -1,3 +1,7 @@
+import {
+  ArchiveColorKeysService,
+  type ArchiveColorKeyRecord,
+} from '@/services/pocketbase/archiveColorKeys.service';
 import { hasColorReferenceContent } from '@/schemas/colorReferenceSchema';
 import {
   ColorReferencesService,
@@ -69,6 +73,7 @@ function addRestorableEntry(zip: JSZip, path: string, content: string | Blob): v
 
 export interface ArchiveExportSourceData {
   colorReferences?: ColorReference[];
+  colorKeys?: ArchiveColorKeyRecord[];
   projects: Project[];
   projectProgressNotes: ProgressNoteListItem[];
   coloringBooks: ColoringBookDTO[];
@@ -136,6 +141,12 @@ function createArchiveManifestFromData(
   const referencesByPage = new Map(
     data.colorReferences?.map(reference => [reference.page, reference])
   );
+  const keysByPage = new Map<string, ArchiveColorKeyRecord[]>();
+  for (const key of data.colorKeys ?? []) {
+    const keys = keysByPage.get(key.page) ?? [];
+    keys.push(key);
+    keysByPage.set(key.page, keys);
+  }
   const coloringNotesByPage = new Map<string, ColoringPageProgressNoteListItem[]>();
 
   data.projectProgressNotes.forEach(note => {
@@ -327,6 +338,18 @@ function createArchiveManifestFromData(
         completedAt: page.completedAt,
         photoPaths,
         colorReference,
+        colorKeys: keysByPage.get(page.id)?.map(key => ({
+          ref: `coloring-color-key:${key.id}` as const,
+          position: key.position,
+          symbol: key.symbol,
+          code: key.code,
+          color_name: key.color_name,
+          swatch: key.swatch,
+          tried: key.tried,
+          note: key.note,
+          created: key.created,
+          updated: key.updated,
+        })),
         progressNotes,
       };
     });
@@ -363,7 +386,9 @@ function createArchiveManifestFromData(
   });
 
   return {
-    schemaVersion: 2,
+    schemaVersion: coloringBooks.some(book => book.pages.some(page => page.colorKeys?.length))
+      ? 4
+      : 2,
     exportedAt,
     appVersion,
     source: 'organized-glitter',
@@ -540,6 +565,7 @@ export async function loadArchiveExportSourceData(): Promise<ArchiveExportSource
     coloringMediumsResult,
     coloringPageProgressNotes,
     colorReferences,
+    colorKeys,
   ] = await Promise.all([
     projectsService.getAllForUser(user.id),
     ProgressNotesService.listAllForUser({ userId: user.id }),
@@ -550,6 +576,7 @@ export async function loadArchiveExportSourceData(): Promise<ArchiveExportSource
     ColoringMediumsService.listColoringMediums(user.id),
     ColoringPageProgressNotesService.listAllForUser({ userId: user.id }),
     ColorReferencesService.list(user.id),
+    ArchiveColorKeysService.list(user.id),
   ]);
 
   const coloringPagesByBookId = await ColoringService.listAllPagesByBook(
@@ -565,6 +592,7 @@ export async function loadArchiveExportSourceData(): Promise<ArchiveExportSource
     coloringMediums: coloringMediumsResult.items,
     coloringPageProgressNotes,
     colorReferences,
+    colorKeys,
   };
 }
 

@@ -705,3 +705,34 @@ describe('v3 validation', () => {
   it('rejects unsupported schemas', () =>
     expect(() => validateArchiveManifestV3({ schemaVersion: 2 })).toThrow());
 });
+
+it('packs and validates a color key with independent page dependencies', async () => {
+  const key: ArchiveSourceItemV3 = {
+    itemId: 'coloring-color-key:k1',
+    kind: 'coloring-color-key',
+    parent: parent(
+      'coloring-page',
+      'coloring-page:p1',
+      parent('coloring-book', 'coloring-book:b1')
+    ),
+    metadata: {
+      position: 0,
+      symbol: 'r:abc123def456ghi',
+      code: '001',
+      color_name: '',
+      swatch: '',
+      tried: [],
+      note: '',
+      created: '2026-01-01 00:00:00.000Z',
+      updated: '2026-01-01 00:00:00.000Z',
+    },
+    assets: [],
+  };
+  const plan = await prepareArchivePlan([key], { backupId, exportedAt });
+  const part = await buildArchivePart(plan, 0);
+  const zip = await JSZip.loadAsync(part.bytes);
+  const manifest = validateArchiveManifestV3(
+    JSON.parse(await zip.file('manifest.json')!.async('string'))
+  );
+  expect(manifest.items[0].metadata).toEqual(key.metadata);
+});

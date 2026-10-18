@@ -23,7 +23,7 @@ import {
 } from '@/features/import-export/archive/archiveManifestJson';
 
 export type DispatchedArchiveImportResult =
-  | { schemaVersion: 1 | 2; result: ArchiveImportResult }
+  | { schemaVersion: 1 | 2 | 4; result: ArchiveImportResult }
   | {
       schemaVersion: 3;
       result: Awaited<
@@ -31,7 +31,7 @@ export type DispatchedArchiveImportResult =
       >;
     };
 
-async function readSchemaVersion(file: File): Promise<1 | 2 | 3> {
+async function readSchemaVersion(file: File): Promise<1 | 2 | 3 | 4> {
   assertImportExportZipWithinSizeLimit(file);
   await assertArchiveCentralDirectoryLimits(file);
   const zip = await JSZip.loadAsync(file);
@@ -60,7 +60,7 @@ export async function importOrganizedGlitterArchives(
 
   if (files.length === 1) {
     const schemaVersion = await readSchemaVersion(files[0]);
-    if (schemaVersion === 1 || schemaVersion === 2) {
+    if (schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 4) {
       return {
         schemaVersion,
         result: await importOrganizedGlitterArchive(files[0]),

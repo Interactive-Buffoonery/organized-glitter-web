@@ -73,20 +73,23 @@ describe('archive import dispatcher', () => {
     mocks.importV3.mockResolvedValue({ success: true });
   });
 
-  it('preserves the legacy v2 route without requiring a v3-capable server', async () => {
-    const file = await schemaFile(2);
-    mocks.importLegacy.mockResolvedValue({
-      archiveSchemaVersion: 2,
-      success: true,
-    });
+  it.each([1, 2, 4])(
+    'routes legacy v%s without requiring a v3-capable server',
+    async schemaVersion => {
+      const file = await schemaFile(schemaVersion);
+      mocks.importLegacy.mockResolvedValue({
+        archiveSchemaVersion: schemaVersion,
+        success: true,
+      });
 
-    const result = await importOrganizedGlitterArchives([file]);
+      const result = await importOrganizedGlitterArchives([file]);
 
-    expect(result.schemaVersion).toBe(2);
-    expect(mocks.importLegacy).toHaveBeenCalledWith(file);
-    expect(mocks.getCapabilities).not.toHaveBeenCalled();
-    expect(mocks.importV3).not.toHaveBeenCalled();
-  });
+      expect(result.schemaVersion).toBe(schemaVersion);
+      expect(mocks.importLegacy).toHaveBeenCalledWith(file);
+      expect(mocks.getCapabilities).not.toHaveBeenCalled();
+      expect(mocks.importV3).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(['null', '[]', '"manifest"', '42', 'true', '{}', '{"schemaVersion":99}'])(
     'rejects invalid manifest root or schema version %s before requesting a restore',

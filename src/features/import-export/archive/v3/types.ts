@@ -1,3 +1,4 @@
+import type { ArchiveColorKeyMetadata } from '../types';
 export type Sha256 = string;
 
 export const ARCHIVE_ITEM_KINDS = [
@@ -8,6 +9,7 @@ export const ARCHIVE_ITEM_KINDS = [
   'coloring-page',
   'coloring-page-note',
   'coloring-color-reference',
+  'coloring-color-key',
   'asset',
 ] as const;
 export type ArchiveItemKind = (typeof ARCHIVE_ITEM_KINDS)[number];
@@ -139,6 +141,7 @@ export interface ArchiveItemMetadataByKind {
   'coloring-page': ColoringPageMetadata;
   'coloring-page-note': ProgressNoteMetadata;
   'coloring-color-reference': ColorReferenceMetadata;
+  'coloring-color-key': ArchiveColorKeyMetadata;
   asset: AssetItemMetadata;
 }
 

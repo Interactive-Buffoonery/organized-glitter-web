@@ -157,6 +157,7 @@ export const ArchiveRestoreItemsItemKindOptions = {
 	"coloring-page": "coloring-page",
 	"coloring-page-note": "coloring-page-note",
 	"coloring-color-reference": "coloring-color-reference",
+	"coloring-color-key": "coloring-color-key",
 	"asset": "asset",
 } as const
 export type ArchiveRestoreItemsItemKindOptions = typeof ArchiveRestoreItemsItemKindOptions[keyof typeof ArchiveRestoreItemsItemKindOptions]

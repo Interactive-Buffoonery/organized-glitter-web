@@ -235,6 +235,7 @@ export function assertArchiveManifestRecordLimits(manifest: {
         addNested(page.photoPaths, 'photo paths');
       }
       if ('progressNotes' in page) addNested(page.progressNotes, 'progress notes');
+      if ('colorKeys' in page) addNested(page.colorKeys, 'color keys');
       if ('mediumRefs' in page) addNested(page.mediumRefs, 'medium references');
       if (
         'colorReference' in page &&

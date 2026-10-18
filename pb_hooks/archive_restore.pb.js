@@ -545,3 +545,88 @@ routerAdd(
   },
   $apis.requireAuth('users')
 );
+
+routerAdd(
+  'POST',
+  '/api/archive/restore-color-key',
+  e => {
+    if (!e.auth.getBool('verified')) throw new ForbiddenError('Email verification is required.');
+    const body = e.requestInfo().body;
+    if (
+      typeof body.archiveFingerprint !== 'string' ||
+      !body.archiveFingerprint ||
+      body.archiveFingerprint.length > 255 ||
+      typeof body.pageId !== 'string' ||
+      !body.key ||
+      typeof body.key !== 'object' ||
+      Array.isArray(body.key) ||
+      typeof body.key.ref !== 'string' ||
+      body.key.ref.length > 255 ||
+      !/^coloring-color-key:[a-z0-9][a-z0-9:._-]*$/.test(body.key.ref)
+    ) {
+      throw new BadRequestError('Invalid archive color key request.');
+    }
+    const metadata = { ...body.key };
+    delete metadata.ref;
+    const authId = e.auth.id;
+    const backupId = $security.sha256('legacy-color-keys:' + body.archiveFingerprint);
+    const digest = $security.sha256(
+      JSON.stringify({
+        pageId: body.pageId,
+        metadata: Object.keys(metadata)
+          .sort()
+          .map(key => [key, metadata[key]]),
+      })
+    );
+    const context = new Context(e.request.context(), 'organized_glitter_archive_restore', true);
+    let result;
+    e.app.runInTransaction(app => {
+      const page = app.findRecordById('coloring_pages', body.pageId);
+      const book = app.findRecordById('coloring_books', page.getString('book'));
+      if (book.getString('user') !== authId) throw new ForbiddenError();
+      const receipts = app.findRecordsByFilter(
+        'archive_restore_items',
+        'user = {:user} && backup_id = {:backup} && item_id = {:item}',
+        '',
+        1,
+        0,
+        { user: authId, backup: backupId, item: body.key.ref }
+      );
+      if (receipts.length) {
+        const receipt = receipts[0];
+        if (receipt.getString('item_digest') !== digest)
+          throw new ApiError(409, 'Archive color key conflicts with an earlier restore.');
+        let target;
+        try {
+          target = app.findRecordById(
+            'coloring_page_color_keys',
+            receipt.getString('target_record_id')
+          );
+        } catch {
+          throw new ApiError(409, 'A previously restored color key was deleted.');
+        }
+        if (target.getString('user') !== authId || target.getString('page') !== page.id)
+          throw new ApiError(409, 'A previously restored color key changed ownership.');
+        result = { id: target.id };
+        return;
+      }
+      const record = new Record(app.findCollectionByNameOrId('coloring_page_color_keys'));
+      record.set('user', authId);
+      record.set('page', page.id);
+      require(`${__hooks}/archive_color_keys.js`).saveKey(app, record, metadata, context);
+      const receipt = new Record(app.findCollectionByNameOrId('archive_restore_items'));
+      receipt.set('user', authId);
+      receipt.set('backup_id', backupId);
+      receipt.set('item_id', body.key.ref);
+      receipt.set('item_kind', 'coloring-color-key');
+      receipt.set('item_digest', digest);
+      receipt.set('state', 'complete');
+      receipt.set('target_collection', 'coloring_page_color_keys');
+      receipt.set('target_record_id', record.id);
+      app.save(receipt);
+      result = { id: record.id };
+    });
+    return e.json(200, result);
+  },
+  $apis.requireAuth('users')
+);

@@ -1,3 +1,5 @@
+import { ArchiveColorKeysService } from '@/services/pocketbase/archiveColorKeys.service';
+import type { ArchiveColorKey } from './types';
 import {
   ColorReferencesService,
   type ColorReferenceRestoreResult,
@@ -160,6 +162,11 @@ export interface ArchiveBundle {
 }
 
 export interface ArchiveImportAdapter {
+  restoreColorKey?(
+    pageId: string,
+    key: ArchiveColorKey,
+    archiveFingerprint: string
+  ): Promise<{ id: string }>;
   restoreColorReference?(
     pageId: string,
     notes: string,
@@ -517,6 +524,9 @@ function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter
     },
     reconcileColoringBookMetrics(bookId) {
       return ArchiveFilesService.reconcileColoringBookMetrics(bookId);
+    },
+    restoreColorKey(pageId, key, archiveFingerprint) {
+      return ArchiveColorKeysService.restore(pageId, userId, key, archiveFingerprint);
     },
     async restoreColorReference(pageId, notes, photoPaths, loadPhoto, restoreKey) {
       return restoreArchivedColorReference(
@@ -1272,6 +1282,21 @@ export async function importArchiveBundle(
               error instanceof Error
                 ? `Page ${page.pageNumber} in ${book.title}: ${error.message}`
                 : `Could not restore color reference for page ${page.pageNumber} in ${book.title}`
+            );
+          }
+        }
+
+        for (const key of page.colorKeys ?? []) {
+          try {
+            if (!adapter.restoreColorKey) throw new Error('Color key restore is unavailable.');
+            const fingerprint =
+              bundle.archiveFingerprint ??
+              (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
+            const restored = await adapter.restoreColorKey(createdPage.id, key, fingerprint);
+            result.refMap[key.ref] = restored.id;
+          } catch (error) {
+            result.errors.push(
+              `Page ${page.pageNumber} in ${book.title}: ${error instanceof Error ? error.message : 'Could not restore color key'}`
             );
           }
         }

@@ -190,6 +190,12 @@ Known concurrency limit: a key saved concurrently with a resolution may keep
   `<symbol> <code>`, where custom shapes use their catalog name and requests use
   their description or "Sent symbol".
 
+## Archives
+
+Archives include color keys with their pages; symbol requests are not included.
+Request placeholder IDs survive restore, subject to the normal same-user late
+resolution hook. See [Import and export](./import-export.md#color-key-archive-extension).
+
 ## Compatibility
 
 Both collections are additive. Released native builds ignore them. The iOS app

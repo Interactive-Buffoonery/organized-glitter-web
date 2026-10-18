@@ -64,6 +64,7 @@ const { serviceMocks, mockCaptureException } = vi.hoisted(() => ({
       createColoringTag: vi.fn(),
       syncBookTags: vi.fn(),
     },
+    archiveColorKeysService: { list: vi.fn().mockResolvedValue([]), restore: vi.fn() },
     colorReferencesService: {
       list: vi.fn().mockResolvedValue([]),
       restore: vi.fn(),
@@ -79,6 +80,10 @@ vi.mock('@/services/analytics-escape-hatch', () => ({
 vi.mock('@/lib/pocketbase', () => ({
   pb: { authStore: { token: '', record: null, onChange: vi.fn(() => vi.fn()) } },
   resolveFileUrl: serviceMocks.pocketbase.resolveFileUrl,
+}));
+
+vi.mock('@/services/pocketbase/archiveColorKeys.service', () => ({
+  ArchiveColorKeysService: serviceMocks.archiveColorKeysService,
 }));
 
 vi.mock('@/services/pocketbase/colorReferences.service', () => ({
@@ -1015,6 +1020,7 @@ describe('archive export', () => {
     ]);
 
     const data = await loadArchiveExportSourceData();
+    expect(serviceMocks.archiveColorKeysService.list).toHaveBeenCalledWith('user-1');
 
     expect(serviceMocks.progressNotesService.listAllForUser).toHaveBeenCalledWith({
       userId: 'user-1',
@@ -4054,5 +4060,97 @@ describe('restoreArchivedColorReference', () => {
       })
     );
     expect(serviceMocks.colorReferencesService.restore).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('color key archives', () => {
+  it('exports page keys, skips orphan keys, preserves placeholders and remaps restores', async () => {
+    const page = makeColoringPage();
+    const key = {
+      id: 'key000000000001',
+      page: page.id,
+      user: 'source-user',
+      position: 0,
+      symbol: 'r:abc123def456ghi',
+      code: '001',
+      color_name: 'Rose',
+      swatch: '#ff00aa',
+      tried: ['002'],
+      note: '  keep spacing  ',
+      created: '2026-01-01 00:00:00.000Z',
+      updated: '2026-02-01 00:00:00.000Z',
+    };
+    const data: ArchiveExportSourceData = {
+      projects: [],
+      projectProgressNotes: [],
+      coloringMediums: [],
+      coloringPageProgressNotes: [],
+      coloringBooks: [
+        {
+          id: 'book-1',
+          userId: 'user-1',
+          title: 'Swatch fixture',
+          publisherId: '',
+          illustratorId: '',
+          series: '',
+          theme: '',
+          isbn: '',
+          edition: '',
+          language: '',
+          sourceUrl: '',
+          datePurchased: '',
+          dateReceived: '',
+          dateStarted: '',
+          dateCompleted: '',
+          bookFormat: '',
+          notes: '',
+          coverImage: '',
+          isMystery: false,
+          status: 'in_stash',
+          totalPages: 1,
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+      coloringPagesByBookId: { 'book-1': [page] },
+      colorKeys: [key, { ...key, id: 'orphan', page: 'absent-page' }],
+    };
+
+    const { blob, manifest } = await createArchiveZipFromData(data);
+    expect(manifest.schemaVersion).toBe(4);
+    const { id, page: _page, user: _user, ...metadata } = key;
+    expect(manifest.coloringBooks[0].pages[0].colorKeys).toEqual([
+      { ref: `coloring-color-key:${id}`, ...metadata },
+    ]);
+    expect(JSON.stringify(manifest)).not.toContain('source-user');
+    expect(JSON.stringify(manifest)).not.toContain('coloring_symbol_requests');
+    const zip = await JSZip.loadAsync(blob);
+    const parsed = validateArchiveManifest(
+      JSON.parse(await zip.file('manifest.json')!.async('string'))
+    );
+    const restore = vi.fn().mockResolvedValue({ id: 'restored-key' });
+    const adapter = makeImportAdapter({
+      createColoringBook: vi.fn().mockResolvedValue({ id: 'new-book' }),
+      listColoringPages: vi
+        .fn()
+        .mockResolvedValue([makeColoringPage({ id: 'new-page', bookId: 'new-book' })]),
+      restoreColorKey: restore,
+    });
+    const bundle = { zip, manifest: parsed, warnings: [], archiveFingerprint: 'keys-fixture' };
+    const result = await importArchiveBundle(bundle, adapter);
+    expect(result.errors).toEqual([]);
+    expect(restore).toHaveBeenCalledWith(
+      'new-page',
+      parsed.coloringBooks[0].pages[0].colorKeys![0],
+      'keys-fixture'
+    );
+    expect(result.refMap[`coloring-color-key:${id}`]).toBe('restored-key');
+    await importArchiveBundle(bundle, adapter);
+    expect(restore.mock.calls[1]).toEqual(restore.mock.calls[0]);
+    delete parsed.coloringBooks[0].pages[0].colorKeys;
+    parsed.schemaVersion = 2;
+    restore.mockClear();
+    expect((await importArchiveBundle(bundle, adapter)).errors).toEqual([]);
+    expect(restore).not.toHaveBeenCalled();
   });
 });

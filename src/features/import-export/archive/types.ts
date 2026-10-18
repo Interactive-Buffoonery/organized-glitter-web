@@ -14,7 +14,8 @@ type ArchiveRef =
   | `coloring-medium:${string}`
   | `coloring-page:${string}`
   | `coloring-page-note:${string}`
-  | `coloring-color-reference:${string}`;
+  | `coloring-color-reference:${string}`
+  | `coloring-color-key:${string}`;
 
 type ArchiveFileRole =
   | 'project-cover'
@@ -80,6 +81,22 @@ interface ArchiveColoringPageProgressNote {
   imagePath?: string;
 }
 
+export interface ArchiveColorKeyMetadata {
+  position: number;
+  symbol: string;
+  code: string;
+  color_name: string;
+  swatch: string;
+  tried: string[];
+  note: string;
+  created: string;
+  updated: string;
+}
+
+export interface ArchiveColorKey extends ArchiveColorKeyMetadata {
+  ref: `coloring-color-key:${string}`;
+}
+
 export interface ArchiveColorReference {
   ref: `coloring-color-reference:${string}`;
   notes: string;
@@ -91,6 +108,7 @@ export interface ArchiveColoringPage {
   oldId: string;
   pageNumber: number;
   colorReference?: ArchiveColorReference;
+  colorKeys?: ArchiveColorKey[];
   status: ColoringPagesStatusOptions;
   mediumRefs: Array<`coloring-medium:${string}`>;
   mediumIds?: string[];
@@ -143,7 +161,7 @@ export interface ArchiveColoringBook {
 }
 
 export interface OrganizedGlitterArchiveManifestV1 {
-  schemaVersion: 1 | 2;
+  schemaVersion: 1 | 2 | 4;
   exportedAt: string;
   appVersion?: string;
   source: 'organized-glitter';

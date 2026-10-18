@@ -13,7 +13,7 @@ export function parseArchiveManifestJson(text: string): Record<string, unknown> 
   return manifest as Record<string, unknown>;
 }
 
-export function getArchiveSchemaVersion(value: unknown): 1 | 2 | 3 {
-  if (value === 1 || value === 2 || value === 3) return value;
+export function getArchiveSchemaVersion(value: unknown): 1 | 2 | 3 | 4 {
+  if (value === 1 || value === 2 || value === 3 || value === 4) return value;
   throw new Error(INVALID_ARCHIVE_SCHEMA_ERROR);
 }

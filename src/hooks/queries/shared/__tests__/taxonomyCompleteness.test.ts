@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ getList: vi.fn() }));
 vi.mock('@/lib/pocketbase', () => ({
   pb: {
+    authStore: { token: '', record: null, onChange: vi.fn(() => vi.fn()) },
     collection: vi.fn(() => ({ getList: mocks.getList })),
     filter: vi.fn((expression: string, values: Record<string, string>) =>
       expression.replace('{:userId}', JSON.stringify(values.userId))

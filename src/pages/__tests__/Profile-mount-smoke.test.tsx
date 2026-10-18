@@ -111,6 +111,13 @@ vi.mock('@/hooks/useAvatar', () => ({
 }));
 
 vi.mock('@/lib/pocketbase', () => ({
+  pb: {
+    authStore: {
+      token: 'profile-test-token',
+      record: { id: 'user-123' },
+      onChange: vi.fn(() => vi.fn()),
+    },
+  },
   resolveFileUrl: vi.fn((_record, _filename) => undefined),
 }));
 

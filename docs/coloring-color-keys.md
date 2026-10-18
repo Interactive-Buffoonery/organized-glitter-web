@@ -157,8 +157,9 @@ Known concurrency limit: a key saved concurrently with a resolution may keep
   pick up the change on their next fetch.
 - Every nonempty `resolved_symbol` must be a canonical Unicode or custom ID,
   including while open or declined. It can be changed or cleared until the
-  previous status is `added` or `matched`, when it becomes immutable. A
-  superuser attempt returns 400. Only matching `r:<request id>` rows are
+  previous status is `added` or `matched`, when it becomes immutable and the
+  status can only move between `added` and `matched`. A superuser attempt
+  returns 400. Only matching `r:<request id>` rows are
   rewritten, so previously resolved choices are not silently reassigned.
 - Resolution and key replacements commit atomically. A failed key save rolls
   back the transaction and returns an error containing the key ID. Resolution

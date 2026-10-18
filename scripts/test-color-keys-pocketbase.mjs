@@ -440,6 +440,15 @@ try {
         error.message.includes('Resolved symbol cannot be changed after resolution')
     );
   }
+  for (const status of ['declined', 'open']) {
+    await assert.rejects(
+      admin.collection(requests).update(request.id, { status }),
+      error =>
+        error.status === 400 &&
+        error.message.includes('A resolved request can only move between added and matched'),
+      status
+    );
+  }
   assert.equal(
     (await admin.collection(requests).getOne(request.id)).resolved_symbol,
     'c:linked-circles'

@@ -99,16 +99,18 @@ function resolveRequest(e) {
     e.app = app;
     try {
       const before = app.findRecordById('coloring_symbol_requests', e.record.id);
-      const previousSymbol = before.getString('resolved_symbol');
+      const wasResolved = ['added', 'matched'].includes(before.getString('status'));
       if (
-        ['added', 'matched'].includes(before.getString('status')) &&
-        previousSymbol !== e.record.getString('resolved_symbol')
+        wasResolved &&
+        before.getString('resolved_symbol') !== e.record.getString('resolved_symbol')
       ) {
         throw new BadRequestError('Resolved symbol cannot be changed after resolution');
       }
       const resolving = validateResolution(e.record);
-      const enteredResolution =
-        resolving && !['added', 'matched'].includes(before.getString('status'));
+      if (wasResolved && !resolving) {
+        throw new BadRequestError('A resolved request can only move between added and matched');
+      }
+      const enteredResolution = resolving && !wasResolved;
       let rewritten = 0;
       if (resolving) {
         // Fetch from offset zero after each batch because saved rows no longer match.

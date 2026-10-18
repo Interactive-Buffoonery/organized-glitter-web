@@ -252,7 +252,8 @@ was rewritten or the status entered `added` or `matched` from an unresolved
 state. Repeat saves and `added`/`matched` transitions send nothing without
 rewrites. Every nonempty `resolved_symbol` must be canonical, including while open or
 declined. It may be changed or cleared until the previous status is `added` or
-`matched`; after that, changes are rejected (HTTP 400).
+`matched`; after that, changes are rejected (HTTP 400), and the status can
+only move between `added` and `matched`.
 A propagation failure rolls back and names the failed key in the error.
 `declined` leaves keys unchanged. Delivery has no retry queue.
 

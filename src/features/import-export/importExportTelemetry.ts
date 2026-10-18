@@ -128,7 +128,11 @@ export function captureImportExportException(
   error: unknown,
   properties: ImportExportExceptionProperties
 ): void {
-  const safeError = new Error('Import/export operation failed');
+  const safeError = new Error(
+    properties.operation === 'restore_coloring_color_key' && error instanceof Error
+      ? error.message
+      : 'Import/export operation failed'
+  );
   safeError.name = 'ImportExportError';
 
   captureException(

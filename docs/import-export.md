@@ -416,7 +416,8 @@ page receipt commit in a single transaction, with one ownership check and one
 receipt lookup. Normal key validation and archived timestamps are preserved. If
 the destination page already has any keys and no receipt for this restore, the
 whole page's keys are skipped with one warning, preserving saved choices.
-A retry of a completed page returns its existing keys without overwriting edits.
+A retry of a completed page returns only its surviving keys without overwriting
+edits. Deleted keys stay deleted and are omitted from the returned reference map.
 A deleted destination or changed archive item reports a conflict and asks the
 user to export again. Invalid keys roll back the entire page batch and receipt.
 Legacy receipt identity uses the archive fingerprint and original page ref;

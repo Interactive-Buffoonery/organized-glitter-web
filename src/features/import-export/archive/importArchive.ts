@@ -1,3 +1,4 @@
+import { createLogger } from '@/utils/logger';
 import {
   ArchiveColorKeysService,
   type ArchiveColorKeysRestoreResult,
@@ -156,6 +157,8 @@ function applyColorReferenceRestoreProgress(
   }
   result.importedPhotoCount += restored.addedPhotoCount;
 }
+
+const logger = createLogger('ArchiveImport');
 
 export interface ArchiveBundle {
   zip: JSZip;
@@ -961,6 +964,9 @@ export async function importArchiveBundle(
     }
   }
 
+  const fingerprint =
+    bundle.archiveFingerprint ??
+    (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
   for (const book of bundle.manifest.coloringBooks) {
     const errorCountBeforeBook = result.errors.length;
     try {
@@ -1249,9 +1255,6 @@ export async function importArchiveBundle(
             if (!adapter.restoreColorReference)
               throw new Error('Color reference restore is unavailable.');
             const reference = page.colorReference;
-            const fingerprint =
-              bundle.archiveFingerprint ??
-              (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
             const restored = await adapter.restoreColorReference(
               createdPage.id,
               reference.notes,
@@ -1293,9 +1296,6 @@ export async function importArchiveBundle(
         if (page.colorKeys?.length) {
           try {
             if (!adapter.restoreColorKeys) throw new Error('Color key restore is unavailable.');
-            const fingerprint =
-              bundle.archiveFingerprint ??
-              (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
             const restored = await adapter.restoreColorKeys(
               createdPage.id,
               page.ref,
@@ -1311,6 +1311,10 @@ export async function importArchiveBundle(
               });
             }
           } catch (error) {
+            logger.error(
+              'Color key restore failed',
+              error instanceof Error ? error.message : 'Unknown restore error'
+            );
             captureImportExportException(error, {
               source: 'archive_import',
               operation: 'restore_coloring_color_key',
@@ -1320,7 +1324,7 @@ export async function importArchiveBundle(
               warning_count: warnings.length,
             });
             result.errors.push(
-              `Page ${page.pageNumber} in ${book.title}: ${error instanceof Error ? error.message : 'Could not restore color keys'}`
+              `Color keys for page ${page.pageNumber} in ${book.title} could not be restored. Export again and retry.`
             );
           }
         }
@@ -1396,6 +1400,6 @@ export async function importOrganizedGlitterArchive(file: File): Promise<Archive
   return withArchiveImportLock(`organized-glitter:archive-import:${user.id}`, () => {
     const adapter = createDefaultArchiveImportAdapter(user.id);
     const recoveryStore = createArchiveImportRecoveryStore(user.id, archiveFingerprint);
-    return importArchiveBundle(bundle, adapter, recoveryStore);
+    return importArchiveBundle({ ...bundle, archiveFingerprint }, adapter, recoveryStore);
   });
 }

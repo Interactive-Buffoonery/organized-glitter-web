@@ -4166,11 +4166,13 @@ describe('color key archives', () => {
     expect(
       skipped.warnings.filter(warning => warning.code === 'skipped-existing-coloring-color-keys')
     ).toHaveLength(1);
-    restore.mockRejectedValueOnce(new Error('Export again to restore these color keys.'));
+    restore.mockRejectedValueOnce(new Error('Invalid or duplicate archive color key.'));
     const failed = await importArchiveBundle(bundle, adapter);
-    expect(failed.errors).toHaveLength(1);
+    expect(failed.errors).toEqual([
+      'Color keys for page 1 in Swatch fixture could not be restored. Export again and retry.',
+    ]);
     expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.any(Error),
+      expect.objectContaining({ message: 'Invalid or duplicate archive color key.' }),
       expect.objectContaining({ operation: 'restore_coloring_color_key' })
     );
     vi.mocked(adapter.listExistingColoringBooks).mockResolvedValue([]);
@@ -4210,7 +4212,15 @@ describe('color key archives', () => {
     const largeArchive = await createArchiveZipFromData(largeData);
     expect(() => validateArchiveManifest(largeArchive.manifest)).not.toThrow();
     largeData.colorKeys.push({ ...key, id: 'over-budget', page: 'page-0' });
-    await expect(createArchiveZipFromData(largeData)).rejects.toThrow('too many color keys');
+    await expect(createArchiveZipFromData(largeData)).rejects.toThrow(
+      'The archive exceeds 100,000 color keys at page 2500 in Swatch fixture.'
+    );
+    await expect(
+      createArchiveZipFromData({
+        ...data,
+        colorKeys: Array.from({ length: 501 }, (_, i) => ({ ...key, id: `limit${i}` })),
+      })
+    ).rejects.toThrow('Page 1 in Swatch fixture has more than 500 color keys.');
     delete parsed.coloringBooks[0].pages[0].colorKeys;
     parsed.schemaVersion = 2;
     restore.mockClear();

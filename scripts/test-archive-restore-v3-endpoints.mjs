@@ -688,6 +688,46 @@ try {
     expectStatus(await restoreLegacyKeys(legacyPageId, pageKeys), 200).outcome,
     'already_applied'
   );
+  const manyPage = await created(complete(page('many-keys', book('many-keys'))), 'coloring_pages');
+  const manyKeys = Array.from({ length: 250 }, (_, position) => ({
+    ...legacyKey,
+    position,
+    ref: `coloring-color-key:many-${position}`,
+  }));
+  const manyOptions = { fingerprint: 'many-keys', pageRef: 'coloring-page:many-keys' };
+  const manyCreated = expectStatus(
+    await restoreLegacyKeys(manyPage.record.id, manyKeys, manyOptions),
+    200
+  );
+  const manyRetry = expectStatus(
+    await restoreLegacyKeys(manyPage.record.id, manyKeys, manyOptions),
+    200
+  );
+  assert.equal(manyRetry.outcome, 'already_applied');
+  assert.deepEqual(manyRetry.refMap, manyCreated.refMap);
+  assert.equal(Object.keys(manyRetry.refMap).length, 250);
+  const deletedRef = manyKeys[0].ref;
+  expectStatus(
+    await json(
+      fetch(
+        `${baseUrl}/api/collections/coloring_page_color_keys/records/${manyCreated.refMap[deletedRef]}`,
+        {
+          method: 'DELETE',
+          headers: authHeaders,
+        }
+      )
+    ),
+    204
+  );
+  const afterDeletion = expectStatus(
+    await restoreLegacyKeys(manyPage.record.id, manyKeys, manyOptions),
+    200
+  );
+  assert.equal(afterDeletion.outcome, 'already_applied');
+  const surviving = { ...manyCreated.refMap };
+  delete surviving[deletedRef];
+  assert.deepEqual(afterDeletion.refMap, surviving);
+  expectStatus(await getRecord('coloring_page_color_keys', manyCreated.refMap[deletedRef]), 404);
   // Restoring an export into its source account or a second export must not duplicate saved keys.
   const before = (await list('coloring_page_color_keys', `page = "${legacyPageId}"`)).length;
   const sourceRows = await list('coloring_page_color_keys', `page = "${legacyPageId}"`);

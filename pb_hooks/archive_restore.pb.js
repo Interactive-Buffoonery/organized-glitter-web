@@ -614,31 +614,25 @@ routerAdd(
         { user: authId, backup: backupId, item: itemId }
       );
       if (receipts.length && receipts[0].getString('item_digest') !== digest) throw conflict();
-      const params = { page: page.id };
-      let keyFilter = 'page = {:page}';
-      if (receipts.length) {
-        const identities = body.keys.map((key, index) => {
-          params['key' + index] = keyId(key.ref);
-          return 'id = {:key' + index + '}';
-        });
-        keyFilter += ' && (' + identities.join(' || ') + ')';
-      }
       const existing = app.findRecordsByFilter(
         'coloring_page_color_keys',
-        keyFilter,
+        'page = {:page}',
         '',
-        receipts.length ? 500 : 1,
+        500,
         0,
-        params
+        { page: page.id }
       );
       if (receipts.length) {
         const ownedIds = new Set(
           existing.filter(row => row.getString('user') === authId).map(row => row.id)
         );
-        if (body.keys.some(key => !ownedIds.has(keyId(key.ref)))) throw conflict();
         result = {
           outcome: 'already_applied',
-          refMap: Object.fromEntries(body.keys.map(key => [key.ref, keyId(key.ref)])),
+          refMap: Object.fromEntries(
+            body.keys
+              .filter(key => ownedIds.has(keyId(key.ref)))
+              .map(key => [key.ref, keyId(key.ref)])
+          ),
         };
         return;
       }

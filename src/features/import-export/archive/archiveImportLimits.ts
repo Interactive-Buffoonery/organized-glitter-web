@@ -239,11 +239,15 @@ export function assertArchiveManifestRecordLimits(manifest: {
       }
       if ('progressNotes' in page) addNested(page.progressNotes, 'progress notes');
       if ('colorKeys' in page && Array.isArray(page.colorKeys)) {
+        const pageName = 'pageNumber' in page ? String(page.pageNumber) : 'unknown';
+        const bookName = 'title' in book ? String(book.title) : 'an untitled book';
         if (page.colorKeys.length > MAX_ARCHIVE_COLOR_KEYS_PER_PAGE)
-          throw new Error('Archive page contains too many color keys');
+          throw new Error(`Page ${pageName} in ${bookName} has more than 500 color keys.`);
         colorKeyCount += page.colorKeys.length;
         if (colorKeyCount > MAX_ARCHIVE_COLOR_KEYS)
-          throw new Error('Archive manifest contains too many color keys');
+          throw new Error(
+            `The archive exceeds 100,000 color keys at page ${pageName} in ${bookName}.`
+          );
       }
       if ('mediumRefs' in page) addNested(page.mediumRefs, 'medium references');
       if (

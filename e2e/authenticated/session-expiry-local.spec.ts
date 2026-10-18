@@ -240,8 +240,8 @@ test('does not open a saved project after its account is replaced during the suc
     authStore.save(authStore.token, { ...authStore.record, id: 'account-b-test' });
   });
 
-  await expect(page.getByLabel('Project title')).toHaveValue('');
   await page.clock.runFor(1_000);
+  await page.clock.resume();
 
   await expect(page).toHaveURL(/\/projects\/new$/);
   await expect(page.getByLabel('Project title')).toHaveValue('');

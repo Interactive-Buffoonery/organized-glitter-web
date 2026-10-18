@@ -103,7 +103,7 @@ for (const [kind, useCreate, create] of [
       expect(create).toHaveBeenCalledOnce();
       expect(create).toHaveBeenCalledWith(input, { accountId: 'account-b', generation: 1 });
       expect(onSuccess).toHaveBeenCalledWith(saved, input, expect.anything(), expect.anything());
-      expect(result.current.variables).toEqual(input);
+      await waitFor(() => expect(result.current.variables).toEqual(input));
     });
 
     it('does not publish a successful old create into the next account', async () => {

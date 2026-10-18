@@ -31,6 +31,7 @@ export const browserSpecInventory = {
     'a11y/mobile-state-a11y.spec.ts',
     'a11y/public-a11y.spec.ts',
     'authenticated/avatar-crop-local.spec.ts',
+    'authenticated/color-keys-local.spec.ts',
     'authenticated/color-references.spec.ts',
     'authenticated/coloring-book-reduction-local.spec.ts',
     'authenticated/coloring-foreign-medium.spec.ts',

@@ -2,16 +2,12 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { Camera } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import catalog from '@/features/coloring/colorKeys/symbolCatalog.json';
-import {
-  getCatalogSymbol,
-  searchSymbols,
-  symbolLabel,
-  symbolsByGroup,
-} from '@/features/coloring/colorKeys/symbols';
+import { searchSymbols, symbolsByGroup } from '@/features/coloring/colorKeys/symbols';
 import { cn } from '@/lib/utils';
 import { ColorKeySheet } from './ColorKeySheet';
 import { SymbolGlyph } from './SymbolGlyph';
 import { readRecentSymbols, rememberRecentSymbol } from './recentSymbols';
+import { symbolName } from './symbolName';
 
 const COLUMNS = 6;
 
@@ -45,8 +41,6 @@ export function SymbolPicker({
     </ColorKeySheet>
   );
 }
-
-const symbolName = (id: string) => getCatalogSymbol(id)?.name ?? symbolLabel(id);
 
 function targetIndex(
   key: string,

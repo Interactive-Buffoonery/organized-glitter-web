@@ -98,6 +98,9 @@ function makeProps(
   };
 }
 
+vi.mock('@/components/coloring/detail/page/colorKeys/ColorKeySection', () => ({
+  ColorKeySection: () => null,
+}));
 vi.mock('@/components/coloring/detail/page/ColorReferenceSection', () => ({
   ColorReferenceSection: () => null,
 }));

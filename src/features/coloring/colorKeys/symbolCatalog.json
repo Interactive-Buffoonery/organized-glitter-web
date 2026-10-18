@@ -1962,13 +1962,6 @@
       "keywords": ["wheel of dharma"]
     },
     {
-      "id": "u:2693",
-      "char": "⚓",
-      "name": "Anchor",
-      "group": "signs",
-      "keywords": ["anchor"]
-    },
-    {
       "id": "u:2691",
       "char": "⚑",
       "name": "Black flag",
@@ -2298,13 +2291,6 @@
       "keywords": ["rotated floral heart bullet", "heart"]
     },
     {
-      "id": "u:2615",
-      "char": "☕",
-      "name": "Hot beverage",
-      "group": "signs",
-      "keywords": ["hot beverage"]
-    },
-    {
       "id": "u:2602",
       "char": "☂",
       "name": "Umbrella",
@@ -2324,13 +2310,6 @@
       "name": "Snowman",
       "group": "signs",
       "keywords": ["snowman"]
-    },
-    {
-      "id": "u:26A1",
-      "char": "⚡",
-      "name": "High voltage sign",
-      "group": "signs",
-      "keywords": ["high voltage sign"]
     },
     {
       "id": "u:2611",
@@ -4879,27 +4858,6 @@
       "name": "Heavy ballot x",
       "group": "shapes",
       "keywords": ["heavy ballot x"]
-    },
-    {
-      "id": "u:2795",
-      "char": "➕",
-      "name": "Heavy plus sign",
-      "group": "shapes",
-      "keywords": ["heavy plus sign"]
-    },
-    {
-      "id": "u:2796",
-      "char": "➖",
-      "name": "Heavy minus sign",
-      "group": "shapes",
-      "keywords": ["heavy minus sign"]
-    },
-    {
-      "id": "u:2797",
-      "char": "➗",
-      "name": "Heavy division sign",
-      "group": "shapes",
-      "keywords": ["heavy division sign"]
     },
     {
       "id": "u:2A2F",

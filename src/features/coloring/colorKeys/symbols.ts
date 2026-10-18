@@ -26,9 +26,11 @@ export function isSymbolId(id: string): boolean {
   return parseSymbolId(id) !== null;
 }
 
+const VARIATION_SELECTORS = /[\uFE0E\uFE0F]/gu;
+
 export function unicodeSymbolId(text: string): string {
-  if (!text) throw new Error('A Unicode symbol must contain at least one code point');
-  const points = Array.from(text, char => char.codePointAt(0)!);
+  const points = Array.from(text.replace(VARIATION_SELECTORS, ''), char => char.codePointAt(0)!);
+  if (!points.length) throw new Error('A Unicode symbol must contain at least one code point');
   if (!points.every(isUnicodeScalar))
     throw new Error('A Unicode symbol must contain valid scalar values');
   return `u:${points.map(point => point.toString(16).toUpperCase().padStart(4, '0')).join('-')}`;
@@ -82,3 +84,9 @@ export const DEFAULT_SETUP_SYMBOLS = Array.from(
   '1234567890abcdefghijklmnopqrstuvwxyz',
   unicodeSymbolId
 );
+
+// Display only: asks for text presentation so emoji-capable symbols do not
+// render as color emoji. Never store the result in an ID or copy text.
+export function symbolDisplayText(text: string): string {
+  return text.replace(/(?![\x00-\x7F])(\p{Emoji})(?![\uFE0E\uFE0F])/gu, '$1\uFE0E');
+}

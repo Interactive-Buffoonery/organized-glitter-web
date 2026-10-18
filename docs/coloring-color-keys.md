@@ -42,8 +42,11 @@ whole-string match, because `$` can match before a trailing line break.
 Rendering rules for clients:
 
 - `u:` renders the decoded code points as text, whether or not the ID is in the
-  client's catalog. Clients use a bundled font with good symbol coverage and
-  fall back to the system font.
+  client's catalog. When rendering, append U+FE0E (text presentation) after
+  every non-ASCII emoji-capable code point that is not already followed by a
+  variation selector, so symbols such as ♥ and ✔ never show as color emoji.
+  IDs never contain U+FE0E or U+FE0F; strip them when building an ID, and keep
+  them out of Copy text.
 - `c:` renders the catalog's vector path. An unknown `c:` slug renders a neutral
   placeholder box with an accessible label of "Unknown symbol".
 - `r:` renders the request's photo thumbnail (`96x96f`). If the request is not

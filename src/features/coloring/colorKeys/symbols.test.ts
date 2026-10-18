@@ -8,6 +8,7 @@ import {
   isSymbolId,
   parseSymbolId,
   searchSymbols,
+  symbolDisplayText,
   symbolLabel,
   symbolsByGroup,
   unicodeSymbolId,
@@ -182,5 +183,26 @@ describe('symbol lookup, search and labels', () => {
     expect(searchSymbols('y with lines').map(({ id }) => id)).toContain('u:00A5');
     expect(searchSymbols('not a real symbol')).toEqual([]);
     expect(searchSymbols('  ')).toEqual(catalog.symbols);
+  });
+});
+
+describe('emoji presentation', () => {
+  it('keeps emoji-by-default code points out of the catalog', () => {
+    const emoji = catalog.symbols.filter(
+      ({ char }) => char && /\p{Emoji_Presentation}/u.test(char)
+    );
+    expect(emoji.map(({ id }) => id)).toEqual([]);
+  });
+
+  it('requests text presentation for display only', () => {
+    expect(symbolDisplayText('♥')).toBe('♥\uFE0E');
+    expect(symbolDisplayText('✔\uFE0F')).toBe('✔\uFE0F');
+    expect(symbolDisplayText('a1#ψ')).toBe('a1#ψ');
+  });
+
+  it('never stores variation selectors in IDs', () => {
+    expect(unicodeSymbolId('♥\uFE0E')).toBe('u:2665');
+    expect(unicodeSymbolId('♥\uFE0F')).toBe('u:2665');
+    expect(() => unicodeSymbolId('\uFE0E')).toThrow();
   });
 });

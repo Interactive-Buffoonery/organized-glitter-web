@@ -11,6 +11,8 @@ interface AuthStoreLike {
   readonly token: string;
   readonly record: AuthRecordLike | null;
   onChange(listener: (token: string, record: AuthRecordLike | null) => void): unknown;
+  save?(token: string, record?: AuthRecordLike | null): unknown;
+  clear?(): unknown;
 }
 
 interface StoredSession {
@@ -21,10 +23,12 @@ interface StoredSession {
 interface EpochMarker {
   accountId: string | null;
   epoch: string;
+  transition?: boolean;
 }
 
 type MarkerRead =
   | { kind: 'valid'; marker: EpochMarker }
+  | { kind: 'transition'; marker: EpochMarker }
   | { kind: 'missing' | 'invalid' | 'unavailable' | 'memory' };
 
 export interface SessionIdentity {
@@ -39,6 +43,7 @@ export interface SessionIdentityTracker {
 }
 
 const sharedTrackers = new WeakMap<object, SessionIdentityTracker>();
+const authMutationHooks = new WeakMap<object, Set<(next: StoredSession) => () => void>>();
 let observingHistoricalTokens = false;
 let fallbackEpochSequence = 0;
 
@@ -95,7 +100,7 @@ function readMarker(storage: Storage | null | undefined): MarkerRead {
       typeof marker?.epoch === 'string' &&
       marker.epoch.length > 0
     ) {
-      return { kind: 'valid', marker };
+      return { kind: marker.transition === true ? 'transition' : 'valid', marker };
     }
   } catch {
     // A corrupt marker invalidates prior work until capture repairs it.
@@ -150,6 +155,72 @@ function observeHistoricalTokens(storage: Storage | null | undefined): void {
   });
 }
 
+function registerAuthMutationHook(
+  authStore: AuthStoreLike,
+  hook: (next: StoredSession) => () => void
+): void {
+  let hooks = authMutationHooks.get(authStore);
+  if (!hooks) {
+    hooks = new Set();
+    authMutationHooks.set(authStore, hooks);
+
+    const begin = (next: StoredSession): Array<() => void> => {
+      const finishers: Array<() => void> = [];
+      for (const registeredHook of hooks!) {
+        try {
+          finishers.push(registeredHook(next));
+        } catch {
+          // Session tracking must not prevent the auth store from handling the mutation.
+        }
+      }
+      return finishers;
+    };
+    const finish = (finishers: Array<() => void>): void => {
+      for (const complete of finishers) {
+        try {
+          complete();
+        } catch {
+          // Preserve an exception from the underlying auth mutation.
+        }
+      }
+    };
+
+    const originalSave = authStore.save;
+    if (typeof originalSave === 'function') {
+      authStore.save = new Proxy(originalSave, {
+        apply(target, thisArg, args) {
+          const token = args[0] as string;
+          const record = args[1] as AuthRecordLike | null | undefined;
+          const finishers = begin({
+            accountId: token && typeof record?.id === 'string' ? record.id : null,
+            token,
+          });
+          try {
+            return Reflect.apply(target, thisArg, args);
+          } finally {
+            finish(finishers);
+          }
+        },
+      });
+    }
+
+    const originalClear = authStore.clear;
+    if (typeof originalClear === 'function') {
+      authStore.clear = new Proxy(originalClear, {
+        apply(target, thisArg, args) {
+          const finishers = begin({ accountId: null, token: '' });
+          try {
+            return Reflect.apply(target, thisArg, args);
+          } finally {
+            finish(finishers);
+          }
+        },
+      });
+    }
+  }
+  hooks.add(hook);
+}
+
 export function createSessionIdentityTracker(
   authStore: AuthStoreLike,
   storage: Storage | null | undefined = currentBrowserStorage()
@@ -158,15 +229,27 @@ export function createSessionIdentityTracker(
   let generation = 0;
   let epoch = '';
   let markerWriteFailed = false;
+  let transitionInProgress = false;
 
   const reconcileSession = (session: StoredSession, initializing = false): void => {
     const previousAccountId = observed.accountId;
     const previousEpoch = epoch;
 
+    if (transitionInProgress) {
+      observed = session;
+      return;
+    }
+
     if (storage === null) {
       if (!epoch || session.accountId !== previousAccountId) epoch = nextEpoch();
     } else {
       const shared = readMarker(storage);
+      if (shared.kind === 'transition') {
+        epoch = '';
+        observed = session;
+        if (!initializing && previousEpoch) generation += 1;
+        return;
+      }
       if (
         !markerWriteFailed &&
         shared.kind === 'valid' &&
@@ -200,6 +283,58 @@ export function createSessionIdentityTracker(
       accountId: token && typeof record?.id === 'string' ? record.id : null,
       token,
     });
+  });
+
+  registerAuthMutationHook(authStore, next => {
+    const current = liveSession(authStore) ?? observed;
+    const shared = readMarker(storage);
+    if (current.accountId === next.accountId && shared.kind !== 'transition') return () => {};
+
+    rememberSession(current);
+    const transitionEpoch = nextEpoch();
+    transitionInProgress = true;
+    generation += 1;
+    epoch = '';
+
+    if (storage !== null) {
+      if (
+        writeMarker(storage, {
+          accountId: next.accountId,
+          epoch: transitionEpoch,
+          transition: true,
+        })
+      ) {
+        markerWriteFailed = false;
+      } else {
+        markerWriteFailed = true;
+        removeMarker(storage);
+      }
+    }
+
+    return () => {
+      const actual = liveSession(authStore);
+      transitionInProgress = false;
+      if (!actual) {
+        epoch = '';
+        markerWriteFailed = true;
+        removeMarker(storage ?? undefined);
+        return;
+      }
+
+      observed = actual;
+      if (storage === null) {
+        epoch = transitionEpoch;
+        return;
+      }
+      if (writeMarker(storage, { accountId: actual.accountId, epoch: transitionEpoch })) {
+        epoch = transitionEpoch;
+        markerWriteFailed = false;
+      } else {
+        epoch = '';
+        markerWriteFailed = true;
+        removeMarker(storage);
+      }
+    };
   });
 
   return {

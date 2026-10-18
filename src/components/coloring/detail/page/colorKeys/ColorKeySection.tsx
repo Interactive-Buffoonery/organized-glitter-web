@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Section, SectionHeading } from '@/components/shared/Section';
+import { ClientResponseError } from 'pocketbase';
 import { Button } from '@/components/ui/button';
 import { DEFAULT_SETUP_SYMBOLS } from '@/features/coloring/colorKeys/symbols';
 import { useColorKeys, useSymbolRequests } from '@/hooks/queries/coloring/useColorKeys';
@@ -74,6 +75,8 @@ function ColorKeyEditor({
       // The setup grid unmounts with focus inside it; land on the heading instead.
       document.getElementById(`color-keys-${pageId}`)?.focus();
     } catch (error) {
+      // Another device set the page up first; the refetched rows are the answer.
+      if (error instanceof ClientResponseError && error.status === 409) return;
       logger.warn('Could not set up color keys', error);
       notifyError('Could not save the symbols. Try again.');
     }

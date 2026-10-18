@@ -32,7 +32,7 @@ export function colorKeyCopyText(
       const symbol = symbolLabel(row.symbol, {
         requestDescription: requestFor(row.symbol, requests)?.description,
       }).replace(/[︎️]/gu, '');
-      return `${symbol} ${row.code.trim()}`.trim();
+      return `${symbol} ${row.code}`.replace(/\s+/g, ' ').trim();
     })
     .join('\n');
 }

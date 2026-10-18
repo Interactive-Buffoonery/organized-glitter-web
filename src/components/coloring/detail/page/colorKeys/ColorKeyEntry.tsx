@@ -56,12 +56,18 @@ interface ColorKeyEntryProps {
   onRequestSymbol?: () => void;
 }
 
-const REMOVED_ELSEWHERE = 'This color was removed on another device.';
+const GONE = 'This color is no longer on this page. Save again to add it back.';
 const HEX = /^#?([0-9a-f]{6})$/i;
+const tidyHex = (value: string) => {
+  const match = HEX.exec(value.trim());
+  return match ? `#${match[1].toUpperCase()}` : value;
+};
 
 export function ColorKeyEntry({ target, onClose, ...props }: ColorKeyEntryProps) {
   const formKey = target ? `${target.row?.id ?? 'new'}:${target.symbol}` : '';
   const [changed, setChanged] = useState<{ formKey: string; symbol: string } | null>(null);
+  // A closed entry forgets a picked symbol, so reopening the same row starts clean.
+  if (!target && changed) setChanged(null);
   const symbol = changed?.formKey === formKey ? changed.symbol : target?.symbol;
   const request = symbol ? requestFor(symbol, props.requests) : undefined;
   const name = symbol ? symbolDisplayName(symbol, request) : '';
@@ -117,6 +123,8 @@ function EntryForm({
   const [triedDraft, setTriedDraft] = useState('');
   const [note, setNote] = useState(row?.note ?? '');
   const [error, setError] = useState<string | null>(null);
+  // The row was deleted, or is no longer ours to edit; the next save adds it back.
+  const [gone, setGone] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
@@ -171,10 +179,7 @@ function EntryForm({
     flushSync(() => setTried(values => values.filter(item => item !== value)));
     (nextButton ?? triedInput.current)?.focus();
   };
-  const tidySwatch = () => {
-    const match = HEX.exec(swatch.trim());
-    if (match) setSwatch(`#${match[1].toUpperCase()}`);
-  };
+  const tidySwatch = () => setSwatch(tidyHex);
 
   const save = async (goNext: boolean) => {
     if (busy) return;
@@ -185,7 +190,7 @@ function EntryForm({
       position: target.position,
       code,
       color_name: colorName,
-      swatch,
+      swatch: tidyHex(swatch),
       tried:
         draft && !tried.includes(draft) && tried.length < COLOR_KEY_LIMITS.tried
           ? [...tried, draft]
@@ -193,12 +198,12 @@ function EntryForm({
       note,
     };
     try {
-      if (row) await update.mutateAsync({ id: row.id, input });
+      if (row && !gone) await update.mutateAsync({ id: row.id, input });
       else await create.mutateAsync(input);
     } catch (saveError) {
-      if (saveError instanceof ClientResponseError && saveError.status === 404) {
-        notifyError(REMOVED_ELSEWHERE);
-        onClose();
+      if (row && !gone && saveError instanceof ClientResponseError && saveError.status === 404) {
+        setGone(true);
+        setError(GONE);
         return;
       }
       logger.warn('Could not save a color key', saveError);

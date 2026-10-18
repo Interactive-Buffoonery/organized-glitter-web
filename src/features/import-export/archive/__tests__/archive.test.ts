@@ -4128,29 +4128,98 @@ describe('color key archives', () => {
     const parsed = validateArchiveManifest(
       JSON.parse(await zip.file('manifest.json')!.async('string'))
     );
-    const restore = vi.fn().mockResolvedValue({ id: 'restored-key' });
+    const restore = vi.fn().mockResolvedValue({
+      outcome: 'created',
+      refMap: { 'coloring-color-key:key000000000001': 'restored-key' },
+    });
     const adapter = makeImportAdapter({
       createColoringBook: vi.fn().mockResolvedValue({ id: 'new-book' }),
       listColoringPages: vi
         .fn()
         .mockResolvedValue([makeColoringPage({ id: 'new-page', bookId: 'new-book' })]),
-      restoreColorKey: restore,
+      restoreColorKeys: restore,
     });
     const bundle = { zip, manifest: parsed, warnings: [], archiveFingerprint: 'keys-fixture' };
     const result = await importArchiveBundle(bundle, adapter);
     expect(result.errors).toEqual([]);
     expect(restore).toHaveBeenCalledWith(
       'new-page',
-      parsed.coloringBooks[0].pages[0].colorKeys![0],
+      parsed.coloringBooks[0].pages[0].ref,
+      parsed.coloringBooks[0].pages[0].colorKeys,
       'keys-fixture'
     );
     expect(result.refMap[`coloring-color-key:${id}`]).toBe('restored-key');
     await importArchiveBundle(bundle, adapter);
     expect(restore.mock.calls[1]).toEqual(restore.mock.calls[0]);
+    parsed.coloringBooks[0].pages[0].colorKeys!.push({
+      ...parsed.coloringBooks[0].pages[0].colorKeys![0],
+      ref: 'coloring-color-key:second',
+    });
+    restore.mockClear();
+    restore.mockResolvedValue({ outcome: 'skipped', refMap: {} });
+    vi.mocked(adapter.listExistingColoringBooks).mockResolvedValue([
+      { id: 'new-book', title: 'Swatch fixture', publisher: '', illustrator: '' },
+    ]);
+    const skipped = await importArchiveBundle(bundle, adapter);
+    expect(skipped.errors).toEqual([]);
+    expect(restore).toHaveBeenCalledOnce();
+    expect(
+      skipped.warnings.filter(warning => warning.code === 'skipped-existing-coloring-color-keys')
+    ).toHaveLength(1);
+    restore.mockRejectedValueOnce(new Error('Export again to restore these color keys.'));
+    const failed = await importArchiveBundle(bundle, adapter);
+    expect(failed.errors).toHaveLength(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ operation: 'restore_coloring_color_key' })
+    );
+    vi.mocked(adapter.listExistingColoringBooks).mockResolvedValue([]);
+    const secondPage = {
+      ...parsed.coloringBooks[0].pages[0],
+      ref: 'coloring-page:second' as const,
+      oldId: 'second',
+      pageNumber: 2,
+    };
+    expect(() =>
+      validateArchiveManifest({
+        ...parsed,
+        coloringBooks: [
+          {
+            ...parsed.coloringBooks[0],
+            totalPages: 2,
+            pages: [parsed.coloringBooks[0].pages[0], secondPage],
+          },
+        ],
+      })
+    ).toThrow('duplicate color key');
+    const largeData = {
+      ...data,
+      coloringBooks: [{ ...data.coloringBooks[0], totalPages: 2500 }],
+      coloringPagesByBookId: {
+        'book-1': Array.from({ length: 2500 }, (_, i) =>
+          makeColoringPage({ id: `page-${i}`, pageNumber: i + 1 })
+        ),
+      },
+      colorKeys: Array.from({ length: 100000 }, (_, i) => ({
+        ...key,
+        id: `key${i}`,
+        page: `page-${Math.floor(i / 40)}`,
+        position: i % 40,
+      })),
+    };
+    const largeArchive = await createArchiveZipFromData(largeData);
+    expect(() => validateArchiveManifest(largeArchive.manifest)).not.toThrow();
+    largeData.colorKeys.push({ ...key, id: 'over-budget', page: 'page-0' });
+    await expect(createArchiveZipFromData(largeData)).rejects.toThrow('too many color keys');
     delete parsed.coloringBooks[0].pages[0].colorKeys;
     parsed.schemaVersion = 2;
     restore.mockClear();
-    expect((await importArchiveBundle(bundle, adapter)).errors).toEqual([]);
+    vi.mocked(adapter.createColoringBook).mockClear();
+    const oldResult = await importArchiveBundle(bundle, adapter);
+    expect(oldResult.errors).toEqual([]);
+    expect(oldResult.createdColoringBookCount).toBe(1);
+    expect(adapter.createColoringBook).toHaveBeenCalledOnce();
+    expect(oldResult.refMap[parsed.coloringBooks[0].pages[0].ref]).toBe('new-page');
     expect(restore).not.toHaveBeenCalled();
   });
 });

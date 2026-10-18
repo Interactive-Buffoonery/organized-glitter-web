@@ -11,6 +11,11 @@ export interface ArchiveColorKeyRecord extends ArchiveColorKeyMetadata {
   user: string;
 }
 
+export interface ArchiveColorKeysRestoreResult {
+  outcome: 'created' | 'already_applied' | 'skipped';
+  refMap: Partial<Record<ArchiveColorKey['ref'], string>>;
+}
+
 function requireOwner(userId: string) {
   if (!userId || getCurrentUserId() !== userId)
     throw new Error('Your account changed. Reopen this page.');
@@ -31,13 +36,14 @@ export const ArchiveColorKeysService = {
   async restore(
     pageId: string,
     userId: string,
-    key: ArchiveColorKey,
+    pageRef: string,
+    keys: ArchiveColorKey[],
     archiveFingerprint: string
-  ): Promise<{ id: string }> {
+  ): Promise<ArchiveColorKeysRestoreResult> {
     requireOwner(userId);
-    const result = await pb.send<{ id: string }>('/api/archive/restore-color-key', {
+    const result = await pb.send<ArchiveColorKeysRestoreResult>('/api/archive/restore-color-keys', {
       method: 'POST',
-      body: { pageId, key, archiveFingerprint },
+      body: { pageId, pageRef, keys, archiveFingerprint },
     });
     requireOwner(userId);
     return result;

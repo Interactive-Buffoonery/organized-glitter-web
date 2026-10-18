@@ -1,3 +1,4 @@
+import { validateArchiveManifest } from '../archiveManifest';
 import JSZip from 'jszip';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -90,6 +91,65 @@ describe('archive import dispatcher', () => {
       expect(mocks.importV3).not.toHaveBeenCalled();
     }
   );
+
+  it('dispatches a complete v4 manifest through the real validator', async () => {
+    const manifest = {
+      schemaVersion: 4,
+      source: 'organized-glitter',
+      exportedAt: '2026-01-01T00:00:00Z',
+      files: [],
+      diamondProjects: [],
+      coloringMediums: [],
+      warnings: [],
+      coloringBooks: [
+        {
+          ref: 'coloring-book:b',
+          oldId: 'b',
+          title: 'Book',
+          totalPages: 1,
+          tags: [],
+          pages: [
+            {
+              ref: 'coloring-page:p',
+              oldId: 'p',
+              pageNumber: 1,
+              status: 'not_started',
+              mediumRefs: [],
+              photoPaths: [],
+              progressNotes: [],
+              colorKeys: [
+                {
+                  ref: 'coloring-color-key:k',
+                  position: 0,
+                  symbol: 'u:0031',
+                  code: '',
+                  color_name: '',
+                  swatch: '',
+                  tried: [],
+                  note: '',
+                  created: '2026-01-01 00:00:00.000Z',
+                  updated: '2026-01-01 00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    mocks.importLegacy.mockImplementationOnce(async file => {
+      const zip = await JSZip.loadAsync(file);
+      const validated = validateArchiveManifest(
+        JSON.parse(await zip.file('manifest.json')!.async('string'))
+      );
+      return { success: true, archiveSchemaVersion: validated.schemaVersion };
+    });
+    const result = await importOrganizedGlitterArchives([
+      await manifestFile(JSON.stringify(manifest)),
+    ]);
+    expect(result.schemaVersion).toBe(4);
+    expect(result.result.success).toBe(true);
+    expect(mocks.importV3).not.toHaveBeenCalled();
+  });
 
   it.each(['null', '[]', '"manifest"', '42', 'true', '{}', '{"schemaVersion":99}'])(
     'rejects invalid manifest root or schema version %s before requesting a restore',

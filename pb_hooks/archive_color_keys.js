@@ -1,5 +1,4 @@
 function saveKey(app, record, metadata, context) {
-  require(`${__hooks}/color_keys.js`).prepareKeyCreate(metadata);
   const fields = [
     'position',
     'symbol',
@@ -19,6 +18,7 @@ function saveKey(app, record, metadata, context) {
   ) {
     throw new BadRequestError('Invalid color key metadata.');
   }
+  require(`${__hooks}/color_keys.js`).prepareKeyCreate(metadata);
   for (const field of fields) {
     if (field !== 'position' && field !== 'tried' && typeof metadata[field] !== 'string')
       throw new BadRequestError('Invalid color key text.');

@@ -6,7 +6,7 @@ const date = z
   .string()
   .min(1)
   .max(40)
-  .refine(value => Number.isFinite(Date.parse(value)));
+  .refine(value => Number.isFinite(Date.parse(value.replace(' ', 'T'))));
 export const archiveColorKeyMetadataSchema = z
   .object({
     position: z.number().int().nonnegative(),

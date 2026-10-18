@@ -634,78 +634,189 @@ try {
     expectStatus(await restore(bad), 400);
     assert.equal((await list('archive_restore_items', `item_id = "${bad.itemId}"`)).length, 0);
   }
-  async function restoreLegacyKey(pageId, key, headers = authHeaders) {
+  async function restoreLegacyKeys(pageId, keys, options = {}) {
     return json(
-      fetch(`${baseUrl}/api/archive/restore-color-key`, {
+      fetch(`${baseUrl}/api/archive/restore-color-keys`, {
         method: 'POST',
-        headers: { ...headers, 'content-type': 'application/json' },
-        body: JSON.stringify({ pageId, archiveFingerprint: 'legacy-key-fixture', key }),
+        headers: { ...(options.headers ?? authHeaders), 'content-type': 'application/json' },
+        body: JSON.stringify({
+          pageId,
+          pageRef: options.pageRef ?? 'coloring-page:legacy',
+          archiveFingerprint: options.fingerprint ?? 'legacy-key-fixture',
+          keys,
+        }),
       })
     );
   }
   const legacyKey = { ref: 'coloring-color-key:legacy', ...keyMetadata };
-  const legacyResult = expectStatus(await restoreLegacyKey(pageResult.record.id, legacyKey), 200);
-  const legacyRecord = expectStatus(
-    await getRecord('coloring_page_color_keys', legacyResult.id),
-    200
+  const legacyPage = await created(
+    complete(page('legacy-keys', book('legacy-keys'))),
+    'coloring_pages'
   );
-  assert.equal(legacyRecord.user, userId);
-  assert.equal(legacyRecord.page, pageResult.record.id);
-  for (const [field, value] of Object.entries(keyMetadata))
-    assert.deepEqual(legacyRecord[field], value, field);
+  const legacyPageId = legacyPage.record.id;
+  const pageKeys = [
+    legacyKey,
+    {
+      ...legacyKey,
+      ref: 'coloring-color-key:legacy-two',
+      position: 1,
+      tried: Array(20).fill('001'),
+    },
+  ];
+  const legacyResult = expectStatus(await restoreLegacyKeys(legacyPageId, pageKeys), 200);
+  assert.equal(legacyResult.outcome, 'created');
   assert.equal(
-    expectStatus(await restoreLegacyKey(pageResult.record.id, legacyKey), 200).id,
-    legacyResult.id
+    (
+      await list(
+        'archive_restore_items',
+        `user = "${userId}" && target_collection = "coloring_pages" && target_record_id = "${legacyPageId}" && item_kind = "coloring-color-key"`
+      )
+    ).length,
+    1
   );
-  expectStatus(await restoreLegacyKey(pageResult.record.id, legacyKey, outsider.headers), 403);
-  expectStatus(await restoreLegacyKey('missing00000000', legacyKey), 404);
+  for (const key of pageKeys) {
+    const record = expectStatus(
+      await getRecord('coloring_page_color_keys', legacyResult.refMap[key.ref]),
+      200
+    );
+    assert.equal(record.user, userId);
+    assert.equal(record.page, legacyPageId);
+    for (const [field, value] of Object.entries(key))
+      if (field !== 'ref') assert.deepEqual(record[field], value, field);
+  }
+  assert.equal(
+    expectStatus(await restoreLegacyKeys(legacyPageId, pageKeys), 200).outcome,
+    'already_applied'
+  );
+  // Restoring an export into its source account or a second export must not duplicate saved keys.
+  const before = (await list('coloring_page_color_keys', `page = "${legacyPageId}"`)).length;
+  const sourceRows = await list('coloring_page_color_keys', `page = "${legacyPageId}"`);
+  const sourceExport = sourceRows.map(row => ({
+    ...keyMetadata,
+    position: row.position,
+    ref: `coloring-color-key:${row.id}`,
+  }));
+  assert.equal(
+    expectStatus(
+      await restoreLegacyKeys(legacyPageId, sourceExport, { fingerprint: 'source-account-export' }),
+      200
+    ).outcome,
+    'skipped'
+  );
+  assert.equal(
+    expectStatus(
+      await restoreLegacyKeys(legacyPageId, pageKeys, { fingerprint: 'second-export' }),
+      200
+    ).outcome,
+    'skipped'
+  );
+  assert.equal((await list('coloring_page_color_keys', `page = "${legacyPageId}"`)).length, before);
+  expectStatus(await restoreLegacyKeys(legacyPageId, pageKeys, { headers: outsider.headers }), 403);
+  expectStatus(await restoreLegacyKeys('missing00000000', pageKeys), 404);
+  const emptyPage = await created(
+    complete(page('invalid-keys', book('invalid-keys'))),
+    'coloring_pages'
+  );
   for (const invalid of [
-    { tried: [42] },
-    { swatch: '#zzz000' },
-    { symbol: 'invalid' },
-    { position: null },
+    null,
+    { ...legacyKey, tried: [42] },
+    { ...legacyKey, tried: Array(21).fill('001') },
+    { ...legacyKey, swatch: '#zzz000' },
+    { ...legacyKey, symbol: 'invalid' },
+    { ...legacyKey, position: null },
   ]) {
     expectStatus(
-      await restoreLegacyKey(pageResult.record.id, {
-        ...legacyKey,
-        ref: `coloring-color-key:invalid-${Object.keys(invalid)[0]}`,
-        ...invalid,
-      }),
+      await restoreLegacyKeys(
+        emptyPage.record.id,
+        [legacyKey, invalid && { ...invalid, ref: 'coloring-color-key:invalid' }],
+        { pageRef: 'coloring-page:invalid' }
+      ),
       400
     );
+    assert.equal(
+      (await list('coloring_page_color_keys', `page = "${emptyPage.record.id}"`)).length,
+      0
+    );
   }
-  assert.equal((await list('coloring_symbol_requests', `user = "${userId}"`)).length, 0);
-
-  const keyCountBeforeRollback = (await list('coloring_page_color_keys', `user = "${userId}"`))
-    .length;
+  expectStatus(await restoreLegacyKeys(emptyPage.record.id, Array(501).fill(legacyKey)), 400);
+  expectStatus(await restoreLegacyKeys(emptyPage.record.id, [legacyKey, legacyKey]), 400);
   const rollbackKey = complete({ ...keyItem, itemId: 'coloring-color-key:rollback' });
   expectStatus(await restore(rollbackKey), 400);
   expectStatus(
-    await restoreLegacyKey(pageResult.record.id, { ...legacyKey, ref: rollbackKey.itemId }),
+    await restoreLegacyKeys(emptyPage.record.id, pageKeys, { pageRef: 'coloring-page:rollback' }),
     400
   );
   assert.equal(
-    (await list('coloring_page_color_keys', `user = "${userId}"`)).length,
-    keyCountBeforeRollback
-  );
-  assert.equal(
-    (await list('archive_restore_items', 'item_id = "coloring-color-key:rollback"')).length,
+    (await list('coloring_page_color_keys', `page = "${emptyPage.record.id}"`)).length,
     0
   );
-  expectStatus(
-    await restoreLegacyKey(pageResult.record.id, { ...legacyKey, note: 'changed' }),
-    409
+  assert.equal(
+    (
+      await list(
+        'archive_restore_items',
+        'item_id = "coloring-color-key:page:coloring-page:rollback"'
+      )
+    ).length,
+    0
   );
+  expectStatus(await restoreLegacyKeys(legacyPageId, [{ ...legacyKey, note: 'changed' }]), 409);
   expectStatus(
     await json(
-      fetch(`${baseUrl}/api/collections/coloring_page_color_keys/records/${legacyResult.id}`, {
+      fetch(`${baseUrl}/api/collections/coloring_books/records/${legacyPage.record.book}`, {
         method: 'DELETE',
         headers: authHeaders,
       })
     ),
     204
   );
-  expectStatus(await restoreLegacyKey(pageResult.record.id, legacyKey), 409);
+  const moved = expectStatus(await restoreLegacyKeys(emptyPage.record.id, pageKeys), 409);
+  assert.match(moved.message, /export again/i);
+
+  const requestForm = new FormData();
+  requestForm.set('user', userId);
+  requestForm.set('book_label', 'Archive resolved symbol');
+  requestForm.set('email', 'archive-symbol@example.test');
+  requestForm.set('photo', new Blob([bytes], { type: 'image/png' }), 'symbol.png');
+  const request = expectStatus(
+    await json(
+      fetch(`${baseUrl}/api/collections/coloring_symbol_requests/records`, {
+        method: 'POST',
+        headers: adminHeaders,
+        body: requestForm,
+      })
+    ),
+    200
+  );
+  expectStatus(
+    await json(
+      fetch(`${baseUrl}/api/collections/coloring_symbol_requests/records/${request.id}`, {
+        method: 'PATCH',
+        headers: jsonHeaders,
+        body: JSON.stringify({ status: 'added', resolved_symbol: 'u:0031' }),
+      })
+    ),
+    200
+  );
+  const resolved = expectStatus(
+    await restoreLegacyKeys(emptyPage.record.id, [{ ...legacyKey, symbol: `r:${request.id}` }], {
+      fingerprint: 'resolved-placeholder',
+    }),
+    200
+  );
+  assert.equal(
+    expectStatus(await getRecord('coloring_page_color_keys', resolved.refMap[legacyKey.ref]), 200)
+      .symbol,
+    'u:0031'
+  );
+  const v3Resolved = await created(
+    complete({
+      ...keyItem,
+      itemId: 'coloring-color-key:resolved',
+      metadata: { ...keyMetadata, symbol: `r:${request.id}` },
+    }),
+    'coloring_page_color_keys'
+  );
+  assert.equal(v3Resolved.record.symbol, 'u:0031');
 
   const longReference = complete({
     itemId: `coloring-color-reference:${'x'.repeat(220)}`,

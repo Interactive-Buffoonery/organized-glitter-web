@@ -185,3 +185,20 @@ describe('archive import limits', () => {
     await expect(readBoundedBlob(photo, 8, budget, 10)).rejects.toThrow(/expanded data/i);
   });
 });
+
+it('counts keys separately but retains a combined record cap and page cap', () => {
+  const keyedPages = Array.from({ length: 2500 }, () => ({ colorKeys: Array(40).fill({}) }));
+  expect(() =>
+    assertArchiveManifestRecordLimits({ coloringBooks: [{ pages: keyedPages }] })
+  ).not.toThrow();
+  expect(() =>
+    assertArchiveManifestRecordLimits({
+      coloringBooks: [{ pages: [...keyedPages, ...Array(97500).fill({})] }],
+    })
+  ).toThrow('too many records');
+  expect(() =>
+    assertArchiveManifestRecordLimits({
+      coloringBooks: [{ pages: [{ colorKeys: Array(501).fill({}) }] }],
+    })
+  ).toThrow('page contains too many color keys');
+});

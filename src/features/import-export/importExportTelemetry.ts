@@ -35,6 +35,7 @@ type ImportExportExceptionOperation =
   | 'preview_dac_csv'
   | 'read_archive_manifest'
   | 'restore_coloring_color_reference'
+  | 'restore_coloring_color_key'
   | 'restore_coloring_page_metadata';
 
 type AnalyticsEventName = (typeof AnalyticsEvent)[keyof typeof AnalyticsEvent];

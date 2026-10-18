@@ -1,4 +1,7 @@
-import { ArchiveColorKeysService } from '@/services/pocketbase/archiveColorKeys.service';
+import {
+  ArchiveColorKeysService,
+  type ArchiveColorKeysRestoreResult,
+} from '@/services/pocketbase/archiveColorKeys.service';
 import type { ArchiveColorKey } from './types';
 import {
   ColorReferencesService,
@@ -162,11 +165,12 @@ export interface ArchiveBundle {
 }
 
 export interface ArchiveImportAdapter {
-  restoreColorKey?(
+  restoreColorKeys?(
     pageId: string,
-    key: ArchiveColorKey,
+    pageRef: string,
+    keys: ArchiveColorKey[],
     archiveFingerprint: string
-  ): Promise<{ id: string }>;
+  ): Promise<ArchiveColorKeysRestoreResult>;
   restoreColorReference?(
     pageId: string,
     notes: string,
@@ -525,8 +529,8 @@ function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter
     reconcileColoringBookMetrics(bookId) {
       return ArchiveFilesService.reconcileColoringBookMetrics(bookId);
     },
-    restoreColorKey(pageId, key, archiveFingerprint) {
-      return ArchiveColorKeysService.restore(pageId, userId, key, archiveFingerprint);
+    restoreColorKeys(pageId, pageRef, keys, archiveFingerprint) {
+      return ArchiveColorKeysService.restore(pageId, userId, pageRef, keys, archiveFingerprint);
     },
     async restoreColorReference(pageId, notes, photoPaths, loadPhoto, restoreKey) {
       return restoreArchivedColorReference(
@@ -1286,17 +1290,37 @@ export async function importArchiveBundle(
           }
         }
 
-        for (const key of page.colorKeys ?? []) {
+        if (page.colorKeys?.length) {
           try {
-            if (!adapter.restoreColorKey) throw new Error('Color key restore is unavailable.');
+            if (!adapter.restoreColorKeys) throw new Error('Color key restore is unavailable.');
             const fingerprint =
               bundle.archiveFingerprint ??
               (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
-            const restored = await adapter.restoreColorKey(createdPage.id, key, fingerprint);
-            result.refMap[key.ref] = restored.id;
+            const restored = await adapter.restoreColorKeys(
+              createdPage.id,
+              page.ref,
+              page.colorKeys,
+              fingerprint
+            );
+            Object.assign(result.refMap, restored.refMap);
+            if (restored.outcome === 'skipped') {
+              warnings.push({
+                code: 'skipped-existing-coloring-color-keys',
+                recordRef: page.ref,
+                message: `Page ${page.pageNumber} in ${book.title} already has color keys. Saved keys were kept.`,
+              });
+            }
           } catch (error) {
+            captureImportExportException(error, {
+              source: 'archive_import',
+              operation: 'restore_coloring_color_key',
+              archive_schema_version: result.archiveSchemaVersion,
+              status: 'partial',
+              failed_count: result.errors.length + 1,
+              warning_count: warnings.length,
+            });
             result.errors.push(
-              `Page ${page.pageNumber} in ${book.title}: ${error instanceof Error ? error.message : 'Could not restore color key'}`
+              `Page ${page.pageNumber} in ${book.title}: ${error instanceof Error ? error.message : 'Could not restore color keys'}`
             );
           }
         }

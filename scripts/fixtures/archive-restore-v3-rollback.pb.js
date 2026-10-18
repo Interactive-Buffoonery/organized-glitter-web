@@ -6,7 +6,8 @@ onRecordCreate(e => {
   if (
     itemId === 'asset:rollback-new-file' ||
     itemId === 'asset:rollback-gallery' ||
-    itemId === 'coloring-color-key:rollback'
+    itemId === 'coloring-color-key:rollback' ||
+    itemId === 'coloring-color-key:page:coloring-page:rollback'
   ) {
     throw new Error('forced rollback after archive target and receipt save');
   }

@@ -548,7 +548,7 @@ routerAdd(
 
 routerAdd(
   'POST',
-  '/api/archive/restore-color-key',
+  '/api/archive/restore-color-keys',
   e => {
     if (!e.auth.getBool('verified')) throw new ForbiddenError('Email verification is required.');
     const body = e.requestInfo().body;
@@ -557,27 +557,48 @@ routerAdd(
       !body.archiveFingerprint ||
       body.archiveFingerprint.length > 255 ||
       typeof body.pageId !== 'string' ||
-      !body.key ||
-      typeof body.key !== 'object' ||
-      Array.isArray(body.key) ||
-      typeof body.key.ref !== 'string' ||
-      body.key.ref.length > 255 ||
-      !/^coloring-color-key:[a-z0-9][a-z0-9:._-]*$/.test(body.key.ref)
+      typeof body.pageRef !== 'string' ||
+      !/^coloring-page:[a-z0-9][a-z0-9:._-]*$/.test(body.pageRef) ||
+      body.pageRef.length > 220 ||
+      !Array.isArray(body.keys) ||
+      !body.keys.length ||
+      body.keys.length > 500
     ) {
-      throw new BadRequestError('Invalid archive color key request.');
+      throw new BadRequestError('Invalid archive color keys request.');
     }
-    const metadata = { ...body.key };
-    delete metadata.ref;
+    const refs = new Set();
+    for (const key of body.keys) {
+      if (
+        !key ||
+        typeof key !== 'object' ||
+        Array.isArray(key) ||
+        typeof key.ref !== 'string' ||
+        key.ref.length > 255 ||
+        !/^coloring-color-key:[a-z0-9][a-z0-9:._-]*$/.test(key.ref) ||
+        refs.has(key.ref)
+      )
+        throw new BadRequestError('Invalid or duplicate archive color key.');
+      refs.add(key.ref);
+    }
     const authId = e.auth.id;
     const backupId = $security.sha256('legacy-color-keys:' + body.archiveFingerprint);
+    const itemId = 'coloring-color-key:page:' + body.pageRef;
     const digest = $security.sha256(
       JSON.stringify({
         pageId: body.pageId,
-        metadata: Object.keys(metadata)
-          .sort()
-          .map(key => [key, metadata[key]]),
+        keys: body.keys.map(key =>
+          Object.keys(key)
+            .sort()
+            .map(field => [field, key[field]])
+        ),
       })
     );
+    const conflict = () =>
+      new ApiError(
+        409,
+        'These color keys conflict with an earlier restore. Export again to restore them.'
+      );
+    const keyId = ref => $security.sha256(authId + '\0' + backupId + '\0' + ref).slice(0, 15);
     const context = new Context(e.request.context(), 'organized_glitter_archive_restore', true);
     let result;
     e.app.runInTransaction(app => {
@@ -590,41 +611,64 @@ routerAdd(
         '',
         1,
         0,
-        { user: authId, backup: backupId, item: body.key.ref }
+        { user: authId, backup: backupId, item: itemId }
+      );
+      if (receipts.length && receipts[0].getString('item_digest') !== digest) throw conflict();
+      const params = { page: page.id };
+      let keyFilter = 'page = {:page}';
+      if (receipts.length) {
+        const identities = body.keys.map((key, index) => {
+          params['key' + index] = keyId(key.ref);
+          return 'id = {:key' + index + '}';
+        });
+        keyFilter += ' && (' + identities.join(' || ') + ')';
+      }
+      const existing = app.findRecordsByFilter(
+        'coloring_page_color_keys',
+        keyFilter,
+        '',
+        receipts.length ? 500 : 1,
+        0,
+        params
       );
       if (receipts.length) {
-        const receipt = receipts[0];
-        if (receipt.getString('item_digest') !== digest)
-          throw new ApiError(409, 'Archive color key conflicts with an earlier restore.');
-        let target;
-        try {
-          target = app.findRecordById(
-            'coloring_page_color_keys',
-            receipt.getString('target_record_id')
-          );
-        } catch {
-          throw new ApiError(409, 'A previously restored color key was deleted.');
-        }
-        if (target.getString('user') !== authId || target.getString('page') !== page.id)
-          throw new ApiError(409, 'A previously restored color key changed ownership.');
-        result = { id: target.id };
+        const ownedIds = new Set(
+          existing.filter(row => row.getString('user') === authId).map(row => row.id)
+        );
+        if (body.keys.some(key => !ownedIds.has(keyId(key.ref)))) throw conflict();
+        result = {
+          outcome: 'already_applied',
+          refMap: Object.fromEntries(body.keys.map(key => [key.ref, keyId(key.ref)])),
+        };
         return;
       }
-      const record = new Record(app.findCollectionByNameOrId('coloring_page_color_keys'));
-      record.set('user', authId);
-      record.set('page', page.id);
-      require(`${__hooks}/archive_color_keys.js`).saveKey(app, record, metadata, context);
+      if (existing.length) {
+        result = { outcome: 'skipped', refMap: {} };
+        return;
+      }
+      const refMap = {};
+      const collection = app.findCollectionByNameOrId('coloring_page_color_keys');
+      for (const key of body.keys) {
+        const metadata = { ...key };
+        delete metadata.ref;
+        const record = new Record(collection);
+        record.set('id', keyId(key.ref));
+        record.set('user', authId);
+        record.set('page', page.id);
+        require(`${__hooks}/archive_color_keys.js`).saveKey(app, record, metadata, context);
+        refMap[key.ref] = record.id;
+      }
       const receipt = new Record(app.findCollectionByNameOrId('archive_restore_items'));
       receipt.set('user', authId);
       receipt.set('backup_id', backupId);
-      receipt.set('item_id', body.key.ref);
+      receipt.set('item_id', itemId);
       receipt.set('item_kind', 'coloring-color-key');
       receipt.set('item_digest', digest);
       receipt.set('state', 'complete');
-      receipt.set('target_collection', 'coloring_page_color_keys');
-      receipt.set('target_record_id', record.id);
+      receipt.set('target_collection', 'coloring_pages');
+      receipt.set('target_record_id', page.id);
       app.save(receipt);
-      result = { id: record.id };
+      result = { outcome: 'created', refMap };
     });
     return e.json(200, result);
   },

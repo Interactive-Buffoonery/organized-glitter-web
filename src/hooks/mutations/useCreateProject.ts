@@ -145,11 +145,17 @@ function adaptCreateCallbacks(
   if (!options) return undefined;
   return {
     onSuccess: (data, variables, context, mutationContext) =>
-      options.onSuccess?.(data, variables.input, context, mutationContext),
+      isCurrentSessionIdentity(variables.sessionIdentity)
+        ? options.onSuccess?.(data, variables.input, context, mutationContext)
+        : undefined,
     onError: (error, variables, context, mutationContext) =>
-      options.onError?.(error, variables.input, context, mutationContext),
+      isCurrentSessionIdentity(variables.sessionIdentity)
+        ? options.onError?.(error, variables.input, context, mutationContext)
+        : undefined,
     onSettled: (data, error, variables, context, mutationContext) =>
-      options.onSettled?.(data, error, variables.input, context, mutationContext),
+      isCurrentSessionIdentity(variables.sessionIdentity)
+        ? options.onSettled?.(data, error, variables.input, context, mutationContext)
+        : undefined,
   };
 }
 

@@ -13,6 +13,7 @@ import { vi } from 'vitest';
 
 const {
   mockCreate,
+  mockRecordCompletedCreate,
   mockBuildFormData,
   mockAddTagToProject,
   mockNavigateToProject,
@@ -22,6 +23,7 @@ const {
   mockNormalizeError,
 } = vi.hoisted(() => ({
   mockCreate: vi.fn(),
+  mockRecordCompletedCreate: vi.fn(),
   mockBuildFormData: vi.fn(),
   mockAddTagToProject: vi.fn(),
   mockNavigateToProject: vi.fn(),
@@ -29,6 +31,12 @@ const {
   mockCapture: vi.fn(),
   mockIsValidationError: vi.fn(() => false),
   mockNormalizeError: vi.fn(),
+}));
+
+vi.doMock('@/services/auth', () => ({ getAuthToken: () => 'original-token' }));
+vi.doMock('@/services/auth/sessionRecovery', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/services/auth/sessionRecovery')>()),
+  recordCompletedSessionCreate: mockRecordCompletedCreate,
 }));
 
 vi.doMock('@/services/pocketbase/projects.service', () => ({
@@ -122,6 +130,8 @@ describe('useCreateProject redirect flow', () => {
     const { result } = renderHookWithProviders(() => useCreateProject({ redirect: true }), {
       queryClient,
     });
+    const onSuccess = vi.fn();
+    const onSettled = vi.fn();
     const pending = result.current.mutateAsync({ userId: 'user-123', title: 'Galaxy Garden' });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(100);
@@ -132,6 +142,8 @@ describe('useCreateProject redirect flow', () => {
       await pending;
     });
     expect(mockNavigateToProject).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onSettled).not.toHaveBeenCalled();
     expect(invalidateSpy).not.toHaveBeenCalledWith({
       queryKey: ['projects', 'detail', 'project-123'],
     });
@@ -200,6 +212,65 @@ describe('useCreateProject redirect flow', () => {
     });
     expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(onConfirmedSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses per-call callbacks after retirement while retaining a completed create for its original token', async () => {
+    let resolveCreate!: (value: { id: string; userId: string; title: string }) => void;
+    mockCreate.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveCreate = resolve;
+        })
+    );
+    const onConfirmedSave = vi.fn();
+    const onSuccess = vi.fn();
+    const onError = vi.fn();
+    const onSettled = vi.fn();
+    const { result } = renderHookWithProviders(() =>
+      useCreateProject({ redirect: true, onConfirmedSave })
+    );
+    const pending = result.current.mutateAsync(
+      { userId: 'user-123', title: 'Galaxy Garden', tagIds: ['tag-1'] },
+      { onSuccess, onError, onSettled }
+    );
+    const rejected = expect(pending).rejects.toMatchObject({ reason: 'session_changed' });
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    sessionGeneration += 1;
+    await act(async () => {
+      resolveCreate({ id: 'project-123', userId: 'user-123', title: 'Galaxy Garden' });
+      await rejected;
+    });
+    expect(onConfirmedSave).not.toHaveBeenCalled();
+    expect(mockAddTagToProject).not.toHaveBeenCalled();
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(mockRecordCompletedCreate).toHaveBeenCalledWith(
+      'original-token',
+      'projects',
+      'project-123'
+    );
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(onSettled).not.toHaveBeenCalled();
+  });
+
+  it('passes the originating session guard into tag linking', async () => {
+    let guard!: () => boolean;
+    mockAddTagToProject.mockImplementation(async (_projectId, _tagId, isSessionCurrent) => {
+      guard = isSessionCurrent;
+      expect(guard()).toBe(true);
+      return { status: 'success' };
+    });
+    const { result } = renderHookWithProviders(() => useCreateProject());
+    await act(async () => {
+      await result.current.mutateAsync({
+        userId: 'user-123',
+        title: 'Galaxy Garden',
+        tagIds: ['tag-1'],
+      });
+    });
+    expect(mockAddTagToProject).toHaveBeenCalledWith('project-123', 'tag-1', expect.any(Function));
+    sessionGeneration += 1;
+    expect(guard()).toBe(false);
   });
 
   it('does not dispatch a create after the session changes while preparing the form', async () => {

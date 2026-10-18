@@ -59,6 +59,11 @@ vi.mock('@/services/analytics-escape-hatch', () => ({
   capture: mocks.capture,
 }));
 
+vi.doMock('@/services/auth/sessionIdentity', () => ({
+  captureSessionIdentity: () => ({ accountId: 'user-123', generation: 0 }),
+  isCurrentSessionIdentity: () => true,
+}));
+
 const { useCreateProject } = await import('../useCreateProject');
 const { useProjectUpdateUnified } = await import('../useProjectUpdateUnified');
 

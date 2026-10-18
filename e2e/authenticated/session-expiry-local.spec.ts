@@ -204,6 +204,50 @@ test('clears a mounted draft when another account replaces the session', async (
   await expect(page.getByLabel('Project title')).not.toHaveValue('Private account A draft');
 });
 
+test('does not open a saved project after its account is replaced during the success delay', async ({
+  page,
+}) => {
+  const privateTitle = 'Private account A completed project';
+  await page.goto('/projects/new');
+  await page.getByLabel('Project title').fill(privateTitle);
+
+  const pausedTime = new Date(Date.now() + 1_000);
+  await page.clock.install({ time: new Date() });
+  await page.clock.pauseAt(pausedTime);
+
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(16);
+      return page.getByText('Project created', { exact: true }).isVisible();
+    })
+    .toBe(true);
+  await expect(page).toHaveURL(/\/projects\/new$/);
+
+  await page.evaluate(() => {
+    const authStore = (
+      window as Window & {
+        pb?: {
+          authStore: {
+            token: string;
+            record: Record<string, unknown> | null;
+            save: (token: string, record: unknown) => void;
+          };
+        };
+      }
+    ).pb?.authStore;
+    if (!authStore?.record) throw new Error('PocketBase auth debug hook is unavailable');
+    authStore.save(authStore.token, { ...authStore.record, id: 'account-b-test' });
+  });
+
+  await expect(page.getByLabel('Project title')).toHaveValue('');
+  await page.clock.runFor(1_000);
+
+  await expect(page).toHaveURL(/\/projects\/new$/);
+  await expect(page.getByLabel('Project title')).toHaveValue('');
+  await expect(page.getByRole('heading', { name: privateTitle, exact: true })).toHaveCount(0);
+});
+
 test('offers a confirmed create that finishes after sign-in', async ({ page }) => {
   await page.goto('/projects/new');
   await page.getByLabel('Project title').fill('Late confirmed session create');

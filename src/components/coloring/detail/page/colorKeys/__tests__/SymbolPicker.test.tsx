@@ -99,10 +99,15 @@ describe('SymbolPicker', () => {
     expect(onRequestSymbol).toHaveBeenCalled();
   });
 
-  it('says when nothing matches', async () => {
+  it('announces the result count from one status that stays mounted', async () => {
     const user = userEvent.setup();
     renderPicker();
+    const status = screen.getByRole('status');
+    await user.type(screen.getByRole('searchbox', { name: 'Search symbols' }), 'yen');
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status).toHaveTextContent(/^\d+ symbols?$/);
     await user.type(screen.getByRole('searchbox', { name: 'Search symbols' }), 'zzzzzz');
-    expect(screen.getByText('No symbols match.')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status).toHaveTextContent('No symbols match.');
   });
 });

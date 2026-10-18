@@ -19,6 +19,7 @@ export function ColorKeySheet({
   description,
   children,
   fill = false,
+  onEscapeKeyDown,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -27,6 +28,8 @@ export function ColorKeySheet({
   children: ReactNode;
   /** Keeps a fixed height so filtering content does not resize the sheet. */
   fill?: boolean;
+  /** Radix handles Escape on the document first; call preventDefault to keep the sheet open. */
+  onEscapeKeyDown?: (event: KeyboardEvent) => void;
 }) {
   const { isPhone } = useMobileDevice();
   const drawerStyle = useKeyboardSafeViewportStyle(isPhone && open);
@@ -38,7 +41,11 @@ export function ColorKeySheet({
         shouldScaleBackground={false}
         repositionInputs={false}
       >
-        <DrawerContent className={fill ? 'h-[92dvh]' : 'max-h-[92dvh]'} style={drawerStyle}>
+        <DrawerContent
+          className={fill ? 'h-[92dvh]' : 'max-h-[92dvh]'}
+          style={drawerStyle}
+          onEscapeKeyDown={onEscapeKeyDown}
+        >
           <div className="space-y-1 px-4 pt-3">
             <DrawerTitle>{title}</DrawerTitle>
             <DrawerDescription className="sr-only">{description}</DrawerDescription>
@@ -57,6 +64,7 @@ export function ColorKeySheet({
           'flex max-h-[85dvh] flex-col overflow-hidden [&>button:last-child]:size-11',
           fill && 'h-[min(85dvh,44rem)]'
         )}
+        onEscapeKeyDown={onEscapeKeyDown}
       >
         <DialogHeader className="pr-12">
           <DialogTitle>{title}</DialogTitle>

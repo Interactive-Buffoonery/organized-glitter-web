@@ -12,7 +12,7 @@ import { createLogger } from '@/utils/logger';
 import { ColorKeyEntry, type EntryTarget } from './ColorKeyEntry';
 import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
-import { colorKeyCopyText, requestFor, symbolName } from './symbolName';
+import { colorKeyCopyText, requestFor, safeSwatch, symbolName } from './symbolName';
 
 const logger = createLogger('ColorKeySection');
 
@@ -71,6 +71,8 @@ function ColorKeyEditor({
     const symbols = setupSymbols.filter(symbol => !off.has(symbol));
     try {
       await setup.mutateAsync(symbols);
+      // The setup grid unmounts with focus inside it; land on the heading instead.
+      document.getElementById(`color-keys-${pageId}`)?.focus();
     } catch (error) {
       logger.warn('Could not set up color keys', error);
       notifyError('Could not save the symbols. Try again.');
@@ -102,7 +104,9 @@ function ColorKeyEditor({
 
   return (
     <Section variant="bordered" className="space-y-3" landmark={false}>
-      <SectionHeading id={`color-keys-${pageId}`}>Colors used</SectionHeading>
+      <SectionHeading id={`color-keys-${pageId}`} tabIndex={-1} className="outline-none">
+        Colors used
+      </SectionHeading>
       {query.isPending && <p role="status">Loading colors…</p>}
       {query.isError && (
         <div role="alert">
@@ -144,7 +148,7 @@ function ColorKeyEditor({
                     'flex size-11 items-center justify-center rounded-md border text-lg transition-colors',
                     isOn
                       ? 'border-primary bg-primary/10 text-foreground'
-                      : 'border-border/60 text-muted-foreground/70 line-through'
+                      : 'border-muted-foreground text-muted-foreground line-through'
                   )}
                 >
                   <span aria-hidden="true" className="contents">
@@ -223,11 +227,11 @@ function ColorKeyEditor({
                           </span>
                         ) : null}
                       </span>
-                      {row.swatch ? (
+                      {safeSwatch(row.swatch) ? (
                         <span
                           aria-hidden="true"
                           className="border-border size-6 shrink-0 rounded-full border"
-                          style={{ background: row.swatch }}
+                          style={{ background: safeSwatch(row.swatch) }}
                         />
                       ) : null}
                     </button>
@@ -282,7 +286,10 @@ function ColorKeyEditor({
         next={next}
         requests={requests}
         onClose={() => setEntry(null)}
-        onNext={row => setEntry({ row, symbol: row.symbol, position: row.position })}
+        onNext={row =>
+          setEntry({ row, symbol: row.symbol, position: row.position, focusCode: true })
+        }
+        onRequestSymbol={onRequestSymbol}
       />
     </Section>
   );

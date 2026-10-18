@@ -1,5 +1,14 @@
-import { useId, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react';
+import { flushSync } from 'react-dom';
 import { X } from 'lucide-react';
+import { ClientResponseError } from 'pocketbase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,12 +32,18 @@ import { createLogger } from '@/utils/logger';
 import { ColorKeySheet } from './ColorKeySheet';
 import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
-import { requestFor, symbolName } from './symbolName';
+import { requestFor, safeSwatch, symbolDisplayName } from './symbolName';
 
 const logger = createLogger('ColorKeyEntry');
 const MAX_SUGGESTIONS = 6;
 
-export type EntryTarget = { row?: ColorKey; symbol: string; position: number };
+export type EntryTarget = {
+  row?: ColorKey;
+  symbol: string;
+  position: number;
+  /** Set when arriving from Save and next, so typing can start right away. */
+  focusCode?: boolean;
+};
 
 interface ColorKeyEntryProps {
   pageId: string;
@@ -38,20 +53,36 @@ interface ColorKeyEntryProps {
   requests?: Record<string, SymbolRequestPreview>;
   onClose: () => void;
   onNext: (next: ColorKey) => void;
+  onRequestSymbol?: () => void;
 }
 
+const REMOVED_ELSEWHERE = 'This color was removed on another device.';
+const HEX = /^#?([0-9a-f]{6})$/i;
+
 export function ColorKeyEntry({ target, onClose, ...props }: ColorKeyEntryProps) {
+  const formKey = target ? `${target.row?.id ?? 'new'}:${target.symbol}` : '';
+  const [changed, setChanged] = useState<{ formKey: string; symbol: string } | null>(null);
+  const symbol = changed?.formKey === formKey ? changed.symbol : target?.symbol;
+  const request = symbol ? requestFor(symbol, props.requests) : undefined;
+  const name = symbol ? symbolDisplayName(symbol, request) : '';
   return (
     <ColorKeySheet
       open={Boolean(target)}
       onOpenChange={open => !open && onClose()}
-      title={target?.row ? 'Edit color' : 'Add a color'}
+      title={target?.row ? `Edit color: ${name}` : `Add a color: ${name}`}
       description="Record the color you used for this symbol."
+      onEscapeKeyDown={event => {
+        // An open suggestion list owns Escape; the combobox closes it.
+        if ((event.target as Element | null)?.getAttribute?.('aria-expanded') === 'true')
+          event.preventDefault();
+      }}
     >
-      {target ? (
+      {target && symbol ? (
         <EntryForm
-          key={`${target.row?.id ?? 'new'}:${target.symbol}`}
+          key={formKey}
           target={target}
+          symbol={symbol}
+          onSymbolChange={picked => setChanged({ formKey, symbol: picked })}
           onClose={onClose}
           {...props}
         />
@@ -68,10 +99,17 @@ function EntryForm({
   requests,
   onClose,
   onNext,
-}: ColorKeyEntryProps & { target: EntryTarget }) {
+  onRequestSymbol,
+  symbol,
+  onSymbolChange,
+}: ColorKeyEntryProps & {
+  target: EntryTarget;
+  symbol: string;
+  onSymbolChange: (symbol: string) => void;
+}) {
   const id = useId();
   const { row } = target;
-  const [symbol, setSymbol] = useState(target.symbol);
+  const triedInput = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState(row?.code ?? '');
   const [colorName, setColorName] = useState(row?.color_name ?? '');
   const [swatch, setSwatch] = useState(row?.swatch ?? '');
@@ -126,22 +164,43 @@ function EntryForm({
     setTriedDraft('');
   };
 
+  const removeTried = (value: string, event: MouseEvent<HTMLButtonElement>) => {
+    const nextButton = event.currentTarget
+      .closest('li')
+      ?.nextElementSibling?.querySelector<HTMLButtonElement>('button');
+    flushSync(() => setTried(values => values.filter(item => item !== value)));
+    (nextButton ?? triedInput.current)?.focus();
+  };
+  const tidySwatch = () => {
+    const match = HEX.exec(swatch.trim());
+    if (match) setSwatch(`#${match[1].toUpperCase()}`);
+  };
+
   const save = async (goNext: boolean) => {
     if (busy) return;
     setError(null);
+    const draft = triedDraft.trim();
     const input = {
       symbol,
       position: target.position,
       code,
       color_name: colorName,
       swatch,
-      tried,
+      tried:
+        draft && !tried.includes(draft) && tried.length < COLOR_KEY_LIMITS.tried
+          ? [...tried, draft]
+          : tried,
       note,
     };
     try {
       if (row) await update.mutateAsync({ id: row.id, input });
       else await create.mutateAsync(input);
     } catch (saveError) {
+      if (saveError instanceof ClientResponseError && saveError.status === 404) {
+        notifyError(REMOVED_ELSEWHERE);
+        onClose();
+        return;
+      }
       logger.warn('Could not save a color key', saveError);
       const message = saveError instanceof Error ? saveError.message : 'Could not save. Try again.';
       setError(message);
@@ -173,7 +232,7 @@ function EntryForm({
   };
 
   const request = requestFor(symbol, requests);
-  const hasSwatch = /^#[0-9a-f]{6}$/i.test(swatch);
+  const hasSwatch = Boolean(safeSwatch(swatch));
   const listboxId = `${id}-codes`;
   const field = 'space-y-1.5';
   const hint = 'text-muted-foreground font-normal';
@@ -181,11 +240,14 @@ function EntryForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4" noValidate>
       <div className="flex items-center gap-3">
-        <span className="border-border/70 bg-background/60 flex size-16 shrink-0 items-center justify-center rounded-lg border text-4xl">
+        <span
+          aria-hidden="true"
+          className="border-border/70 bg-background/60 flex size-16 shrink-0 items-center justify-center rounded-lg border text-4xl"
+        >
           <SymbolGlyph symbol={symbol} request={request} />
         </span>
         <div className="min-w-0">
-          <p className="truncate font-semibold">{symbolName(symbol, request)}</p>
+          <p className="truncate font-semibold">{symbolDisplayName(symbol, request)}</p>
           <Button
             type="button"
             variant="link"
@@ -216,6 +278,9 @@ function EntryForm({
           spellCheck={false}
           className="h-11 font-mono"
           maxLength={COLOR_KEY_LIMITS.code}
+          // Save and next remounts the form; focus Code so the next row can be typed straight away.
+          // eslint-disable-next-line jsx-a11y/no-autofocus
+          autoFocus={target.focusCode}
           value={code}
           onChange={event => {
             setCode(event.target.value);
@@ -252,7 +317,7 @@ function EntryForm({
                 <span
                   aria-hidden="true"
                   className="border-border size-4 shrink-0 rounded-full border"
-                  style={{ background: entry.swatch || 'transparent' }}
+                  style={{ background: safeSwatch(entry.swatch) ?? 'transparent' }}
                 />
                 <span className="font-mono">{entry.code}</span>
                 {entry.color_name ? (
@@ -270,7 +335,6 @@ function EntryForm({
         </Label>
         <Input
           id={`${id}-name`}
-          aria-label="Color name"
           className="h-11"
           maxLength={COLOR_KEY_LIMITS.colorName}
           value={colorName}
@@ -300,7 +364,7 @@ function EntryForm({
           </span>
           <Input
             aria-label="Swatch hex"
-            placeholder="#A1B2C3"
+            placeholder="Like #A1B2C3"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="characters"
@@ -309,6 +373,7 @@ function EntryForm({
             maxLength={7}
             value={swatch}
             onChange={event => setSwatch(event.target.value.trim())}
+            onBlur={tidySwatch}
           />
           {swatch ? (
             <Button type="button" variant="ghost" onClick={() => setSwatch('')}>
@@ -335,7 +400,7 @@ function EntryForm({
                   data-close-button
                   aria-label={`Remove ${value}`}
                   className="hover:bg-background/80 relative inline-flex size-6 items-center justify-center rounded-full after:absolute after:-inset-2.5 after:content-['']"
-                  onClick={() => setTried(values => values.filter(item => item !== value))}
+                  onClick={event => removeTried(value, event)}
                 >
                   <X aria-hidden="true" className="size-3.5" />
                 </button>
@@ -345,6 +410,7 @@ function EntryForm({
         ) : null}
         <div className="flex gap-2">
           <Input
+            ref={triedInput}
             id={`${id}-tried`}
             aria-label="Add a code you tried"
             autoComplete="off"
@@ -416,7 +482,7 @@ function EntryForm({
             disabled={busy}
             onClick={() => void save(true)}
           >
-            Save and next: {symbolName(next.symbol, requestFor(next.symbol, requests))}
+            Save and next: {symbolDisplayName(next.symbol, requestFor(next.symbol, requests))}
           </Button>
         ) : null}
       </div>
@@ -426,8 +492,9 @@ function EntryForm({
         onOpenChange={setPickerOpen}
         userId={userId}
         title="Change symbol"
+        onRequestSymbol={onRequestSymbol}
         onPick={picked => {
-          setSymbol(picked);
+          onSymbolChange(picked);
           setPickerOpen(false);
         }}
       />

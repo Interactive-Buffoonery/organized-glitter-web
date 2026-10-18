@@ -1,4 +1,13 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import { Camera } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import catalog from '@/features/coloring/colorKeys/symbolCatalog.json';
@@ -73,6 +82,46 @@ function targetIndex(
   return null;
 }
 
+const SymbolOption = memo(function SymbolOption({
+  symbol,
+  id,
+  index,
+  isActive,
+  onSelect,
+}: {
+  symbol: string;
+  id: string;
+  index: number;
+  isActive: boolean;
+  onSelect: (index: number, symbol: string) => void;
+}) {
+  const name = symbolName(symbol);
+  return (
+    // Keyboard selection lives on the listbox via aria-activedescendant.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events
+    <div
+      tabIndex={-1}
+      onMouseDown={event => event.preventDefault()}
+      id={id}
+      role="option"
+      aria-selected={isActive}
+      aria-label={name}
+      title={name}
+      data-symbol={symbol}
+      onClick={() => onSelect(index, symbol)}
+      className={cn(
+        'border-border/70 bg-background/60 hover:bg-muted flex h-12 cursor-pointer items-center justify-center rounded-md border text-2xl select-none',
+        isActive &&
+          'group-focus-visible:border-primary group-focus-visible:ring-primary/40 group-focus-visible:ring-2'
+      )}
+    >
+      <span aria-hidden="true" className="contents">
+        <SymbolGlyph symbol={symbol} />
+      </span>
+    </div>
+  );
+});
+
 function PickerBody({
   onPick,
   userId,
@@ -108,10 +157,20 @@ function PickerBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- optionId is derived from the stable idPrefix
   }, [activeIndex]);
 
-  const pick = (symbol: string) => {
-    rememberRecentSymbol(userId, symbol);
-    onPick(symbol);
-  };
+  const pick = useCallback(
+    (symbol: string) => {
+      rememberRecentSymbol(userId, symbol);
+      onPick(symbol);
+    },
+    [userId, onPick]
+  );
+  const onSelect = useCallback(
+    (index: number, symbol: string) => {
+      setActive(index);
+      pick(symbol);
+    },
+    [pick]
+  );
   const symbolAt = (index: number) => {
     const section = starts.findLastIndex(start => start <= index);
     return sections[section]?.symbols[index - starts[section]];
@@ -154,8 +213,11 @@ function PickerBody({
           listboxRef.current?.focus();
         }}
       />
+      <p role="status" className="sr-only">
+        {total ? `${total} symbol${total === 1 ? '' : 's'}` : 'No symbols match.'}
+      </p>
       {total === 0 ? (
-        <p role="status" className="text-muted-foreground text-sm">
+        <p aria-hidden="true" className="text-muted-foreground text-sm">
           No symbols match.
         </p>
       ) : null}
@@ -181,34 +243,15 @@ function PickerBody({
             <div className="grid grid-cols-6 gap-1.5">
               {section.symbols.map((symbol, index) => {
                 const flatIndex = starts[sectionIndex] + index;
-                const isActive = flatIndex === activeIndex;
                 return (
-                  // Keyboard selection lives on the listbox via aria-activedescendant.
-                  // eslint-disable-next-line jsx-a11y/click-events-have-key-events
-                  <div
+                  <SymbolOption
                     key={symbol}
-                    tabIndex={-1}
-                    onMouseDown={event => event.preventDefault()}
+                    symbol={symbol}
                     id={optionId(flatIndex)}
-                    role="option"
-                    aria-selected={isActive}
-                    aria-label={symbolName(symbol)}
-                    title={symbolName(symbol)}
-                    data-symbol={symbol}
-                    onClick={() => {
-                      setActive(flatIndex);
-                      pick(symbol);
-                    }}
-                    className={cn(
-                      'border-border/70 bg-background/60 hover:bg-muted flex h-12 cursor-pointer items-center justify-center rounded-md border text-2xl select-none',
-                      isActive &&
-                        'group-focus-visible:border-primary group-focus-visible:ring-primary/40 group-focus-visible:ring-2'
-                    )}
-                  >
-                    <span aria-hidden="true" className="contents">
-                      <SymbolGlyph symbol={symbol} />
-                    </span>
-                  </div>
+                    index={flatIndex}
+                    isActive={flatIndex === activeIndex}
+                    onSelect={onSelect}
+                  />
                 );
               })}
             </div>

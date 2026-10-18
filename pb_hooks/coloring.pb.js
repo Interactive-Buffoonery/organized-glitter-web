@@ -82,6 +82,9 @@ routerAdd(
                 OR COALESCE(cp.mediums, '') NOT IN ('', '[]', 'null')
                 OR COALESCE(cp.photos, '') NOT IN ('', '[]', 'null')
                 OR EXISTS (
+                  SELECT 1 FROM coloring_page_color_keys ck WHERE ck.page = cp.id
+                )
+                OR EXISTS (
                   SELECT 1 FROM coloring_page_color_references cr
                   WHERE cr.page = cp.id
                     AND (trim(cr.notes, char(9) || char(10) || char(13) || ' ') != ''
@@ -344,6 +347,9 @@ onRecordUpdate(e => {
               OR COALESCE(cp.revealed_at, '') != ''
               OR COALESCE(cp.mediums, '') NOT IN ('', '[]', 'null')
               OR COALESCE(cp.photos, '') NOT IN ('', '[]', 'null')
+                OR EXISTS (
+                  SELECT 1 FROM coloring_page_color_keys ck WHERE ck.page = cp.id
+                )
                 OR EXISTS (
                   SELECT 1 FROM coloring_page_color_references cr
                   WHERE cr.page = cp.id

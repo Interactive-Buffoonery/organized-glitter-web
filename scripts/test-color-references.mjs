@@ -242,6 +242,49 @@ try {
       0
     );
   });
+  for (const path of ['batched', 'direct']) {
+    await check(
+      `${path} page reduction preserves a not-started page with only color keys`,
+      async () => {
+        const keyBook = await owner.collection('coloring_books').create({
+          title: `Color key reduction ${path}`,
+          user: user.id,
+          total_pages: 2,
+          status: 'in_progress',
+        });
+        const keyPage = await owner
+          .collection('coloring_pages')
+          .getFirstListItem(`book = '${keyBook.id}' && page_number = 2`);
+        assert.equal(keyPage.status, 'not_started');
+        const key = await owner.collection('coloring_page_color_keys').create({
+          user: user.id,
+          page: keyPage.id,
+          position: 0,
+          symbol: 'u:0031',
+          tried: [],
+        });
+        const reduction =
+          path === 'direct'
+            ? owner.collection('coloring_books').update(keyBook.id, { total_pages: 1 })
+            : owner.send(`/api/coloring/books/${keyBook.id}/reduce-pages`, {
+                method: 'POST',
+                body: { targetTotalPages: 1 },
+              });
+        await assert.rejects(
+          reduction,
+          error =>
+            error.status === 400 &&
+            error.response.data.total_pages.code === 'validation_worked_pages'
+        );
+        assert.equal((await owner.collection('coloring_books').getOne(keyBook.id)).total_pages, 2);
+        assert.equal((await owner.collection('coloring_pages').getOne(keyPage.id)).id, keyPage.id);
+        assert.equal(
+          (await owner.collection('coloring_page_color_keys').getOne(key.id)).symbol,
+          'u:0031'
+        );
+      }
+    );
+  }
   const reduce = () =>
     owner.send(`/api/coloring/books/${book.id}/reduce-pages`, {
       method: 'POST',

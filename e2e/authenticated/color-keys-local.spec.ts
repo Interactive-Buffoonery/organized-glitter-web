@@ -1,4 +1,5 @@
 import { devices, expect, test, type Page, type TestInfo } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
 import PocketBase from 'pocketbase';
 
 import { assertLocalE2ETargets } from '../fixtures/local-safety';
@@ -190,6 +191,61 @@ test.describe('on a phone', () => {
           pb.filter('page = {:page} && symbol = {:symbol}', { page: pageId, symbol: 'u:00A5' })
         );
       expect(saved).toMatchObject({ code: 'Q800', swatch: '#B79AD6', position: 2 });
+    } finally {
+      await cleanup();
+    }
+  });
+
+  test('colors used: send a photo of a missing symbol and use it on the page', async ({
+    page,
+    baseURL,
+  }, testInfo) => {
+    test.setTimeout(90000);
+    const { pb, book, pageId, cleanup } = await seededPage(page, baseURL, testInfo);
+    try {
+      await page.getByRole('button', { name: 'Add symbol' }).tap();
+      await page.getByRole('button', { name: /Can't find your symbol/ }).tap();
+
+      const request = page.getByRole('dialog', { name: 'Send us a symbol' });
+      await expect(request.getByRole('textbox', { name: 'Book and page' })).toHaveValue(
+        `${book.title}, page 1`
+      );
+      await expect(request.getByRole('textbox', { name: 'Email' })).toHaveValue(
+        process.env.E2E_TEST_EMAIL!
+      );
+      await request
+        .getByLabel('Photo of the symbol')
+        .setInputFiles(fileURLToPath(new URL('../fixtures/portrait-cover.jpg', import.meta.url)));
+      await expect(request.getByRole('img', { name: 'Chosen symbol' })).toBeVisible();
+      await request.getByRole('textbox', { name: /^Description/ }).fill('Two w stacked');
+      await request.getByRole('button', { name: 'Send', exact: true }).tap();
+      await expect(request).toHaveCount(0);
+
+      const entry = page.getByRole('dialog', { name: 'Edit color: Two w stacked' });
+      await expect(entry).toBeVisible();
+      // The protected thumbnail has to load with a file token, including on Mobile Safari.
+      const thumbnail = entry.locator('img[alt="Two w stacked"]');
+      await expect(thumbnail).toBeVisible();
+      await expect
+        .poll(() => thumbnail.evaluate(image => (image as HTMLImageElement).naturalWidth))
+        .toBeGreaterThan(0);
+
+      const sent = await pb
+        .collection('coloring_symbol_requests')
+        .getFirstListItem(pb.filter('page = {:page}', { page: pageId }));
+      expect(sent).toMatchObject({
+        description: 'Two w stacked',
+        email: process.env.E2E_TEST_EMAIL,
+        status: 'open',
+      });
+      expect(sent.photo).toMatch(/\.(jpe?g|png|webp)$/);
+      const row = await pb.collection('coloring_page_color_keys').getFirstListItem(
+        pb.filter('page = {:page} && symbol = {:symbol}', {
+          page: pageId,
+          symbol: `r:${sent.id}`,
+        })
+      );
+      expect(row.position).toBe(2);
     } finally {
       await cleanup();
     }

@@ -214,8 +214,15 @@ test.describe('on a phone', () => {
         process.env.E2E_TEST_EMAIL!
       );
       await request
-        .getByLabel('Photo of the symbol')
+        .getByLabel('Photo', { exact: true })
         .setInputFiles(fileURLToPath(new URL('../fixtures/portrait-cover.jpg', import.meta.url)));
+      await expect(request.getByRole('img', { name: 'Chosen symbol' })).toBeVisible();
+      await request.getByRole('button', { name: 'Crop photo' }).tap();
+      const crop = page.getByRole('dialog', { name: 'Crop the symbol' });
+      // Use crop enables once the cropper has measured the loaded photo.
+      await expect(crop.getByRole('button', { name: 'Use crop' })).toBeEnabled();
+      await crop.getByRole('button', { name: 'Use crop' }).tap();
+      await expect(crop).toHaveCount(0);
       await expect(request.getByRole('img', { name: 'Chosen symbol' })).toBeVisible();
       await request.getByRole('textbox', { name: /^Description/ }).fill('Two w stacked');
       await request.getByRole('button', { name: 'Send', exact: true }).tap();
@@ -238,7 +245,7 @@ test.describe('on a phone', () => {
         email: process.env.E2E_TEST_EMAIL,
         status: 'open',
       });
-      expect(sent.photo).toMatch(/\.(jpe?g|png|webp)$/);
+      expect(sent.photo).toMatch(/cropped.*\.(jpe?g|png|webp)$/);
       const row = await pb.collection('coloring_page_color_keys').getFirstListItem(
         pb.filter('page = {:page} && symbol = {:symbol}', {
           page: pageId,

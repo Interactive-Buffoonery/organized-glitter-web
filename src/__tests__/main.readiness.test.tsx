@@ -9,6 +9,8 @@ vi.mock('react-dom/client', () => ({
   createRoot: () => ({ render: vi.fn() }),
 }));
 vi.mock('@/App', () => ({ default: () => null }));
+vi.mock('@/e2e/accountDeletionBridge', () => ({ installAccountDeletionBridge: vi.fn() }));
+vi.mock('@/utils/overviewDiagnostics', () => ({ enableDiagnosticConsoleAccess: vi.fn() }));
 vi.mock('@/lib/queryClient', () => ({ queryClient: {} }));
 vi.mock('@/utils/auth/userInitialization', () => ({ initializeUser: vi.fn() }));
 vi.mock('@/utils/error/fatalErrorHandler', () => ({
@@ -36,6 +38,7 @@ describe('main startup readiness', () => {
 
   it('marks mounted only after an app-loaded event with a ready root', async () => {
     await import('@/main');
+    await vi.dynamicImportSettled();
 
     window.dispatchEvent(new CustomEvent('app-loaded'));
     expect(markFatalMounted).not.toHaveBeenCalled();

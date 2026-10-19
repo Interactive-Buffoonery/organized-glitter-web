@@ -119,7 +119,10 @@ that the account is intact.
 
 ## PostHog worker
 
-**Release blocker: automatic vendor completion is unavailable.** This adapter has
+**Deferred follow-up: automatic vendor completion is unavailable.** The release
+owner has accepted shipping without this completion verification. This decision
+does not establish erasure or permit reporting cleanup as completed. Analytics
+is linked to the internal account ID and is not fully anonymous. This adapter has
 no proven verification protocol covering the person profile, events and recordings.
 An empty status preflight is a candidate for establishing fresh event coverage by
 request ordering, under assumptions described below; it is not full-scope proof.
@@ -354,8 +357,10 @@ erasure or a deployed backend revision. Before release:
 - Run the required local backend-first validation and strict combined `test:pr`.
   Integrate client and native work, including malformed responses, uncertain
   requests, account/session fencing and local cleanup failures.
-- Resolve the full-scope verification blocker before enabling release.
-  Exercise the adapter in an explicitly authorized disposable vendor project.
+- Track full-scope verification as accepted follow-up work, separately from
+  release acceptance. Keep vendor cleanup pending and erasure configuration unset
+  until the protocol is established. Before enabling the worker, exercise the
+  adapter in an explicitly authorized disposable vendor project.
   Confirm region, scopes, full linked identity coverage, request and verification
   semantics, personless identified events, late events and session recordings.
   Until resolved with evidence, no-person jobs stay blocked.

@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { testAccountDeletionMigration } from './test-support/account-deletion-migration.mjs';
 import { startAppleFixture } from './test-support/apple/fixture.mjs';
 
 const fixture = await startAppleFixture();
@@ -24,6 +25,7 @@ const request = async (route, token, body, method = 'POST') => {
 };
 const secret = () => randomBytes(32).toString('base64url');
 try {
+  testAccountDeletionMigration(fixture.binary, fixture.runDir);
   let result = await request('/api/collections/_superusers/auth-with-password', '', {
     identity: adminEmail,
     password: adminPassword,
@@ -206,6 +208,62 @@ try {
     204,
     'older client deletion remains compatible'
   );
+  const legacyJob = db
+    .prepare('SELECT * FROM account_deletion_jobs WHERE user_id = ?')
+    .get(other.id);
+  assert.ok(legacyJob, 'legacy deletion creates a private job');
+  assert.equal(legacyJob.source_kind, 'legacy');
+  assert.equal(legacyJob.proof_hash, '', 'legacy deletion never fabricates a receipt proof');
+  assert.ok(
+    Date.parse(legacyJob.next_attempt) >= Date.now() + 3500_000,
+    'initial worker attempt allows in-flight batches to settle'
+  );
+  const adminDeleted = await makeUser('adminremoved');
+  db.exec(
+    "CREATE TRIGGER fail_job_test BEFORE INSERT ON account_deletion_jobs BEGIN SELECT RAISE(ABORT, 'disposable failure'); END;"
+  );
+  assert.notEqual(
+    (await request(`/api/collections/users/records/${adminDeleted.id}`, admin, undefined, 'DELETE'))
+      .status,
+    204
+  );
+  assert.ok(
+    db.prepare('SELECT id FROM users WHERE id = ?').get(adminDeleted.id),
+    'job failure rolls back administrative deletion'
+  );
+  db.exec('DROP TRIGGER fail_job_test');
+  db.exec(
+    `CREATE TRIGGER fail_legacy_delete BEFORE DELETE ON users WHEN OLD.id = '${adminDeleted.id}' BEGIN SELECT RAISE(ABORT, 'disposable failure'); END;`
+  );
+  assert.notEqual(
+    (await request(`/api/collections/users/records/${adminDeleted.id}`, admin, undefined, 'DELETE'))
+      .status,
+    204
+  );
+  assert.equal(
+    db.prepare('SELECT id FROM account_deletion_jobs WHERE user_id = ?').get(adminDeleted.id),
+    undefined,
+    'failed user deletion rolls back legacy job'
+  );
+  db.exec('DROP TRIGGER fail_legacy_delete');
+  assert.equal(
+    (await request(`/api/collections/users/records/${adminDeleted.id}`, admin, undefined, 'DELETE'))
+      .status,
+    204
+  );
+  assert.equal(
+    db
+      .prepare('SELECT source_kind FROM account_deletion_jobs WHERE user_id = ?')
+      .get(adminDeleted.id).source_kind,
+    'legacy'
+  );
+  assert.equal(
+    db
+      .prepare('SELECT COUNT(*) AS count FROM account_deletion_jobs WHERE user_id = ?')
+      .get(owner.id).count,
+    1,
+    'guarded hook does not duplicate job'
+  );
   result = await request(
     '/api/collections/users',
     admin,
@@ -378,8 +436,21 @@ try {
     db.prepare('SELECT id FROM account_deletion_jobs WHERE user_id = ?').get(owner.id),
     'pending vendor work prevents expiry'
   );
+  db.prepare("UPDATE account_deletion_jobs SET posthog_status = 'completed' WHERE user_id = ?").run(
+    owner.id
+  );
+  assert.deepEqual(
+    (await deletion('', proof)).body,
+    { status: 'deleted', cleanup: 'pending' },
+    'completion needs verified timestamp'
+  );
+  assert.equal((await runRetention()).status, 200);
+  assert.ok(
+    db.prepare('SELECT id FROM account_deletion_jobs WHERE user_id = ?').get(owner.id),
+    'unverified completion cannot expire'
+  );
   db.prepare(
-    "UPDATE account_deletion_jobs SET posthog_status = 'completed', revenuecat_status = 'completed', cleanup_completed = '' WHERE user_id = ?"
+    "UPDATE account_deletion_jobs SET posthog_status = 'completed', posthog_verified_at = '2026-10-18 00:00:00.000Z', cleanup_completed = '' WHERE user_id = ?"
   ).run(owner.id);
   assert.equal((await runRetention()).status, 200);
   assert.ok(
@@ -393,7 +464,7 @@ try {
     "UPDATE account_deletion_jobs SET cleanup_completed = '2000-01-01 00:00:00.000Z' WHERE user_id = ?"
   ).run(owner.id);
   db.prepare(
-    "UPDATE account_deletion_jobs SET posthog_status = 'completed', revenuecat_status = 'completed', cleanup_completed = '2000-01-01 00:00:00.000Z' WHERE user_id = ?"
+    "UPDATE account_deletion_jobs SET posthog_status = 'completed', posthog_verified_at = '2026-10-18 00:00:00.000Z', cleanup_completed = '2000-01-01 00:00:00.000Z' WHERE user_id = ?"
   ).run(appleUser.id);
   assert.equal((await runRetention()).status, 200);
   assert.equal(
@@ -408,6 +479,25 @@ try {
     (await deletion('', proof)).status,
     401,
     'expired receipt does not assert successful deletion'
+  );
+  const audit = await request('/api/collections/account_deletions/records', admin, {
+    user_id: unverified.id,
+    user_email: 'disposable@localhost.test',
+    signup_method: 'password',
+  });
+  assert.equal(audit.status, 200);
+  db.prepare("UPDATE account_deletions SET created = '2000-01-01 00:00:00.000Z' WHERE id = ?").run(
+    audit.body.id
+  );
+  assert.equal((await runRetention()).status, 200);
+  assert.equal(
+    db.prepare('SELECT id FROM account_deletions WHERE id = ?').get(audit.body.id),
+    undefined,
+    'legacy PII expires even when account still exists'
+  );
+  assert.ok(
+    db.prepare('SELECT id FROM users WHERE id = ?').get(unverified.id),
+    'audit is not deletion evidence'
   );
   console.log(
     'Account deletion: authentication, proof binding, rollback, retry, cascades, Apple queue, and older clients passed.'

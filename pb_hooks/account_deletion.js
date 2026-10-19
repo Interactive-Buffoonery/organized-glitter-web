@@ -1,6 +1,22 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 module.exports = {
+  ensureJob(app, userId, proofHash = '') {
+    const jobs = app.findRecordsByFilter('account_deletion_jobs', 'user_id = {:user}', '', 1, 0, {
+      user: userId,
+    });
+    if (jobs.length) return jobs[0];
+    const job = new Record(app.findCollectionByNameOrId('account_deletion_jobs'));
+    job.set('user_id', userId);
+    job.set('source_kind', proofHash ? 'guarded' : 'legacy');
+    job.set('proof_hash', proofHash);
+    job.set('posthog_status', 'pending');
+    // Allow in-flight client batches to settle; this is not a guarantee about
+    // offline devices, which must independently stop sending this identity.
+    job.set('next_attempt', new DateTime(new Date(Date.now() + 60 * 60 * 1000).toISOString()));
+    app.save(job);
+    return job;
+  },
   cleanupStatus(app, job) {
     const grants = app.countRecords(
       'apple_oauth_grants',
@@ -9,7 +25,7 @@ module.exports = {
       })
     );
     return job.getString('posthog_status') === 'completed' &&
-      job.getString('revenuecat_status') === 'completed' &&
+      job.getString('posthog_verified_at') !== '' &&
       grants === 0
       ? 'completed'
       : 'pending';
@@ -22,7 +38,7 @@ module.exports = {
         .newQuery(
           `
         SELECT jobs.id FROM account_deletion_jobs jobs
-        WHERE jobs.posthog_status = 'completed' AND jobs.revenuecat_status = 'completed'
+        WHERE jobs.posthog_status = 'completed' AND jobs.posthog_verified_at != ''
           AND NOT EXISTS (SELECT 1 FROM apple_oauth_grants grants WHERE grants.user_id = jobs.user_id)
           AND jobs.cleanup_completed = ''
         LIMIT 100
@@ -41,7 +57,7 @@ module.exports = {
         .newQuery(
           `
         SELECT jobs.id FROM account_deletion_jobs jobs
-        WHERE jobs.posthog_status = 'completed' AND jobs.revenuecat_status = 'completed'
+        WHERE jobs.posthog_status = 'completed' AND jobs.posthog_verified_at != ''
           AND NOT EXISTS (SELECT 1 FROM apple_oauth_grants grants WHERE grants.user_id = jobs.user_id)
           AND jobs.cleanup_completed != '' AND jobs.cleanup_completed <= {:cutoff}
         ORDER BY jobs.cleanup_completed
@@ -52,6 +68,17 @@ module.exports = {
         .all(expired);
       for (const row of expired)
         txApp.delete(txApp.findRecordById('account_deletion_jobs', row.id));
+      // Legacy audits record attempts, including failures. Their PII lifetime is
+      // bounded by creation, independent of whether an account was deleted.
+      const audits = txApp.findRecordsByFilter(
+        'account_deletions',
+        'created <= {:cutoff}',
+        'created',
+        100,
+        0,
+        { cutoff: cutoff.string() }
+      );
+      for (const audit of audits) txApp.delete(audit);
     });
   },
   issueProof(app, userId, value, method, provider = '', identityHash = '') {

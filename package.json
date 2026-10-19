@@ -116,7 +116,7 @@
     "qa:browser:full": "node scripts/run-local-release-qa.mjs --suite=full",
     "test:blog": "pnpm --dir blog test",
     "qa:blog": "node scripts/run-blog-qa.mjs",
-    "pb:test:account-deletion": "node scripts/test-account-deletion.mjs"
+    "pb:test:account-deletion": "node scripts/test-account-deletion.mjs && node scripts/test-account-deletion-worker.mjs"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.2.8",

@@ -23,16 +23,13 @@ that became linked. Keep only genuinely anonymous events and anonymous
 aggregates that cannot identify a specific person. An opaque account ID or a
 replacement stable ID does not make events anonymous.
 
-Retain required financial evidence separately from app accounts. Before enabling
-RevenueCat customer deletion, verify that store reports and bookkeeping preserve
-necessary sales, refunds, fees, adjustments and settlement evidence. Customer
-deletion does not promise a refund or deletion of the store's own records.
+Deleting the app account does not promise a refund or deletion of the app
+store's own transaction records.
 
 Keep minimal operational evidence for 30 days after cleanup completes. Keep
 necessary vendor identifiers and encrypted Apple grants only while cleanup
 needs them. Backups must expire within 30 days, and restoration must reapply
-account deletions before the restored system serves requests. Required financial
-records have their own applicable retention period. Do not publish financial
+account deletions before the restored system serves requests. Do not publish financial
 records, credentials, actual deletion receipts or production configuration.
 
 ## Implemented backend contract
@@ -105,49 +102,139 @@ It performs no second deletion. A 401 with an unknown proof is not confirmation
 that deletion completed. Receipt expiry ends this retry window.
 
 `account_deletion_jobs` is inaccessible to ordinary collection clients. It keeps
-an opaque account ID, proof hash, vendor completion flags and timestamps. It
-contains no email, feedback, library content or detailed usage snapshot.
-Pending vendor jobs survive account deletion. Completed receipts expire after
-30 days once no Apple grant remains. An hourly task records `cleanup_completed` after both vendor flags are complete
-and Apple grants are gone, then expires up to 100 old receipts per run. Trusted
-workers must mark vendor flags complete only after verified erasure, not merely
-API acceptance. Completion-only retries report `cleanup: "completed"` once all
-three cleanup checks pass.
+an opaque account ID, optional proof hash, source kind, worker state, retry and
+lease timestamps, and the PostHog target until verification. It contains no email,
+feedback, library content or usage snapshot. A private target can contain linked
+vendor distinct IDs, which are identifying data and must not enter logs or public
+artifacts. It is removed when erasure is verified. Pending jobs survive user
+deletion and are not expired while cleanup remains unresolved.
 
-## Compatibility
+Completion-only retries report `cleanup: "completed"` only when PostHog is
+`completed` with a verification timestamp and no Apple grant remains. The hourly
+retention task timestamps overall completion, then removes up to 100 receipts
+older than 30 days after completion. Apple revocation remains required. A missing
+or expired receipt, including an unknown-proof 401, proves neither deletion nor
+that the account is intact.
 
-Existing collection-based web and older native deletion requests remain
-available under their existing verified-owner rules. Their client-created audit
-and separate deletion requests are not upgraded by this route. They do not
-receive the new fresh-proof or durable vendor-job guarantees. Older clients
-cannot consume a deletion proof to link or unlink a sign-in provider.
+## PostHog worker
 
-New clients must use the guarded route. Replacing the older web flow requires
-its own UI integration and compatibility plan.
+The five-minute cron processes at most ten due jobs. Each HTTP request has a
+ten-second timeout, outside database transactions. New deletions wait one hour
+before the first attempt to allow in-flight batches to arrive. This delay does
+not prove remote or offline queues are empty; client queue erasure and suppression
+remain separate release requirements.
 
-## Remaining release gates
+The worker uses these server-only environment variables:
 
-This backend change is not a complete App Store release implementation.
+| Variable                     | Required value                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------- |
+| `POSTHOG_ERASURE_HOST`       | `https://us.posthog.com` or `https://eu.posthog.com`, matching the actual project region |
+| `POSTHOG_ERASURE_PROJECT_ID` | The project's positive numeric ID                                                        |
+| `POSTHOG_ERASURE_API_KEY`    | A private API key authorized for `person:read` and `person:write` in that project        |
 
-- Add the native confirmation, fresh-authentication and deletion UI. Verify
-  local cleanup, pending edits, interrupted requests and account switching.
-- Implement trusted PostHog and RevenueCat workers, durable retry scheduling,
-  completion verification and unresolved-failure alerts. The current job is a
-  handoff, not a claim of vendor erasure. Do not mark jobs complete without
-  vendor evidence. Workers must preserve required accounting evidence and
-  cannot guess identity links for unrelated anonymous events.
-- Verify revocation requirements for linked Google and Discord identities; this
-  change adds no provider revocation beyond the existing Apple worker.
-- Reconcile retention of legacy web audit records before claiming the policy
-  covers every deletion path.
-- Verify the selected SDK's queued-event behavior. Identity reset alone is not
-  proof that queued account-linked events were erased.
-- Verify production backup expiry and restoration safeguards. The backend code
-  cannot enforce an external provider's backup policy.
-- Verify deployed backend revision, PocketBase version, Apple configuration and
-  revocation worker. Pin the native backend contract only after deployment.
-- Confirm applicable financial retention with the release owner. Store live
-  settings, accounting records and operational evidence privately.
+Never use an ingestion token as the erasure credential. Missing configuration
+blocks jobs and emits a sanitized alert. There is no success or no-op fallback.
+Self-hosted destinations require an explicit reviewed adapter change.
 
-Legacy native Apple account remediation is outside this prelaunch scope.
-Existing web Apple grants still use the shared revocation hooks.
+1. Claim one due row transactionally with a random token and a two-minute lease.
+   Renew and compare the token before submitting and before every state write.
+   An expired claim is recoverable; a stale claimant cannot overwrite its
+   successor. A database write failure leaves the lease for recovery.
+2. Resolve the exact PocketBase account ID as the PostHog `distinct_id`.
+   Require exactly one person and no unresolved pagination. Fetch that person's
+   detail record for the full authoritative linked `distinct_ids`; list and
+   batch representations can truncate them. Reject missing, ambiguous or
+   oversized identity manifests instead of guessing or truncating.
+3. Persist the person UUID, host, project, all linked IDs, and request timestamp
+   before sending `DELETE persons/:uuid/?delete_events=true&delete_recordings=true`.
+   No irreversible call occurs if that save or ownership check fails. The vendor
+   operation targets the whole person, including linked anonymous history.
+4. On subsequent attempts, query `persons/deletion_status/` for that saved UUID
+   first. Complete only when every returned entry is `completed`, has a valid
+   `delete_verified_at`, and belongs to this request or later. A changed project
+   or region blocks the job rather than redirecting its target.
+5. API acceptance, an empty status response, a missing person, and a 404 never
+   mean completion. An empty status response retries the same saved UUID;
+   uncertain or missing targets remain private and unresolved for reconciliation.
+
+Backoff starts at 15 minutes, doubles to a 24-hour cap and is stored in the job.
+A 429 also honors a longer valid `Retry-After` delay, including HTTP dates.
+401/403, malformed responses, missing identities and configuration mismatch are
+blocked and retried durably. Pending verification is retried without resubmission
+while the vendor reports a matching pending request.
+
+Blocked jobs and jobs still unresolved after 14 days emit a warning at most once
+per job per 24 hours. Warnings contain only the job ID and a fixed reason code,
+never vendor bodies, account IDs, linked IDs, proofs or credentials. Operators
+must route these warnings, monitor cron liveness and inspect the private job
+queue; logging an alert is not proof that a human received it. Do not manually
+mark a job completed to silence an alert.
+
+API sources checked for this implementation:
+[PostHog persons](https://posthog.com/docs/api/persons),
+[deletion and verification](https://posthog.com/docs/privacy/data-storage), and
+[person serialization and full detail retrieval](https://github.com/PostHog/posthog/blob/master/posthog/api/person.py).
+These describe the API contract, not observed erasure in the deployed project.
+
+## Compatibility and legacy retention
+
+Existing collection-based owner and superuser user deletes remain available.
+A model deletion hook explicitly wraps job creation and `e.next()` in the same
+transaction, including the existing relation cascades and Apple grant queue.
+Failure to create the job prevents deletion; failure later in deletion rolls the
+job back. The guarded route inserts its job first and the hook reuses it. A unique
+user index prevents duplicate jobs.
+
+Legacy paths have `source_kind: "legacy"` and an empty optional `proof_hash`.
+They gain durable vendor cleanup but do not gain fresh-proof authorization or a
+completion retry credential. No proof is fabricated. Guarded jobs use
+`source_kind: "guarded"` and a unique nonempty proof hash. New clients must use
+the guarded route; older clients retain their verified-owner rules.
+
+Legacy `account_deletions` rows are records of attempts, including failed or
+abandoned attempts, not evidence that a user was deleted. Their PII expires by
+creation time, independent of account existence. The hourly retention job
+removes up to 100 rows older than 30 days per run. Backlogs can take multiple runs;
+monitor them before claiming the 30-day policy is satisfied. No historical audit
+is used to infer a successful deletion or backfill a vendor job. Historical
+accounts deleted before this hook need separate evidence-based reconciliation.
+This source change performs no production audit purge.
+
+## Deployment and remaining release gates
+
+Deploy the forward migration `1792281600_account_deletion_worker.js`, canonical
+schema, and current hooks together. Historical migrations remain immutable. The
+forward migration removes the unused vendor field and adds worker state; there
+is no second vendor worker or configuration requirement. Existing receipts are
+preserved. Earlier manually completed PostHog flags lack verification evidence,
+so the migration requeues them and clears overall completion. Destructive down
+migration is refused while durable receipts and targets may exist.
+
+Local fixture tests use checksum-verified PocketBase and a loopback vendor. They
+prove transaction behavior and worker transitions only. They do not prove vendor
+erasure or a deployed backend revision. Before release:
+
+- Run the required local backend-first validation and strict combined `test:pr`.
+  Integrate client and native work, including malformed responses, uncertain
+  requests, account/session fencing and local cleanup failures.
+- Exercise the adapter in an explicitly authorized disposable vendor project.
+  Confirm region, scopes, full linked identity coverage, request and verification
+  semantics, personless identified events, late events and session recordings.
+  Until resolved with evidence, no-person jobs stay blocked.
+- Verify exact SDK offline queue erasure and suppression on every client. A reset
+  alone or a one-hour worker delay is insufficient proof.
+- Verify Google and Discord revocation applicability. Existing Apple revocation
+  and its encrypted grant queue still gate overall completion.
+- Verify alert routing, worker liveness and an owner for unresolved jobs. Track
+  legacy audit backlogs and historical deletion reconciliation privately.
+- Verify backup expiry within 30 days and rehearse restore while ingress and
+  workers are blocked. Reapply the deletion ledger held outside the snapshot,
+  including pending targets, before service resumes. Cover a pre-migration
+  snapshot; migration alone cannot reconstruct post-snapshot deletions.
+- Verify deployed backend revision, hook/migration hashes, PocketBase version,
+  configuration and Apple worker. Pin the native backend contract only after
+  deployment is independently verified. This change makes no deployed pin claim.
+
+Keep live settings, deletion ledgers and operational evidence private. Legacy
+native Apple account remediation is outside this prelaunch scope; existing web
+Apple grants still use the shared revocation hooks.

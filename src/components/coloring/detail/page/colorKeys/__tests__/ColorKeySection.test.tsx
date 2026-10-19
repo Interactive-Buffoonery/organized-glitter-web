@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   update: vi.fn(),
   remove: vi.fn(),
   reorder: vi.fn(),
+  loadSortPanel: vi.fn(),
   reorderPending: false,
   refetch: vi.fn(),
   sendRequest: vi.fn(),
@@ -45,7 +46,7 @@ vi.mock('@/utils/image/symbolRequestPhoto', () => ({
   prepareSymbolRequestPhoto: async (file: File) => file,
 }));
 // jsdom has no layout for dnd-kit; this stand-in reverses the order instead of dragging.
-vi.mock('../ColorKeySortPanel', () => ({ ColorKeySortPanel: SortPanelStandIn }));
+vi.mock('../loadSortPanel', () => ({ loadSortPanel: state.loadSortPanel }));
 function SortPanelStandIn({
   order,
   onOrderChange,
@@ -106,6 +107,7 @@ beforeEach(() => {
   state.error.mockReset();
   state.success.mockReset();
   state.reorderPending = false;
+  state.loadSortPanel.mockReset().mockResolvedValue({ ColorKeySortPanel: SortPanelStandIn });
 });
 
 describe('Colors used setup', () => {
@@ -264,22 +266,16 @@ describe('Colors used sort', () => {
   it('keeps the panel closed and asks to try again when it cannot load', async () => {
     const user = userEvent.setup();
     state.rows = three();
-    vi.doMock('../ColorKeySortPanel', () => {
-      throw new TypeError('Failed to fetch dynamically imported module');
-    });
-    vi.resetModules();
-    try {
-      render(<ColorKeySection pageId="page-1" />);
-      await user.click(screen.getByRole('button', { name: 'Sort' }));
-      expect(await screen.findByRole('alert')).toHaveTextContent(
-        'Couldn’t open Sort Color Order. Please try again.'
-      );
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Add symbol' })).toBeEnabled();
-    } finally {
-      vi.doMock('../ColorKeySortPanel', () => ({ ColorKeySortPanel: SortPanelStandIn }));
-      vi.resetModules();
-    }
+    state.loadSortPanel.mockRejectedValue(
+      new TypeError('Failed to fetch dynamically imported module')
+    );
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: 'Sort' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Couldn’t open Sort Color Order. Please try again.'
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add symbol' })).toBeEnabled();
   });
 
   it('disables Sort, the rows and Add symbol while an order is saving', () => {

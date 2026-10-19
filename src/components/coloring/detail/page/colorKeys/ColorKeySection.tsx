@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import type { ColorKey } from '@/services/pocketbase/colorKeys.service';
 import { createLogger } from '@/utils/logger';
 import { ColorKeyEntry, type EntrySymbolRequest, type EntryTarget } from './ColorKeyEntry';
+import { loadSortPanel } from './loadSortPanel';
 import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
 import { SymbolRequestDialog } from './SymbolRequestDialog';
@@ -32,7 +33,6 @@ const SORT_OFFLINE = 'Sorting colors needs a connection. Reconnect and try again
 const SORT_LOAD_FAILED = 'Couldn’t open Sort Color Order. Please try again.';
 
 // Sorting needs a connection, so dnd-kit loads on first use and stays out of the PWA precache.
-const loadSortPanel = () => import('./ColorKeySortPanel');
 const ColorKeySortPanel = lazy(() =>
   loadSortPanel().then(module => ({ default: module.ColorKeySortPanel }))
 );

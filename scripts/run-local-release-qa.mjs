@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import {
   chmodSync,
   closeSync,
@@ -33,10 +34,22 @@ export const pocketBaseCachePath = path.join(
 const defaultTestEmail = 'sarah-local@example.test';
 const defaultTestPassword = 'local-test-password-123';
 const adminEmail = 'admin@localhost.test';
-const adminPassword = 'admin-local-release-qa-123';
 const randomizerFixtureCount = 8;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+export const createQaSuperuserCredentials = () => ({
+  email: adminEmail,
+  password: randomBytes(32).toString('base64url'),
+});
+
+export const redactQaCredentials = (output, env) => {
+  let redacted = String(output);
+  for (const value of [env.LOCAL_POCKETBASE_ADMIN_PASSWORD, env.LOCAL_POCKETBASE_ADMIN_EMAIL]) {
+    if (value) redacted = redacted.replaceAll(value, '[redacted]');
+  }
+  return redacted;
+};
 
 export const qaEnvironment = env => {
   const environment = { ...env };
@@ -310,11 +323,19 @@ const preparePocketBaseBinary = async pbDir => {
   return target;
 };
 
-const runSync = ({ command, args, env, logPath, label }) => {
-  const result = spawnSync(command, args, { cwd: rootDir, env, encoding: 'utf8' });
-  writeFileSync(
+export const runSync = (
+  { command, args, env, logPath, label },
+  { spawnCommand = spawnSync, writeFile = writeFileSync } = {}
+) => {
+  const result = spawnCommand(command, args, { cwd: rootDir, env, encoding: 'utf8' });
+  writeFile(
     logPath,
-    [`$ ${[command, ...args].join(' ')}`, '', result.stdout || '', result.stderr || ''].join('\n')
+    redactQaCredentials(
+      [`$ ${[command, ...args].join(' ')}`, '', result.stdout || '', result.stderr || ''].join(
+        '\n'
+      ),
+      env
+    )
   );
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -461,8 +482,9 @@ const stopProcess = async processHandle => {
   });
 };
 
-const writeReport = ({
+export const writeReport = ({
   appUrl,
+  env,
   error,
   listedTestCount,
   logsDir,
@@ -473,6 +495,7 @@ const writeReport = ({
   runDir,
   status,
   suite,
+  writeFile = writeFileSync,
 }) => {
   const commandArgs = [suite === 'legacy' ? '' : `--suite=${suite}`, ...playwrightArgs].filter(
     Boolean
@@ -509,7 +532,7 @@ const writeReport = ({
     '- Isolated PocketBase data remains in the run directory for inspection.',
     '',
   ].join('\n');
-  writeFileSync(reportPath, content);
+  writeFile(reportPath, redactQaCredentials(content, env));
 };
 
 export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
@@ -533,6 +556,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
   mkdirSync(artifactsDir, { recursive: true });
   mkdirSync(path.join(runDir, 'auth'), { recursive: true });
 
+  const qaSuperuser = createQaSuperuserCredentials();
   const env = {
     ...qaEnvironment(process.env),
     APP_TEST_ENV: 'test',
@@ -542,8 +566,8 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     E2E_STORAGE_STATE: path.join(runDir, 'auth', 'user.json'),
     E2E_TEST_EMAIL: defaultTestEmail,
     E2E_TEST_PASSWORD: defaultTestPassword,
-    LOCAL_POCKETBASE_ADMIN_EMAIL: adminEmail,
-    LOCAL_POCKETBASE_ADMIN_PASSWORD: adminPassword,
+    LOCAL_POCKETBASE_ADMIN_EMAIL: qaSuperuser.email,
+    LOCAL_POCKETBASE_ADMIN_PASSWORD: qaSuperuser.password,
     LOCAL_POCKETBASE_ALLOWED_ORIGINS: appUrl,
     LOCAL_POCKETBASE_DIR: pbDir,
     LOCAL_POCKETBASE_TEST_USER_EMAIL: defaultTestEmail,
@@ -573,8 +597,8 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     upsertLocalPocketBaseSuperuser({
       pocketbaseBinary,
       localDir: pbDir,
-      email: adminEmail,
-      password: adminPassword,
+      email: env.LOCAL_POCKETBASE_ADMIN_EMAIL,
+      password: env.LOCAL_POCKETBASE_ADMIN_PASSWORD,
     });
 
     const pbStdout = openSync(path.join(logsDir, 'pocketbase.stdout.log'), 'a');
@@ -679,13 +703,14 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     console.log(`Report: ${reportPath}`);
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);
-    console.error(failure);
+    console.error(redactQaCredentials(failure, env));
   } finally {
     await stopProcess(appProcess);
     await stopProcess(pbProcess);
     for (const handle of handles) closeSync(handle);
     writeReport({
       appUrl,
+      env,
       error: failure,
       listedTestCount,
       logsDir,

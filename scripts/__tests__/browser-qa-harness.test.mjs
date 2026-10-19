@@ -1,10 +1,12 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import ciConfig, * as ciConfigModule from '../../playwright.ci.config';
 import {
+  createQaSuperuserCredentials,
   deletionPlaywrightEnvironment,
   parseArgs,
   parseListedInventory,
@@ -12,10 +14,13 @@ import {
   parseRandomizerFixtureIds,
   pocketBaseCachePath,
   qaEnvironment,
+  redactQaCredentials,
   resolveQaFixtures,
+  runSync,
   seedRandomizerFixturesForSuite,
   validateManagedPlaywrightReport,
   waitForHttp,
+  writeReport,
 } from '../run-local-release-qa.mjs';
 import {
   hasVerifiedCachedBinary,
@@ -175,6 +180,79 @@ describe('PocketBase installer', () => {
 });
 
 describe('browser QA harness safeguards', () => {
+  it('generates distinct run credentials for setup and Playwright without logging them', () => {
+    const first = createQaSuperuserCredentials();
+    const second = createQaSuperuserCredentials();
+    const digest = value => createHash('sha256').update(value).digest('hex');
+    const firstEnv = {
+      LOCAL_POCKETBASE_ADMIN_EMAIL: first.email,
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: first.password,
+    };
+    const secondEnv = {
+      LOCAL_POCKETBASE_ADMIN_EMAIL: second.email,
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: second.password,
+    };
+
+    expect(first.email).toBe('admin@localhost.test');
+    expect(second.email).toBe(first.email);
+    expect(first.password.length).toBeGreaterThanOrEqual(40);
+    expect(digest(first.password) === digest(second.password)).toBe(false);
+    expect(
+      deletionPlaywrightEnvironment(firstEnv).E2E_DELETION_ADMIN_PASSWORD === first.password
+    ).toBe(true);
+    expect(
+      deletionPlaywrightEnvironment(secondEnv).E2E_DELETION_ADMIN_PASSWORD === second.password
+    ).toBe(true);
+
+    let report = '';
+    writeReport({
+      appUrl: 'http://127.0.0.1:3000',
+      error: `Setup failed for ${first.email} with ${first.password}`,
+      env: firstEnv,
+      logsDir: '/tmp/logs',
+      pbUrl: 'http://127.0.0.1:8090',
+      playwrightArgs: [],
+      reportPath: '/tmp/report.md',
+      runDir: '/tmp/run',
+      status: 'failed',
+      suite: 'smoke',
+      writeFile: (_path, content) => {
+        report = content;
+      },
+    });
+    expect(report.includes('Failure: Setup failed for [redacted] with [redacted]')).toBe(true);
+    expect(report.includes(first.password)).toBe(false);
+    expect(report.includes(first.email)).toBe(false);
+    expect(
+      redactQaCredentials(`child: ${second.password}`, secondEnv) === 'child: [redacted]'
+    ).toBe(true);
+
+    let commandLog = '';
+    runSync(
+      {
+        command: 'fixture',
+        args: [],
+        env: firstEnv,
+        logPath: '/tmp/fixture.log',
+        label: 'fixture',
+      },
+      {
+        spawnCommand: () => ({
+          status: 0,
+          stdout: `stdout ${first.password}`,
+          stderr: `stderr ${first.email}`,
+        }),
+        writeFile: (_path, content) => {
+          commandLog = content;
+        },
+      }
+    );
+    expect(commandLog.includes('stdout [redacted]')).toBe(true);
+    expect(commandLog.includes('stderr [redacted]')).toBe(true);
+    expect(commandLog.includes(first.password)).toBe(false);
+    expect(commandLog.includes(first.email)).toBe(false);
+  });
+
   it('runs disposable account deletion in managed Chromium and WebKit projects', () => {
     const spec = '/repo/e2e/authenticated/account-deletion-local.spec.ts';
     const matches = inventory => inventory?.some(pattern => pattern.test(spec));

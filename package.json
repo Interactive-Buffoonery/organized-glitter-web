@@ -123,6 +123,8 @@
     "pb:test:color-keys": "node scripts/test-color-keys-pocketbase.mjs"
   },
   "dependencies": {
+    "@dnd-kit/helpers": "0.5.1",
+    "@dnd-kit/react": "0.5.1",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@fontsource-variable/karla": "^5.3.0",
     "@fontsource/caveat": "^5.2.8",

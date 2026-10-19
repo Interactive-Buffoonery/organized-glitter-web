@@ -162,8 +162,6 @@ export default defineConfig(({ mode }) => {
           skipWaiting: true,
           clientsClaim: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-          // Sorting colors needs a connection, so its lazy dnd-kit chunk loads on first use.
-          globIgnores: ['**/assets/ColorKeySortPanel-*.js'],
           // dist/index.html is the static landing; app routes fall back to the SPA shell.
           navigateFallback: 'app.html',
           navigateFallbackAllowlist: APP_ROUTE_PATHS.filter(route => route !== '/').map(

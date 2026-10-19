@@ -32,7 +32,7 @@ const SORT_FAILED = 'Couldn’t save the updated order. Please try again.';
 const SORT_OFFLINE = 'Sorting colors needs a connection. Reconnect and try again.';
 const SORT_LOAD_FAILED = 'Couldn’t open Sort Color Order. Please try again.';
 
-// Sorting needs a connection, so dnd-kit loads on first use and stays out of the PWA precache.
+// dnd-kit stays off the coloring page's first load; the panel loads when Sort is first used.
 const ColorKeySortPanel = lazy(() =>
   loadSortPanel().then(module => ({ default: module.ColorKeySortPanel }))
 );

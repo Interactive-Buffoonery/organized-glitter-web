@@ -464,7 +464,7 @@ describe('Symbol requests', () => {
     await user.click(screen.getByRole('button', { name: /Can't find your symbol/ }));
     const dialog = screen.getByRole('dialog', { name: 'Send us a symbol' });
     await user.upload(
-      within(dialog).getByLabelText('Photo of the symbol'),
+      within(dialog).getByLabelText('Photo'),
       new File(['photo'], 'symbol.jpg', { type: 'image/jpeg' })
     );
     if (!usePhoto)
@@ -522,20 +522,133 @@ describe('Symbol requests', () => {
     expect(state.success).toHaveBeenCalled();
   });
 
-  it('says the photo was sent when adding its row fails', async () => {
+  it('retries adding the row without sending the photo again', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031')];
     state.sendRequest.mockResolvedValue({ id: REQUEST });
-    state.create.mockRejectedValue(new Error('offline'));
+    state.create
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(key('r', 1, `r:${REQUEST}`));
     render(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
     await user.click(screen.getByRole('button', { name: 'Add symbol' }));
-    await sendPhoto(user);
-    await waitFor(() =>
-      expect(state.error).toHaveBeenCalledWith(
-        "We got your photo, but couldn't add it to this page."
-      )
+    await user.click(screen.getByRole('button', { name: /Can't find your symbol/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Send us a symbol' });
+    await user.upload(
+      within(dialog).getByLabelText('Photo'),
+      new File(['photo'], 'symbol.jpg', { type: 'image/jpeg' })
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Send' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      "We got your photo, but couldn't add it to this page."
     );
     expect(state.success).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Try again' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Edit color: Sent symbol' })
+    ).toBeInTheDocument();
+    expect(state.sendRequest).toHaveBeenCalledTimes(1);
+    expect(state.create).toHaveBeenCalledTimes(2);
+    expect(state.create).toHaveBeenLastCalledWith({ symbol: `r:${REQUEST}`, position: 1 });
+    expect(state.success).toHaveBeenCalledTimes(1);
+  });
+
+  it('places the row after rows that arrived while sending', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    let resolve: (value: unknown) => void = () => {};
+    state.sendRequest.mockReturnValue(new Promise(done => (resolve = done)));
+    state.create.mockResolvedValue(key('r', 6, `r:${REQUEST}`));
+    const { rerender } = render(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
+    await user.click(screen.getByRole('button', { name: 'Add symbol' }));
+    await user.click(screen.getByRole('button', { name: /Can't find your symbol/ }));
+    await user.upload(
+      screen.getByLabelText('Photo'),
+      new File(['photo'], 'symbol.jpg', { type: 'image/jpeg' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    state.rows = [key('a', 0, 'u:0031'), key('b', 5, 'u:0032')];
+    rerender(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
+    resolve({ id: REQUEST });
+    await waitFor(() =>
+      expect(state.create).toHaveBeenCalledWith({ symbol: `r:${REQUEST}`, position: 6 })
+    );
+  });
+
+  it('keeps the request open while sending, whatever tries to close it', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    let reject: (error: unknown) => void = () => {};
+    state.sendRequest.mockReturnValue(new Promise((_, fail) => (reject = fail)));
+    render(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
+    await user.click(screen.getByRole('button', { name: 'Add symbol' }));
+    await user.click(screen.getByRole('button', { name: /Can't find your symbol/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Send us a symbol' });
+    await user.upload(
+      within(dialog).getByLabelText('Photo'),
+      new File(['photo'], 'symbol.jpg', { type: 'image/jpeg' })
+    );
+    await user.type(within(dialog).getByRole('textbox', { name: /^Description/ }), 'Two w');
+    await user.click(within(dialog).getByRole('button', { name: 'Send' }));
+    await user.keyboard('{Escape}');
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(screen.getByRole('dialog', { name: 'Send us a symbol' })).toBe(dialog);
+
+    reject(new Error('Network down'));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Network down');
+    expect(within(dialog).getByRole('textbox', { name: /^Description/ })).toHaveValue('Two w');
+    expect(within(dialog).getByRole('img', { name: 'Chosen symbol' })).toBeInTheDocument();
+    expect(state.create).not.toHaveBeenCalled();
+  });
+
+  it('returns focus to Add symbol after closing the request', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    render(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
+    await user.click(screen.getByRole('button', { name: 'Add symbol' }));
+    await user.click(screen.getByRole('button', { name: /Can't find your symbol/ }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add symbol' })).toHaveFocus());
+  });
+
+  it('returns focus to Change symbol after closing a request from the entry', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    render(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.click(screen.getByRole('button', { name: 'Change symbol' }));
+    await user.click(screen.getByRole('button', { name: /Can't find your symbol/ }));
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Change symbol' })).toHaveFocus()
+    );
+  });
+
+  it('does not claim the photo was used when the entry changed while sending', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    let resolve: (value: unknown) => void = () => {};
+    state.sendRequest.mockReturnValue(new Promise(done => (resolve = done)));
+    const { rerender } = render(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.click(screen.getByRole('button', { name: 'Change symbol' }));
+    await user.click(screen.getByRole('button', { name: /Can't find your symbol/ }));
+    await user.upload(
+      screen.getByLabelText('Photo'),
+      new File(['photo'], 'symbol.jpg', { type: 'image/jpeg' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    // Another device changed this row's symbol, so the open form is a different one now.
+    state.rows = [key('a', 0, 'u:0032')];
+    rerender(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
+    resolve({ id: REQUEST });
+    await waitFor(() =>
+      expect(state.success).toHaveBeenCalledWith(
+        "Thanks for the photo. We'll email you when it's added.",
+        "It wasn't used on this color because the color changed."
+      )
+    );
+    expect(screen.getByRole('dialog', { name: 'Edit color: Two' })).toBeInTheDocument();
   });
 
   it('adds the photo to the setup list', async () => {

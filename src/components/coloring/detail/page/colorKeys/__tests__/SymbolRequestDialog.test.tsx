@@ -4,19 +4,65 @@ import { ClientResponseError } from 'pocketbase';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SymbolRequestDialog } from '../SymbolRequestDialog';
 
-const state = vi.hoisted(() => ({ send: vi.fn(), prepare: vi.fn(), onSent: vi.fn() }));
+const state = vi.hoisted(() => ({
+  send: vi.fn(),
+  prepare: vi.fn(),
+  onSent: vi.fn(),
+  onOpenChange: vi.fn(),
+}));
 vi.mock('@/hooks/mutations/coloring/useColorKeyMutations', () => ({
   useCreateSymbolRequest: () => ({ mutateAsync: state.send }),
 }));
 vi.mock('@/utils/image/symbolRequestPhoto', () => ({ prepareSymbolRequestPhoto: state.prepare }));
 
 const photo = new File(['photo'], 'symbol.jpg', { type: 'image/jpeg' });
+const cropped = new File(['cropped'], 'symbol-cropped.jpg', { type: 'image/jpeg' });
+
+// react-easy-crop needs real image layout; the stub drives the dialog's two ways out.
+vi.mock('@/components/image/ImageCropDialog', () => ({
+  ImageCropDialog: ({
+    open,
+    file,
+    onCropComplete,
+    onUseOriginal,
+    onOpenChange,
+  }: {
+    open: boolean;
+    file: File | null;
+    onCropComplete: (file: File) => void;
+    onUseOriginal: (file: File) => void;
+    onOpenChange: (open: boolean) => void;
+  }) =>
+    open ? (
+      <div role="dialog" aria-label="Crop the symbol">
+        <span>{file?.name}</span>
+        <button
+          type="button"
+          onClick={() => {
+            onCropComplete(cropped);
+            onOpenChange(false);
+          }}
+        >
+          Use crop
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (file) onUseOriginal(file);
+            onOpenChange(false);
+          }}
+        >
+          Skip crop
+        </button>
+      </div>
+    ) : null,
+}));
 
 function renderDialog() {
   render(
     <SymbolRequestDialog
       open
-      onOpenChange={() => {}}
+      onOpenChange={state.onOpenChange}
       userId="owner"
       pageId="page-1"
       bookLabel="Lost Ocean, page 4"
@@ -28,7 +74,7 @@ function renderDialog() {
 }
 
 async function fillAndSend(user: ReturnType<typeof userEvent.setup>) {
-  await user.upload(screen.getByLabelText('Photo of the symbol'), photo);
+  await user.upload(screen.getByLabelText('Photo'), photo);
   await user.type(screen.getByRole('textbox', { name: /^Description/ }), 'Two w stacked');
   await user.click(screen.getByRole('button', { name: 'Send' }));
 }
@@ -36,6 +82,7 @@ async function fillAndSend(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   for (const mock of Object.values(state)) mock.mockReset();
   state.prepare.mockImplementation(async (file: File) => file);
+  state.onSent.mockResolvedValue(true);
   URL.createObjectURL = vi.fn(() => 'blob:preview');
   URL.revokeObjectURL = vi.fn();
 });
@@ -148,5 +195,85 @@ describe('SymbolRequestDialog', () => {
     );
     expect(screen.getByRole('img', { name: 'Chosen symbol' })).toBeInTheDocument();
     expect(state.send).not.toHaveBeenCalled();
+  });
+
+  it('marks the photo and book as required', () => {
+    renderDialog();
+    expect(screen.getByLabelText('Photo')).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByRole('textbox', { name: 'Book and page' })).toBeRequired();
+  });
+
+  it('points the failed field at the error', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    const alert = screen.getByRole('alert');
+    const input = screen.getByLabelText('Photo');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input.getAttribute('aria-describedby')).toContain(alert.id);
+
+    await user.upload(input, photo);
+    const email = screen.getByRole('textbox', { name: 'Email' });
+    await user.clear(email);
+    await user.type(email, 'nope');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(input).not.toHaveAttribute('aria-invalid');
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(email).toHaveAccessibleDescription(
+      "We'll email you when it's added. Enter a valid email address."
+    );
+  });
+
+  it('cannot be dismissed while sending, and shows the error after', async () => {
+    const user = userEvent.setup();
+    let reject: (error: unknown) => void = () => {};
+    state.send.mockReturnValue(new Promise((_, fail) => (reject = fail)));
+    renderDialog();
+    await fillAndSend(user);
+    expect(screen.getByRole('button', { name: 'Sending…' })).toBeDisabled();
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(state.onOpenChange).not.toHaveBeenCalledWith(false);
+
+    reject(new ClientResponseError({ status: 429 }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "You've sent a few requests. Try again in a little while."
+    );
+    expect(screen.getByRole('textbox', { name: /^Description/ })).toHaveValue('Two w stacked');
+    await user.keyboard('{Escape}');
+    expect(state.onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('retries only the placement after the request was created', async () => {
+    const user = userEvent.setup();
+    state.send.mockResolvedValue({ id: 'abcdefghijklmno' });
+    state.onSent.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    renderDialog();
+    await fillAndSend(user);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "We got your photo, but couldn't add it to this page."
+    );
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(state.onSent).toHaveBeenCalledTimes(2));
+    expect(state.onSent).toHaveBeenLastCalledWith('abcdefghijklmno', true);
+    expect(state.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends a cropped photo, and the original after skipping the crop', async () => {
+    const user = userEvent.setup();
+    state.send.mockResolvedValue({ id: 'abcdefghijklmno' });
+    renderDialog();
+    await user.upload(screen.getByLabelText('Photo'), photo);
+    await user.click(screen.getByRole('button', { name: 'Crop photo' }));
+    await user.click(screen.getByRole('button', { name: 'Use crop' }));
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(state.prepare).toHaveBeenCalledWith(cropped));
+
+    await user.click(screen.getByRole('button', { name: 'Crop photo' }));
+    expect(screen.getByRole('dialog', { name: 'Crop the symbol' })).toHaveTextContent('symbol.jpg');
+    await user.click(screen.getByRole('button', { name: 'Skip crop' }));
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(state.prepare).toHaveBeenLastCalledWith(photo));
   });
 });

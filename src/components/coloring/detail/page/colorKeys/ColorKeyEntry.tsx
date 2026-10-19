@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useId,
   useRef,
   useState,
@@ -53,9 +54,16 @@ interface ColorKeyEntryProps {
   requests?: Record<string, SymbolRequestPreview>;
   onClose: () => void;
   onNext: (next: ColorKey) => void;
-  /** Opens the symbol request flow; `place` puts the sent photo's symbol on this color. */
-  onRequestSymbol?: (place: (symbol: string) => void) => void;
+  /** Opens the symbol request flow for this color. */
+  onRequestSymbol?: (request: EntrySymbolRequest) => void;
 }
+
+export type EntrySymbolRequest = {
+  /** Puts the sent photo's symbol in this color's draft; false once this form has closed. */
+  place: (symbol: string) => boolean;
+  /** Moves focus back to Change symbol after the request sheet closes. */
+  focus: () => void;
+};
 
 const GONE = 'This color is no longer on this page. Save again to add it back.';
 const HEX = /^#?([0-9a-f]{6})$/i;
@@ -73,6 +81,12 @@ export function ColorKeyEntry({ target, onClose, ...props }: ColorKeyEntryProps)
   if (!target && goneKey) setGoneKey('');
   const gone = Boolean(target) && goneKey === formKey;
   const symbol = changed?.formKey === formKey ? changed.symbol : target?.symbol;
+  // A request resolves after a send; it may only touch the form that asked for it.
+  const openKey = useRef(formKey);
+  useEffect(() => {
+    openKey.current = formKey;
+  }, [formKey]);
+  const { onRequestSymbol, ...formProps } = props;
   const request = symbol ? requestFor(symbol, props.requests) : undefined;
   const name = symbol ? symbolDisplayName(symbol, request) : '';
   return (
@@ -96,7 +110,19 @@ export function ColorKeyEntry({ target, onClose, ...props }: ColorKeyEntryProps)
           gone={gone}
           onGone={() => setGoneKey(formKey)}
           onClose={onClose}
-          {...props}
+          onRequestSymbol={
+            onRequestSymbol &&
+            (focus =>
+              onRequestSymbol({
+                focus,
+                place: picked => {
+                  if (openKey.current !== formKey) return false;
+                  setChanged({ formKey, symbol: picked });
+                  return true;
+                },
+              }))
+          }
+          {...formProps}
         />
       ) : null}
     </ColorKeySheet>
@@ -116,7 +142,8 @@ function EntryForm({
   onSymbolChange,
   gone,
   onGone,
-}: ColorKeyEntryProps & {
+}: Omit<ColorKeyEntryProps, 'onRequestSymbol'> & {
+  onRequestSymbol?: (focusChangeSymbol: () => void) => void;
   target: EntryTarget;
   symbol: string;
   onSymbolChange: (symbol: string) => void;
@@ -263,6 +290,7 @@ function EntryForm({
         <div className="min-w-0">
           <p className="truncate font-semibold">{symbolDisplayName(symbol, request)}</p>
           <Button
+            id={`${id}-change-symbol`}
             type="button"
             variant="link"
             className="h-auto p-0"
@@ -510,7 +538,7 @@ function EntryForm({
           onRequestSymbol &&
           (() => {
             setPickerOpen(false);
-            onRequestSymbol(onSymbolChange);
+            onRequestSymbol(() => document.getElementById(`${id}-change-symbol`)?.focus());
           })
         }
         onPick={picked => {

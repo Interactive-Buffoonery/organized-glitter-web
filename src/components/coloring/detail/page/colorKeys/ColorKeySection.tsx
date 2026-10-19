@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { ClientResponseError } from 'pocketbase';
 import { Section, SectionHeading } from '@/components/shared/Section';
@@ -13,7 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { notifyError, notifySuccess } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/utils/logger';
-import { ColorKeyEntry, type EntryTarget } from './ColorKeyEntry';
+import { ColorKeyEntry, type EntrySymbolRequest, type EntryTarget } from './ColorKeyEntry';
 import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
 import { SymbolRequestDialog } from './SymbolRequestDialog';
@@ -21,8 +21,10 @@ import { colorKeyCopyText, requestFor, safeSwatch, symbolName } from './symbolNa
 
 const logger = createLogger('ColorKeySection');
 
-/** Places a sent photo's `r:` symbol; false when that failed and the user was already told. */
-type PlaceSymbol = (symbol: string) => boolean | Promise<boolean>;
+/** Where a sent photo's `r:` symbol goes when it stands in on this page. */
+type RequestTarget =
+  { kind: 'add' } | { kind: 'setup' } | { kind: 'entry'; request: EntrySymbolRequest };
+const THANKS = "Thanks for the photo. We'll email you when it's added.";
 
 export function ColorKeySection({
   pageId,
@@ -65,7 +67,14 @@ function ColorKeyEditor({
   ]).data;
   const setup = useSetupColorKeys(pageId, userId);
   const createKey = useCreateColorKey(pageId, userId);
-  const [requestTarget, setRequestTarget] = useState<{ place: PlaceSymbol } | null>(null);
+  // Kept after closing so focus can return to where the request started.
+  const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
+  const [requestOpen, setRequestOpen] = useState(false);
+  // A send can outlast several renders; place after whatever rows exist when it lands.
+  const latestRows = useRef(rows);
+  useEffect(() => {
+    latestRows.current = rows;
+  });
   const [skipped, setSkipped] = useState(false);
   const [setupSymbols, setSetupSymbols] = useState<string[]>(DEFAULT_SETUP_SYMBOLS);
   const [off, setOff] = useState<Set<string>>(() => new Set());
@@ -112,7 +121,9 @@ function ColorKeyEditor({
       notifyError('Could not copy. Try again.');
     }
   };
-  const nextPosition = rows.reduce((max, row) => Math.max(max, row.position + 1), 0);
+  const nextPositionIn = (list: typeof rows) =>
+    list.reduce((max, row) => Math.max(max, row.position + 1), 0);
+  const nextPosition = nextPositionIn(rows);
   const addSetupSymbol = (symbol: string) => {
     setSetupSymbols(symbols => (symbols.includes(symbol) ? symbols : [...symbols, symbol]));
     setOff(current => {
@@ -120,30 +131,47 @@ function ColorKeyEditor({
       nextOff.delete(symbol);
       return nextOff;
     });
-    return true;
   };
   const addRequestRow = async (symbol: string) => {
     try {
-      const row = await createKey.mutateAsync({ symbol, position: nextPosition });
+      const position = nextPositionIn(latestRows.current);
+      const row = await createKey.mutateAsync({ symbol, position });
       setEntry({ row, symbol: row.symbol, position: row.position });
       return true;
     } catch (error) {
       logger.warn('Could not add a sent symbol to the page', error);
-      notifyError("We got your photo, but couldn't add it to this page.");
       return false;
     }
+  };
+  const openRequest = (target: RequestTarget) => {
+    setRequestTarget(target);
+    setRequestOpen(true);
   };
   const onPick = (symbol: string) => {
     setPicker(null);
     if (picker === 'setup') addSetupSymbol(symbol);
     else setEntry({ symbol, position: nextPosition });
   };
+  /** False when adding the row failed; the sheet then offers to add it again. */
   const onSent = async (requestId: string, usePhoto: boolean) => {
-    const target = requestTarget;
-    setRequestTarget(null);
-    setSentIds(ids => [...ids, requestId]);
-    if (usePhoto && target && !(await target.place(`r:${requestId}`))) return;
-    notifySuccess("Thanks for the photo. We'll email you when it's added.");
+    const symbol = `r:${requestId}`;
+    setSentIds(ids => (ids.includes(requestId) ? ids : [...ids, requestId]));
+    let unused = false;
+    if (usePhoto && requestTarget?.kind === 'setup') addSetupSymbol(symbol);
+    if (usePhoto && requestTarget?.kind === 'add' && !(await addRequestRow(symbol))) return false;
+    if (usePhoto && requestTarget?.kind === 'entry') unused = !requestTarget.request.place(symbol);
+    setRequestOpen(false);
+    if (unused) notifySuccess(THANKS, "It wasn't used on this color because the color changed.");
+    else notifySuccess(THANKS);
+    return true;
+  };
+  const focusAfterRequest = (event: Event) => {
+    event.preventDefault();
+    if (requestTarget?.kind === 'entry') return requestTarget.request.focus();
+    // A placed row opens its own entry, which already holds focus.
+    if (entry) return;
+    const returnTo = requestTarget?.kind === 'setup' ? 'add-setup-symbol' : 'add-symbol';
+    document.getElementById(`color-keys-${pageId}-${returnTo}`)?.focus();
   };
 
   return (
@@ -202,6 +230,7 @@ function ColorKeyEditor({
               );
             })}
             <button
+              id={`color-keys-${pageId}-add-setup-symbol`}
               type="button"
               aria-label="Add symbols after z"
               disabled={setup.isPending}
@@ -285,7 +314,13 @@ function ColorKeyEditor({
             </ul>
           )}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Button type="button" variant="link" className="px-0" onClick={() => setPicker('add')}>
+            <Button
+              id={`color-keys-${pageId}-add-symbol`}
+              type="button"
+              variant="link"
+              className="px-0"
+              onClick={() => setPicker('add')}
+            >
               Add symbol
             </Button>
             {rows.length === 0 ? (
@@ -322,7 +357,7 @@ function ColorKeyEditor({
         userId={userId}
         onPick={onPick}
         onRequestSymbol={() => {
-          setRequestTarget({ place: picker === 'setup' ? addSetupSymbol : addRequestRow });
+          openRequest({ kind: picker === 'setup' ? 'setup' : 'add' });
           setPicker(null);
         }}
       />
@@ -336,23 +371,17 @@ function ColorKeyEditor({
         onNext={row =>
           setEntry({ row, symbol: row.symbol, position: row.position, focusCode: true })
         }
-        onRequestSymbol={place =>
-          setRequestTarget({
-            place: symbol => {
-              place(symbol);
-              return true;
-            },
-          })
-        }
+        onRequestSymbol={request => openRequest({ kind: 'entry', request })}
       />
       <SymbolRequestDialog
-        open={requestTarget !== null}
-        onOpenChange={open => !open && setRequestTarget(null)}
+        open={requestOpen}
+        onOpenChange={setRequestOpen}
+        onCloseAutoFocus={focusAfterRequest}
         userId={userId}
         pageId={pageId}
         bookLabel={bookLabel}
         email={email}
-        onSent={(requestId, usePhoto) => void onSent(requestId, usePhoto)}
+        onSent={onSent}
       />
     </Section>
   );

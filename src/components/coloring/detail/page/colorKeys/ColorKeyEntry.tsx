@@ -53,7 +53,8 @@ interface ColorKeyEntryProps {
   requests?: Record<string, SymbolRequestPreview>;
   onClose: () => void;
   onNext: (next: ColorKey) => void;
-  onRequestSymbol?: () => void;
+  /** Opens the symbol request flow; `place` puts the sent photo's symbol on this color. */
+  onRequestSymbol?: (place: (symbol: string) => void) => void;
 }
 
 const GONE = 'This color is no longer on this page. Save again to add it back.';
@@ -505,7 +506,13 @@ function EntryForm({
         onOpenChange={setPickerOpen}
         userId={userId}
         title="Change symbol"
-        onRequestSymbol={onRequestSymbol}
+        onRequestSymbol={
+          onRequestSymbol &&
+          (() => {
+            setPickerOpen(false);
+            onRequestSymbol(onSymbolChange);
+          })
+        }
         onPick={picked => {
           onSymbolChange(picked);
           setPickerOpen(false);

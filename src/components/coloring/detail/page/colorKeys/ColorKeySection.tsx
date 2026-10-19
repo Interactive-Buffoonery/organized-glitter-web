@@ -5,7 +5,10 @@ import { Section, SectionHeading } from '@/components/shared/Section';
 import { Button } from '@/components/ui/button';
 import { DEFAULT_SETUP_SYMBOLS } from '@/features/coloring/colorKeys/symbols';
 import { useColorKeys, useSymbolRequests } from '@/hooks/queries/coloring/useColorKeys';
-import { useSetupColorKeys } from '@/hooks/mutations/coloring/useColorKeyMutations';
+import {
+  useCreateColorKey,
+  useSetupColorKeys,
+} from '@/hooks/mutations/coloring/useColorKeyMutations';
 import { useAuth } from '@/hooks/useAuth';
 import { notifyError, notifySuccess } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
@@ -13,17 +16,21 @@ import { createLogger } from '@/utils/logger';
 import { ColorKeyEntry, type EntryTarget } from './ColorKeyEntry';
 import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
+import { SymbolRequestDialog } from './SymbolRequestDialog';
 import { colorKeyCopyText, requestFor, safeSwatch, symbolName } from './symbolName';
 
 const logger = createLogger('ColorKeySection');
 
+/** Places a sent photo's `r:` symbol; false when that failed and the user was already told. */
+type PlaceSymbol = (symbol: string) => boolean | Promise<boolean>;
+
 export function ColorKeySection({
   pageId,
-  onRequestSymbol,
+  bookLabel = '',
 }: {
   pageId: string;
-  /** Opens the symbol request flow from the picker. Without it the picker hides that row. */
-  onRequestSymbol?: () => void;
+  /** Prefills "Book and page" in a symbol request. */
+  bookLabel?: string;
 }) {
   const { user } = useAuth();
   if (!user) return null;
@@ -32,7 +39,8 @@ export function ColorKeySection({
       key={`${user.id}:${pageId}`}
       pageId={pageId}
       userId={user.id}
-      onRequestSymbol={onRequestSymbol}
+      email={user.email ?? ''}
+      bookLabel={bookLabel}
     />
   );
 }
@@ -40,19 +48,24 @@ export function ColorKeySection({
 function ColorKeyEditor({
   pageId,
   userId,
-  onRequestSymbol,
+  email,
+  bookLabel,
 }: {
   pageId: string;
   userId: string;
-  onRequestSymbol?: () => void;
+  email: string;
+  bookLabel: string;
 }) {
   const query = useColorKeys(pageId, userId);
   const rows = query.data ?? [];
-  const requests = useSymbolRequests(
-    userId,
-    rows.map(row => row.symbol)
-  ).data;
+  const [sentIds, setSentIds] = useState<string[]>([]);
+  const requests = useSymbolRequests(userId, [
+    ...rows.map(row => row.symbol),
+    ...sentIds.map(id => `r:${id}`),
+  ]).data;
   const setup = useSetupColorKeys(pageId, userId);
+  const createKey = useCreateColorKey(pageId, userId);
+  const [requestTarget, setRequestTarget] = useState<{ place: PlaceSymbol } | null>(null);
   const [skipped, setSkipped] = useState(false);
   const [setupSymbols, setSetupSymbols] = useState<string[]>(DEFAULT_SETUP_SYMBOLS);
   const [off, setOff] = useState<Set<string>>(() => new Set());
@@ -99,19 +112,38 @@ function ColorKeyEditor({
       notifyError('Could not copy. Try again.');
     }
   };
+  const nextPosition = rows.reduce((max, row) => Math.max(max, row.position + 1), 0);
+  const addSetupSymbol = (symbol: string) => {
+    setSetupSymbols(symbols => (symbols.includes(symbol) ? symbols : [...symbols, symbol]));
+    setOff(current => {
+      const nextOff = new Set(current);
+      nextOff.delete(symbol);
+      return nextOff;
+    });
+    return true;
+  };
+  const addRequestRow = async (symbol: string) => {
+    try {
+      const row = await createKey.mutateAsync({ symbol, position: nextPosition });
+      setEntry({ row, symbol: row.symbol, position: row.position });
+      return true;
+    } catch (error) {
+      logger.warn('Could not add a sent symbol to the page', error);
+      notifyError("We got your photo, but couldn't add it to this page.");
+      return false;
+    }
+  };
   const onPick = (symbol: string) => {
     setPicker(null);
-    if (picker === 'setup') {
-      setSetupSymbols(symbols => (symbols.includes(symbol) ? symbols : [...symbols, symbol]));
-      setOff(current => {
-        const nextOff = new Set(current);
-        nextOff.delete(symbol);
-        return nextOff;
-      });
-      return;
-    }
-    const position = rows.reduce((max, row) => Math.max(max, row.position + 1), 0);
-    setEntry({ symbol, position });
+    if (picker === 'setup') addSetupSymbol(symbol);
+    else setEntry({ symbol, position: nextPosition });
+  };
+  const onSent = async (requestId: string, usePhoto: boolean) => {
+    const target = requestTarget;
+    setRequestTarget(null);
+    setSentIds(ids => [...ids, requestId]);
+    if (usePhoto && target && !(await target.place(`r:${requestId}`))) return;
+    notifySuccess("Thanks for the photo. We'll email you when it's added.");
   };
 
   return (
@@ -146,7 +178,7 @@ function ColorKeyEditor({
                   key={symbol}
                   type="button"
                   aria-pressed={isOn}
-                  aria-label={symbolName(symbol)}
+                  aria-label={symbolName(symbol, requestFor(symbol, requests))}
                   disabled={setup.isPending}
                   onClick={() =>
                     setOff(current => {
@@ -164,7 +196,7 @@ function ColorKeyEditor({
                   )}
                 >
                   <span aria-hidden="true" className="contents">
-                    <SymbolGlyph symbol={symbol} />
+                    <SymbolGlyph symbol={symbol} request={requestFor(symbol, requests)} />
                   </span>
                 </button>
               );
@@ -289,7 +321,10 @@ function ColorKeyEditor({
         onOpenChange={open => !open && setPicker(null)}
         userId={userId}
         onPick={onPick}
-        onRequestSymbol={onRequestSymbol}
+        onRequestSymbol={() => {
+          setRequestTarget({ place: picker === 'setup' ? addSetupSymbol : addRequestRow });
+          setPicker(null);
+        }}
       />
       <ColorKeyEntry
         pageId={pageId}
@@ -301,7 +336,23 @@ function ColorKeyEditor({
         onNext={row =>
           setEntry({ row, symbol: row.symbol, position: row.position, focusCode: true })
         }
-        onRequestSymbol={onRequestSymbol}
+        onRequestSymbol={place =>
+          setRequestTarget({
+            place: symbol => {
+              place(symbol);
+              return true;
+            },
+          })
+        }
+      />
+      <SymbolRequestDialog
+        open={requestTarget !== null}
+        onOpenChange={open => !open && setRequestTarget(null)}
+        userId={userId}
+        pageId={pageId}
+        bookLabel={bookLabel}
+        email={email}
+        onSent={(requestId, usePhoto) => void onSent(requestId, usePhoto)}
       />
     </Section>
   );

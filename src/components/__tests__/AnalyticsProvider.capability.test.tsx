@@ -58,7 +58,13 @@ it('keeps an unsupported real SDK transport disabled through consent publication
     if (String(url).includes('/e/')) eventRequests.push(String(url));
     return new Response('{}', { status: 200 });
   });
-  Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: () => true });
+  Object.defineProperty(navigator, 'sendBeacon', {
+    configurable: true,
+    value: (url: string) => {
+      if (String(url).includes('/e/')) eventRequests.push(String(url));
+      return true;
+    },
+  });
 
   const { default: posthog } = await import('posthog-js');
   const init = posthog.init;
@@ -79,7 +85,7 @@ it('keeps an unsupported real SDK transport disabled through consent publication
 
   const { AnalyticsProvider } = await import('../AnalyticsProvider');
   const { getAnalyticsEnabled } = await import('@/services/analytics-preference');
-  const { armDeletionTransportFence, suspendDeletionAnalytics } =
+  const { armDeletionTransportFence, installDeletionAnalyticsFence, suspendDeletionAnalytics } =
     await import('@/services/accountDeletion/analytics');
 
   render(
@@ -87,6 +93,8 @@ it('keeps an unsupported real SDK transport disabled through consent publication
       <div>App</div>
     </AnalyticsProvider>
   );
+  expect((posthog as unknown as { _requestQueue?: unknown })._requestQueue).toBeUndefined();
+  expect(installDeletionAnalyticsFence()).toBe(false);
   const signedOutEnabled = getAnalyticsEnabled();
 
   auth.user = { id: 'account-a', created: '2026-01-01' };
@@ -98,6 +106,7 @@ it('keeps an unsupported real SDK transport disabled through consent publication
   const signedInEnabled = getAnalyticsEnabled();
   const optedOutAfterPublication = posthog.has_opted_out_capturing();
 
+  eventRequests.length = 0;
   posthog.set_config({ opt_out_useragent_filter: true });
   expect(posthog.capture('session_context', { fixture: 'rejected-capability' })).toBeUndefined();
   armDeletionTransportFence('http://localhost:8090', 'account-a');

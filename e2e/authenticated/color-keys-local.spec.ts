@@ -157,6 +157,114 @@ test('colors used: keyboard flow keeps the sheet, focus and drafts', async ({
   }
 });
 
+test('colors used: sort by dragging and by keyboard, and keep the order after reload', async ({
+  page,
+  baseURL,
+}, testInfo) => {
+  test.setTimeout(90000);
+  const { pb, pageId, cleanup } = await seededPage(page, baseURL, testInfo);
+  try {
+    await pb.collection('coloring_page_color_keys').create({
+      user: pb.authStore.record!.id,
+      page: pageId,
+      symbol: 'u:2665',
+      position: 2,
+    });
+    await page.reload();
+    const list = page.locator('ul').filter({ has: page.getByRole('button', { name: /^Black/ }) });
+    await expect(list.getByRole('button')).toHaveCount(3);
+
+    await page.getByRole('button', { name: 'Sort', exact: true }).click();
+    const panel = page.getByRole('dialog', { name: 'Sort Color Order' });
+    const handle = (name: string) => panel.getByRole('button', { name: new RegExp(`^${name},`) });
+    await expect(handle('Black heart suit')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Add symbol', includeHidden: true })
+    ).toBeDisabled();
+
+    // Drag the heart above the spade with the pointer.
+    // hover waits for the sheet to finish sliding in before measuring.
+    await handle('Black heart suit').hover();
+    const to = (await handle('Black spade suit').boundingBox())!;
+    await page.mouse.down();
+    await page.mouse.move(to.x + to.width / 2, to.y + 4, { steps: 12 });
+    await page.mouse.move(to.x + to.width / 2, to.y + 2, { steps: 4 });
+    // WebKit can release before dnd-kit sorts, so wait for the gap to open above the spade.
+    await expect(panel.locator('[data-dnd-placeholder] + li')).toContainText('♠');
+    await page.mouse.up();
+    const order = () =>
+      panel
+        .getByRole('button', { name: /^Black/ })
+        .evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')));
+    await expect
+      .poll(order)
+      .toEqual([
+        'Black heart suit, no code yet',
+        'Black spade suit, no code yet',
+        'Black club suit, no code yet',
+      ]);
+
+    // Move the spade down one with the keyboard.
+    const spade = handle('Black spade suit');
+    // dnd-kit ignores a new drag, and then restores focus, until the drop animation ends.
+    await expect(async () => {
+      await spade.focus();
+      await page.keyboard.press('Space');
+      await expect(spade).toHaveAttribute('aria-pressed', 'true', { timeout: 500 });
+    }).toPass();
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(order).toContain('Black spade suit, no code yet');
+    await expect
+      .poll(() =>
+        panel
+          .getByRole('button', { name: /^Black/ })
+          .last()
+          .getAttribute('aria-label')
+      )
+      .toBe('Black spade suit, no code yet');
+    await page.keyboard.press('Space');
+    await expect(spade).toHaveAttribute('aria-pressed', 'false');
+    await expect
+      .poll(order)
+      .toEqual([
+        'Black heart suit, no code yet',
+        'Black club suit, no code yet',
+        'Black spade suit, no code yet',
+      ]);
+
+    await panel.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(panel).toHaveCount(0);
+    await expect
+      .poll(async () =>
+        (
+          await pb.collection('coloring_page_color_keys').getFullList({
+            filter: pb.filter('page = {:page}', { page: pageId }),
+            sort: 'position',
+          })
+        ).map(row => [row.symbol, row.position])
+      )
+      .toEqual([
+        ['u:2665', 0],
+        ['u:2663', 1],
+        ['u:2660', 2],
+      ]);
+
+    await page.reload();
+    await expect(list.getByRole('button')).toHaveCount(3);
+    expect(
+      await list
+        .getByRole('button')
+        .evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))
+    ).toEqual([
+      'Black heart suit, no code yet',
+      'Black club suit, no code yet',
+      'Black spade suit, no code yet',
+    ]);
+  } finally {
+    await cleanup();
+  }
+});
+
 test.describe('on a phone', () => {
   if (browserName === 'chromium') {
     const { viewport, isMobile, hasTouch, userAgent } = devices['Pixel 7'];

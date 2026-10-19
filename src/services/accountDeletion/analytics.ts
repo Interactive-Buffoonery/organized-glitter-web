@@ -2,12 +2,15 @@ import posthog from 'posthog-js';
 import type { DeletionIntent } from './types';
 
 type BatchQueue = {
-  _queue: unknown[];
+  _queue: RetryOptions[];
   _isPaused: boolean;
   _flushTimeout?: ReturnType<typeof setTimeout>;
+  enqueue: (options: RetryOptions) => void;
+  _flush: () => void;
+  unload: () => void;
 };
 type RetryQueue = {
-  _queue: unknown[];
+  _queue: Array<{ requestOptions: RetryOptions }>;
   _poller?: ReturnType<typeof setTimeout>;
   _isPolling: boolean;
   _poll: () => void;
@@ -16,6 +19,8 @@ type RetryQueue = {
   _offlineListener?: EventListener;
   retriableRequest: (options: RetryOptions, transport?: string) => void;
   _enqueue: (options: RetryOptions, retryAfterMs?: number) => void;
+  _flush: () => void;
+  unload: () => void;
 };
 type RetryOptions = Record<PropertyKey, unknown>;
 type AnalyticsSDK = Omit<typeof posthog, '_requestQueue' | '_retryQueue'> & {
@@ -30,6 +35,7 @@ const RETRY_GENERATION = Symbol('deletion-retry-generation');
 let suspended = false;
 let retryGeneration = 0;
 const seenCompleted = new WeakMap<object, Set<string>>();
+const installedBatch = new WeakSet<object>();
 const installedRetry = new WeakSet<object>();
 const installed = new WeakMap<
   object,
@@ -69,33 +75,85 @@ function observeCompletedFences(sdk: AnalyticsSDK): boolean {
   return observed;
 }
 
+function stampRequest(options: unknown): void {
+  if (!options || typeof options !== 'object') return;
+  const request = options as RetryOptions;
+  if (typeof request[RETRY_GENERATION] !== 'number') request[RETRY_GENERATION] = retryGeneration;
+}
+
+function isStaleRequest(options: unknown): boolean {
+  if (!options || typeof options !== 'object') return false;
+  const generation = (options as RetryOptions)[RETRY_GENERATION];
+  return typeof generation === 'number' && generation !== retryGeneration;
+}
+
+function installBatchFence(sdk: AnalyticsSDK): void {
+  const batch = sdk._requestQueue;
+  if (!batch || installedBatch.has(batch)) return;
+  installedBatch.add(batch);
+  batch._queue.forEach(stampRequest);
+  const enqueue = batch.enqueue;
+  const flush = batch._flush;
+  const unload = batch.unload;
+  batch.enqueue = options => {
+    stampRequest(options);
+    enqueue.call(batch, options);
+  };
+  batch._flush = () => {
+    observeCompletedFences(sdk);
+    batch._queue.forEach(stampRequest);
+    flush.call(batch);
+  };
+  batch.unload = () => {
+    observeCompletedFences(sdk);
+    batch._queue.forEach(stampRequest);
+    unload.call(batch);
+  };
+}
+
 function installRetryFence(sdk: AnalyticsSDK): void {
   const retry = sdk._retryQueue;
   if (!retry || installedRetry.has(retry)) return;
   installedRetry.add(retry);
   const send = retry.retriableRequest;
   const enqueue = retry._enqueue;
+  const flush = retry._flush;
+  const unload = retry.unload;
+  retry._queue.forEach(item => stampRequest(item.requestOptions));
   retry.retriableRequest = (options, transport) => {
     if (observeCompletedFences(sdk)) return;
+    if (isStaleRequest(options)) return;
+    stampRequest(options);
     if (!suspended && !hasTransportFence()) flushers.forEach(flush => flush());
     if (suspended || hasTransportFence()) {
       const held = heldRequests.get(sdk);
-      held?.push(() => {
-        options[RETRY_GENERATION] = retryGeneration;
+      const deliver = () => {
+        if (observeCompletedFences(sdk) || isStaleRequest(options)) return;
+        if (suspended || hasTransportFence()) {
+          held?.unshift(deliver);
+          return;
+        }
         send.call(retry, options, transport);
-      });
+      };
+      held?.push(deliver);
       return;
     }
-    options[RETRY_GENERATION] = retryGeneration;
     send.call(retry, options, transport);
   };
   retry._enqueue = (options, retryAfterMs) => {
-    if (
-      typeof options[RETRY_GENERATION] === 'number' &&
-      options[RETRY_GENERATION] !== retryGeneration
-    )
-      return;
+    if (isStaleRequest(options)) return;
+    stampRequest(options);
     enqueue.call(retry, options, retryAfterMs);
+  };
+  retry._flush = () => {
+    observeCompletedFences(sdk);
+    retry._queue.forEach(item => stampRequest(item.requestOptions));
+    flush.call(retry);
+  };
+  retry.unload = () => {
+    observeCompletedFences(sdk);
+    retry._queue.forEach(item => stampRequest(item.requestOptions));
+    unload.call(retry);
   };
 }
 
@@ -176,6 +234,7 @@ export function recordCompletedDeletionTransportFence(
 }
 
 export function installDeletionAnalyticsFence(sdk: AnalyticsSDK = posthog as AnalyticsSDK): void {
+  installBatchFence(sdk);
   installRetryFence(sdk);
   const previous = installed.get(sdk);
   if (
@@ -190,25 +249,40 @@ export function installDeletionAnalyticsFence(sdk: AnalyticsSDK = posthog as Ana
   const held: Array<() => void> = [];
   heldRequests.set(sdk, held);
   const flush = () => {
-    while (held.length && !suspended && !hasTransportFence()) held.shift()?.();
+    while (held.length && !suspended && !hasTransportFence()) {
+      if (observeCompletedFences(sdk)) return;
+      held.shift()?.();
+    }
   };
   flushers.add(flush);
-  const guard = (transmit: () => void) => {
+  const guard = (options: unknown, transmit: () => void) => {
+    if (isStaleRequest(options)) return false;
+    stampRequest(options);
     if (suspended || hasTransportFence()) {
-      held.push(transmit);
+      const deliver = () => {
+        if (observeCompletedFences(sdk) || isStaleRequest(options)) return;
+        if (suspended || hasTransportFence()) {
+          held.unshift(deliver);
+          return;
+        }
+        transmit();
+      };
+      held.push(deliver);
       return false;
     }
     return true;
   };
   sdk._send_request = (...args) => {
     if (observeCompletedFences(sdk)) return;
+    if (isStaleRequest(args[0])) return;
     if (!suspended && !hasTransportFence()) flush();
-    if (guard(() => send.apply(sdk, args))) return send.apply(sdk, args);
+    if (guard(args[0], () => send.apply(sdk, args))) return send.apply(sdk, args);
   };
   sdk._send_retriable_request = (...args) => {
     if (observeCompletedFences(sdk)) return;
+    if (isStaleRequest(args[0])) return;
     if (!suspended && !hasTransportFence()) flush();
-    if (guard(() => sendRetry.apply(sdk, args))) return sendRetry.apply(sdk, args);
+    if (guard(args[0], () => sendRetry.apply(sdk, args))) return sendRetry.apply(sdk, args);
   };
   installed.set(sdk, { send: sdk._send_request, retry: sdk._send_retriable_request, flush });
 }

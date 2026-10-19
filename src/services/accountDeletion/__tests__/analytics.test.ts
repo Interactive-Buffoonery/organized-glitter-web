@@ -6,7 +6,11 @@ const require = createRequire(import.meta.url);
 const { RequestQueue } = require('posthog-js/lib/src/request-queue.js');
 const { RetryQueue } = require('posthog-js/lib/src/retry-queue.js');
 const requestModule = require('posthog-js/lib/src/request.js');
-const mocked = vi.hoisted(() => ({ sdk: {} as Record<string, unknown>, wire: vi.fn() }));
+const mocked = vi.hoisted(() => ({
+  sdk: {} as Record<string, unknown>,
+  wire: vi.fn(),
+  retryWire: vi.fn(),
+}));
 vi.mock('posthog-js', () => ({ default: mocked.sdk }));
 import {
   suspendDeletionAnalytics,
@@ -27,13 +31,14 @@ describe('deletion analytics transport fence', () => {
     localStorage.clear();
     const sdk = mocked.sdk;
     mocked.wire.mockClear();
+    mocked.retryWire.mockClear();
     Object.assign(sdk, {
       config: { token: 'test-token' },
       opt_out_capturing: vi.fn(),
       stopSessionRecording: vi.fn(),
       reset: vi.fn(),
       _send_request: mocked.wire,
-      _send_retriable_request: vi.fn(),
+      _send_retriable_request: mocked.retryWire,
       __request_queue: [],
     });
     sdk._requestQueue = new RequestQueue(vi.fn());
@@ -55,6 +60,124 @@ describe('deletion analytics transport fence', () => {
     });
     return vi.spyOn(requestModule, 'request').mockImplementation(() => {});
   }
+
+  function completeInAnotherTab() {
+    localStorage.setItem(
+      `og:account-deletion:analytics-complete:v1:other-tab-${crypto.randomUUID()}`,
+      'completed'
+    );
+  }
+
+  it('drops every due installed-SDK retry extracted before cross-tab completion', () => {
+    const wire = allowSdkDispatch();
+    const retry = mocked.sdk._retryQueue as InstanceType<typeof RetryQueue>;
+    for (const fixture of [1, 2]) {
+      retry._queue.push({
+        retryAt: Date.now() - 1,
+        requestOptions: { url: '/e/', data: { distinct_id: 'deleted-account', fixture } },
+      });
+    }
+    const guarded = retry.retriableRequest;
+    let first = true;
+    retry.retriableRequest = (options, transport) => {
+      if (first) {
+        first = false;
+        completeInAnotherTab();
+      }
+      guarded.call(retry, options, transport);
+    };
+    retry._flush();
+    expect(wire).not.toHaveBeenCalled();
+    expect(retry._queue).toHaveLength(0);
+    retry.retriableRequest({ url: '/e/', data: { distinct_id: 'fresh-account' } });
+    expect(wire).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ data: { distinct_id: 'fresh-account' } }),
+      expect.any(Function)
+    );
+  });
+
+  it.each(['flush', 'unload'])(
+    'drops every installed-SDK batch group extracted before cross-tab completion on %s',
+    operation => {
+      const queue = mocked.sdk._requestQueue as InstanceType<typeof RequestQueue>;
+      let first = true;
+      queue._sendRequest = (req, transport) => {
+        if (first) {
+          first = false;
+          completeInAnotherTab();
+        }
+        mocked.sdk._send_retriable_request(req, transport);
+      };
+      for (const fixture of [1, 2]) {
+        queue.enqueue({
+          url: '/e/',
+          batchGroup: `group-${fixture}`,
+          data: { distinct_id: 'deleted-account', fixture },
+        });
+      }
+      if (operation === 'flush') queue._flush();
+      else queue.unload();
+      expect(mocked.retryWire).not.toHaveBeenCalled();
+      expect(queue._queue).toHaveLength(0);
+      queue.enqueue({ url: '/e/', batchGroup: 'fresh', data: { distinct_id: 'fresh-account' } });
+      queue._flush();
+      expect(mocked.retryWire).toHaveBeenCalledOnce();
+      expect(mocked.retryWire).toHaveBeenCalledWith(
+        expect.objectContaining({ data: [{ distinct_id: 'fresh-account' }] }),
+        undefined
+      );
+    }
+  );
+
+  it('preserves both queued SDK retries across a proven safe cancellation', async () => {
+    const wire = allowSdkDispatch();
+    const retry = mocked.sdk._retryQueue as InstanceType<typeof RetryQueue>;
+    for (const fixture of [1, 2]) {
+      retry._queue.push({
+        retryAt: Date.now() - 1,
+        requestOptions: { url: '/e/', data: { fixture } },
+      });
+    }
+    const fenceId = armDeletionTransportFence('http://localhost:8090', 'account-a');
+    suspendDeletionAnalytics();
+    expect(retry._queue).toHaveLength(2);
+    releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    resumeDeletionAnalytics();
+    await vi.advanceTimersByTimeAsync(3_100);
+    expect(wire).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves two installed-SDK batch groups across a proven safe cancellation', () => {
+    const queue = mocked.sdk._requestQueue as InstanceType<typeof RequestQueue>;
+    queue._sendRequest = (req, transport) => mocked.sdk._send_retriable_request(req, transport);
+    queue.enqueue({ url: '/e/', batchGroup: 'one', data: { fixture: 1 } });
+    queue.enqueue({ url: '/e/', batchGroup: 'two', data: { fixture: 2 } });
+    const fenceId = armDeletionTransportFence('http://localhost:8090', 'account-a');
+    queue._flush();
+    expect(mocked.retryWire).not.toHaveBeenCalled();
+    expect(retainedDeletionAnalyticsCount()).toBe(2);
+    releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    mocked.sdk._send_retriable_request({ url: '/e/', data: { fixture: 3 } });
+    expect(mocked.retryWire.mock.calls.map(call => call[0].data)).toEqual([
+      [{ fixture: 1 }],
+      [{ fixture: 2 }],
+      { fixture: 3 },
+    ]);
+  });
+
+  it('does not drain held batch requests when another tab completed before resume', () => {
+    const fenceId = armDeletionTransportFence('http://localhost:8090', 'account-a');
+    mocked.sdk._send_retriable_request({ url: '/e/', data: 'old-1' });
+    mocked.sdk._send_retriable_request({ url: '/e/', data: 'old-2' });
+    suspendDeletionAnalytics();
+    releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    completeInAnotherTab();
+    resumeDeletionAnalytics();
+    expect(mocked.retryWire).not.toHaveBeenCalled();
+    expect(retainedDeletionAnalyticsCount()).toBe(0);
+    mocked.sdk._send_retriable_request({ url: '/e/', data: 'fresh' });
+    expect(mocked.retryWire).toHaveBeenCalledOnce();
+  });
 
   it('keeps a pre-intent marker and exposes bounded recovery if no intent appears', async () => {
     const id = armDeletionTransportFence('http://localhost:8090', 'account-a');
@@ -168,7 +291,11 @@ describe('deletion analytics transport fence', () => {
     expect(secondRetry._queue).toHaveLength(0);
     expect(retainedDeletionAnalyticsCount(secondTab)).toBe(0);
     secondTab._send_request({ url: '/e/', data: 'new-account' });
-    expect(secondWire).toHaveBeenCalledExactlyOnceWith({ url: '/e/', data: 'new-account' });
+    expect(secondWire).toHaveBeenCalledOnce();
+    expect(Object.fromEntries(Object.entries(secondWire.mock.calls[0][0]))).toEqual({
+      url: '/e/',
+      data: 'new-account',
+    });
   });
 
   it('retains actual pending batch/retry queues while uncertain and prevents unload from flushing', () => {
@@ -267,7 +394,8 @@ describe('deletion analytics transport fence', () => {
     releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
     wire({ url: '/e/', data: { distinct_id: 'new-anonymous-id' } });
     expect(retainedDeletionAnalyticsCount()).toBe(0);
-    expect(mocked.wire).toHaveBeenCalledExactlyOnceWith({
+    expect(mocked.wire).toHaveBeenCalledOnce();
+    expect(Object.fromEntries(Object.entries(mocked.wire.mock.calls[0][0]))).toEqual({
       url: '/e/',
       data: { distinct_id: 'new-anonymous-id' },
     });

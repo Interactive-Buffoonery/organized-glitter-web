@@ -502,9 +502,8 @@ describe('Symbol requests', () => {
     await sendPhoto(user);
     expect(state.sendRequest).toHaveBeenCalledWith(expect.objectContaining({ page: 'page-1' }));
     expect(state.create).toHaveBeenCalledWith({ symbol: `r:${REQUEST}`, position: 4 });
-    expect(
-      await screen.findByRole('dialog', { name: 'Edit color: Sent symbol' })
-    ).toBeInTheDocument();
+    const entry = await screen.findByRole('dialog', { name: 'Edit color: Sent symbol' });
+    await waitFor(() => expect(entry).toContainElement(document.activeElement as HTMLElement));
     expect(state.success).toHaveBeenCalledWith(
       "Thanks for the photo. We'll email you when it's added."
     );
@@ -551,6 +550,32 @@ describe('Symbol requests', () => {
     expect(state.create).toHaveBeenCalledTimes(2);
     expect(state.create).toHaveBeenLastCalledWith({ symbol: `r:${REQUEST}`, position: 1 });
     expect(state.success).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes after a failed placement without sending or adding again', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    state.sendRequest.mockResolvedValue({ id: REQUEST });
+    state.create.mockRejectedValue(new Error('offline'));
+    render(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
+    await user.click(screen.getByRole('button', { name: 'Add symbol' }));
+    await user.click(screen.getByRole('button', { name: /Can't find your symbol/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Send us a symbol' });
+    await user.upload(
+      within(dialog).getByLabelText('Photo'),
+      new File(['photo'], 'symbol.jpg', { type: 'image/jpeg' })
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Send' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      "We got your photo, but couldn't add it to this page."
+    );
+    // The form's Close button; the sheet's own close control shares the name.
+    await user.click(within(dialog).getAllByRole('button', { name: 'Close' })[0]);
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Send us a symbol' })).toBeNull()
+    );
+    expect(state.sendRequest).toHaveBeenCalledTimes(1);
+    expect(state.create).toHaveBeenCalledTimes(1);
   });
 
   it('places the row after rows that arrived while sending', async () => {
@@ -649,6 +674,9 @@ describe('Symbol requests', () => {
       )
     );
     expect(screen.getByRole('dialog', { name: 'Edit color: Two' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Change symbol' })).toHaveFocus()
+    );
   });
 
   it('adds the photo to the setup list', async () => {
@@ -658,6 +686,9 @@ describe('Symbol requests', () => {
     render(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
     await user.click(screen.getByRole('button', { name: 'Add symbols after z' }));
     await sendPhoto(user);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add symbols after z' })).toHaveFocus()
+    );
     const group = screen.getByRole('group', { name: 'Symbols on this page' });
     expect(within(group).getByRole('button', { name: 'Sent symbol' })).toHaveAttribute(
       'aria-pressed',

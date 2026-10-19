@@ -120,6 +120,11 @@ function RequestForm({
     setError(null);
   };
   const fail = (message: string, field?: Field) => setError({ message, field });
+  // Sending disables the focused control; bring focus back to the button, under the error.
+  const settle = () => {
+    setBusy(false);
+    requestAnimationFrame(() => document.getElementById(`${id}-submit`)?.focus());
+  };
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -139,26 +144,27 @@ function RequestForm({
       try {
         prepared = await prepareSymbolRequestPhoto(photo.file);
       } catch (prepError) {
-        setBusy(false);
+        settle();
         return fail(prepError instanceof Error ? prepError.message : FIELD_ERRORS.photo, 'photo');
       }
       try {
         requestId = (await send.mutateAsync({ ...input, photo: prepared })).id;
       } catch (requestError) {
         logger.warn('Could not send a symbol request', requestError);
-        setBusy(false);
+        settle();
         return setError(sendError(requestError));
       }
     }
     setBusy(true);
-    try {
-      // On success the parent closes the sheet and this form unmounts.
-      if (await onSent(requestId, usePhoto)) return;
-      setSentId(requestId);
-      fail(PLACE_FAILED);
-    } finally {
-      setBusy(false);
-    }
+    const placed = await onSent(requestId, usePhoto).catch((placeError: unknown) => {
+      logger.warn('Could not place a symbol request', placeError);
+      return false;
+    });
+    // On success the parent closes the sheet and this form unmounts.
+    if (placed) return setBusy(false);
+    setSentId(requestId);
+    fail(PLACE_FAILED);
+    settle();
   };
 
   const field = 'space-y-1.5';
@@ -304,7 +310,7 @@ function RequestForm({
         <Button type="button" variant="ghost" className="h-11" disabled={busy} onClick={onCancel}>
           {sentId ? 'Close' : 'Cancel'}
         </Button>
-        <Button type="submit" className="h-11 min-w-28" disabled={busy}>
+        <Button id={`${id}-submit`} type="submit" className="h-11 min-w-28" disabled={busy}>
           {busy ? 'Sending…' : sentId ? 'Try again' : 'Send'}
         </Button>
       </div>

@@ -73,10 +73,12 @@ function renderDialog() {
   return screen.getByRole('dialog', { name: 'Send us a symbol' });
 }
 
-async function fillAndSend(user: ReturnType<typeof userEvent.setup>) {
+async function fillAndSend(user: ReturnType<typeof userEvent.setup>, submitWithEnter = false) {
   await user.upload(screen.getByLabelText('Photo'), photo);
   await user.type(screen.getByRole('textbox', { name: /^Description/ }), 'Two w stacked');
-  await user.click(screen.getByRole('button', { name: 'Send' }));
+  // Enter leaves focus in a field, as the phone keyboard's Go key does.
+  if (submitWithEnter) await user.keyboard('{Enter}');
+  else await user.click(screen.getByRole('button', { name: 'Send' }));
 }
 
 beforeEach(() => {
@@ -156,8 +158,9 @@ describe('SymbolRequestDialog', () => {
     const user = userEvent.setup();
     state.send.mockRejectedValueOnce(new ClientResponseError({ status }));
     renderDialog();
-    await fillAndSend(user);
+    await fillAndSend(user, true);
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toHaveFocus());
     expect(state.onSent).not.toHaveBeenCalled();
     expect(screen.getByRole('textbox', { name: /^Description/ })).toHaveValue('Two w stacked');
     expect(screen.getByRole('img', { name: 'Chosen symbol' })).toBeInTheDocument();
@@ -249,11 +252,12 @@ describe('SymbolRequestDialog', () => {
     state.send.mockResolvedValue({ id: 'abcdefghijklmno' });
     state.onSent.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     renderDialog();
-    await fillAndSend(user);
+    await fillAndSend(user, true);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       "We got your photo, but couldn't add it to this page."
     );
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).toHaveFocus());
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(state.onSent).toHaveBeenCalledTimes(2));
     expect(state.onSent).toHaveBeenLastCalledWith('abcdefghijklmno', true);

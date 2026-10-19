@@ -290,7 +290,7 @@ function EntryForm({
         <div className="min-w-0">
           <p className="truncate font-semibold">{symbolDisplayName(symbol, request)}</p>
           <Button
-            id={`${id}-change-symbol`}
+            id={`color-keys-${pageId}-change-symbol`}
             type="button"
             variant="link"
             className="h-auto p-0"
@@ -538,7 +538,13 @@ function EntryForm({
           onRequestSymbol &&
           (() => {
             setPickerOpen(false);
-            onRequestSymbol(() => document.getElementById(`${id}-change-symbol`)?.focus());
+            // Only one entry is open at a time; a remount by another device keeps this id.
+            onRequestSymbol(() =>
+              (
+                document.getElementById(`color-keys-${pageId}-change-symbol`) ??
+                document.getElementById(`color-keys-${pageId}`)
+              )?.focus()
+            );
           })
         }
         onPick={picked => {

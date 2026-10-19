@@ -5,6 +5,7 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import { isAllowedAnalyticsEvent, sanitizeAnalyticsEvent } from '@/utils/analytics/sanitizeEvent';
 import { enrichWebAnalyticsEvent } from '@/utils/analytics/webContext';
 import { installDeletionAnalyticsFence } from '@/services/accountDeletion/analytics';
+import { createLogger } from '@/utils/logger';
 
 import {
   getAnalyticsEnabled,
@@ -55,12 +56,18 @@ const posthogOptions: Partial<PostHogConfig> = {
 };
 
 // Initialize before React effects, including child capture calls, can run.
-const posthogClient =
+let posthogClient =
   posthogKey?.trim() && posthogHost ? posthog.init(posthogKey, posthogOptions) : undefined;
 
 if (posthogClient) {
-  installDeletionAnalyticsFence();
-  syncAnalyticsConsent();
+  if (installDeletionAnalyticsFence()) syncAnalyticsConsent();
+  else {
+    posthog.opt_out_capturing();
+    posthogClient = undefined;
+    createLogger('AnalyticsProvider').error(
+      'Analytics disabled because deletion transport protection is unavailable'
+    );
+  }
 }
 
 /**

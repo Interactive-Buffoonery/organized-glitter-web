@@ -1,7 +1,15 @@
 import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 import { deletionIntents } from '@/services/accountDeletion/intentStore';
-import { armDeletionTransportFence } from '@/services/accountDeletion/analytics';
+import {
+  armDeletionTransportFence,
+  discardDeletionAnalyticsQueues,
+  recordCompletedDeletionTransportFence,
+  releaseDeletionTransportFence,
+  resumeDeletionAnalytics,
+  suspendDeletionAnalytics,
+} from '@/services/accountDeletion/analytics';
 import { loginWithPassword } from '@/services/auth/local';
+import posthog from 'posthog-js';
 
 const localHost = (value: string): boolean => {
   try {
@@ -17,7 +25,13 @@ export const installAccountDeletionBridge = (): void => {
   window.__ogDeletionQa = Object.freeze({
     deletionIntents,
     armDeletionTransportFence,
+    discardDeletionAnalyticsQueues,
+    recordCompletedDeletionTransportFence,
+    releaseDeletionTransportFence,
+    resumeDeletionAnalytics,
+    suspendDeletionAnalytics,
     loginWithPassword,
+    posthog,
   });
 };
 
@@ -26,7 +40,13 @@ declare global {
     __ogDeletionQa?: Readonly<{
       deletionIntents: typeof deletionIntents;
       armDeletionTransportFence: typeof armDeletionTransportFence;
+      discardDeletionAnalyticsQueues: typeof discardDeletionAnalyticsQueues;
+      recordCompletedDeletionTransportFence: typeof recordCompletedDeletionTransportFence;
+      releaseDeletionTransportFence: typeof releaseDeletionTransportFence;
+      resumeDeletionAnalytics: typeof resumeDeletionAnalytics;
+      suspendDeletionAnalytics: typeof suspendDeletionAnalytics;
       loginWithPassword: typeof loginWithPassword;
+      posthog: typeof posthog;
     }>;
   }
 }

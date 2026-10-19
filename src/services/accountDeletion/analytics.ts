@@ -2,24 +2,25 @@ import posthog from 'posthog-js';
 import type { DeletionIntent } from './types';
 
 type BatchQueue = {
-  _queue: RetryOptions[];
-  _isPaused: boolean;
+  _queue?: RetryOptions[];
+  _isPaused?: boolean;
   _flushTimeout?: ReturnType<typeof setTimeout>;
   enqueue: (options: RetryOptions) => void;
-  _flush: () => void;
+  enable: () => void;
+  _flush?: () => void;
   unload: () => void;
 };
 type RetryQueue = {
-  _queue: Array<{ requestOptions: RetryOptions }>;
+  _queue?: Array<{ requestOptions: RetryOptions }>;
   _poller?: ReturnType<typeof setTimeout>;
   _isPolling: boolean;
-  _poll: () => void;
+  _poll?: () => void;
   resume: () => void;
   _onlineListener?: EventListener;
   _offlineListener?: EventListener;
   retriableRequest: (options: RetryOptions, transport?: string) => void;
-  _enqueue: (options: RetryOptions, retryAfterMs?: number) => void;
-  _flush: () => void;
+  _enqueue?: (options: RetryOptions, retryAfterMs?: number) => void;
+  _flush?: () => void;
   unload: () => void;
 };
 type RetryOptions = Record<PropertyKey, unknown>;
@@ -48,6 +49,54 @@ const installed = new WeakMap<
 const heldRequests = new WeakMap<object, Array<() => void>>();
 const flushers = new Set<() => void>();
 let restoreRetryPoll: (() => void) | undefined;
+
+function queueArray<T>(queue: object): T[] | undefined {
+  try {
+    const arrays = Object.values(queue).filter(Array.isArray);
+    return arrays.length === 1 ? (arrays[0] as T[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function hasMethod(value: object, name: string): boolean {
+  try {
+    return typeof (value as Record<string, unknown>)[name] === 'function';
+  } catch {
+    return false;
+  }
+}
+
+function sdkQueues(sdk: AnalyticsSDK): {
+  batch?: BatchQueue;
+  retry?: RetryQueue;
+  batchItems?: RetryOptions[];
+  retryItems?: Array<{ requestOptions: RetryOptions }>;
+} {
+  let objects: object[];
+  try {
+    objects = Object.values(sdk).filter(value => value !== null && typeof value === 'object');
+  } catch {
+    return {};
+  }
+  const batches = objects.filter(
+    value => hasMethod(value, 'enqueue') && hasMethod(value, 'enable') && hasMethod(value, 'unload')
+  );
+  const retries = objects.filter(
+    value =>
+      hasMethod(value, 'retriableRequest') &&
+      hasMethod(value, 'resume') &&
+      hasMethod(value, 'unload')
+  );
+  const batch = batches.length === 1 ? (batches[0] as BatchQueue) : undefined;
+  const retry = retries.length === 1 ? (retries[0] as RetryQueue) : undefined;
+  return {
+    batch,
+    retry,
+    batchItems: batch && queueArray<RetryOptions>(batch),
+    retryItems: retry && queueArray<{ requestOptions: RetryOptions }>(retry),
+  };
+}
 
 function completedSeenBy(sdk: object): Set<string> {
   let seen = seenCompleted.get(sdk);
@@ -87,11 +136,10 @@ function isStaleRequest(options: unknown): boolean {
   return typeof generation === 'number' && generation !== retryGeneration;
 }
 
-function installBatchFence(sdk: AnalyticsSDK): void {
-  const batch = sdk._requestQueue;
-  if (!batch || installedBatch.has(batch)) return;
+function installBatchFence(sdk: AnalyticsSDK, batch: BatchQueue, items: RetryOptions[]): void {
+  if (installedBatch.has(batch)) return;
   installedBatch.add(batch);
-  batch._queue.forEach(stampRequest);
+  items.forEach(stampRequest);
   const enqueue = batch.enqueue;
   const flush = batch._flush;
   const unload = batch.unload;
@@ -99,27 +147,31 @@ function installBatchFence(sdk: AnalyticsSDK): void {
     stampRequest(options);
     enqueue.call(batch, options);
   };
-  batch._flush = () => {
-    observeCompletedFences(sdk);
-    batch._queue.forEach(stampRequest);
-    flush.call(batch);
-  };
+  if (flush)
+    batch._flush = () => {
+      observeCompletedFences(sdk);
+      items.forEach(stampRequest);
+      flush.call(batch);
+    };
   batch.unload = () => {
     observeCompletedFences(sdk);
-    batch._queue.forEach(stampRequest);
+    items.forEach(stampRequest);
     unload.call(batch);
   };
 }
 
-function installRetryFence(sdk: AnalyticsSDK): void {
-  const retry = sdk._retryQueue;
-  if (!retry || installedRetry.has(retry)) return;
+function installRetryFence(
+  sdk: AnalyticsSDK,
+  retry: RetryQueue,
+  items: Array<{ requestOptions: RetryOptions }>
+): void {
+  if (installedRetry.has(retry)) return;
   installedRetry.add(retry);
   const send = retry.retriableRequest;
   const enqueue = retry._enqueue;
   const flush = retry._flush;
   const unload = retry.unload;
-  retry._queue.forEach(item => stampRequest(item.requestOptions));
+  items.forEach(item => stampRequest(item.requestOptions));
   retry.retriableRequest = (options, transport) => {
     if (observeCompletedFences(sdk)) return;
     if (isStaleRequest(options)) return;
@@ -141,19 +193,21 @@ function installRetryFence(sdk: AnalyticsSDK): void {
     }
     send.call(retry, options, transport);
   };
-  retry._enqueue = (options, retryAfterMs) => {
-    if (isStaleRequest(options)) return;
-    stampRequest(options);
-    enqueue.call(retry, options, retryAfterMs);
-  };
-  retry._flush = () => {
-    observeCompletedFences(sdk);
-    retry._queue.forEach(item => stampRequest(item.requestOptions));
-    flush.call(retry);
-  };
+  if (enqueue)
+    retry._enqueue = (options, retryAfterMs) => {
+      if (isStaleRequest(options)) return;
+      stampRequest(options);
+      enqueue.call(retry, options, retryAfterMs);
+    };
+  if (flush)
+    retry._flush = () => {
+      observeCompletedFences(sdk);
+      items.forEach(item => stampRequest(item.requestOptions));
+      flush.call(retry);
+    };
   retry.unload = () => {
     observeCompletedFences(sdk);
-    retry._queue.forEach(item => stampRequest(item.requestOptions));
+    items.forEach(item => stampRequest(item.requestOptions));
     unload.call(retry);
   };
 }
@@ -234,16 +288,24 @@ export function recordCompletedDeletionTransportFence(
   return fresh;
 }
 
-export function installDeletionAnalyticsFence(sdk: AnalyticsSDK = posthog as AnalyticsSDK): void {
-  installBatchFence(sdk);
-  installRetryFence(sdk);
+export function installDeletionAnalyticsFence(
+  sdk: AnalyticsSDK = posthog as AnalyticsSDK
+): boolean {
+  const { batch, retry, batchItems, retryItems } = sdkQueues(sdk);
+  if (
+    sdk.config?.token &&
+    (!batch || !retry || !batchItems || !retryItems || typeof sdk._send_request !== 'function')
+  )
+    return false;
+  if (batch && batchItems) installBatchFence(sdk, batch, batchItems);
+  if (retry && retryItems) installRetryFence(sdk, retry, retryItems);
   const previous = installed.get(sdk);
   if (
     previous &&
     sdk._send_request === previous.send &&
     sdk._send_retriable_request === previous.retry
   )
-    return;
+    return true;
   const send = sdk._send_request;
   const sendRetry = sdk._send_retriable_request;
   if (previous) flushers.delete(previous.flush);
@@ -279,13 +341,15 @@ export function installDeletionAnalyticsFence(sdk: AnalyticsSDK = posthog as Ana
     if (!suspended && !hasTransportFence()) flush();
     if (guard(args[0], () => send.apply(sdk, args))) return send.apply(sdk, args);
   };
-  sdk._send_retriable_request = (...args) => {
-    if (observeCompletedFences(sdk)) return;
-    if (isStaleRequest(args[0])) return;
-    if (!suspended && !hasTransportFence()) flush();
-    if (guard(args[0], () => sendRetry.apply(sdk, args))) return sendRetry.apply(sdk, args);
-  };
+  if (sendRetry)
+    sdk._send_retriable_request = (...args) => {
+      if (observeCompletedFences(sdk)) return;
+      if (isStaleRequest(args[0])) return;
+      if (!suspended && !hasTransportFence()) flush();
+      if (guard(args[0], () => sendRetry.apply(sdk, args))) return sendRetry.apply(sdk, args);
+    };
   installed.set(sdk, { send: sdk._send_request, retry: sdk._send_retriable_request, flush });
+  return true;
 }
 
 export function retainedDeletionAnalyticsCount(sdk: object = posthog): number {
@@ -303,15 +367,15 @@ export function suspendDeletionAnalytics(): void {
   if (!posthog.config?.token) return;
   posthog.opt_out_capturing();
   posthog.stopSessionRecording();
-  const sdk = posthog as AnalyticsSDK;
-  const batch = sdk._requestQueue;
+  const { batch, retry } = sdkQueues(posthog as AnalyticsSDK);
   if (batch) {
-    batch._isPaused = true;
-    clearTimeout(batch._flushTimeout);
-    batch._flushTimeout = undefined;
+    if (typeof batch._isPaused === 'boolean') {
+      batch._isPaused = true;
+      clearTimeout(batch._flushTimeout);
+      batch._flushTimeout = undefined;
+    }
   }
-  const retry = sdk._retryQueue;
-  if (retry) {
+  if (retry?._poll) {
     clearTimeout(retry._poller);
     retry._poller = undefined;
     retry._isPolling = false;
@@ -329,8 +393,9 @@ export function suspendDeletionAnalytics(): void {
 
 export function discardDeletionAnalyticsQueues(sdk: AnalyticsSDK = posthog as AnalyticsSDK): void {
   retryGeneration += 1;
-  if (sdk._requestQueue) sdk._requestQueue._queue.length = 0;
-  if (sdk._retryQueue) sdk._retryQueue._queue.length = 0;
+  const { batchItems, retryItems } = sdkQueues(sdk);
+  if (batchItems) batchItems.length = 0;
+  if (retryItems) retryItems.length = 0;
   if (sdk.__request_queue) sdk.__request_queue.length = 0;
   heldRequests.get(sdk)?.splice(0);
 }
@@ -339,10 +404,10 @@ export function resumeDeletionAnalytics(): void {
   if (!suspended) return;
   restoreRetryPoll?.();
   restoreRetryPoll = undefined;
-  const retry = (posthog as AnalyticsSDK)._retryQueue;
-  retry?.resume();
+  const { retry, retryItems } = sdkQueues(posthog as AnalyticsSDK);
   suspended = false;
-  if (retry?._queue.length && !retry._isPolling) {
+  retry?.resume();
+  if (retry?._poll && retryItems?.length && !retry._isPolling) {
     retry._isPolling = true;
     retry._poll();
   }

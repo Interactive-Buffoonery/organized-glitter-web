@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import PocketBase, { BaseAuthStore } from 'pocketbase';
+import type {} from '../../src/e2e/accountDeletionBridge';
 import { assertLocalE2ETargets } from '../fixtures/local-safety';
 
 const appUrl = process.env.E2E_APP_URL ?? 'http://localhost:3000';
@@ -47,6 +48,7 @@ test.beforeEach(async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'Delete your account', exact: true })
   ).toBeVisible();
+  await expect.poll(() => page.evaluate(() => Boolean(window.__ogDeletionQa))).toBe(true);
 });
 
 test.afterEach(async () => {
@@ -214,11 +216,11 @@ test('locks a second tab and retains one private proof after ambiguity', async (
 test('serializes a two-tab sign-out claim against intent admission', async ({ page, context }) => {
   const other = await context.newPage();
   await other.goto('/delete-account');
+  await expect.poll(() => other.evaluate(() => Boolean(window.__ogDeletionQa))).toBe(true);
   const makeIntent = async () =>
     page.evaluate(
       async ({ id, backend }) => {
-        const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
-        const { deletionIntents } = await load();
+        const { deletionIntents } = window.__ogDeletionQa!;
         try {
           await deletionIntents.create({
             version: 1,
@@ -240,8 +242,7 @@ test('serializes a two-tab sign-out claim against intent admission', async ({ pa
   const claim = async () =>
     other.evaluate(
       async ({ id, backend }) => {
-        const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
-        const { deletionIntents } = await load();
+        const { deletionIntents } = window.__ogDeletionQa!;
         return deletionIntents.claimSignOut(backend, id, 'epoch-a');
       },
       { id: accountId, backend: backendUrl }
@@ -275,8 +276,7 @@ test('rejects an in-flight account switch when an intent arrives', async ({ page
     });
     const login = page.evaluate(
       async ({ loginEmail, password }) => {
-        const loadAuth = new Function('return import("/src/services/auth/local.ts")');
-        const { loginWithPassword } = await loadAuth();
+        const { loginWithPassword } = window.__ogDeletionQa!;
         const result = await loginWithPassword({ email: loginEmail, password });
         const app = window as Window & { pb?: { authStore: { record?: { id: string } } } };
         return { success: result.success, accountId: app.pb?.authStore.record?.id };
@@ -286,10 +286,10 @@ test('rejects an in-flight account switch when an intent arrives', async ({ page
     await reachedRequest;
     const otherTab = await context.newPage();
     await otherTab.goto('/delete-account');
+    await expect.poll(() => otherTab.evaluate(() => Boolean(window.__ogDeletionQa))).toBe(true);
     await otherTab.evaluate(
       async ({ id, backend }) => {
-        const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
-        const { deletionIntents } = await load();
+        const { deletionIntents } = window.__ogDeletionQa!;
         await deletionIntents.create({
           version: 1,
           backendUrl: backend,
@@ -316,8 +316,7 @@ test('releases a completed sign-out claim only during fresh login application', 
 }) => {
   await page.evaluate(
     async ({ id, backend }) => {
-      const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
-      const { deletionIntents } = await load();
+      const { deletionIntents } = window.__ogDeletionQa!;
       await deletionIntents.claimSignOut(backend, id, 'old-session');
       const app = window as Window & { pb?: { authStore: { clear(): void } } };
       app.pb?.authStore.clear();
@@ -331,8 +330,7 @@ test('releases a completed sign-out claim only during fresh login application', 
   await expect(page).not.toHaveURL(/\/login$/);
   const remaining = await page.evaluate(
     async ({ id, backend }) => {
-      const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
-      const { deletionIntents } = await load();
+      const { deletionIntents } = window.__ogDeletionQa!;
       return deletionIntents.get(backend, id);
     },
     { id: accountId, backend: backendUrl }
@@ -345,8 +343,7 @@ test('keeps an interrupted sign-out claim visible and releases only its owner', 
 }) => {
   const result = await page.evaluate(
     async ({ backend, id }) => {
-      const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
-      const { deletionIntents } = await load();
+      const { deletionIntents } = window.__ogDeletionQa!;
       const first = await deletionIntents.claimSignOut(backend, id, 'same-epoch', 'first-claim');
       const concurrent = await deletionIntents.claimSignOut(
         backend,
@@ -365,8 +362,7 @@ test('keeps an interrupted sign-out claim visible and releases only its owner', 
   await expect(page.getByRole('link', { name: 'Contact support' })).toBeVisible();
   const released = await page.evaluate(
     async ({ backend, id }) => {
-      const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
-      const { deletionIntents } = await load();
+      const { deletionIntents } = window.__ogDeletionQa!;
       return deletionIntents.releaseSignOut(backend, id, 'first-claim');
     },
     { backend: backendUrl, id: accountId }
@@ -381,14 +377,7 @@ test('releases only the completed receipt marker after a cleanup interruption', 
 }) => {
   const markers = await page.evaluate(
     async ({ backend, id }) => {
-      const loadStore = new Function(
-        'return import("/src/services/accountDeletion/intentStore.ts")'
-      );
-      const loadAnalytics = new Function(
-        'return import("/src/services/accountDeletion/analytics.ts")'
-      );
-      const { deletionIntents } = await loadStore();
-      const { armDeletionTransportFence } = await loadAnalytics();
+      const { deletionIntents, armDeletionTransportFence } = window.__ogDeletionQa!;
       const completed = armDeletionTransportFence(backend, id);
       const concurrent = armDeletionTransportFence(backend, id);
       await deletionIntents.create({
@@ -452,8 +441,7 @@ test('preserves unfinished drafts if Logout is attempted during an unresolved de
 test('uses the account key and ignores malformed records for another backend', async ({ page }) => {
   const result = await page.evaluate(
     async ({ backend, id }) => {
-      const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
-      const { deletionIntents } = await load();
+      const { deletionIntents } = window.__ogDeletionQa!;
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('og-account-deletion', 1);
         request.onsuccess = () => resolve(request.result);
@@ -484,11 +472,11 @@ test('uses the account key and ignores malformed records for another backend', a
 test('admits one proof when two tabs create an intent concurrently', async ({ page, context }) => {
   const other = await context.newPage();
   await other.goto('/delete-account');
+  await expect.poll(() => other.evaluate(() => Boolean(window.__ogDeletionQa))).toBe(true);
   const create = (tab: Page, proof: string) =>
     tab.evaluate(
       async ({ backend, id, value }) => {
-        const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
-        const { deletionIntents } = await load();
+        const { deletionIntents } = window.__ogDeletionQa!;
         const intent = await deletionIntents.create({
           version: 1,
           backendUrl: backend,

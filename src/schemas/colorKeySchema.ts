@@ -42,3 +42,24 @@ export function parseColorKeyInput<T extends Partial<ColorKeyInput>>(
   if (!result.success) throw new Error(result.error.issues[0]?.message ?? 'Check this color.');
   return result.data;
 }
+
+export const SYMBOL_REQUEST_LIMITS = { bookLabel: 200, description: 500 } as const;
+
+export const symbolRequestInputSchema = z.object({
+  page: z.string().optional(),
+  book_label: text('Book and page', SYMBOL_REQUEST_LIMITS.bookLabel).refine(
+    Boolean,
+    'Enter the book and page.'
+  ),
+  description: text('Description', SYMBOL_REQUEST_LIMITS.description).optional(),
+  email: z.string().trim().email('Enter a valid email address.'),
+  photo: z.instanceof(File, { message: 'Choose a photo.' }),
+});
+
+export type SymbolRequestInput = z.input<typeof symbolRequestInputSchema>;
+
+export function parseSymbolRequestInput(input: SymbolRequestInput) {
+  const result = symbolRequestInputSchema.safeParse(input);
+  if (!result.success) throw new Error(result.error.issues[0]?.message ?? 'Check this request.');
+  return result.data;
+}

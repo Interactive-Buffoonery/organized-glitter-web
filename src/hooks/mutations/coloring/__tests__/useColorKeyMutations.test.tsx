@@ -1,10 +1,12 @@
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { ClientResponseError } from 'pocketbase';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import {
   useCreateColorKey,
+  useCreateSymbolRequest,
   useDeleteColorKey,
   useSetupColorKeys,
   useUpdateColorKey,
@@ -15,6 +17,7 @@ const service = vi.hoisted(() => ({
   update: vi.fn(),
   remove: vi.fn(),
   setup: vi.fn(),
+  createRequest: vi.fn(),
 }));
 vi.mock('@/services/pocketbase/colorKeys.service', () => ({ ColorKeysService: service }));
 vi.mock('@/services/auth', () => ({ getCurrentUserId: () => 'owner' }));
@@ -123,5 +126,20 @@ describe('color key mutations', () => {
     service.update.mockResolvedValue(row('a', 0, { code: '655', color_name: '', swatch: '' }));
     await act(() => result.current.mutateAsync({ id: 'a', input: { code: '655' } }));
     expect(client.getQueryState(historyKey)?.isInvalidated).toBe(true);
+  });
+
+  it('sends a symbol request once, without retrying a rate limit', async () => {
+    const input = {
+      book_label: 'Lost Ocean, page 4',
+      email: 'me@example.test',
+      photo: new File([], 'p.jpg'),
+    };
+    service.createRequest.mockRejectedValue(new ClientResponseError({ status: 429 }));
+    const { result } = renderHook(() => useCreateSymbolRequest('owner'), { wrapper });
+    await expect(act(() => result.current.mutateAsync(input))).rejects.toMatchObject({
+      status: 429,
+    });
+    expect(service.createRequest).toHaveBeenCalledTimes(1);
+    expect(service.createRequest).toHaveBeenCalledWith('owner', input);
   });
 });

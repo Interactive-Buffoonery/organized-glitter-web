@@ -6,6 +6,7 @@ import {
   ColorKeysService,
   type ColorKey,
   type ColorKeyInput,
+  type SymbolRequestInput,
 } from '@/services/pocketbase/colorKeys.service';
 import { createLogger } from '@/utils/logger';
 
@@ -88,6 +89,14 @@ export function useSetupColorKeys(pageId: string, userId: string) {
     mutationFn: (symbols: string[]) => ColorKeysService.setup(pageId, userId, symbols),
     onSuccess: created => settle(client, userId, pageId, { update: () => created }),
     onError: () => settle(client, userId, pageId),
+    retry: false,
+  });
+}
+
+// ponytail: no invalidation; nothing cached lists requests, and the r: row it may add refreshes its own page.
+export function useCreateSymbolRequest(userId: string) {
+  return useMutation({
+    mutationFn: (input: SymbolRequestInput) => ColorKeysService.createRequest(userId, input),
     retry: false,
   });
 }

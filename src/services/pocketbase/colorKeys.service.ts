@@ -1,14 +1,20 @@
 import { ClientResponseError } from 'pocketbase';
 import { pb } from '@/lib/pocketbase';
 import { getCurrentUserId } from '@/services/auth';
-import { parseColorKeyInput, type ColorKeyInput } from '@/schemas/colorKeySchema';
+import {
+  parseColorKeyInput,
+  parseSymbolRequestInput,
+  type ColorKeyInput,
+  type SymbolRequestInput,
+} from '@/schemas/colorKeySchema';
 import {
   Collections,
   type ColoringPageColorKeysResponse,
   type ColoringSymbolRequestsResponse,
 } from '@/types/pocketbase.types';
 export type ColorKey = ColoringPageColorKeysResponse<string[]>;
-export type { ColorKeyInput };
+export type SymbolRequest = ColoringSymbolRequestsResponse;
+export type { ColorKeyInput, SymbolRequestInput };
 export type ColorCodeHistoryEntry = { code: string; color_name: string; swatch: string };
 export type SymbolRequestPreview = { description: string; thumbnail: string };
 
@@ -81,6 +87,14 @@ export const ColorKeysService = {
         seen.set(key, { code, color_name: item.color_name ?? '', swatch: item.swatch ?? '' });
     }
     return [...seen.values()];
+  },
+
+  async createRequest(userId: string, input: SymbolRequestInput): Promise<SymbolRequest> {
+    requireOwner(userId);
+    const data = parseSymbolRequestInput(input);
+    return pb
+      .collection(Collections.ColoringSymbolRequests)
+      .create<SymbolRequest>({ user: userId, ...data }, { requestKey: null });
   },
 
   async requests(

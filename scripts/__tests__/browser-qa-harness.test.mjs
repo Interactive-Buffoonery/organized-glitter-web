@@ -3,13 +3,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-import ciConfig from '../../playwright.ci.config';
+import ciConfig, * as ciConfigModule from '../../playwright.ci.config';
 import {
+  deletionPlaywrightEnvironment,
   parseArgs,
   parseListedInventory,
   parseListedTestCount,
   parseRandomizerFixtureIds,
   pocketBaseCachePath,
+  qaEnvironment,
   resolveQaFixtures,
   seedRandomizerFixturesForSuite,
   validateManagedPlaywrightReport,
@@ -173,6 +175,34 @@ describe('PocketBase installer', () => {
 });
 
 describe('browser QA harness safeguards', () => {
+  it('runs disposable account deletion in managed Chromium and WebKit projects', () => {
+    const spec = '/repo/e2e/authenticated/account-deletion-local.spec.ts';
+    const matches = inventory => inventory?.some(pattern => pattern.test(spec));
+    const mobileSmoke = ciConfig.projects?.find(project => project.name === 'mobile-webkit-smoke');
+
+    expect(matches(ciConfigModule.chromiumSmokeInventory)).toBe(true);
+    expect(matches(ciConfigModule.chromiumFullInventory)).toBe(true);
+    expect(matches(ciConfigModule.webkitFlowInventory)).toBe(true);
+    expect(matches(mobileSmoke?.testMatch)).toBe(true);
+  });
+
+  it("passes only this run's disposable backend superuser to Playwright", () => {
+    const base = {
+      LOCAL_POCKETBASE_ADMIN_EMAIL: 'run-admin@localhost.test',
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: 'run-only-password',
+      E2E_DELETION_ADMIN_EMAIL: 'inherited@example.test',
+      E2E_DELETION_ADMIN_PASSWORD: 'inherited-password',
+    };
+    const playwright = deletionPlaywrightEnvironment(base);
+
+    expect(playwright.E2E_DELETION_ADMIN_EMAIL).toBe(base.LOCAL_POCKETBASE_ADMIN_EMAIL);
+    expect(playwright.E2E_DELETION_ADMIN_PASSWORD).toBe(base.LOCAL_POCKETBASE_ADMIN_PASSWORD);
+    expect(base.E2E_DELETION_ADMIN_EMAIL).toBe('inherited@example.test');
+    expect(() => deletionPlaywrightEnvironment({})).toThrow(/local backend superuser/i);
+    expect(qaEnvironment(base)).not.toHaveProperty('E2E_DELETION_ADMIN_EMAIL');
+    expect(qaEnvironment(base)).not.toHaveProperty('E2E_DELETION_ADMIN_PASSWORD');
+  });
+
   it('keeps legacy Playwright positional filters working', () => {
     const parsed = parseArgs(['--', '--project=authenticated', 'e2e/example.spec.ts']);
     expect(parsed.harness.suite).toBe('legacy');
@@ -238,24 +268,24 @@ describe('browser QA harness safeguards', () => {
   });
 
   it('requires the exact managed inventory for smoke and full suites', () => {
-    expect(parseListedInventory('Total: 83 tests in 23 files', 'smoke')).toEqual({
-      files: 23,
-      tests: 83,
+    expect(parseListedInventory('Total: 95 tests in 24 files', 'smoke')).toEqual({
+      files: 24,
+      tests: 95,
     });
-    expect(parseListedInventory('Total: 298 tests in 40 files', 'full')).toEqual({
-      files: 40,
-      tests: 298,
+    expect(parseListedInventory('Total: 310 tests in 41 files', 'full')).toEqual({
+      files: 41,
+      tests: 310,
     });
-    expect(() => parseListedInventory('Total: 297 tests in 40 files', 'full')).toThrow(
-      /expected 298 tests in 40 files/i
+    expect(() => parseListedInventory('Total: 309 tests in 41 files', 'full')).toThrow(
+      /expected 310 tests in 41 files/i
     );
-    expect(() => parseListedInventory('Total: 76 tests in 23 files', 'smoke')).toThrow(
-      /expected 83 tests in 23 files/i
+    expect(() => parseListedInventory('Total: 88 tests in 24 files', 'smoke')).toThrow(
+      /expected 95 tests in 24 files/i
     );
   });
 
   it('accepts a reconciled smoke report with no skipped tests', () => {
-    const tests = Array.from({ length: 83 }, (_, index) => ({
+    const tests = Array.from({ length: 95 }, (_, index) => ({
       projectName: 'authenticated-chromium-smoke',
       expectedStatus: 'passed',
       status: 'expected',
@@ -271,13 +301,13 @@ describe('browser QA harness safeguards', () => {
         },
       ],
       errors: [],
-      stats: { expected: 83, unexpected: 0, flaky: 0, skipped: 0 },
+      stats: { expected: 95, unexpected: 0, flaky: 0, skipped: 0 },
     };
 
     expect(validateManagedPlaywrightReport(report, 'smoke')).toEqual({
-      expected: 83,
+      expected: 95,
       skipped: 0,
-      total: 83,
+      total: 95,
     });
   });
 
@@ -293,7 +323,7 @@ describe('browser QA harness safeguards', () => {
             },
           ],
           errors: [],
-          stats: { expected: 83, unexpected: 0, flaky: 0, skipped: 0 },
+          stats: { expected: 95, unexpected: 0, flaky: 0, skipped: 0 },
         },
         'smoke'
       )
@@ -301,7 +331,7 @@ describe('browser QA harness safeguards', () => {
   });
 
   it('allows only the exact conditional full-suite skip', () => {
-    const passing = Array.from({ length: 297 }, (_, index) => ({
+    const passing = Array.from({ length: 309 }, (_, index) => ({
       projectName: 'authenticated-chromium-full',
       expectedStatus: 'passed',
       status: 'expected',
@@ -346,13 +376,13 @@ describe('browser QA harness safeguards', () => {
         },
       ],
       errors: [],
-      stats: { expected: 297, unexpected: 0, flaky: 0, skipped: 1 },
+      stats: { expected: 309, unexpected: 0, flaky: 0, skipped: 1 },
     };
 
     expect(validateManagedPlaywrightReport(report, 'full')).toEqual({
-      expected: 297,
+      expected: 309,
       skipped: 1,
-      total: 298,
+      total: 310,
     });
 
     allowedSkip.annotations[0].description = 'different reason';

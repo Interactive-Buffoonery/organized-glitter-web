@@ -14,19 +14,21 @@ const publicInventory =
   /[/\\]e2e[/\\](?:(?:home|public-accessibility|page-titles)\.spec\.ts|a11y[/\\]public-a11y\.spec\.ts)$/;
 const publicWebkitInventory =
   /[/\\]e2e[/\\](?:(?:home|page-titles)\.spec\.ts|a11y[/\\]public-a11y\.spec\.ts)$/;
-const chromiumSmokeInventory = [
+export const chromiumSmokeInventory = [
+  /[/\\]e2e[/\\]authenticated[/\\]account-deletion-local\.spec\.ts$/,
   /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
   /[/\\]e2e[/\\]ci[/\\](?:authenticated-accessibility-smoke|change-password-accessibility|feedback-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|unverified-login-recovery)\.spec\.ts$/,
   /[/\\]e2e[/\\]authenticated[/\\](?:archive-legacy-project-local|archive-recovery-local|archive-v3-restore-local|coloring-detail-errors-local|coloring-page-detail|diamond-pagination-url|notes-feed-timeline|project-create-cover-local|project-delete-atomic-local|project-field-clearing|project-inline-dates-local)\.spec\.ts$/,
 ];
-const webkitFlowInventory = [
+export const webkitFlowInventory = [
+  /[/\\]e2e[/\\]authenticated[/\\]account-deletion-local\.spec\.ts$/,
   /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
   /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|feedback-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
   /[/\\]e2e[/\\]a11y[/\\]mobile-state-a11y\.spec\.ts$/,
   /[/\\]e2e[/\\]authenticated[/\\](?:archive-v3-restore-local|avatar-crop-local|coloring-detail-errors-local|coloring-page-detail|notes-feed-timeline|project-create-cover-local|project-field-clearing|project-inline-dates-local|randomizer-interruption-local)\.spec\.ts$/,
   /[/\\]e2e[/\\]authenticated[/\\]int-1093-filter-validation\.spec\.ts$/,
 ];
-const chromiumFullInventory = [
+export const chromiumFullInventory = [
   ...chromiumSmokeInventory,
   /[/\\]e2e[/\\]ci[/\\]authenticated-contrast\.spec\.ts$/,
   /[/\\]e2e[/\\]a11y[/\\]authenticated-a11y\.spec\.ts$/,
@@ -58,6 +60,7 @@ const smokeProjects: Project[] = [
   {
     name: 'mobile-webkit-smoke',
     testMatch: [
+      /[/\\]e2e[/\\]authenticated[/\\]account-deletion-local\.spec\.ts$/,
       /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
       /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|feedback-accessibility|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
     ],

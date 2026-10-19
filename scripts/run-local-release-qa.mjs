@@ -38,12 +38,28 @@ const randomizerFixtureCount = 8;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-export const qaEnvironment = env => ({
-  ...env,
-  POSTHOG_CLI_TOKEN: '',
-  POSTHOG_CLI_API_KEY: '',
-  RESEND_API_KEY: '',
-});
+export const qaEnvironment = env => {
+  const environment = { ...env };
+  delete environment.E2E_DELETION_ADMIN_EMAIL;
+  delete environment.E2E_DELETION_ADMIN_PASSWORD;
+  return {
+    ...environment,
+    POSTHOG_CLI_TOKEN: '',
+    POSTHOG_CLI_API_KEY: '',
+    RESEND_API_KEY: '',
+  };
+};
+
+export const deletionPlaywrightEnvironment = env => {
+  if (!env.LOCAL_POCKETBASE_ADMIN_EMAIL || !env.LOCAL_POCKETBASE_ADMIN_PASSWORD) {
+    throw new Error('Playwright requires the disposable local backend superuser.');
+  }
+  return {
+    ...env,
+    E2E_DELETION_ADMIN_EMAIL: env.LOCAL_POCKETBASE_ADMIN_EMAIL,
+    E2E_DELETION_ADMIN_PASSWORD: env.LOCAL_POCKETBASE_ADMIN_PASSWORD,
+  };
+};
 
 export const assertPortAvailable = port =>
   new Promise((resolve, reject) => {
@@ -328,8 +344,8 @@ export function parseListedTestCount(output) {
 }
 
 const managedInventory = {
-  smoke: { files: 23, tests: 83 },
-  full: { files: 40, tests: 298 },
+  smoke: { files: 24, tests: 95 },
+  full: { files: 41, tests: 310 },
 };
 
 export function parseListedInventory(output, suite) {
@@ -618,10 +634,11 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     await waitForHttp(appUrl, 'local build server', { processHandle: appProcess });
 
     const basePlaywrightArgs = ['exec', 'playwright', 'test', '--config', configPath];
+    const playwrightEnv = deletionPlaywrightEnvironment(env);
     const listResult = runSync({
       command: pnpm,
       args: [...basePlaywrightArgs, ...playwrightArgs, '--list'],
-      env,
+      env: playwrightEnv,
       logPath: path.join(logsDir, 'playwright-list.log'),
       label: 'Playwright inventory preflight',
     });
@@ -633,7 +650,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
 
     const result = spawnSync(pnpm, [...basePlaywrightArgs, ...playwrightArgs, '--retries=0'], {
       cwd: rootDir,
-      env,
+      env: playwrightEnv,
       stdio: 'inherit',
     });
     if (result.error) throw result.error;

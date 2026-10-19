@@ -6,7 +6,7 @@ import {
   runBoundedCommand,
 } from '../check-browser-discovery.mjs';
 
-const listed = { smoke: 'Total: 83 tests in 23 files', full: 'Total: 298 tests in 40 files' };
+const listed = { smoke: 'Total: 95 tests in 24 files', full: 'Total: 310 tests in 41 files' };
 
 describe('browser discovery check', () => {
   it('lists each managed suite exactly once with the synthetic fixture environment', async () => {
@@ -17,8 +17,8 @@ describe('browser discovery check', () => {
     }));
 
     await expect(checkBrowserDiscovery({ run })).resolves.toEqual({
-      smoke: { files: 23, tests: 83 },
-      full: { files: 40, tests: 298 },
+      smoke: { files: 24, tests: 95 },
+      full: { files: 41, tests: 310 },
     });
     expect(run).toHaveBeenCalledTimes(2);
     for (const suite of ['smoke', 'full']) {
@@ -40,7 +40,7 @@ describe('browser discovery check', () => {
   });
 
   it('fails closed when the Total line is missing or malformed', async () => {
-    for (const stdout of ['Listing tests:\n', 'Total: many tests in 23 files', 'Total: 83 tests']) {
+    for (const stdout of ['Listing tests:\n', 'Total: many tests in 24 files', 'Total: 95 tests']) {
       const run = async () => ({ status: 0, stdout, stderr: '' });
       await expect(checkBrowserDiscovery({ run, suites: ['smoke'] })).rejects.toThrow(
         /complete managed test inventory/i
@@ -49,10 +49,10 @@ describe('browser discovery check', () => {
   });
 
   it('fails when discovered files or tests differ from the managed inventory', async () => {
-    const run = async () => ({ status: 0, stdout: 'Total: 83 tests in 22 files', stderr: '' });
+    const run = async () => ({ status: 0, stdout: 'Total: 95 tests in 23 files', stderr: '' });
 
     await expect(checkBrowserDiscovery({ run, suites: ['smoke'] })).rejects.toThrow(
-      /expected 83 tests in 23 files/i
+      /expected 95 tests in 24 files/i
     );
   });
 

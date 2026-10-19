@@ -1,5 +1,6 @@
 export const browserSpecInventory = {
   pr: [
+    'authenticated/account-deletion-local.spec.ts',
     'authenticated/app-startup-local.spec.ts',
     'authenticated/archive-legacy-project-local.spec.ts',
     'authenticated/archive-recovery-local.spec.ts',

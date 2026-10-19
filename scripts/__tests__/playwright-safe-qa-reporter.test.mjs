@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { validateManagedPlaywrightReport } from '../run-local-release-qa.mjs';
 import SafeQaReporter from '../playwright-safe-qa-reporter.mjs';
 
-const makeTests = (password, failFirst, count = 109) =>
+const makeTests = (password, failFirst, count = 113) =>
   Array.from({ length: count }, (_, index) => ({
     title: `managed test ${index}`,
     location: { file: `/repo/e2e/authenticated/managed-${index}.spec.ts` },
@@ -44,16 +44,16 @@ describe('safe managed Playwright report', () => {
     expect(retained.includes('credential ')).toBe(false);
     expect(retained.includes('attachments')).toBe(false);
     const report = JSON.parse(retained);
-    expect(report.stats.expected).toBe(failFirst ? 108 : 109);
+    expect(report.stats.expected).toBe(failFirst ? 112 : 113);
     expect(report.stats.unexpected).toBe(failFirst ? 1 : 0);
     expect(report.runStatus).toBe(failFirst ? 'failed' : 'passed');
     if (failFirst) {
       expect(() => validateManagedPlaywrightReport(report, 'smoke')).toThrow();
     } else {
       expect(validateManagedPlaywrightReport(report, 'smoke')).toEqual({
-        expected: 109,
+        expected: 113,
         skipped: 0,
-        total: 109,
+        total: 113,
       });
     }
   });
@@ -77,7 +77,7 @@ describe('safe managed Playwright report', () => {
 
   it('preserves the one permitted full-suite skip and exact counts', () => {
     let retained = '';
-    const tests = makeTests('unused', false, 324);
+    const tests = makeTests('unused', false, 328);
     const allowedSkip = tests.at(-1);
     allowedSkip.title = 'bottom nav remains anchored during scroll';
     allowedSkip.location.file = '/repo/e2e/authenticated/mobile-touch-targets.spec.ts';
@@ -105,9 +105,9 @@ describe('safe managed Playwright report', () => {
     reporter.onEnd({ status: 'passed' });
 
     expect(validateManagedPlaywrightReport(JSON.parse(retained), 'full')).toEqual({
-      expected: 323,
+      expected: 327,
       skipped: 1,
-      total: 324,
+      total: 328,
     });
   });
 });

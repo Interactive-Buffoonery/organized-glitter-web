@@ -183,10 +183,13 @@ Self-hosted destinations require an explicit reviewed adapter change.
    same saved person's full detail again. If retrieval fails, a recorded ID is
    missing (`identity_changed`), the refreshed target is oversized, or a linked
    ID belongs to another existing user (`identity_shared`), block and preserve the
-   original durable target. Safe additions are saved in the full refreshed
-   manifest before dispatch, followed by the transactional shared-ID and lease
-   check. A save failure prevents DELETE. This narrows the retry merge window but
-   cannot prevent external merges after the final retrieval/check.
+   original durable target when detected before the refreshed manifest is saved.
+   Safe additions are saved in the full refreshed manifest before dispatch,
+   followed by the transactional shared-ID and lease check. If a shared account
+   appears only at that final check, the refreshed manifest remains saved but
+   DELETE is prevented. A save failure also prevents DELETE. This narrows the
+   retry merge window but cannot prevent external merges after the final
+   retrieval/check.
 6. A plausible partial vendor failure can return 503 while queuing event deletion
    and leaving the person profile present. Pending event status currently stays
    unresolved without another DELETE; completed event status remains blocked.

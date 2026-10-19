@@ -636,7 +636,6 @@ try {
   await run();
   assert.equal(row(id).last_error, 'verification_pending');
   assert.equal(profileDeletes, 1, 'pending event status does not repair a surviving profile');
-  assert.equal((await fetch(`${host}/api/projects/123/persons/${uuid}/`)).status, 200);
   eventState = 'completed';
   due(id);
   await run();

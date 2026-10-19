@@ -265,7 +265,7 @@ function processJob(app, claim, config) {
     try {
       fresh = personTarget(config, target.personId, claim.job.getString('user_id'));
     } catch (outcome) {
-      throw failure(outcome?.reason || 'identity_ambiguous', true, outcome?.retryAfter || 0);
+      throw failure(outcome?.reason || 'worker_failure', true, outcome?.retryAfter || 0);
     }
     const freshIds = new Set(fresh.distinctIds);
     if (target.distinctIds.some(id => !freshIds.has(id))) throw failure('identity_changed', true);

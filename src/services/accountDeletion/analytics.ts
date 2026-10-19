@@ -34,6 +34,7 @@ const FENCE_PREFIX = 'og:account-deletion:analytics-fence:v1:';
 const COMPLETED_PREFIX = 'og:account-deletion:analytics-complete:v1:';
 const RETRY_GENERATION = Symbol('deletion-retry-generation');
 let suspended = false;
+let transportCapabilityDisabled = false;
 let retryGeneration = 0;
 const seenCompleted = new WeakMap<object, Set<string>>();
 const installedBatch = new WeakSet<object>();
@@ -350,6 +351,15 @@ export function installDeletionAnalyticsFence(
     };
   installed.set(sdk, { send: sdk._send_request, retry: sdk._send_retriable_request, flush });
   return true;
+}
+
+export function disableDeletionAnalyticsForPage(): void {
+  transportCapabilityDisabled = true;
+  posthog.opt_out_capturing();
+}
+
+export function isDeletionAnalyticsCapabilityDisabled(): boolean {
+  return transportCapabilityDisabled;
 }
 
 export function retainedDeletionAnalyticsCount(sdk: object = posthog): number {

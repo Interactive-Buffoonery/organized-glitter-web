@@ -4,7 +4,10 @@ import posthog, { type PostHogConfig } from 'posthog-js';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { isAllowedAnalyticsEvent, sanitizeAnalyticsEvent } from '@/utils/analytics/sanitizeEvent';
 import { enrichWebAnalyticsEvent } from '@/utils/analytics/webContext';
-import { installDeletionAnalyticsFence } from '@/services/accountDeletion/analytics';
+import {
+  disableDeletionAnalyticsForPage,
+  installDeletionAnalyticsFence,
+} from '@/services/accountDeletion/analytics';
 import { createLogger } from '@/utils/logger';
 
 import {
@@ -62,7 +65,7 @@ let posthogClient =
 if (posthogClient) {
   if (installDeletionAnalyticsFence()) syncAnalyticsConsent();
   else {
-    posthog.opt_out_capturing();
+    disableDeletionAnalyticsForPage();
     posthogClient = undefined;
     createLogger('AnalyticsProvider').error(
       'Analytics disabled because deletion transport protection is unavailable'

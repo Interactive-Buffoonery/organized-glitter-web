@@ -1,7 +1,9 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 
 import ciConfig, * as ciConfigModule from '../../playwright.ci.config';
@@ -17,9 +19,11 @@ import {
   redactQaCredentials,
   resolveQaFixtures,
   runSync,
+  runPlaywright,
   seedRandomizerFixturesForSuite,
   validateManagedPlaywrightReport,
   waitForHttp,
+  withoutQaSuperuser,
   writeReport,
 } from '../run-local-release-qa.mjs';
 import {
@@ -180,6 +184,96 @@ describe('PocketBase installer', () => {
 });
 
 describe('browser QA harness safeguards', () => {
+  it('streams split Playwright failures without exposing the run credential', async () => {
+    const credential = createQaSuperuserCredentials();
+    const env = {
+      LOCAL_POCKETBASE_ADMIN_EMAIL: credential.email,
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: credential.password,
+    };
+    let stdout = '';
+    let stderr = '';
+    let streamedBeforeClose = false;
+    const result = await runPlaywright('pnpm', ['exec', 'playwright', 'test'], env, {
+      spawnCommand: (_command, _args, options) => {
+        expect(options.stdio).toEqual(['ignore', 'pipe', 'pipe']);
+        const child = new EventEmitter();
+        child.stdout = new PassThrough();
+        child.stderr = new PassThrough();
+        queueMicrotask(() => {
+          child.stdout.write(`Running test\nFailure: ${credential.password.slice(0, 12)}`);
+          streamedBeforeClose = stdout.includes('Running test\n');
+          child.stdout.write(`${credential.password.slice(12)}\nNext test\n`);
+          child.stderr.write(`Request for ${credential.email.slice(0, 8)}`);
+          child.stderr.end(`${credential.email.slice(8)} failed\n`);
+          child.stdout.end();
+          setImmediate(() => child.emit('close', 3, null));
+        });
+        return child;
+      },
+      stdoutWrite: chunk => {
+        stdout += chunk;
+      },
+      stderrWrite: chunk => {
+        stderr += chunk;
+      },
+    });
+
+    expect(result.status).toBe(3);
+    expect(streamedBeforeClose).toBe(true);
+    expect(stdout.includes('Running test')).toBe(true);
+    expect(stdout.includes('Failure: [redacted]\nNext test')).toBe(true);
+    expect(stderr.includes('Request for [redacted] failed')).toBe(true);
+    expect(stdout.includes(credential.password)).toBe(false);
+    expect(stderr.includes(credential.email)).toBe(false);
+  });
+
+  it('retains only safe Playwright reports and removes test output', () => {
+    expect(ciConfig.preserveOutput).toBe('never');
+    expect(ciConfig.reporter).toEqual([
+      ['list'],
+      ['./scripts/playwright-safe-qa-reporter.mjs', expect.any(Object)],
+    ]);
+  });
+
+  it('flushes a final unterminated diagnostic when Playwright closes', async () => {
+    const credential = createQaSuperuserCredentials();
+    const env = {
+      LOCAL_POCKETBASE_ADMIN_EMAIL: credential.email,
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: credential.password,
+    };
+    let output = '';
+    const result = await runPlaywright('pnpm', [], env, {
+      spawnCommand: () => {
+        const child = new EventEmitter();
+        child.stdout = new PassThrough();
+        child.stderr = new PassThrough();
+        queueMicrotask(() => {
+          child.stdout.write(`failure ${credential.password}`);
+          child.emit('close', 2, null);
+        });
+        return child;
+      },
+      stdoutWrite: chunk => {
+        output += chunk;
+      },
+      stderrWrite: () => {},
+    });
+    expect(result.status).toBe(2);
+    expect(output === 'failure [redacted]').toBe(true);
+  });
+
+  it('keeps the run superuser out of ordinary backend and app children', () => {
+    const parent = {
+      PATH: '/bin',
+      LOCAL_POCKETBASE_ADMIN_EMAIL: 'admin@localhost.test',
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: 'run-password',
+      E2E_DELETION_ADMIN_PASSWORD: 'run-password',
+    };
+    const child = withoutQaSuperuser(parent);
+    expect(child).toEqual({ PATH: '/bin' });
+    expect(parent.LOCAL_POCKETBASE_ADMIN_PASSWORD).toBe('run-password');
+  });
+
   it('generates distinct run credentials for setup and Playwright without logging them', () => {
     const first = createQaSuperuserCredentials();
     const second = createQaSuperuserCredentials();
@@ -372,6 +466,7 @@ describe('browser QA harness safeguards', () => {
       title: `test ${index}`,
     }));
     const report = {
+      runStatus: 'passed',
       suites: [
         {
           title: 'e2e/example.spec.ts',
@@ -394,6 +489,7 @@ describe('browser QA harness safeguards', () => {
     expect(() =>
       validateManagedPlaywrightReport(
         {
+          runStatus: 'passed',
           suites: [
             {
               title: 'e2e/example.spec.ts',
@@ -431,6 +527,7 @@ describe('browser QA harness safeguards', () => {
       title: 'bottom nav remains anchored during scroll',
     };
     const report = {
+      runStatus: 'passed',
       suites: [
         {
           title: 'e2e/authenticated/mobile-touch-targets.spec.ts',

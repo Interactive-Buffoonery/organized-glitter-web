@@ -51,6 +51,15 @@ export const redactQaCredentials = (output, env) => {
   return redacted;
 };
 
+export const withoutQaSuperuser = env => {
+  const environment = { ...env };
+  delete environment.LOCAL_POCKETBASE_ADMIN_EMAIL;
+  delete environment.LOCAL_POCKETBASE_ADMIN_PASSWORD;
+  delete environment.E2E_DELETION_ADMIN_EMAIL;
+  delete environment.E2E_DELETION_ADMIN_PASSWORD;
+  return environment;
+};
+
 export const qaEnvironment = env => {
   const environment = { ...env };
   delete environment.E2E_DELETION_ADMIN_EMAIL;
@@ -344,6 +353,54 @@ export const runSync = (
   return result;
 };
 
+const writeRedactedLines = (stream, write, env) => {
+  let pending = '';
+  let flushed = false;
+  stream.setEncoding('utf8');
+  stream.on('data', chunk => {
+    pending += chunk;
+    while (true) {
+      const boundary = pending.search(/[\r\n]/);
+      if (boundary < 0) break;
+      write(redactQaCredentials(pending.slice(0, boundary + 1), env));
+      pending = pending.slice(boundary + 1);
+    }
+  });
+  const flush = () => {
+    if (flushed) return;
+    flushed = true;
+    if (pending) write(redactQaCredentials(pending, env));
+  };
+  stream.on('end', flush);
+  return flush;
+};
+
+export const runPlaywright = (
+  command,
+  args,
+  env,
+  {
+    spawnCommand = spawn,
+    stdoutWrite = chunk => process.stdout.write(chunk),
+    stderrWrite = chunk => process.stderr.write(chunk),
+  } = {}
+) =>
+  new Promise((resolve, reject) => {
+    const child = spawnCommand(command, args, {
+      cwd: rootDir,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const flushStdout = writeRedactedLines(child.stdout, stdoutWrite, env);
+    const flushStderr = writeRedactedLines(child.stderr, stderrWrite, env);
+    child.once('error', reject);
+    child.once('close', (status, signal) => {
+      flushStdout();
+      flushStderr();
+      resolve({ status: status ?? 1, signal });
+    });
+  });
+
 export function seedRandomizerFixturesForSuite({ suite, env, logsDir, runCommand = runSync }) {
   if (suite !== 'full') return [];
   const result = runCommand({
@@ -424,6 +481,7 @@ export function validateManagedPlaywrightReport(report, suite) {
   if (!expected || !report || !Array.isArray(report.suites) || !report.stats) {
     throw new Error('Playwright structured report is missing or malformed.');
   }
+  if (report.runStatus !== 'passed') throw new Error('Playwright run did not pass.');
   const tests = collectReportTests(report.suites);
   if (tests.length === 0) throw new Error('Playwright structured report contained no tests.');
   if (tests.length !== expected.tests) {
@@ -521,9 +579,8 @@ export const writeReport = ({
     '',
     'Artifacts:',
     '',
-    `- Playwright report: ${path.join(runDir, 'artifacts', 'playwright-report')}`,
-    `- Structured results: ${path.join(runDir, 'artifacts', 'playwright-results.json')}`,
-    `- Playwright test results: ${path.join(runDir, 'artifacts', 'test-results')}`,
+    `- Safe structured results: ${path.join(runDir, 'artifacts', 'playwright-results.json')}`,
+    '- Per-test output and rich HTML results are not retained.',
     `- Logs: ${logsDir}`,
     '',
     'Cleanup:',
@@ -573,7 +630,6 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     LOCAL_POCKETBASE_TEST_USER_EMAIL: defaultTestEmail,
     LOCAL_POCKETBASE_TEST_USER_PASSWORD: defaultTestPassword,
     LOCAL_POCKETBASE_URL: pbUrl,
-    PLAYWRIGHT_HTML_REPORT: path.join(artifactsDir, 'playwright-report'),
     PLAYWRIGHT_JSON_OUTPUT_FILE: path.join(artifactsDir, 'playwright-results.json'),
     PLAYWRIGHT_OUTPUT_DIR: path.join(artifactsDir, 'test-results'),
     PORT: String(appPort),
@@ -582,6 +638,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     VITE_APP_VERSION: `release-qa-${harness.runId}`,
     VITE_POCKETBASE_URL: pbUrl,
   };
+  const unprivilegedEnv = withoutQaSuperuser(env);
 
   let appProcess;
   let listedTestCount;
@@ -607,7 +664,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     pbProcess = spawn(
       pocketbaseBinary,
       ['serve', `--http=127.0.0.1:${pbPort}`, `--origins=${appUrl}`],
-      { cwd: pbDir, env, stdio: ['ignore', pbStdout, pbStderr] }
+      { cwd: pbDir, env: unprivilegedEnv, stdio: ['ignore', pbStdout, pbStderr] }
     );
     await waitForHttp(`${pbUrl}/api/health`, 'PocketBase', { processHandle: pbProcess });
 
@@ -620,7 +677,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     });
     const randomizerProjectIds = seedRandomizerFixturesForSuite({
       suite: harness.suite,
-      env,
+      env: unprivilegedEnv,
       logsDir,
     });
     const fixtures = await resolveQaFixtures({
@@ -642,7 +699,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     runSync({
       command: pnpm,
       args: ['build'],
-      env,
+      env: unprivilegedEnv,
       logPath: path.join(logsDir, 'build.log'),
       label: 'Production build',
     });
@@ -652,7 +709,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     handles.push(appStdout, appStderr);
     appProcess = spawn(process.execPath, ['server/local-build-server.js'], {
       cwd: rootDir,
-      env,
+      env: unprivilegedEnv,
       stdio: ['ignore', appStdout, appStderr],
     });
     await waitForHttp(appUrl, 'local build server', { processHandle: appProcess });
@@ -672,12 +729,11 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
         ? parseListedTestCount(listedOutput)
         : parseListedInventory(listedOutput, harness.suite).tests;
 
-    const result = spawnSync(pnpm, [...basePlaywrightArgs, ...playwrightArgs, '--retries=0'], {
-      cwd: rootDir,
-      env: playwrightEnv,
-      stdio: 'inherit',
-    });
-    if (result.error) throw result.error;
+    const result = await runPlaywright(
+      pnpm,
+      [...basePlaywrightArgs, ...playwrightArgs, '--retries=0'],
+      playwrightEnv
+    );
     exitStatus = result.status ?? 1;
     if (exitStatus !== 0) failure = `Playwright failed with status ${exitStatus}.`;
     if (harness.suite !== 'legacy') {

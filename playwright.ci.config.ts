@@ -102,12 +102,13 @@ export default defineConfig({
   forbidOnly: true,
   retries: 0,
   workers: 1,
+  preserveOutput: 'never',
   reporter: [
     ['list'],
-    ['html', { outputFolder: process.env.PLAYWRIGHT_HTML_REPORT, open: 'never' }],
-    ...(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE
-      ? ([['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_FILE }]] as const)
-      : []),
+    [
+      './scripts/playwright-safe-qa-reporter.mjs',
+      { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_FILE },
+    ],
   ],
   outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR || 'test-results',
   use: {

@@ -3,6 +3,20 @@ import catalog from './symbolCatalog.json';
 export const SYMBOL_ID_PATTERN =
   /^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$/;
 
+export const SYMBOL_GROUP_IDS = [
+  'numbers',
+  'lowercase',
+  'uppercase',
+  'greek',
+  'money',
+  'math',
+  'music',
+  'signs',
+  'letters-extra',
+  'shapes',
+] as const;
+
+export type SymbolGroupId = (typeof SYMBOL_GROUP_IDS)[number];
 export type CatalogSymbol = (typeof catalog.symbols)[number];
 export type ParsedSymbolId =
   | { kind: 'unicode'; text: string }
@@ -42,18 +56,25 @@ export function getCatalogSymbol(id: string): CatalogSymbol | undefined {
   return symbolsById.get(id);
 }
 
-export const symbolsByGroup: Record<string, CatalogSymbol[]> = Object.fromEntries(
-  catalog.groups.map(({ id }) => [id, catalog.symbols.filter(symbol => symbol.group === id)])
-);
+export const symbolsByGroup = Object.fromEntries(
+  SYMBOL_GROUP_IDS.map(id => [id, [] as CatalogSymbol[]])
+) as Record<SymbolGroupId, CatalogSymbol[]>;
+for (const symbol of catalog.symbols) symbolsByGroup[symbol.group as SymbolGroupId]?.push(symbol);
+
+// Keywords are stored lowercase (enforced by the catalog test).
+const searchIndex = catalog.symbols.map(symbol => ({
+  symbol,
+  char: symbol.char?.toLowerCase(),
+  name: symbol.name.toLowerCase(),
+}));
 
 export function searchSymbols(query: string): CatalogSymbol[] {
   const term = query.trim().toLowerCase();
   if (!term) return [...catalog.symbols];
-  return catalog.symbols
-    .map(symbol => {
-      const name = symbol.name.toLowerCase();
+  return searchIndex
+    .map(({ symbol, char, name }) => {
       const rank =
-        symbol.char?.toLowerCase() === term
+        char === term
           ? 0
           : name.startsWith(term)
             ? 1

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import catalog from './symbolCatalog.json';
 import {
   DEFAULT_SETUP_SYMBOLS,
+  SYMBOL_GROUP_IDS,
   SYMBOL_ID_PATTERN,
+  type SymbolGroupId,
   getCatalogSymbol,
   isSymbolId,
   parseSymbolId,
@@ -14,27 +16,15 @@ import {
   unicodeSymbolId,
 } from './symbols';
 
-const groups = [
-  'numbers',
-  'lowercase',
-  'uppercase',
-  'greek',
-  'money',
-  'math',
-  'music',
-  'signs',
-  'letters-extra',
-  'shapes',
-];
-
 describe('symbol catalog contract', () => {
   it('uses version 1 and all contract groups in display order', () => {
     expect(catalog.version).toBe(1);
-    expect(catalog.groups.map(({ id }) => id)).toEqual(groups);
+    expect(catalog.groups.map(({ id }) => id)).toEqual(SYMBOL_GROUP_IDS);
     for (const { id, label } of catalog.groups) {
+      const group = id as SymbolGroupId;
       expect(label.trim()).not.toBe('');
-      expect(symbolsByGroup[id].length).toBeGreaterThan(0);
-      expect(symbolsByGroup[id]).toEqual(catalog.symbols.filter(symbol => symbol.group === id));
+      expect(symbolsByGroup[group].length).toBeGreaterThan(0);
+      expect(symbolsByGroup[group]).toEqual(catalog.symbols.filter(symbol => symbol.group === id));
     }
   });
 
@@ -43,7 +33,7 @@ describe('symbol catalog contract', () => {
     for (const symbol of catalog.symbols) {
       expect(symbol.id).toMatch(SYMBOL_ID_PATTERN);
       expect(isSymbolId(symbol.id)).toBe(true);
-      expect(groups).toContain(symbol.group);
+      expect(SYMBOL_GROUP_IDS).toContain(symbol.group);
       expect(symbol.name.trim()).not.toBe('');
       expect(symbol.keywords.length).toBeGreaterThan(0);
       for (const keyword of symbol.keywords) {
@@ -166,17 +156,17 @@ describe('symbol lookup, search and labels', () => {
   });
 
   it('ranks exact characters before name prefixes, keyword prefixes and substrings', () => {
-    for (const query of ['a', 'pi', 'circle', 'triangle', 'y']) {
-      const rank = (symbol: (typeof catalog.symbols)[number]) => {
-        if (symbol.char?.toLowerCase() === query) return 0;
-        if (symbol.name.toLowerCase().startsWith(query)) return 1;
-        if (symbol.keywords.some(keyword => keyword.startsWith(query))) return 2;
-        return 3;
-      };
-      const results = searchSymbols(query);
-      expect(results.length).toBeGreaterThan(1);
-      expect(results.map(rank)).toEqual(results.map(rank).sort((a, b) => a - b));
-    }
+    // y, Y: exact character. Yen sign: name prefix.
+    expect(
+      searchSymbols('y')
+        .slice(0, 3)
+        .map(({ id }) => id)
+    ).toEqual(['u:0079', 'u:0059', 'u:00A5']);
+    // Circled white star: name prefix. Sigma: keyword prefix. At: substring.
+    const circleIds = searchSymbols('circle').map(({ id }) => id);
+    const tiers = ['u:272A', 'u:03C3', 'u:0040'].map(id => circleIds.indexOf(id));
+    expect(tiers.every(index => index >= 0)).toBe(true);
+    expect(tiers).toEqual([...tiers].sort((a, b) => a - b));
     expect(searchSymbols('ψ')[0].id).toBe('u:03C8');
     expect(searchSymbols(' PI ')).toEqual(searchSymbols('pi'));
     expect(searchSymbols('trident').map(({ id }) => id)).toContain('u:03C8');

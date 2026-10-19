@@ -2,6 +2,7 @@ import { pb } from '@/lib/pocketbase';
 import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 import { queryClient } from '@/lib/queryClient';
 import { isCurrentSessionIdentity } from '@/services/auth/sessionIdentity';
+import { hasKnownExpiredDeletionSession } from '@/services/auth/deletionSession';
 import { deletionIntents } from '@/services/accountDeletion/intentStore';
 import {
   armDeletionTransportFence,
@@ -113,9 +114,11 @@ export class AccountDeletionService {
 
   static async retryAuthenticated(
     intent: DeletionIntent,
-    proof: FreshDeletionProof
+    proof: FreshDeletionProof,
+    confirmed: boolean
   ): Promise<DeletionIntent> {
     if (
+      confirmed !== true ||
       intent.dispatch === 'prepared' ||
       intent.phase !== 'pending' ||
       intent.backendUrl !== POCKETBASE_URL ||
@@ -125,7 +128,8 @@ export class AccountDeletionService {
       proof.expiresAt <= Date.now() ||
       !isCurrentSessionIdentity(proof.identity) ||
       pb.authStore.record?.id !== intent.accountId ||
-      !pb.authStore.token
+      !pb.authStore.token ||
+      hasKnownExpiredDeletionSession()
     )
       throw new AccountDeletionError('verification');
     return this.send(intent, pb.authStore.token);

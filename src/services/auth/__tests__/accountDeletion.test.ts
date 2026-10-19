@@ -90,9 +90,37 @@ describe('action-specific account deletion authorization', () => {
       vi.useRealTimers();
     }
   });
+  it('aborts a password step-up that never responds and restores verification', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.send.mockReturnValue(new Promise(() => {}));
+      const pending = requestDeletionPasswordProof('password', 'account-a');
+      await vi.advanceTimersByTimeAsync(20_000);
+      await expect(pending).resolves.toMatchObject({ success: false });
+      expect(mocks.send.mock.calls[0][1].signal.aborted).toBe(true);
+      expect(mocks.clear).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('rejects a late password result after an account epoch change', async () => {
     mocks.send.mockImplementation(async () => {
       mocks.current = false;
+    });
+    await expect(requestDeletionPasswordProof('password', 'account-a')).resolves.toMatchObject({
+      success: false,
+    });
+  });
+  it('locks a known expired original session before and after password verification', async () => {
+    const expired = `header.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 1 }))}.signature`;
+    mocks.token = expired;
+    await expect(requestDeletionPasswordProof('password', 'account-a')).resolves.toMatchObject({
+      success: false,
+    });
+    expect(mocks.send).not.toHaveBeenCalled();
+    mocks.token = 'test-token';
+    mocks.send.mockImplementation(async () => {
+      mocks.token = expired;
     });
     await expect(requestDeletionPasswordProof('password', 'account-a')).resolves.toMatchObject({
       success: false,

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   identity: { accountId: 'account-a', generation: 1, epoch: 'a' },
   current: true,
   storageError: false,
+  expired: false,
 }));
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: mocks.accountId ? { id: mocks.accountId } : null }),
@@ -33,6 +34,9 @@ vi.mock('@/services/auth/providers', () => ({ listAccountSignInMethods: mocks.me
 vi.mock('@/services/auth/sessionIdentity', () => ({
   captureSessionIdentity: () => mocks.identity,
   isCurrentSessionIdentity: () => mocks.current,
+}));
+vi.mock('@/services/auth/deletionSession', () => ({
+  hasKnownExpiredDeletionSession: () => mocks.expired,
 }));
 vi.mock('@/services/pocketbase/accountDeletion.service', () => ({
   AccountDeletionService: {
@@ -68,6 +72,7 @@ beforeEach(() => {
   mocks.intents = [];
   mocks.current = true;
   mocks.storageError = false;
+  mocks.expired = false;
   mocks.removeIntent.mockResolvedValue(undefined);
   mocks.methods.mockResolvedValue([
     { provider: 'google', label: 'Google', configured: true, linked: true },
@@ -119,6 +124,36 @@ describe('account deletion state machine', () => {
     expect(screen.getByRole('status')).not.toHaveTextContent('not been deleted');
     expect(mocks.cleanup).not.toHaveBeenCalled();
     expect(document.body).not.toHaveTextContent('private response');
+  });
+  it('requires a separate confirmation after fresh recovery verification', async () => {
+    mocks.intents = [intent()];
+    render(<DeleteAccount />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Current password'), 'password');
+    await user.click(screen.getByRole('button', { name: 'Verify password for retry' }));
+    const retry = screen.getByRole('button', { name: 'Retry deletion with current session' });
+    expect(retry).toBeDisabled();
+    await user.click(screen.getByLabelText(/I confirm this recovery retry/));
+    await user.click(retry);
+    expect(mocks.authenticatedRetry).toHaveBeenCalledWith(intent(), expect.any(Object), true);
+  });
+  it('announces a failed recovery verification', async () => {
+    mocks.intents = [intent()];
+    mocks.verify.mockResolvedValue({ success: false, error: 'Incorrect password. Try again.' });
+    render(<DeleteAccount />);
+    await userEvent.type(screen.getByLabelText('Current password'), 'wrong');
+    await userEvent.click(screen.getByRole('button', { name: 'Verify password for retry' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect password');
+  });
+  it('keeps an expired original session locked with support guidance', async () => {
+    mocks.intents = [intent()];
+    mocks.expired = true;
+    render(<DeleteAccount />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('original session has expired');
+    expect(
+      screen.queryByRole('button', { name: 'Retry deletion with current session' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Contact support' })).toBeVisible();
   });
   it('keeps server deletion distinct from failed local cleanup', async () => {
     mocks.cleanup.mockRejectedValue(new Error('storage'));

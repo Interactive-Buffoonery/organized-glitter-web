@@ -3,6 +3,7 @@ import { pb } from '@/lib/pocketbase';
 import { captureSessionIdentity, isCurrentSessionIdentity } from './sessionIdentity';
 import type { OAuthProvider } from './types';
 import type { FreshDeletionProof } from '@/services/accountDeletion/types';
+import { hasKnownExpiredDeletionSession } from './deletionSession';
 
 type VerificationResult =
   { success: true; proof: FreshDeletionProof } | { success: false; error: string };
@@ -11,6 +12,7 @@ function prepare(accountId: string, existingProof?: string): FreshDeletionProof 
   const identity = captureSessionIdentity();
   if (
     !pb.authStore.token ||
+    hasKnownExpiredDeletionSession() ||
     pb.authStore.record?.id !== accountId ||
     pb.authStore.record?.verified !== true ||
     identity.accountId !== accountId ||
@@ -49,18 +51,31 @@ export async function requestDeletionPasswordProof(
   if (!proof || !password) return failure();
   const token = pb.authStore.token;
   const client = new PocketBase(pb.baseURL, new BaseAuthStore());
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    await client.send('/api/auth/step-up/password', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      requestKey: null,
-      body: { action: 'delete_account', targetProvider: 'account', password, proof: proof.value },
-    });
-    if (!isCurrentSessionIdentity(proof.identity)) return failure();
+    await Promise.race([
+      client.send('/api/auth/step-up/password', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        requestKey: null,
+        signal: controller.signal,
+        body: { action: 'delete_account', targetProvider: 'account', password, proof: proof.value },
+      }),
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          reject(new Error('verification_timeout'));
+        }, 20_000);
+      }),
+    ]);
+    if (!isCurrentSessionIdentity(proof.identity) || hasKnownExpiredDeletionSession())
+      return failure();
     return { success: true, proof };
   } catch {
     return failure();
   } finally {
+    clearTimeout(timeout);
     client.authStore.clear();
   }
 }
@@ -94,7 +109,8 @@ export async function requestDeletionOAuthProof(
     if (
       result.record.id !== accountId ||
       result.record.verified !== true ||
-      !isCurrentSessionIdentity(proof.identity)
+      !isCurrentSessionIdentity(proof.identity) ||
+      hasKnownExpiredDeletionSession()
     )
       return failure();
     return { success: true, proof };

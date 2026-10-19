@@ -88,16 +88,28 @@ function accountStillMatches(proof: FreshSignInMethodProof): boolean {
   return pb.authStore.record?.id === proof.userId && pb.authStore.token === proof.authToken;
 }
 
-export async function listConfiguredOAuthProviders(): Promise<OAuthProvider[]> {
-  const methods = await pb.collection('users').listAuthMethods();
+export async function listConfiguredOAuthProviders(signal?: AbortSignal): Promise<OAuthProvider[]> {
+  const methods = await pb.collection('users').listAuthMethods({ signal, requestKey: null });
   return normalizeOAuthProviders(methods);
 }
 
 export async function listAccountSignInMethods(userId: string): Promise<AccountSignInMethod[]> {
-  const [configuredProviders, externalAuths] = await Promise.all([
-    listConfiguredOAuthProviders(),
-    pb.collection('users').listExternalAuths(userId),
-  ]);
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const [configuredProviders, externalAuths] = await Promise.race([
+    Promise.all([
+      listConfiguredOAuthProviders(controller.signal),
+      pb
+        .collection('users')
+        .listExternalAuths(userId, { signal: controller.signal, requestKey: null }),
+    ]),
+    new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort();
+        reject(new Error('Sign-in method lookup timed out'));
+      }, 15_000);
+    }),
+  ]).finally(() => clearTimeout(timeout));
 
   const configured = new Set(configuredProviders);
   const linked = new Set<OAuthProvider>();

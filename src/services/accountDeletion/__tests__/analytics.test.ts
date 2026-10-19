@@ -5,7 +5,8 @@ const require = createRequire(import.meta.url);
 // Exercise the queues from the lockfile's SDK, rather than a lookalike mock.
 const { RequestQueue } = require('posthog-js/lib/src/request-queue.js');
 const { RetryQueue } = require('posthog-js/lib/src/retry-queue.js');
-const mocked = vi.hoisted(() => ({ sdk: {} as Record<string, unknown> }));
+const requestModule = require('posthog-js/lib/src/request.js');
+const mocked = vi.hoisted(() => ({ sdk: {} as Record<string, unknown>, wire: vi.fn() }));
 vi.mock('posthog-js', () => ({ default: mocked.sdk }));
 import {
   suspendDeletionAnalytics,
@@ -13,7 +14,9 @@ import {
   isDeletionAnalyticsSuspended,
   armDeletionTransportFence,
   releaseDeletionTransportFence,
+  recordCompletedDeletionTransportFence,
   installDeletionAnalyticsFence,
+  inspectUnownedDeletionTransportFence,
   discardDeletionAnalyticsQueues,
   retainedDeletionAnalyticsCount,
 } from '../analytics';
@@ -23,12 +26,13 @@ describe('deletion analytics transport fence', () => {
     vi.useFakeTimers();
     localStorage.clear();
     const sdk = mocked.sdk;
+    mocked.wire.mockClear();
     Object.assign(sdk, {
       config: { token: 'test-token' },
       opt_out_capturing: vi.fn(),
       stopSessionRecording: vi.fn(),
       reset: vi.fn(),
-      _send_request: vi.fn(),
+      _send_request: mocked.wire,
       _send_retriable_request: vi.fn(),
       __request_queue: [],
     });
@@ -38,8 +42,133 @@ describe('deletion analytics transport fence', () => {
   });
   afterEach(() => {
     resumeDeletionAnalytics();
+    vi.restoreAllMocks();
     localStorage.clear();
     vi.useRealTimers();
+  });
+
+  function allowSdkDispatch() {
+    Object.assign(mocked.sdk, {
+      __loaded: true,
+      config: { token: 'test-token', request_headers: {}, api_transport: 'XHR' },
+      rateLimiter: { isServerRateLimited: () => false, checkForLimiting: vi.fn() },
+    });
+    return vi.spyOn(requestModule, 'request').mockImplementation(() => {});
+  }
+
+  it('keeps a pre-intent marker and exposes bounded recovery if no intent appears', async () => {
+    const id = armDeletionTransportFence('http://localhost:8090', 'account-a');
+    expect(inspectUnownedDeletionTransportFence('http://localhost:8090', [])).toMatchObject({
+      checking: true,
+      orphan: false,
+    });
+    await vi.advanceTimersByTimeAsync(5_001);
+    expect(inspectUnownedDeletionTransportFence('http://localhost:8090', [])).toMatchObject({
+      checking: false,
+      orphan: true,
+    });
+    expect(localStorage.length).toBe(1);
+    expect(
+      inspectUnownedDeletionTransportFence('http://localhost:8090', [
+        {
+          version: 1,
+          backendUrl: 'http://localhost:8090',
+          accountId: 'account-a',
+          proof: 'x'.repeat(43),
+          phase: 'pending',
+          cleanup: 'pending',
+          localCleanupDone: false,
+          transportFenceId: id,
+        },
+      ])
+    ).toMatchObject({ checking: false, orphan: false });
+  });
+
+  it('holds a due installed-SDK retry at its direct dispatcher until the fence is released', () => {
+    const wire = allowSdkDispatch();
+    const retry = mocked.sdk._retryQueue as InstanceType<typeof RetryQueue>;
+    const fenceId = armDeletionTransportFence('http://localhost:8090', 'account-a');
+    retry._queue.push({
+      retryAt: Date.now() - 1,
+      requestOptions: { url: '/e/', data: { distinct_id: 'account-a' } },
+    });
+    retry._flush();
+    expect(wire).not.toHaveBeenCalled();
+    expect(retainedDeletionAnalyticsCount()).toBe(1);
+    releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    mocked.sdk._send_request({ url: '/e/', data: { distinct_id: 'later' } });
+    expect(wire).toHaveBeenCalledOnce();
+    expect(retainedDeletionAnalyticsCount()).toBe(0);
+  });
+
+  it('drops an in-flight SDK retry failure callback after validated cleanup', () => {
+    let response!: (value: { statusCode: number }) => void;
+    const wire = allowSdkDispatch().mockImplementation((_options, callback) => {
+      response = callback;
+    });
+    const retry = mocked.sdk._retryQueue as InstanceType<typeof RetryQueue>;
+    retry.retriableRequest({ url: '/e/', data: { distinct_id: 'account-a' } });
+    expect(wire).toHaveBeenCalledOnce();
+    discardDeletionAnalyticsQueues();
+    response({ statusCode: 500 });
+    expect(retry._queue).toHaveLength(0);
+    expect(wire).toHaveBeenCalledOnce();
+  });
+
+  it('restores the installed retry poller and due request after safe cancellation', async () => {
+    const wire = allowSdkDispatch();
+    const retry = mocked.sdk._retryQueue as InstanceType<typeof RetryQueue>;
+    retry._queue.push({ retryAt: Date.now() - 1, requestOptions: { url: '/e/' } });
+    suspendDeletionAnalytics();
+    resumeDeletionAnalytics();
+    await vi.advanceTimersByTimeAsync(3_100);
+    expect(wire).toHaveBeenCalledOnce();
+  });
+
+  it('flushes fence-only held requests in order on the next send after safe release', () => {
+    const wire = mocked.wire;
+    const fenceId = armDeletionTransportFence('http://localhost:8090', 'account-a');
+    mocked.sdk._send_request({ url: '/e/', data: 'first' });
+    releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    mocked.sdk._send_request({ url: '/e/', data: 'second' });
+    expect(wire.mock.calls.map(call => call[0].data)).toEqual(['first', 'second']);
+  });
+
+  it('discards fence-only held requests when completion is recorded before marker release', () => {
+    const wire = mocked.wire;
+    const fenceId = armDeletionTransportFence('http://localhost:8090', 'account-a');
+    mocked.sdk._send_request({ url: '/e/', data: 'deleted-account' });
+    recordCompletedDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    discardDeletionAnalyticsQueues();
+    releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    mocked.sdk._send_request({ url: '/e/', data: 'new-account' });
+    expect(wire.mock.calls.map(call => call[0].data)).toEqual(['new-account']);
+  });
+
+  it('drops another tab SDK queue and held request before its next send after completion', () => {
+    const secondWire = vi.fn();
+    const secondTab = {
+      _send_request: secondWire,
+      _send_retriable_request: vi.fn(),
+      _retryQueue: undefined as InstanceType<typeof RetryQueue> | undefined,
+    };
+    const secondRetry = new RetryQueue(secondTab);
+    secondTab._retryQueue = secondRetry;
+    installDeletionAnalyticsFence(secondTab as never);
+    const fenceId = armDeletionTransportFence('http://localhost:8090', 'account-a');
+    secondTab._send_request({ url: '/e/', data: 'old-account' });
+    secondRetry._queue.push({
+      retryAt: Date.now() + 10_000,
+      requestOptions: { url: '/e/', data: 'old-retry' },
+    });
+    recordCompletedDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    secondTab._send_request({ url: '/e/', data: 'first-after-completion' });
+    expect(secondWire).not.toHaveBeenCalled();
+    expect(secondRetry._queue).toHaveLength(0);
+    expect(retainedDeletionAnalyticsCount(secondTab)).toBe(0);
+    secondTab._send_request({ url: '/e/', data: 'new-account' });
+    expect(secondWire).toHaveBeenCalledExactlyOnceWith({ url: '/e/', data: 'new-account' });
   });
 
   it('retains actual pending batch/retry queues while uncertain and prevents unload from flushing', () => {
@@ -133,10 +262,14 @@ describe('deletion analytics transport fence', () => {
     const wire = mocked.sdk._send_request as (...args: unknown[]) => void;
     wire({ url: '/e/', data: { distinct_id: 'account-a' } });
     expect(retainedDeletionAnalyticsCount()).toBe(1);
+    recordCompletedDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    discardDeletionAnalyticsQueues();
     releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
     wire({ url: '/e/', data: { distinct_id: 'new-anonymous-id' } });
-    expect(retainedDeletionAnalyticsCount()).toBe(1);
-    discardDeletionAnalyticsQueues();
     expect(retainedDeletionAnalyticsCount()).toBe(0);
+    expect(mocked.wire).toHaveBeenCalledExactlyOnceWith({
+      url: '/e/',
+      data: { distinct_id: 'new-anonymous-id' },
+    });
   });
 });

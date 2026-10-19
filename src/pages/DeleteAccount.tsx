@@ -15,6 +15,7 @@ import {
   requestDeletionPasswordProof,
 } from '@/services/auth/accountDeletion';
 import { captureSessionIdentity, isCurrentSessionIdentity } from '@/services/auth/sessionIdentity';
+import { hasKnownExpiredDeletionSession } from '@/services/auth/deletionSession';
 import type { OAuthProvider } from '@/services/auth/types';
 import { AccountDeletionService } from '@/services/pocketbase/accountDeletion.service';
 import { finishDeletionCleanup } from '@/services/accountDeletion/cleanup';
@@ -119,6 +120,7 @@ function DeletionFlow({
   const [state, dispatch] = useReducer(reducer, initialIntent, restored);
   const [password, setPassword] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  const [recoveryConfirmed, setRecoveryConfirmed] = useState(false);
   const [methods, setMethods] = useState<AccountSignInMethod[]>([]);
   const [discoveryError, setDiscoveryError] = useState(false);
   const [discoveryAttempt, setDiscoveryAttempt] = useState(0);
@@ -136,7 +138,10 @@ function DeletionFlow({
     previousPhase.current = state.phase;
   }, [state.phase]);
   useEffect(() => {
-    if (initialIntent) dispatch({ type: 'restore', intent: initialIntent });
+    if (initialIntent) {
+      setRecoveryConfirmed(false);
+      dispatch({ type: 'restore', intent: initialIntent });
+    }
   }, [initialIntent]);
   const inFlight = useRef(false);
   const mounted = useRef(true);
@@ -170,6 +175,7 @@ function DeletionFlow({
     inFlight.current = true;
     const identity = captureSessionIdentity();
     dispatch({ type: 'verify' });
+    setRecoveryConfirmed(false);
     // Do not await anything before the OAuth helper opens its popup.
     const originalProof =
       (state.intent ?? recovery.intents.find(intent => intent.accountId === accountId))
@@ -248,16 +254,34 @@ function DeletionFlow({
   };
 
   const sendAuthenticated = async (intent: DeletionIntent) => {
-    if (inFlight.current || !state.proof || state.proof.value !== intent.proof) return;
+    if (
+      inFlight.current ||
+      !recoveryConfirmed ||
+      !state.proof ||
+      state.proof.value !== intent.proof ||
+      hasKnownExpiredDeletionSession()
+    )
+      return;
     inFlight.current = true;
     dispatch({ type: 'send' });
     try {
-      const result = await AccountDeletionService.retryAuthenticated(intent, state.proof);
+      const result = await AccountDeletionService.retryAuthenticated(
+        intent,
+        state.proof,
+        recoveryConfirmed
+      );
       if (!mounted.current) return;
       dispatch({ type: 'deleted', intent: result });
       if (!result.localCleanupDone) await clean(result);
     } catch {
-      if (mounted.current) dispatch({ type: 'uncertain', intent });
+      if (mounted.current)
+        dispatch({
+          type: 'uncertain',
+          intent,
+          error: hasKnownExpiredDeletionSession()
+            ? 'Your original session has expired. This request stays paused. Contact support for help.'
+            : undefined,
+        });
     } finally {
       inFlight.current = false;
     }
@@ -367,6 +391,7 @@ function DeletionFlow({
                   </p>
                 </div>
               )}
+              {state.error && <p role="alert">{state.error}</p>}
               {visibleIntent?.dispatch === 'prepared' ? (
                 <Button
                   type="button"
@@ -406,7 +431,8 @@ function DeletionFlow({
               {visibleIntent &&
                 accountId &&
                 accountId === visibleIntent.accountId &&
-                visibleIntent.dispatch !== 'prepared' && (
+                visibleIntent.dispatch !== 'prepared' &&
+                !hasKnownExpiredDeletionSession() && (
                   <div className="space-y-3">
                     <p>
                       To retry the original request with your current session, verify again first.
@@ -449,15 +475,36 @@ function DeletionFlow({
                         Verify with {method.label} for retry
                       </Button>
                     ))}
+                    {state.phase === 'ready' && (
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="deletion-recovery-confirmed"
+                          checked={recoveryConfirmed}
+                          onCheckedChange={value => setRecoveryConfirmed(value === true)}
+                          disabled={isBusy}
+                        />
+                        <Label htmlFor="deletion-recovery-confirmed">
+                          I confirm this recovery retry may permanently delete my account
+                        </Label>
+                      </div>
+                    )}
                     <Button
                       type="button"
                       variant="glass-destructive"
-                      disabled={state.phase !== 'ready' || isBusy}
+                      disabled={state.phase !== 'ready' || !recoveryConfirmed || isBusy}
                       onClick={() => void sendAuthenticated(visibleIntent)}
                     >
                       Retry deletion with current session
                     </Button>
                   </div>
+                )}
+              {visibleIntent &&
+                accountId === visibleIntent.accountId &&
+                hasKnownExpiredDeletionSession() && (
+                  <p role="alert">
+                    Your original session has expired. This request stays paused. Contact support
+                    for help.
+                  </p>
                 )}
             </>
           ) : !accountId ? (

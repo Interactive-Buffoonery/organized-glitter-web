@@ -29,6 +29,11 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: null, isLoading: false }),
 }));
 
+vi.mock('@/services/accountDeletion/recovery', () => ({
+  initializeDeletionRecovery: vi.fn(),
+  useDeletionRecovery: () => ({ ready: true, intents: [], error: false }),
+}));
+
 vi.mock('@/hooks/queries/useUserProfileQuery', () => ({
   useUserProfileQuery: () => ({ data: undefined }),
 }));

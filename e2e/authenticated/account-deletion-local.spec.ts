@@ -148,6 +148,7 @@ test('reverifies the same proof and retries once with the current session', asyn
   await expect(page.getByRole('status')).toContainText('not confirmed');
   await page.getByLabel('Current password', { exact: true }).fill(fixturePassword);
   await page.getByRole('button', { name: 'Verify password for retry' }).click();
+  await page.getByLabel(/I confirm this recovery retry/).check();
   await page.getByRole('button', { name: 'Retry deletion with current session' }).click();
   await expect(page.getByRole('status')).toContainText('Account deleted');
 });
@@ -337,6 +338,86 @@ test('releases a completed sign-out claim only during fresh login application', 
     { id: accountId, backend: backendUrl }
   );
   expect(remaining).toBeUndefined();
+});
+
+test('keeps an interrupted sign-out claim visible and releases only its owner', async ({
+  page,
+}) => {
+  const result = await page.evaluate(
+    async ({ backend, id }) => {
+      const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
+      const { deletionIntents } = await load();
+      const first = await deletionIntents.claimSignOut(backend, id, 'same-epoch', 'first-claim');
+      const concurrent = await deletionIntents.claimSignOut(
+        backend,
+        id,
+        'same-epoch',
+        'second-claim'
+      );
+      const wrongRelease = await deletionIntents.releaseSignOut(backend, id, 'second-claim');
+      return { first, concurrent, wrongRelease };
+    },
+    { backend: backendUrl, id: accountId }
+  );
+  expect(result).toEqual({ first: true, concurrent: false, wrongRelease: false });
+  await page.reload();
+  await expect(page.getByRole('alert')).toContainText('Sign-out was interrupted');
+  await expect(page.getByRole('link', { name: 'Contact support' })).toBeVisible();
+  const released = await page.evaluate(
+    async ({ backend, id }) => {
+      const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
+      const { deletionIntents } = await load();
+      return deletionIntents.releaseSignOut(backend, id, 'first-claim');
+    },
+    { backend: backendUrl, id: accountId }
+  );
+  expect(released).toBe(true);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Delete your account' })).toBeVisible();
+});
+
+test('releases only the completed receipt marker after a cleanup interruption', async ({
+  page,
+}) => {
+  const markers = await page.evaluate(
+    async ({ backend, id }) => {
+      const loadStore = new Function(
+        'return import("/src/services/accountDeletion/intentStore.ts")'
+      );
+      const loadAnalytics = new Function(
+        'return import("/src/services/accountDeletion/analytics.ts")'
+      );
+      const { deletionIntents } = await loadStore();
+      const { armDeletionTransportFence } = await loadAnalytics();
+      const completed = armDeletionTransportFence(backend, id);
+      const concurrent = armDeletionTransportFence(backend, id);
+      await deletionIntents.create({
+        version: 1,
+        backendUrl: backend,
+        accountId: id,
+        proof: 'x'.repeat(43),
+        phase: 'deleted',
+        cleanup: 'completed',
+        localCleanupDone: true,
+        transportFenceId: completed,
+      });
+      return { completed, concurrent };
+    },
+    { backend: backendUrl, id: accountId }
+  );
+  await page.reload();
+  const remaining = await page.evaluate(
+    ({ completed, concurrent }) => ({
+      completed: Object.keys(localStorage).some(
+        key => key.endsWith(`:${completed}`) && key.includes('analytics-fence')
+      ),
+      concurrent: Object.keys(localStorage).some(
+        key => key.endsWith(`:${concurrent}`) && key.includes('analytics-fence')
+      ),
+    }),
+    markers
+  );
+  expect(remaining).toEqual({ completed: false, concurrent: true });
 });
 
 test('preserves unfinished drafts if Logout is attempted during an unresolved deletion', async ({

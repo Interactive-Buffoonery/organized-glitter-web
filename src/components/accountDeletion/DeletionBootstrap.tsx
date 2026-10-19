@@ -18,6 +18,12 @@ export function DeletionBootstrap({ children }: { children: ReactNode }) {
         Checking account recovery…
       </div>
     );
+  if (recovery.fenceChecking)
+    return (
+      <div role="status" className="p-6">
+        Checking account recovery…
+      </div>
+    );
   if (recovery.error)
     return (
       <div role="alert" className="p-6">
@@ -29,6 +35,39 @@ export function DeletionBootstrap({ children }: { children: ReactNode }) {
         >
           Retry recovery check
         </button>
+      </div>
+    );
+  if (recovery.claimBlocked)
+    return (
+      <div role="alert" className="p-6">
+        Sign-out was interrupted. Your account and unfinished edits remain locked on this device.
+        <button
+          type="button"
+          className="ml-3 underline"
+          onClick={() => void refreshDeletionRecovery()}
+        >
+          Retry recovery check
+        </button>{' '}
+        <a className="underline" href="mailto:support@organizedglitter.app">
+          Contact support
+        </a>
+      </div>
+    );
+  if (recovery.orphanFence)
+    return (
+      <div role="alert" className="p-6">
+        An unfinished deletion transport check is still protecting account data. Your edits remain
+        locked on this device.
+        <button
+          type="button"
+          className="ml-3 underline"
+          onClick={() => void refreshDeletionRecovery()}
+        >
+          Retry recovery check
+        </button>{' '}
+        <a className="underline" href="mailto:support@organizedglitter.app">
+          Contact support
+        </a>
       </div>
     );
   if (recovery.intents.some(intent => !intent.localCleanupDone)) suspendDeletionAnalytics();

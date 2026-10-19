@@ -271,15 +271,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (token !== pb.authStore.token || !pb.authStore.record) return;
       const invalidAccountId = pb.authStore.record.id;
       const invalidIdentity = getSessionIdentityTracker(pb.authStore).capture();
+      const claimId = crypto.randomUUID();
       void deletionIntents
-        .claimSignOut(POCKETBASE_URL, invalidAccountId, invalidIdentity.epoch)
-        .then(claimed => {
+        .claimSignOut(POCKETBASE_URL, invalidAccountId, invalidIdentity.epoch, claimId)
+        .then(async claimed => {
           if (
             !claimed ||
             token !== pb.authStore.token ||
             !getSessionIdentityTracker(pb.authStore).isCurrent(invalidIdentity)
-          )
+          ) {
+            if (claimed)
+              await deletionIntents.releaseSignOut(POCKETBASE_URL, invalidAccountId, claimId);
             return;
+          }
           const activeAccountId = activeUserIdRef.current;
           retireSessionTokens(sessionTokensRef.current, activeAccountId);
           markSessionTokenInactive(token);
@@ -362,6 +366,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signOut = useCallback(async () => {
     const tracker = getSessionIdentityTracker(pb.authStore);
     const identity = tracker.capture();
+    const originalToken = pb.authStore.token;
     const departingUserId = identity.accountId ?? user?.id;
     if (isSigningOut.current) {
       authLogger.debug('SignOut already in progress, skipping...');
@@ -370,12 +375,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isSigningOut.current = true;
     if (departingUserId) {
       try {
+        const claimId = crypto.randomUUID();
         const claimed = await deletionIntents.claimSignOut(
           POCKETBASE_URL,
           departingUserId,
-          identity.epoch
+          identity.epoch,
+          claimId
         );
-        if (!tracker.isCurrent(identity)) {
+        if (!tracker.isCurrent(identity) || pb.authStore.token !== originalToken) {
+          if (claimed)
+            await deletionIntents.releaseSignOut(POCKETBASE_URL, departingUserId, claimId);
           isSigningOut.current = false;
           return { success: false, error: new Error('Your session changed. Try again.') };
         }

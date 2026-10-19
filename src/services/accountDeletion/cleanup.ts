@@ -16,6 +16,7 @@ import {
 import { deletionIntents } from './intentStore';
 import {
   discardDeletionAnalyticsQueues,
+  recordCompletedDeletionTransportFence,
   releaseDeletionTransportFence,
   resumeDeletionAnalytics,
   suspendDeletionAnalytics,
@@ -53,6 +54,11 @@ export async function finishDeletionCleanup(intent: DeletionIntent): Promise<Del
     const updated = await deletionIntents.update({ ...intent, localCleanupDone: true });
     if (!isCurrentSessionIdentity(signedOutIdentity))
       throw new AccountDeletionError('account_changed');
+    recordCompletedDeletionTransportFence(
+      intent.backendUrl,
+      intent.accountId,
+      intent.transportFenceId
+    );
     releaseDeletionTransportFence(intent.backendUrl, intent.accountId, intent.transportFenceId);
     resumeDeletionAnalytics();
     syncAnalyticsConsent();

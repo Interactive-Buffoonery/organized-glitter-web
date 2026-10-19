@@ -207,18 +207,41 @@ describe('guarded account deletion', () => {
     expect(mocks.store.update).not.toHaveBeenCalled();
   });
   it('sends one user-initiated authenticated same-proof retry after fresh verification', async () => {
-    await AccountDeletionService.retryAuthenticated(intent(), proof());
+    await AccountDeletionService.retryAuthenticated(intent(), proof(), true);
     expect(fetch).toHaveBeenCalledOnce();
     expect(new Headers(vi.mocked(fetch).mock.calls[0][1]!.headers).get('Authorization')).toBe(
       'Bearer test-session'
     );
     await expect(
-      AccountDeletionService.retryAuthenticated(intent(), {
-        ...proof(),
-        value: 'y'.repeat(43),
-      })
+      AccountDeletionService.retryAuthenticated(
+        intent(),
+        {
+          ...proof(),
+          value: 'y'.repeat(43),
+        },
+        true
+      )
     ).rejects.toMatchObject({ reason: 'verification' });
     expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it('requires a distinct recovery confirmation at the authenticated send boundary', async () => {
+    await expect(
+      AccountDeletionService.retryAuthenticated(intent(), proof(), false)
+    ).rejects.toMatchObject({
+      reason: 'verification',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a known expired original session before authenticated retry', async () => {
+    mocks.token = `header.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 1 }))}.signature`;
+    await expect(
+      AccountDeletionService.retryAuthenticated(intent(), proof(), true)
+    ).rejects.toMatchObject({
+      reason: 'verification',
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('saves confirmed deletion independently from a changed interactive session', async () => {

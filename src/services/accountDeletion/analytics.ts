@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import type { DeletionIntent } from './types';
 
 type BatchQueue = {
   _queue: unknown[];
@@ -13,7 +14,10 @@ type RetryQueue = {
   resume: () => void;
   _onlineListener?: EventListener;
   _offlineListener?: EventListener;
+  retriableRequest: (options: RetryOptions, transport?: string) => void;
+  _enqueue: (options: RetryOptions, retryAfterMs?: number) => void;
 };
+type RetryOptions = Record<PropertyKey, unknown>;
 type AnalyticsSDK = Omit<typeof posthog, '_requestQueue' | '_retryQueue'> & {
   _requestQueue?: BatchQueue;
   _retryQueue?: RetryQueue;
@@ -21,7 +25,12 @@ type AnalyticsSDK = Omit<typeof posthog, '_requestQueue' | '_retryQueue'> & {
 };
 
 const FENCE_PREFIX = 'og:account-deletion:analytics-fence:v1:';
+const COMPLETED_PREFIX = 'og:account-deletion:analytics-complete:v1:';
+const RETRY_GENERATION = Symbol('deletion-retry-generation');
 let suspended = false;
+let retryGeneration = 0;
+const seenCompleted = new WeakMap<object, Set<string>>();
+const installedRetry = new WeakSet<object>();
 const installed = new WeakMap<
   object,
   {
@@ -33,6 +42,62 @@ const installed = new WeakMap<
 const heldRequests = new WeakMap<object, Array<() => void>>();
 const flushers = new Set<() => void>();
 let restoreRetryPoll: (() => void) | undefined;
+
+function completedSeenBy(sdk: object): Set<string> {
+  let seen = seenCompleted.get(sdk);
+  if (!seen) {
+    seen = new Set();
+    seenCompleted.set(sdk, seen);
+  }
+  return seen;
+}
+
+function observeCompletedFences(sdk: AnalyticsSDK): boolean {
+  let observed = false;
+  const seen = completedSeenBy(sdk);
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(COMPLETED_PREFIX) || seen.has(key)) continue;
+      seen.add(key);
+      discardDeletionAnalyticsQueues(sdk);
+      observed = true;
+    }
+  } catch {
+    // The transport remains fenced when storage cannot be read.
+  }
+  return observed;
+}
+
+function installRetryFence(sdk: AnalyticsSDK): void {
+  const retry = sdk._retryQueue;
+  if (!retry || installedRetry.has(retry)) return;
+  installedRetry.add(retry);
+  const send = retry.retriableRequest;
+  const enqueue = retry._enqueue;
+  retry.retriableRequest = (options, transport) => {
+    if (observeCompletedFences(sdk)) return;
+    if (!suspended && !hasTransportFence()) flushers.forEach(flush => flush());
+    if (suspended || hasTransportFence()) {
+      const held = heldRequests.get(sdk);
+      held?.push(() => {
+        options[RETRY_GENERATION] = retryGeneration;
+        send.call(retry, options, transport);
+      });
+      return;
+    }
+    options[RETRY_GENERATION] = retryGeneration;
+    send.call(retry, options, transport);
+  };
+  retry._enqueue = (options, retryAfterMs) => {
+    if (
+      typeof options[RETRY_GENERATION] === 'number' &&
+      options[RETRY_GENERATION] !== retryGeneration
+    )
+      return;
+    enqueue.call(retry, options, retryAfterMs);
+  };
+}
 
 function hasTransportFence(): boolean {
   try {
@@ -49,9 +114,42 @@ export function armDeletionTransportFence(backendUrl: string, accountId: string)
   const id = crypto.randomUUID();
   localStorage.setItem(
     `${FENCE_PREFIX}${encodeURIComponent(backendUrl)}:${accountId}:${id}`,
-    'pending'
+    String(Date.now())
   );
   return id;
+}
+
+export function inspectUnownedDeletionTransportFence(
+  backendUrl: string,
+  intents: DeletionIntent[]
+): { checking: boolean; orphan: boolean; waitMs: number } {
+  const prefix = `${FENCE_PREFIX}${encodeURIComponent(backendUrl)}:`;
+  let waitMs = 0;
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(prefix)) continue;
+      const suffix = key.slice(prefix.length);
+      const separator = suffix.lastIndexOf(':');
+      if (separator < 1) return { checking: false, orphan: true, waitMs: 0 };
+      const accountId = suffix.slice(0, separator);
+      const fenceId = suffix.slice(separator + 1);
+      if (
+        intents.some(
+          intent => intent.accountId === accountId && intent.transportFenceId === fenceId
+        )
+      )
+        continue;
+      const createdAt = Number(localStorage.getItem(key));
+      const age = Date.now() - createdAt;
+      if (!Number.isFinite(age) || age < 0 || age >= 5000)
+        return { checking: false, orphan: true, waitMs: 0 };
+      waitMs = Math.max(waitMs, 5000 - age);
+    }
+  } catch {
+    return { checking: false, orphan: true, waitMs: 0 };
+  }
+  return { checking: waitMs > 0, orphan: false, waitMs };
 }
 
 export function releaseDeletionTransportFence(
@@ -63,7 +161,22 @@ export function releaseDeletionTransportFence(
   localStorage.removeItem(expectedId ? `${key}:${expectedId}` : key);
 }
 
+export function recordCompletedDeletionTransportFence(
+  _backendUrl: string,
+  _accountId: string,
+  fenceId?: string
+): boolean {
+  if (!fenceId) return false;
+  const key = `${COMPLETED_PREFIX}${fenceId}`;
+  localStorage.setItem(key, 'completed');
+  const seen = completedSeenBy(posthog);
+  const fresh = !seen.has(key);
+  seen.add(key);
+  return fresh;
+}
+
 export function installDeletionAnalyticsFence(sdk: AnalyticsSDK = posthog as AnalyticsSDK): void {
+  installRetryFence(sdk);
   const previous = installed.get(sdk);
   if (
     previous &&
@@ -88,9 +201,13 @@ export function installDeletionAnalyticsFence(sdk: AnalyticsSDK = posthog as Ana
     return true;
   };
   sdk._send_request = (...args) => {
+    if (observeCompletedFences(sdk)) return;
+    if (!suspended && !hasTransportFence()) flush();
     if (guard(() => send.apply(sdk, args))) return send.apply(sdk, args);
   };
   sdk._send_retriable_request = (...args) => {
+    if (observeCompletedFences(sdk)) return;
+    if (!suspended && !hasTransportFence()) flush();
     if (guard(() => sendRetry.apply(sdk, args))) return sendRetry.apply(sdk, args);
   };
   installed.set(sdk, { send: sdk._send_request, retry: sdk._send_retriable_request, flush });
@@ -125,6 +242,8 @@ export function suspendDeletionAnalytics(): void {
     retry._isPolling = false;
     if (retry._onlineListener) window.removeEventListener('online', retry._onlineListener);
     if (retry._offlineListener) window.removeEventListener('offline', retry._offlineListener);
+    retry._onlineListener = undefined;
+    retry._offlineListener = undefined;
     const poll = retry._poll;
     retry._poll = () => {};
     restoreRetryPoll = () => {
@@ -133,8 +252,8 @@ export function suspendDeletionAnalytics(): void {
   }
 }
 
-export function discardDeletionAnalyticsQueues(): void {
-  const sdk = posthog as AnalyticsSDK;
+export function discardDeletionAnalyticsQueues(sdk: AnalyticsSDK = posthog as AnalyticsSDK): void {
+  retryGeneration += 1;
   if (sdk._requestQueue) sdk._requestQueue._queue.length = 0;
   if (sdk._retryQueue) sdk._retryQueue._queue.length = 0;
   if (sdk.__request_queue) sdk.__request_queue.length = 0;
@@ -145,7 +264,12 @@ export function resumeDeletionAnalytics(): void {
   if (!suspended) return;
   restoreRetryPoll?.();
   restoreRetryPoll = undefined;
-  (posthog as AnalyticsSDK)._retryQueue?.resume();
+  const retry = (posthog as AnalyticsSDK)._retryQueue;
+  retry?.resume();
   suspended = false;
+  if (retry?._queue.length && !retry._isPolling) {
+    retry._isPolling = true;
+    retry._poll();
+  }
   flushers.forEach(flush => flush());
 }

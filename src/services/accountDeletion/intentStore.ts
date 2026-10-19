@@ -29,7 +29,13 @@ function validIntent(value: unknown): value is DeletionIntent {
   );
 }
 
-type SignOutClaim = { kind: 'signed_out'; backendUrl: string; accountId: string; epoch: string };
+type SignOutClaim = {
+  kind: 'signed_out';
+  backendUrl: string;
+  accountId: string;
+  epoch: string;
+  claimId?: string;
+};
 function validClaim(value: unknown): value is SignOutClaim {
   const claim = value as SignOutClaim | null;
   return (
@@ -222,21 +228,46 @@ export const deletionIntents = {
     notify();
     return result;
   },
-  async claimSignOut(backendUrl: string, accountId: string, epoch: string): Promise<boolean> {
+  async claimSignOut(
+    backendUrl: string,
+    accountId: string,
+    epoch: string,
+    claimId = crypto.randomUUID()
+  ): Promise<boolean> {
     const claimed = await transaction<boolean>('readwrite', (store, done) => {
       const request = store.get([backendUrl, accountId]);
       request.onsuccess = () => {
-        if (request.result && !validClaim(request.result)) {
-          if (!validIntent(request.result)) request.transaction?.abort();
+        if (request.result) {
+          if (!validIntent(request.result) && !validClaim(request.result))
+            request.transaction?.abort();
           else done(false);
           return;
         }
-        store.put({ kind: 'signed_out', backendUrl, accountId, epoch } satisfies SignOutClaim);
+        store.put({
+          kind: 'signed_out',
+          backendUrl,
+          accountId,
+          epoch,
+          claimId,
+        } satisfies SignOutClaim);
         done(true);
       };
     });
     if (claimed) notify();
     return claimed;
+  },
+  async releaseSignOut(backendUrl: string, accountId: string, claimId: string): Promise<boolean> {
+    const released = await transaction<boolean>('readwrite', (store, done) => {
+      const request = store.get([backendUrl, accountId]);
+      request.onsuccess = () => {
+        if (validClaim(request.result) && request.result.claimId === claimId) {
+          store.delete([backendUrl, accountId]);
+          done(true);
+        } else done(false);
+      };
+    });
+    if (released) notify();
+    return released;
   },
   async markSubmitted(intent: DeletionIntent): Promise<DeletionIntent> {
     const result = await transaction<DeletionIntent>('readwrite', (store, done) => {

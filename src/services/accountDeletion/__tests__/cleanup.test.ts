@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   resume: vi.fn(),
   discard: vi.fn(),
   release: vi.fn(),
+  completed: vi.fn(),
   sync: vi.fn(),
   update: vi.fn(),
 }));
@@ -57,6 +58,7 @@ vi.mock('../analytics', () => ({
   resumeDeletionAnalytics: mocks.resume,
   discardDeletionAnalyticsQueues: mocks.discard,
   releaseDeletionTransportFence: mocks.release,
+  recordCompletedDeletionTransportFence: mocks.completed,
 }));
 vi.mock('../intentStore', () => ({ deletionIntents: { update: mocks.update } }));
 import { finishDeletionCleanup } from '../cleanup';

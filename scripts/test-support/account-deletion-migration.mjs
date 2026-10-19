@@ -9,6 +9,8 @@ export function testAccountDeletionMigration(binary, runDir) {
   const migrations = path.join(directory, 'migrations');
   mkdirSync(migrations, { recursive: true });
   const schema = JSON.parse(readFileSync('docs/pocketbase/collections.schema.json', 'utf8'));
+  const audits = schema.find(c => c.name === 'account_deletions');
+  audits.indexes = audits.indexes.filter(index => !index.includes('idx_account_deletions_created'));
   // Reconstruct the shipped jobs collection from its immutable migration.
   const oldMigration = readFileSync('pb_migrations/1791129600_account_deletion.js', 'utf8');
   writeFileSync(
@@ -58,6 +60,10 @@ export function testAccountDeletionMigration(binary, runDir) {
     assert.equal(jobs.length, 2, 'upgrade preserves receipts');
     for (const job of jobs) {
       assert.equal(job.source_kind, 'guarded');
+      assert.ok(
+        Number.isFinite(Date.parse(job.next_alert)),
+        'upgraded jobs have independent alert scheduling'
+      );
       assert.equal(job.proof_hash.length, 64);
       assert.equal(job.posthog_status, 'pending', 'unverified historical completion is rechecked');
     }

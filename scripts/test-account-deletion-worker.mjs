@@ -7,6 +7,7 @@ import { createServer } from 'node:http';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { testErasureConfiguration } from './test-support/account-deletion-config.mjs';
 import { startAppleFixture } from './test-support/apple/fixture.mjs';
 
 mkdirSync('.tmp', { recursive: true });
@@ -21,6 +22,19 @@ routerAdd('POST', '/api/test/posthog/run', e => {
     host: $os.getenv('TEST_POSTHOG_URL'), projectId: '123', apiKey: 'disposable-key'
   };
   return e.json(200, worker.processPending(e.app, config));
+}, $apis.requireSuperuserAuth());
+routerAdd('POST', '/api/test/posthog/plans', e => {
+  const queries = require(__hooks + '/account_deletion_posthog.js').queries;
+  const output = {};
+  for (const name of ['claim', 'alerts']) {
+    const rows = arrayOf(new DynamicModel({ id: 0, parent: 0, notused: 0, detail: '' }));
+    e.app.db().newQuery('EXPLAIN QUERY PLAN ' + queries[name]).bind({ now: '2026-10-19 00:00:00.000Z' }).all(rows);
+    output[name] = rows;
+  }
+  const rows = arrayOf(new DynamicModel({ id: 0, parent: 0, notused: 0, detail: '' }));
+  e.app.db().newQuery('EXPLAIN QUERY PLAN SELECT id FROM account_deletions WHERE created <= {:cutoff} ORDER BY created LIMIT 100').bind({ cutoff: '2001-01-01' }).all(rows);
+  output.audit = rows;
+  return e.json(200, output);
 }, $apis.requireSuperuserAuth());`
 );
 let handler = () => ({ status: 500, body: {} });
@@ -85,6 +99,7 @@ try {
       user_id: `test${Math.random().toString(36).slice(2)}`,
       source_kind: 'legacy',
       posthog_status: 'pending',
+      next_alert: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     });
     assert.equal(result.status, 200);
     return result.body.id;
@@ -121,6 +136,42 @@ try {
   const count = requests.length;
   await run();
   assert.equal(requests.length, count, 'backoff survives worker invocation');
+
+  id = await create();
+  const futureDate = new Date(Date.now() + 3 * 60 * 60 * 1000).toUTCString();
+  handler = () => ({ status: 429, headers: { 'Retry-After': futureDate } });
+  await run();
+  assert.ok(
+    Date.parse(row(id).next_attempt) >= Date.parse(futureDate),
+    'HTTP-date Retry-After is honored'
+  );
+
+  id = await create();
+  handler = () => ({ status: 429, headers: { 'Retry-After': '31536000' } });
+  const yearStart = Date.now();
+  await run();
+  const rateLimitedUntil = row(id).next_attempt;
+  assert.ok(Date.parse(rateLimitedUntil) >= yearStart + 31535999_000);
+  const beforeOverdue = requests.length;
+  db.prepare(
+    "UPDATE account_deletion_jobs SET created = '2000-01-01 00:00:00.000Z', next_alert = '2000-01-15 00:00:00.000Z' WHERE id = ?"
+  ).run(id);
+  await run();
+  assert.equal(requests.length, beforeOverdue, 'alert scan must not ignore vendor rate limits');
+  assert.equal(row(id).next_attempt, rateLimitedUntil);
+  assert.ok(row(id).alerted_at, 'overdue warning is independent of next_attempt');
+  const overdueAlerted = row(id).alerted_at;
+  await run();
+  assert.equal(row(id).alerted_at, overdueAlerted, 'overdue alerts suppressed for 24 hours');
+
+  id = await create();
+  handler = () => ({ status: 429, headers: { 'Retry-After': '1000000000000000000' } });
+  await run();
+  assert.equal(row(id).posthog_status, 'blocked');
+  assert.equal(row(id).last_error, 'rate_limit_invalid');
+  assert.ok(Number.isFinite(Date.parse(row(id).next_attempt)));
+  assert.equal(row(id).lease_token, '', 'unrepresentable retry releases lease durably');
+  assert.ok(row(id).alerted_at);
 
   id = await create();
   handler = () => ({
@@ -217,9 +268,43 @@ try {
     },
   });
   await run();
-  assert.equal(row(id).posthog_status, 'completed');
-  assert.ok(row(id).posthog_verified_at);
-  assert.equal(row(id).posthog_target, null, 'vendor identities cleared after verification');
+  assert.equal(
+    row(id).posthog_status,
+    'blocked',
+    'unattributable vendor completion must remain unresolved'
+  );
+  assert.equal(row(id).last_error, 'verification_attribution');
+  assert.equal(row(id).posthog_verified_at, '');
+  assert.ok(row(id).posthog_target, 'retain target until current-request erasure can be proven');
+  for (const entries of [
+    [
+      {
+        person_uuid: uuid,
+        status: 'completed',
+        created_at: '2000-01-01T00:00:00Z',
+        delete_verified_at: '2000-01-02T00:00:00Z',
+      },
+      { person_uuid: uuid, status: 'completed', created_at: now(), delete_verified_at: now() },
+    ],
+    [
+      {
+        person_uuid: uuid,
+        status: 'completed',
+        created_at: new Date(Date.now() - 2000).toISOString(),
+        delete_verified_at: now(),
+      },
+    ],
+  ]) {
+    due(id);
+    handler = () => ({ body: { results: entries, next: null } });
+    await run();
+    assert.equal(
+      row(id).last_error,
+      'verification_attribution',
+      'mixed history and skew have explicit attribution blockers, never inferred success'
+    );
+    assert.equal(row(id).posthog_verified_at, '');
+  }
 
   // Lost acceptance followed by an absent person must preserve the same target.
   id = await create();
@@ -252,6 +337,60 @@ try {
     row(id).posthog_status,
     'completed',
     'old deletion evidence cannot certify this request'
+  );
+
+  id = await create();
+  const sharedUser = await request('/api/collections/users/records', {
+    email: 'synthetic-shared@localhost.test',
+    password: 'disposable-password-123',
+    passwordConfirm: 'disposable-password-123',
+    username: 'sharedfixture',
+    verified: true,
+  });
+  assert.equal(sharedUser.status, 200);
+  const sharedIds = [row(id).user_id, 'anonymous-device', sharedUser.body.id];
+  handler = req => ({
+    body: req.url.includes(`/${uuid}/`)
+      ? { uuid, distinct_ids: sharedIds }
+      : { results: [{ id: uuid }], next: null },
+  });
+  const beforeSharedDelete = requests.filter(r => r.method === 'DELETE').length;
+  await run();
+  assert.equal(row(id).posthog_status, 'blocked');
+  assert.equal(row(id).last_error, 'identity_shared');
+  assert.deepEqual(
+    JSON.parse(row(id).posthog_target).distinctIds,
+    sharedIds,
+    'preserve shared manifest for reconciliation'
+  );
+  assert.equal(requests.filter(r => r.method === 'DELETE').length, beforeSharedDelete);
+
+  id = await create();
+  db.prepare(
+    "UPDATE account_deletion_jobs SET posthog_status = 'requested', posthog_target = ?, posthog_requested_at = ?, created = '2000-01-01 00:00:00.000Z', next_alert = '2000-01-15 00:00:00.000Z' WHERE id = ?"
+  ).run(
+    JSON.stringify({ host, projectId: '123', personId: uuid, distinctIds: [row(id).user_id] }),
+    now(),
+    id
+  );
+  handler = () => ({
+    body: {
+      results: [
+        { person_uuid: uuid, status: 'pending', created_at: now(), delete_verified_at: null },
+      ],
+      next: null,
+    },
+  });
+  await run();
+  assert.equal(row(id).last_error, 'verification_pending');
+  assert.ok(row(id).alerted_at, '14-day pending verification alerts');
+  const pendingAlerted = row(id).alerted_at;
+  due(id);
+  await run();
+  assert.equal(
+    row(id).alerted_at,
+    pendingAlerted,
+    'pending verification alert suppressed for 24 hours'
   );
 
   // A second claimant owns this row while the first HTTP call is in flight.
@@ -310,6 +449,7 @@ try {
       user_id: `batch${index}`,
       source_kind: 'legacy',
       posthog_status: 'pending',
+      next_alert: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     });
     assert.equal(result.status, 200);
     batch.push(result.body.id);
@@ -317,6 +457,57 @@ try {
   handler = () => ({ status: 503 });
   assert.equal((await run()).attempted, 10, 'cron work is bounded');
   assert.equal(batch.filter(jobId => row(jobId).attempts === 1).length, 10);
+  // Production PB schema + exact production claim SQL against a retained backlog.
+  db.exec(`WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 100000)
+    INSERT INTO account_deletion_jobs (id, user_id, source_kind, posthog_status, created, updated)
+    SELECT printf('retained%07d', x), printf('retained%07d', x), 'legacy', 'completed', '2000-01-01 00:00:00.000Z', '2000-01-01 00:00:00.000Z' FROM n`);
+  db.exec(`WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 100000)
+    INSERT INTO account_deletions (id, user_id, user_email, signup_method, created, updated)
+    SELECT printf('oldaudit%07d', x), 'synthetic', 'synthetic@localhost.test', 'unknown', '2000-01-01 00:00:00.000Z', '2000-01-01 00:00:00.000Z' FROM n`);
+  const plans = await request('/api/test/posthog/plans', {});
+  assert.equal(plans.status, 200);
+  for (const [name, index] of Object.entries({
+    claim: 'idx_account_deletion_work',
+    alerts: 'idx_account_deletion_alert',
+    audit: 'idx_account_deletions_created',
+  })) {
+    const detail = plans.body[name].map(row => row.detail).join('\n');
+    assert.ok(detail.includes(index), `${name} uses its production index: ${detail}`);
+    assert.ok(!detail.includes('TEMP B-TREE'), `${name} avoids a temporary sort`);
+    assert.ok(
+      !detail.includes('SCAN account_deletion'),
+      `${name} avoids a full retained-table scan`
+    );
+  }
+  writeFileSync(path.join(runDir, 'query-plans.json'), JSON.stringify(plans.body, null, 2));
+  assert.equal((await run()).attempted, 2, 'actual PB claim skips 100000 completed receipts');
+  assert.equal(
+    db
+      .prepare(
+        "SELECT SUM(attempts) AS attempts FROM account_deletion_jobs WHERE id LIKE 'retained%'"
+      )
+      .get().attempts,
+    0
+  );
+  const priorAudits = db.prepare('SELECT COUNT(*) AS count FROM account_deletions').get().count;
+  assert.equal((await request('/api/test/apple/deletion-retention', {})).status, 200);
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS count FROM account_deletions').get().count,
+    priorAudits - 100,
+    'actual PB retention remains bounded under backlog'
+  );
+  db.exec(`WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 250)
+    INSERT INTO account_deletion_jobs (id, user_id, source_kind, posthog_status, created, updated, next_attempt, next_alert, last_error)
+    SELECT printf('blocked%08d', x), printf('blocked%08d', x), 'legacy', 'blocked', '2026-01-01 00:00:00.000Z', '2026-01-01 00:00:00.000Z', '2099-01-01 00:00:00.000Z', '2000-01-01 00:00:00.000Z', 'identity_missing' FROM n`);
+  const beforeAlerts = requests.length;
+  for (const expected of [100, 100, 50, 0])
+    assert.equal(
+      (await run()).alerted,
+      expected,
+      'alerts use a bounded aggregate with durable per-job suppression'
+    );
+  assert.equal(requests.length, beforeAlerts, 'alert-only backlog does not contact vendor');
+
   console.log(
     'PostHog worker: fail closed config, durable target, backoff, crash recovery, verification, and stale claims passed.'
   );
@@ -326,3 +517,8 @@ try {
   await fixture?.close();
   await new Promise(resolve => server.close(resolve));
 }
+
+await testErasureConfiguration(runDir);
+console.log(
+  'PostHog production configuration: invalid nonempty host, project and key values fail closed before transport.'
+);

@@ -22,20 +22,25 @@ function configFromEnvironment() {
   return { host, projectId, apiKey };
 }
 
+const queries = {
+  claim: `SELECT id FROM account_deletion_jobs
+    WHERE posthog_status != 'completed' AND next_attempt <= {:now} AND lease_until <= {:now}
+    ORDER BY next_attempt, created, id LIMIT 1`,
+  alerts: `SELECT id FROM account_deletion_jobs
+    WHERE posthog_status != 'completed' AND next_alert <= {:now}
+    ORDER BY next_alert, created, id LIMIT 100`,
+};
+
 function claim(app) {
   let claimed = null;
   app.runInTransaction(tx => {
-    const now = date(Date.now());
-    const jobs = tx.findRecordsByFilter(
-      'account_deletion_jobs',
-      'posthog_status != "completed" && (next_attempt = "" || next_attempt <= {:now}) && (lease_until = "" || lease_until <= {:now})',
-      'next_attempt,created,id',
-      1,
-      0,
-      { now }
-    );
-    if (!jobs.length) return;
-    const job = jobs[0];
+    const rows = arrayOf(new DynamicModel({ id: '' }));
+    tx.db()
+      .newQuery(queries.claim)
+      .bind({ now: date(Date.now()) })
+      .all(rows);
+    if (!rows.length) return;
+    const job = tx.findRecordById('account_deletion_jobs', rows[0].id);
     job.set('lease_token', $security.randomString(32));
     job.set('lease_until', date(Date.now() + leaseDuration));
     job.set('attempts', job.getInt('attempts') + 1);
@@ -43,6 +48,72 @@ function claim(app) {
     claimed = { id: job.id, token: job.getString('lease_token'), job };
   });
   return claimed;
+}
+
+function alertUnresolved(app) {
+  const reasons = [
+    'configuration',
+    'authorization',
+    'identity_missing',
+    'identity_shared',
+    'identity_ambiguous',
+    'target_configuration',
+    'vendor_shape',
+    'vendor_response',
+    'deletion_unconfirmed',
+    'verification_pending',
+    'verification_attribution',
+    'rate_limit',
+    'rate_limit_invalid',
+    'transport',
+    'vendor_unavailable',
+  ];
+  const counts = {};
+  let total = 0;
+  app.runInTransaction(tx => {
+    const rows = arrayOf(new DynamicModel({ id: '' }));
+    tx.db()
+      .newQuery(queries.alerts)
+      .bind({ now: date(Date.now()) })
+      .all(rows);
+    for (const row of rows) {
+      const job = tx.findRecordById('account_deletion_jobs', row.id);
+      const reason = reasons.includes(job.getString('last_error'))
+        ? job.getString('last_error')
+        : 'worker_failure';
+      counts[reason] = (counts[reason] || 0) + 1;
+      job.set('alerted_at', date(Date.now()));
+      job.set('next_alert', date(Date.now() + day));
+      tx.save(job);
+      total++;
+    }
+  });
+  if (total)
+    app
+      .logger()
+      .warn(
+        'Account deletion cleanup unresolved.',
+        'reason',
+        'cleanup_unresolved',
+        'count',
+        total,
+        'categories',
+        JSON.stringify(counts)
+      );
+  return total;
+}
+
+function identityShared(app, target, owner) {
+  const rows = arrayOf(new DynamicModel({ id: '' }));
+  app
+    .db()
+    .newQuery(
+      `SELECT id FROM users
+    WHERE id != {:owner} AND id IN (SELECT value FROM json_each({:identities})) LIMIT 1`
+    )
+    .bind({ owner, identities: JSON.stringify(target.distinctIds) })
+    .all(rows);
+  return rows.length > 0;
 }
 
 function updateClaim(app, claim, mutate) {
@@ -55,7 +126,7 @@ function updateClaim(app, claim, mutate) {
       job.getString('posthog_status') === 'completed'
     )
       return;
-    mutate(job);
+    mutate(job, tx);
     tx.save(job);
     claim.job = job;
     updated = true;
@@ -87,6 +158,15 @@ function request(config, method, suffix) {
     const delay = /^\d+$/.test(value || '')
       ? Number(value) * 1000
       : Date.parse(value || '') - Date.now();
+    const timestamp = Date.now() + delay;
+    if (
+      value &&
+      (!Number.isFinite(delay) ||
+        !Number.isFinite(new Date(timestamp).getTime()) ||
+        timestamp > Date.parse('9999-12-31T23:59:59.999Z'))
+    ) {
+      throw failure('rate_limit_invalid', true, day);
+    }
     throw failure('rate_limit', false, Number.isFinite(delay) ? Math.max(0, delay) : 0);
   }
   if (code === 401 || code === 403) throw failure('authorization', true);
@@ -120,8 +200,6 @@ function targetFor(config, job) {
   const person = request(config, 'GET', `${encodeURIComponent(uuid)}/`).json;
   if (!person || (person.uuid || person.id) !== uuid) throw failure('identity_ambiguous', true);
   if (
-    typeof uuid !== 'string' ||
-    !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(uuid) ||
     !Array.isArray(person.distinct_ids) ||
     !person.distinct_ids.includes(job.getString('user_id')) ||
     person.distinct_ids.some(id => typeof id !== 'string' || !id) ||
@@ -143,6 +221,8 @@ function processJob(app, claim, config) {
     if (target.host !== config.host || target.projectId !== config.projectId) {
       throw failure('target_configuration', true);
     }
+    if (identityShared(app, target, claim.job.getString('user_id')))
+      throw failure('identity_shared', true);
     const entries = results(
       request(
         config,
@@ -152,30 +232,17 @@ function processJob(app, claim, config) {
     );
     if (entries.some(entry => entry.person_uuid !== target.personId))
       throw failure('vendor_shape', true);
-    const requested = Date.parse(claim.job.getString('posthog_requested_at'));
     if (entries.length) {
-      const verified = entries.every(
-        entry =>
-          entry.status === 'completed' &&
-          Number.isFinite(Date.parse(entry.delete_verified_at)) &&
-          Date.parse(entry.delete_verified_at) >= requested &&
-          Number.isFinite(Date.parse(entry.created_at)) &&
-          Date.parse(entry.created_at) >= requested
-      );
-      if (verified) {
-        updateClaim(app, claim, job => {
-          job.set('posthog_status', 'completed');
-          job.set(
-            'posthog_verified_at',
-            date(Math.max(...entries.map(entry => Date.parse(entry.delete_verified_at))))
-          );
-          job.set('posthog_target', null);
-          job.set('last_error', '');
-          job.set('next_attempt', '');
-          job.set('lease_token', '');
-          job.set('lease_until', '');
-        });
-        return;
+      // The vendor deduplicates AsyncDeletion by person UUID and DELETE returns
+      // no operation ID. Neither timestamps nor mixed history attribute a status
+      // to this submission. Keep the target until an attributable API exists.
+      if (
+        entries.some(
+          entry =>
+            entry.status === 'completed' && Number.isFinite(Date.parse(entry.delete_verified_at))
+        )
+      ) {
+        throw failure('verification_attribution', true);
       }
       throw failure('verification_pending');
     }
@@ -194,8 +261,15 @@ function processJob(app, claim, config) {
   }
   // Renew ownership immediately before the external side effect. The timeout is
   // far shorter than the lease; every subsequent write checks the same token.
-  if (!updateClaim(app, claim, job => job.set('lease_until', date(Date.now() + leaseDuration))))
+  let shared = false;
+  if (
+    !updateClaim(app, claim, (job, tx) => {
+      shared = identityShared(tx, target, job.getString('user_id'));
+      job.set('lease_until', date(Date.now() + leaseDuration));
+    })
+  )
     return;
+  if (shared) throw failure('identity_shared', true);
   request(
     config,
     'DELETE',
@@ -205,7 +279,6 @@ function processJob(app, claim, config) {
 }
 
 function reschedule(app, claim, outcome) {
-  let alert = false;
   const reason = outcome && typeof outcome.reason === 'string' ? outcome.reason : 'worker_failure';
   updateClaim(app, claim, job => {
     const delay = Math.max(
@@ -218,38 +291,40 @@ function reschedule(app, claim, outcome) {
     );
     job.set('next_attempt', date(Date.now() + delay));
     job.set('last_error', reason);
+    if (outcome?.blocked) {
+      job.set(
+        'next_alert',
+        date(Math.max(Date.now(), (Date.parse(job.getString('alerted_at')) || 0) + day))
+      );
+    }
     job.set('lease_token', '');
     job.set('lease_until', '');
-    const overdue = Date.parse(job.getString('created')) <= Date.now() - 14 * day;
-    if (
-      (outcome?.blocked || overdue) &&
-      (!job.getString('alerted_at') || Date.parse(job.getString('alerted_at')) <= Date.now() - day)
-    ) {
-      job.set('alerted_at', date(Date.now()));
-      alert = true;
-    }
   });
-  if (alert)
-    app.logger().warn('Account deletion cleanup unresolved.', 'reason', reason, 'job', claim.id);
 }
 
 module.exports = {
+  queries,
   processPending(app, config = configFromEnvironment()) {
     const result = { attempted: 0 };
-    // Ten jobs, at most three ten-second HTTP requests per job, per cron run.
-    for (let index = 0; index < 10; index++) {
-      const current = claim(app);
-      if (!current) break;
-      result.attempted++;
-      try {
-        processJob(app, current, config);
-      } catch (outcome) {
+    try {
+      // Ten jobs, at most three ten-second HTTP requests per job, per cron run.
+      for (let index = 0; index < 10; index++) {
+        const current = claim(app);
+        if (!current) break;
+        result.attempted++;
         try {
-          reschedule(app, current, outcome);
-        } catch (_) {
-          app.logger().warn('Account deletion worker write failed.', 'reason', 'worker_write');
+          processJob(app, current, config);
+        } catch (outcome) {
+          try {
+            reschedule(app, current, outcome);
+          } catch (_) {
+            app.logger().warn('Account deletion worker write failed.', 'reason', 'worker_write');
+          }
         }
       }
+    } finally {
+      // Operational visibility is independent of the vendor's Retry-After.
+      result.alerted = alertUnresolved(app);
     }
     return result;
   },

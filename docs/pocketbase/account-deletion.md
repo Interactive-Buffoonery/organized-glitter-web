@@ -106,7 +106,8 @@ an opaque account ID, optional proof hash, source kind, worker state, retry and
 lease timestamps, and the PostHog target until verification. It contains no email,
 feedback, library content or usage snapshot. A private target can contain linked
 vendor distinct IDs, which are identifying data and must not enter logs or public
-artifacts. It is removed when erasure is verified. Pending jobs survive user
+artifacts. The intended retention boundary is verified erasure, but the current
+adapter cannot establish it and therefore retains the target. Pending jobs survive user
 deletion and are not expired while cleanup remains unresolved.
 
 Completion-only retries report `cleanup: "completed"` only when PostHog is
@@ -117,6 +118,13 @@ or expired receipt, including an unknown-proof 401, proves neither deletion nor
 that the account is intact.
 
 ## PostHog worker
+
+**Release blocker: automatic vendor completion is unavailable.** The current
+persons API cannot attribute a deletion status to this submission. The worker
+keeps vendor cleanup pending or blocked, retains the private target, and never
+sets `posthog_status` to `completed`. This is a deliberate fail-closed limitation,
+not evidence that erasure has or has not occurred. Do not enable this adapter for
+release until an attributable vendor verification protocol has been established.
 
 The five-minute cron processes at most ten due jobs. Each HTTP request has a
 ten-second timeout, outside database transactions. New deletions wait one hour
@@ -149,32 +157,72 @@ Self-hosted destinations require an explicit reviewed adapter change.
    before sending `DELETE persons/:uuid/?delete_events=true&delete_recordings=true`.
    No irreversible call occurs if that save or ownership check fails. The vendor
    operation targets the whole person, including linked anonymous history.
+   Before dispatch, query the current users collection for every recorded linked
+   ID. If another existing user's ID is present, block as `identity_shared` and
+   preserve the complete manifest for reconciliation. The check is repeated on
+   retries and under the pre-dispatch lease transaction. It can detect exact
+   account-ID links, not ownership hidden behind unrelated anonymous/vendor IDs;
+   it cannot lock external PostHog identity merges after the final check.
 4. On subsequent attempts, query `persons/deletion_status/` for that saved UUID
-   first. Complete only when every returned entry is `completed`, has a valid
-   `delete_verified_at`, and belongs to this request or later. A changed project
-   or region blocks the job rather than redirecting its target.
+   first. Pending status stays pending. A completed status with a verification
+   timestamp blocks as `verification_attribution`, since the API does not tie it
+   to this submission. Old-only status, mixed history, and clock skew never
+   certify completion. A changed project or region blocks the job rather than
+   redirecting its target.
 5. API acceptance, an empty status response, a missing person, and a 404 never
    mean completion. An empty status response retries the same saved UUID;
    uncertain or missing targets remain private and unresolved for reconciliation.
 
 Backoff starts at 15 minutes, doubles to a 24-hour cap and is stored in the job.
-A 429 also honors a longer valid `Retry-After` delay, including HTTP dates.
+A 429 also honors a longer valid `Retry-After` delay, including HTTP dates;
+there is no one-day cap on a valid vendor delay. An unrepresentable delay or date
+beyond year 9999 blocks as `rate_limit_invalid`, stores a one-day retry, releases
+the lease, and schedules an alert instead of throwing during persistence.
 401/403, malformed responses, missing identities and configuration mismatch are
 blocked and retried durably. Pending verification is retried without resubmission
 while the vendor reports a matching pending request.
 
-Blocked jobs and jobs still unresolved after 14 days emit a warning at most once
-per job per 24 hours. Warnings contain only the job ID and a fixed reason code,
-never vendor bodies, account IDs, linked IDs, proofs or credentials. Operators
-must route these warnings, monitor cron liveness and inspect the private job
-queue; logging an alert is not proof that a human received it. Do not manually
-mark a job completed to silence an alert.
+Alert scheduling uses `next_alert` independently of `next_attempt`. New jobs
+become alert-eligible after 14 days; blocked outcomes become eligible immediately
+subject to 24-hour per-job suppression. Every cron run selects at most 100 due
+alerts through a partial index excluding completed receipts, updates their next
+alert time durably, and emits one aggregate warning with a total and allowlisted
+reason counts. Missing-person jobs remain blocked and visible without a daily
+per-job message flood. The oldest due alert is considered first. A valid year-long
+vendor rate limit does not delay alerts or cause an earlier vendor request.
+
+Warnings never include job IDs, account IDs, linked IDs, proofs, credentials or
+vendor bodies. Operators must route these warnings, monitor cron liveness and
+inspect the private queue; logging is not proof of delivery. Do not manually
+mark a job completed to silence an alert. Claim scheduling uses a partial
+`(next_attempt, created, id)` index excluding completed receipts. Audit retention
+has a separate `created` index. Tests exercise the actual claim SQL in PocketBase
+with 100,000 retained receipts and the real audit retention path with 100,000
+synthetic audit rows; no production backlog or timing is inferred.
 
 API sources checked for this implementation:
 [PostHog persons](https://posthog.com/docs/api/persons),
 [deletion and verification](https://posthog.com/docs/privacy/data-storage), and
 [person serialization and full detail retrieval](https://github.com/PostHog/posthog/blob/master/posthog/api/person.py).
-These describe the API contract, not observed erasure in the deployed project.
+Current primary source was also inspected at PostHog commit
+`069e3b3acc87cc880fa0b13423d9c450d36674d2`:
+
+- [AsyncDeletion model](https://github.com/PostHog/posthog/blob/069e3b3acc87cc880fa0b13423d9c450d36674d2/posthog/models/async_deletion/async_deletion.py)
+  has a uniqueness constraint on deletion type and person UUID.
+- [Event deletion queue](https://github.com/PostHog/posthog/blob/069e3b3acc87cc880fa0b13423d9c450d36674d2/posthog/models/person/bulk_delete.py)
+  ignores conflicting inserts instead of returning a fresh request identifier.
+- [Persons API and status serializer](https://github.com/PostHog/posthog/blob/069e3b3acc87cc880fa0b13423d9c450d36674d2/posthog/api/person.py)
+  return an empty 202 for single-person DELETE; status contains person UUID,
+  creation time, status and verification time, but no operation identifier.
+
+Consequently an old completed row can survive another deletion attempt. A
+PocketBase timestamp, arbitrary clock tolerance, accepting any completed row or
+subtracting a preflight history snapshot does not establish current-request
+attribution under deduplication or concurrent vendor operations. This adapter
+needs a documented vendor operation identifier or another verifiable protocol
+before it can produce completion. Source inspection is not deployed-project
+verification. The existing receipt completion/Apple/retention contract is retained
+for a future verified producer, but this worker cannot satisfy it today.
 
 ## Compatibility and legacy retention
 
@@ -217,7 +265,8 @@ erasure or a deployed backend revision. Before release:
 - Run the required local backend-first validation and strict combined `test:pr`.
   Integrate client and native work, including malformed responses, uncertain
   requests, account/session fencing and local cleanup failures.
-- Exercise the adapter in an explicitly authorized disposable vendor project.
+- Resolve the current-request attribution blocker before enabling release.
+  Exercise the adapter in an explicitly authorized disposable vendor project.
   Confirm region, scopes, full linked identity coverage, request and verification
   semantics, personless identified events, late events and session recordings.
   Until resolved with evidence, no-person jobs stay blocked.

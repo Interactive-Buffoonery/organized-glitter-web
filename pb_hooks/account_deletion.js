@@ -14,6 +14,10 @@ module.exports = {
     // Allow in-flight client batches to settle; this is not a guarantee about
     // offline devices, which must independently stop sending this identity.
     job.set('next_attempt', new DateTime(new Date(Date.now() + 60 * 60 * 1000).toISOString()));
+    job.set(
+      'next_alert',
+      new DateTime(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString())
+    );
     app.save(job);
     return job;
   },

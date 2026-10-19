@@ -661,6 +661,7 @@ export type AccountDeletionJobsRecord<Tposthog_target = unknown> = {
 	last_error?: string
 	lease_token?: string
 	lease_until?: IsoDateString
+	next_alert?: IsoDateString
 	next_attempt?: IsoDateString
 	posthog_requested_at?: IsoDateString
 	posthog_status: AccountDeletionJobsPosthogStatusOptions

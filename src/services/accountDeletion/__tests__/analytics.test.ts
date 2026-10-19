@@ -86,9 +86,15 @@ describe('deletion analytics transport fence', () => {
     secondQueue.unload();
     expect(wire).not.toHaveBeenCalled();
     expect(retainedDeletionAnalyticsCount(secondTab)).toBe(1);
+    suspendDeletionAnalytics();
     releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
-    secondTab._send_retriable_request({ url: '/e/', data: { distinct_id: 'new-anonymous-id' } });
+    resumeDeletionAnalytics();
     expect(wire).toHaveBeenCalledOnce();
+    expect(wire).toHaveBeenCalledWith(
+      expect.objectContaining({ data: [expect.objectContaining({ distinct_id: 'account-a' })] })
+    );
+    secondTab._send_retriable_request({ url: '/e/', data: { distinct_id: 'new-anonymous-id' } });
+    expect(wire).toHaveBeenCalledTimes(2);
     expect(retainedDeletionAnalyticsCount(secondTab)).toBe(0);
   });
 
@@ -110,6 +116,7 @@ describe('deletion analytics transport fence', () => {
   });
 
   it('keeps a newer tab fenced when an older attempt is cancelled', () => {
+    suspendDeletionAnalytics();
     const first = armDeletionTransportFence('http://localhost:8090', 'account-a');
     const second = armDeletionTransportFence('http://localhost:8090', 'account-a');
     releaseDeletionTransportFence('http://localhost:8090', 'account-a', first);
@@ -117,7 +124,19 @@ describe('deletion analytics transport fence', () => {
     wire({ url: '/e/', data: { distinct_id: 'account-a' } });
     expect(retainedDeletionAnalyticsCount()).toBe(1);
     releaseDeletionTransportFence('http://localhost:8090', 'account-a', second);
+    resumeDeletionAnalytics();
+    expect(retainedDeletionAnalyticsCount()).toBe(0);
+  });
+
+  it('does not release held account events when success removes the marker', () => {
+    const fenceId = armDeletionTransportFence('http://localhost:8090', 'account-a');
+    const wire = mocked.sdk._send_request as (...args: unknown[]) => void;
     wire({ url: '/e/', data: { distinct_id: 'account-a' } });
+    expect(retainedDeletionAnalyticsCount()).toBe(1);
+    releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+    wire({ url: '/e/', data: { distinct_id: 'new-anonymous-id' } });
+    expect(retainedDeletionAnalyticsCount()).toBe(1);
+    discardDeletionAnalyticsQueues();
     expect(retainedDeletionAnalyticsCount()).toBe(0);
   });
 });

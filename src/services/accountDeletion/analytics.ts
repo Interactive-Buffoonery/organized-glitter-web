@@ -24,9 +24,14 @@ const FENCE_PREFIX = 'og:account-deletion:analytics-fence:v1:';
 let suspended = false;
 const installed = new WeakMap<
   object,
-  { send: AnalyticsSDK['_send_request']; retry: AnalyticsSDK['_send_retriable_request'] }
+  {
+    send: AnalyticsSDK['_send_request'];
+    retry: AnalyticsSDK['_send_retriable_request'];
+    flush: () => void;
+  }
 >();
-const heldRequests = new WeakMap<object, unknown[][]>();
+const heldRequests = new WeakMap<object, Array<() => void>>();
+const flushers = new Set<() => void>();
 let restoreRetryPoll: (() => void) | undefined;
 
 function hasTransportFence(): boolean {
@@ -68,26 +73,27 @@ export function installDeletionAnalyticsFence(sdk: AnalyticsSDK = posthog as Ana
     return;
   const send = sdk._send_request;
   const sendRetry = sdk._send_retriable_request;
-  const held: unknown[][] = [];
+  if (previous) flushers.delete(previous.flush);
+  const held: Array<() => void> = [];
   heldRequests.set(sdk, held);
-  const guard = (args: unknown[]) => {
+  const flush = () => {
+    while (held.length && !suspended && !hasTransportFence()) held.shift()?.();
+  };
+  flushers.add(flush);
+  const guard = (transmit: () => void) => {
     if (suspended || hasTransportFence()) {
-      held.push(args);
+      held.push(transmit);
       return false;
     }
-    held.length = 0;
     return true;
   };
   sdk._send_request = (...args) => {
-    if (guard(args)) return send.apply(sdk, args);
+    if (guard(() => send.apply(sdk, args))) return send.apply(sdk, args);
   };
   sdk._send_retriable_request = (...args) => {
-    if (guard(args)) return sendRetry.apply(sdk, args);
+    if (guard(() => sendRetry.apply(sdk, args))) return sendRetry.apply(sdk, args);
   };
-  installed.set(sdk, { send: sdk._send_request, retry: sdk._send_retriable_request });
-  window.addEventListener('storage', event => {
-    if (event.key?.startsWith(FENCE_PREFIX) && !hasTransportFence()) held.length = 0;
-  });
+  installed.set(sdk, { send: sdk._send_request, retry: sdk._send_retriable_request, flush });
 }
 
 export function retainedDeletionAnalyticsCount(sdk: object = posthog): number {
@@ -141,4 +147,5 @@ export function resumeDeletionAnalytics(): void {
   restoreRetryPoll = undefined;
   (posthog as AnalyticsSDK)._retryQueue?.resume();
   suspended = false;
+  flushers.forEach(flush => flush());
 }

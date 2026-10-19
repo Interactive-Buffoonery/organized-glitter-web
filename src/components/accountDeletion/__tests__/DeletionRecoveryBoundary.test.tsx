@@ -4,24 +4,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   user: null as { id: string } | null,
   localDone: false,
+  noIntent: false,
   reset: vi.fn(),
   resume: vi.fn(),
   suspend: vi.fn(),
   sync: vi.fn(),
   consent: vi.fn(),
+  discard: vi.fn(),
   cancel: vi.fn(),
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: mocks.user }) }));
 vi.mock('@/services/accountDeletion/recovery', () => ({
   useDeletionRecovery: () => ({
     ready: true,
-    intents: [
-      {
-        accountId: 'account-a',
-        phase: mocks.localDone ? 'deleted' : 'pending',
-        localCleanupDone: mocks.localDone,
-      },
-    ],
+    intents: mocks.noIntent
+      ? []
+      : [
+          {
+            accountId: 'account-a',
+            phase: mocks.localDone ? 'deleted' : 'pending',
+            localCleanupDone: mocks.localDone,
+          },
+        ],
   }),
 }));
 vi.mock('@/lib/queryClient', () => ({ queryClient: { cancelQueries: mocks.cancel } }));
@@ -29,6 +33,7 @@ vi.mock('posthog-js', () => ({ default: { reset: mocks.reset } }));
 vi.mock('@/services/accountDeletion/analytics', () => ({
   isDeletionAnalyticsSuspended: () => true,
   suspendDeletionAnalytics: mocks.suspend,
+  discardDeletionAnalyticsQueues: mocks.discard,
   resumeDeletionAnalytics: mocks.resume,
 }));
 vi.mock('@/services/analytics-preference', () => ({
@@ -41,6 +46,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.user = null;
   mocks.localDone = false;
+  mocks.noIntent = false;
   mocks.cancel.mockResolvedValue(undefined);
 });
 describe('other-tab deletion completion', () => {
@@ -77,5 +83,17 @@ describe('other-tab deletion completion', () => {
     );
     expect(mocks.reset).not.toHaveBeenCalled();
     expect(mocks.resume).not.toHaveBeenCalled();
+  });
+  it('resumes retained wire requests after a proven unsent cancellation in another tab', async () => {
+    mocks.noIntent = true;
+    mocks.user = { id: 'account-a' };
+    render(
+      <MemoryRouter>
+        <DeletionRecoveryBoundary>Account A</DeletionRecoveryBoundary>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(mocks.resume).toHaveBeenCalledOnce());
+    expect(mocks.reset).not.toHaveBeenCalled();
+    expect(mocks.sync).toHaveBeenCalledOnce();
   });
 });

@@ -26,17 +26,22 @@ export function DeletionRecoveryBoundary({ children }: { children: ReactNode }) 
     void queryClient.cancelQueries();
   }, [pending]);
   useEffect(() => {
-    if (user || pending || !isDeletionAnalyticsSuspended()) return;
+    if (!recovery.ready || recovery.error || pending || !isDeletionAnalyticsSuspended()) return;
     const completed = recovery.intents.filter(
       intent => intent.phase === 'deleted' && intent.localCleanupDone
     );
-    if (!completed.length) return;
+    if (!completed.length) {
+      resumeDeletionAnalytics();
+      syncAnalyticsConsent();
+      return;
+    }
+    if (user) return;
     discardDeletionAnalyticsQueues();
     posthog.reset();
     completed.forEach(intent => clearRememberedAnalyticsConsent(intent.accountId));
     resumeDeletionAnalytics();
     syncAnalyticsConsent();
-  }, [user, pending, recovery.intents]);
+  }, [user, pending, recovery]);
   if (pending && location.pathname !== '/delete-account')
     return <Navigate to="/delete-account" replace />;
   return <>{children}</>;

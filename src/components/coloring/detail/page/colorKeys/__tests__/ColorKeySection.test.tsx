@@ -45,28 +45,28 @@ vi.mock('@/utils/image/symbolRequestPhoto', () => ({
   prepareSymbolRequestPhoto: async (file: File) => file,
 }));
 // jsdom has no layout for dnd-kit; this stand-in reverses the order instead of dragging.
-vi.mock('../ColorKeySortPanel', () => ({
-  ColorKeySortPanel: ({
-    order,
-    onOrderChange,
-    onDone,
-  }: {
-    order: { id: string }[] | null;
-    onOrderChange: (order: unknown[]) => void;
-    onDone: () => void;
-  }) =>
-    order ? (
-      <div role="dialog" aria-label="Sort Color Order">
-        <span>{order.map(row => row.id).join(',')}</span>
-        <button type="button" onClick={() => onOrderChange([...order].reverse())}>
-          Reverse
-        </button>
-        <button type="button" onClick={onDone}>
-          Done
-        </button>
-      </div>
-    ) : null,
-}));
+vi.mock('../ColorKeySortPanel', () => ({ ColorKeySortPanel: SortPanelStandIn }));
+function SortPanelStandIn({
+  order,
+  onOrderChange,
+  onDone,
+}: {
+  order: { id: string }[] | null;
+  onOrderChange: (order: unknown[]) => void;
+  onDone: () => void;
+}) {
+  return order ? (
+    <div role="dialog" aria-label="Sort Color Order">
+      <span>{order.map(row => row.id).join(',')}</span>
+      <button type="button" onClick={() => onOrderChange([...order].reverse())}>
+        Reverse
+      </button>
+      <button type="button" onClick={onDone}>
+        Done
+      </button>
+    </div>
+  ) : null;
+}
 vi.mock('@/lib/notifications', () => ({ notifyError: state.error, notifySuccess: state.success }));
 vi.mock('@/components/image/PrivateFileImage', () => ({
   PrivateFileImage: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
@@ -227,6 +227,10 @@ describe('Colors used record', () => {
 
 describe('Colors used sort', () => {
   const three = () => [key('a', 0, 'u:0031'), key('b', 1, 'u:0032'), key('c', 2, 'u:0033')];
+  const openSort = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: 'Sort' }));
+    return screen.findByRole('dialog', { name: 'Sort Color Order' });
+  };
 
   it('offers Sort only once there are two colors', () => {
     state.rows = [key('a', 0, 'u:0031')];
@@ -241,7 +245,7 @@ describe('Colors used sort', () => {
     const user = userEvent.setup();
     state.rows = three();
     render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: 'Sort' }));
+    await openSort(user);
     await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(state.reorder).not.toHaveBeenCalled();
@@ -251,10 +255,31 @@ describe('Colors used sort', () => {
     const user = userEvent.setup();
     state.rows = three();
     render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: 'Sort' }));
+    await openSort(user);
     expect(screen.getByRole('button', { name: 'Sort' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Add symbol' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^One,/ })).toBeDisabled();
+  });
+
+  it('keeps the panel closed and asks to try again when it cannot load', async () => {
+    const user = userEvent.setup();
+    state.rows = three();
+    vi.doMock('../ColorKeySortPanel', () => {
+      throw new TypeError('Failed to fetch dynamically imported module');
+    });
+    vi.resetModules();
+    try {
+      render(<ColorKeySection pageId="page-1" />);
+      await user.click(screen.getByRole('button', { name: 'Sort' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Couldn’t open Sort Color Order. Please try again.'
+      );
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add symbol' })).toBeEnabled();
+    } finally {
+      vi.doMock('../ColorKeySortPanel', () => ({ ColorKeySortPanel: SortPanelStandIn }));
+      vi.resetModules();
+    }
   });
 
   it('disables Sort, the rows and Add symbol while an order is saving', () => {
@@ -271,7 +296,7 @@ describe('Colors used sort', () => {
     state.rows = three();
     state.reorder.mockResolvedValue([]);
     render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: 'Sort' }));
+    await openSort(user);
     await user.click(screen.getByRole('button', { name: 'Reverse' }));
     await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(state.reorder).toHaveBeenCalledWith([state.rows[2], state.rows[1], state.rows[0]]);
@@ -283,7 +308,7 @@ describe('Colors used sort', () => {
     state.rows = three();
     state.reorder.mockRejectedValue(new Error('busy'));
     render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: 'Sort' }));
+    await openSort(user);
     await user.click(screen.getByRole('button', { name: 'Reverse' }));
     await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -295,7 +320,7 @@ describe('Colors used sort', () => {
     const user = userEvent.setup();
     state.rows = three();
     const { rerender } = render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: 'Sort' }));
+    await openSort(user);
     await user.click(screen.getByRole('button', { name: 'Reverse' }));
     state.rows = [...three(), key('d', 3, 'u:0034')];
     rerender(<ColorKeySection pageId="page-1" />);
@@ -326,7 +351,7 @@ describe('Colors used sort', () => {
         throw new Error('Failed to fetch');
       });
       render(<ColorKeySection pageId="page-1" />);
-      await user.click(screen.getByRole('button', { name: 'Sort' }));
+      await openSort(user);
       await user.click(screen.getByRole('button', { name: 'Reverse' }));
       await user.click(screen.getByRole('button', { name: 'Done' }));
       expect(await screen.findByRole('alert')).toHaveTextContent(

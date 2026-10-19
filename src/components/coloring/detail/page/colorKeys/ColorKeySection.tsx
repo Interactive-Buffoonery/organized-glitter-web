@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ArrowUpDown, Plus } from 'lucide-react';
 import { ClientResponseError } from 'pocketbase';
 import { Section, SectionHeading } from '@/components/shared/Section';
@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils';
 import type { ColorKey } from '@/services/pocketbase/colorKeys.service';
 import { createLogger } from '@/utils/logger';
 import { ColorKeyEntry, type EntrySymbolRequest, type EntryTarget } from './ColorKeyEntry';
-import { ColorKeySortPanel } from './ColorKeySortPanel';
 import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
 import { SymbolRequestDialog } from './SymbolRequestDialog';
@@ -30,6 +29,13 @@ type RequestTarget =
 const THANKS = "Thanks for the photo. We'll email you when it's added.";
 const SORT_FAILED = 'Couldn’t save the updated order. Please try again.';
 const SORT_OFFLINE = 'Sorting colors needs a connection. Reconnect and try again.';
+const SORT_LOAD_FAILED = 'Couldn’t open Sort Color Order. Please try again.';
+
+// Sorting needs a connection, so dnd-kit loads on first use and stays out of the PWA precache.
+const loadSortPanel = () => import('./ColorKeySortPanel');
+const ColorKeySortPanel = lazy(() =>
+  loadSortPanel().then(module => ({ default: module.ColorKeySortPanel }))
+);
 
 const subscribeOnline = (onChange: () => void) => {
   window.addEventListener('online', onChange);
@@ -92,6 +98,8 @@ function ColorKeyEditor({
   // The panel's working order; null while it is closed.
   const [sortOrder, setSortOrder] = useState<ColorKey[] | null>(null);
   const [sortError, setSortError] = useState('');
+  // Stays mounted once loaded so closing can animate and return focus.
+  const [sortPanelLoaded, setSortPanelLoaded] = useState(false);
   const sorting = sortOrder !== null || reorder.isPending;
   // Kept after closing so focus can return to where the request started.
   const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
@@ -207,6 +215,17 @@ function ColorKeyEditor({
       setSortError(navigator.onLine ? SORT_FAILED : SORT_OFFLINE);
     }
   };
+  const openSort = async () => {
+    setSortError('');
+    try {
+      await loadSortPanel();
+    } catch (error) {
+      logger.warn('Could not load the sort panel', error);
+      return setSortError(navigator.onLine ? SORT_LOAD_FAILED : SORT_OFFLINE);
+    }
+    setSortPanelLoaded(true);
+    setSortOrder(rows);
+  };
   const focusAfterRequest = (event: Event) => {
     event.preventDefault();
     if (requestTarget?.kind === 'entry') return requestTarget.request.focus();
@@ -228,10 +247,8 @@ function ColorKeyEditor({
             variant="link"
             className="px-0"
             disabled={!online || sorting || setup.isPending || createKey.isPending}
-            onClick={() => {
-              setSortError('');
-              setSortOrder(rows);
-            }}
+            onPointerEnter={() => void loadSortPanel().catch(() => {})}
+            onClick={() => void openSort()}
           >
             <ArrowUpDown aria-hidden="true" />
             Sort
@@ -446,16 +463,20 @@ function ColorKeyEditor({
         email={email}
         onSent={onSent}
       />
-      <ColorKeySortPanel
-        order={sortOrder}
-        onOrderChange={setSortOrder}
-        onDone={() => void finishSort()}
-        onCloseAutoFocus={event => {
-          event.preventDefault();
-          document.getElementById(`color-keys-${pageId}`)?.focus();
-        }}
-        requests={requests}
-      />
+      {sortPanelLoaded ? (
+        <Suspense fallback={null}>
+          <ColorKeySortPanel
+            order={sortOrder}
+            onOrderChange={setSortOrder}
+            onDone={() => void finishSort()}
+            onCloseAutoFocus={event => {
+              event.preventDefault();
+              document.getElementById(`color-keys-${pageId}`)?.focus();
+            }}
+            requests={requests}
+          />
+        </Suspense>
+      ) : null}
     </Section>
   );
 }

@@ -23,6 +23,25 @@ routerAdd('POST', '/api/test/posthog/run', e => {
   };
   return e.json(200, worker.processPending(e.app, config));
 }, $apis.requireSuperuserAuth());
+routerAdd('POST', '/api/test/posthog/alert-crash', e => {
+  let attempts = 0;
+  let emitted = 0;
+  const facade = {
+    runInTransaction: callback => e.app.runInTransaction(callback),
+    logger: () => ({ warn: (...args) => {
+      attempts++;
+      if (e.requestInfo().body.beforeEmit) throw new Error('Synthetic stop before emission.');
+      e.app.logger().warn(...args);
+      emitted++;
+    } }),
+  };
+  try {
+    require(__hooks + '/account_deletion_posthog.js').processPending(facade, null);
+    return e.json(200, { failed: false, attempts, emitted });
+  } catch (_) {
+    return e.json(200, { failed: true, attempts, emitted });
+  }
+}, $apis.requireSuperuserAuth());
 routerAdd('POST', '/api/test/posthog/plans', e => {
   const queries = require(__hooks + '/account_deletion_posthog.js').queries;
   const output = {};
@@ -111,11 +130,92 @@ try {
   };
   const uuid = '095be615-a8ad-4c33-8e9c-c7612fbf6c9f';
   let id = await create();
+  db.prepare(
+    "UPDATE account_deletion_jobs SET next_attempt = '2099-01-01', next_alert = '2000-01-01', last_error = 'identity_missing' WHERE id = ?"
+  ).run(id);
+  const beforeAlertCrash = row(id);
+  let crash = await request('/api/test/posthog/alert-crash', { beforeEmit: true });
+  assert.deepEqual(crash.body, { failed: true, attempts: 1, emitted: 0 });
+  assert.equal(
+    row(id).next_alert,
+    beforeAlertCrash.next_alert,
+    'stop before emission must leave alert eligible'
+  );
+  assert.equal(row(id).alerted_at, beforeAlertCrash.alerted_at);
+  db.exec(
+    "CREATE TRIGGER fail_alert_ack BEFORE UPDATE ON account_deletion_jobs WHEN NEW.alerted_at != OLD.alerted_at BEGIN SELECT RAISE(ABORT, 'Synthetic stop after emission'); END;"
+  );
+  crash = await request('/api/test/posthog/alert-crash', { beforeEmit: false });
+  assert.deepEqual(crash.body, { failed: true, attempts: 1, emitted: 1 });
+  assert.equal(
+    row(id).next_alert,
+    beforeAlertCrash.next_alert,
+    'failed acknowledgement must leave alert eligible'
+  );
+  db.exec('DROP TRIGGER fail_alert_ack');
+  crash = await request('/api/test/posthog/alert-crash', { beforeEmit: false });
+  assert.deepEqual(
+    crash.body,
+    { failed: false, attempts: 1, emitted: 1 },
+    'duplicate local emission is tolerated after failed acknowledgement'
+  );
+  assert.ok(row(id).alerted_at);
+  crash = await request('/api/test/posthog/alert-crash', { beforeEmit: false });
+  assert.deepEqual(crash.body, { failed: false, attempts: 0, emitted: 0 });
+
+  for (const [byteSize, symbol] of [
+    [240000, '界'],
+    [240001, '界'],
+    [300000, '🙂'],
+  ]) {
+    id = await create();
+    const target = { host, projectId: '123', personId: uuid, distinctIds: [row(id).user_id, ''] };
+    const remaining = byteSize - Buffer.byteLength(JSON.stringify(target), 'utf8');
+    const width = Buffer.byteLength(symbol, 'utf8');
+    target.distinctIds[1] =
+      symbol.repeat(Math.floor(remaining / width)) + 'x'.repeat(remaining % width);
+    assert.equal(Buffer.byteLength(JSON.stringify(target), 'utf8'), byteSize);
+    assert.ok(
+      JSON.stringify(target.distinctIds).length < 200000,
+      'old code-unit guard would accept multibyte target'
+    );
+    let dispatched = 0;
+    handler = req => {
+      if (req.method === 'DELETE') {
+        dispatched++;
+        assert.deepEqual(
+          JSON.parse(row(id).posthog_target),
+          target,
+          'complete byte-bounded target saved before DELETE'
+        );
+        return { status: 202 };
+      }
+      return {
+        body: req.url.includes(`/${uuid}/`)
+          ? { uuid, distinct_ids: target.distinctIds }
+          : { results: [{ id: uuid }], next: null },
+      };
+    };
+    await run();
+    if (byteSize <= 240000) {
+      assert.equal(dispatched, 1);
+      assert.equal(row(id).last_error, 'verification_pending');
+    } else {
+      assert.equal(dispatched, 0, 'oversized UTF8 target never dispatched');
+      assert.equal(row(id).last_error, 'identity_oversized');
+      assert.equal(row(id).posthog_status, 'blocked');
+      assert.ok(row(id).alerted_at, 'oversized identity alerts immediately');
+      assert.equal(row(id).posthog_target, null);
+    }
+  }
+
+  id = await create();
+  const beforeMissingConfig = requests.length;
   await run(false);
   assert.equal(row(id).posthog_status, 'blocked');
   assert.equal(row(id).last_error, 'configuration');
   assert.ok(row(id).alerted_at);
-  assert.equal(requests.length, 0, 'missing configuration never contacts vendor');
+  assert.equal(requests.length, beforeMissingConfig, 'missing configuration never contacts vendor');
 
   id = await create();
   handler = () => ({ body: { results: [], next: null } });
@@ -300,8 +400,8 @@ try {
     await run();
     assert.equal(
       row(id).last_error,
-      'verification_attribution',
-      'mixed history and skew have explicit attribution blockers, never inferred success'
+      entries.length > 1 ? 'vendor_shape' : 'verification_attribution',
+      'multiple rows violate vendor uniqueness; skew never establishes completion'
     );
     assert.equal(row(id).posthog_verified_at, '');
   }
@@ -312,11 +412,31 @@ try {
   db.prepare(
     "UPDATE account_deletion_jobs SET posthog_status = 'requested', posthog_target = ?, posthog_requested_at = ? WHERE id = ?"
   ).run(JSON.stringify(lostTarget), now(), id);
+  const beforeMissingPerson = requests.filter(r => r.method === 'DELETE').length;
   handler = req =>
-    req.method === 'DELETE' ? { status: 404 } : { body: { results: [], next: null } };
+    req.url.includes('deletion_status') ? { body: { results: [], next: null } } : { status: 404 };
   await run();
   assert.equal(row(id).posthog_status, 'blocked');
-  assert.equal(row(id).last_error, 'deletion_unconfirmed');
+  assert.equal(row(id).last_error, 'vendor_response');
+  assert.equal(
+    requests.filter(r => r.method === 'DELETE').length,
+    beforeMissingPerson,
+    'unavailable fresh detail blocks repeat DELETE'
+  );
+  assert.deepEqual(JSON.parse(row(id).posthog_target), lostTarget);
+  due(id);
+  handler = req =>
+    req.method === 'DELETE'
+      ? { status: 404 }
+      : req.url.includes('deletion_status')
+        ? { body: { results: [], next: null } }
+        : { body: { uuid, distinct_ids: lostTarget.distinctIds } };
+  await run();
+  assert.equal(
+    row(id).last_error,
+    'deletion_unconfirmed',
+    'DELETE 404 after successful detail refresh still cannot confirm erasure'
+  );
   assert.deepEqual(JSON.parse(row(id).posthog_target), lostTarget);
   due(id);
   handler = () => ({
@@ -365,6 +485,92 @@ try {
   );
   assert.equal(requests.filter(r => r.method === 'DELETE').length, beforeSharedDelete);
 
+  for (const change of ['shared', 'removed', 'added', 'save_failure', 'unavailable', 'throttled']) {
+    id = await create();
+    const saved = {
+      host,
+      projectId: '123',
+      personId: uuid,
+      distinctIds: [row(id).user_id, 'original-anonymous'],
+    };
+    db.prepare(
+      "UPDATE account_deletion_jobs SET posthog_status = 'requested', posthog_target = ?, posthog_requested_at = ? WHERE id = ?"
+    ).run(JSON.stringify(saved), now(), id);
+    const fresh = {
+      ...saved,
+      distinctIds:
+        change === 'removed'
+          ? [row(id).user_id]
+          : [...saved.distinctIds, change === 'shared' ? sharedUser.body.id : 'new-anonymous'],
+    };
+    const sequence = [];
+    handler = req => {
+      if (req.method === 'DELETE') {
+        sequence.push('delete');
+        assert.deepEqual(
+          JSON.parse(row(id).posthog_target),
+          fresh,
+          'refreshed full manifest durable before repeat DELETE'
+        );
+        return { status: 202 };
+      }
+      if (req.url.includes('deletion_status')) {
+        sequence.push('status');
+        return { body: { results: [], next: null } };
+      }
+      assert.equal(
+        req.url,
+        `/api/projects/123/persons/${uuid}/`,
+        'retrieve same durable UUID, never rediscover another person'
+      );
+      sequence.push('detail');
+      if (change === 'unavailable') return { status: 503 };
+      if (change === 'throttled') return { status: 429, headers: { 'Retry-After': '7200' } };
+      return { body: { uuid, distinct_ids: fresh.distinctIds } };
+    };
+    if (change === 'save_failure')
+      db.exec(
+        "CREATE TRIGGER fail_refresh_save BEFORE UPDATE ON account_deletion_jobs WHEN NEW.posthog_target != OLD.posthog_target BEGIN SELECT RAISE(ABORT, 'Synthetic refreshed target persistence failure'); END;"
+      );
+    await run();
+    assert.deepEqual(
+      sequence,
+      change === 'added' ? ['status', 'detail', 'delete'] : ['status', 'detail']
+    );
+    if (change === 'added') {
+      assert.equal(row(id).last_error, 'verification_pending');
+      assert.deepEqual(JSON.parse(row(id).posthog_target), fresh);
+    } else {
+      assert.deepEqual(
+        JSON.parse(row(id).posthog_target),
+        saved,
+        'unsafe or failed refresh retains complete original target'
+      );
+      assert.equal(
+        row(id).last_error,
+        change === 'shared'
+          ? 'identity_shared'
+          : change === 'removed'
+            ? 'identity_changed'
+            : change === 'unavailable'
+              ? 'vendor_unavailable'
+              : change === 'throttled'
+                ? 'rate_limit'
+                : 'worker_failure'
+      );
+      if (change === 'throttled')
+        assert.ok(
+          Date.parse(row(id).next_attempt) > Date.now() + 7190_000,
+          'unavailable refresh respects rate limit'
+        );
+      if (change !== 'save_failure') {
+        assert.equal(row(id).posthog_status, 'blocked');
+        assert.ok(row(id).alerted_at);
+      }
+    }
+    if (change === 'save_failure') db.exec('DROP TRIGGER fail_refresh_save');
+  }
+
   id = await create();
   db.prepare(
     "UPDATE account_deletion_jobs SET posthog_status = 'requested', posthog_target = ?, posthog_requested_at = ?, created = '2000-01-01 00:00:00.000Z', next_alert = '2000-01-15 00:00:00.000Z' WHERE id = ?"
@@ -391,6 +597,55 @@ try {
     row(id).alerted_at,
     pendingAlerted,
     'pending verification alert suppressed for 24 hours'
+  );
+
+  // Model the plausible partial vendor failure: event queue survives 503 while
+  // profile deletion fails. An event row must never certify full-scope erasure.
+  id = await create();
+  let profileDeletes = 0;
+  let eventState = 'pending';
+  handler = req => {
+    if (req.method === 'DELETE') {
+      profileDeletes++;
+      return { status: 503 };
+    }
+    if (req.url.includes('deletion_status'))
+      return {
+        body: {
+          results: [
+            {
+              person_uuid: uuid,
+              status: eventState,
+              created_at: now(),
+              delete_verified_at: eventState === 'completed' ? now() : null,
+            },
+          ],
+          next: null,
+        },
+      };
+    return {
+      body: req.url.includes(`/${uuid}/`)
+        ? { uuid, distinct_ids: [row(id).user_id] }
+        : { results: [{ id: uuid }], next: null },
+    };
+  };
+  await run();
+  assert.equal(row(id).last_error, 'vendor_unavailable');
+  assert.equal(profileDeletes, 1);
+  due(id);
+  await run();
+  assert.equal(row(id).last_error, 'verification_pending');
+  assert.equal(profileDeletes, 1, 'pending event status does not repair a surviving profile');
+  assert.equal((await fetch(`${host}/api/projects/123/persons/${uuid}/`)).status, 200);
+  eventState = 'completed';
+  due(id);
+  await run();
+  assert.equal(row(id).last_error, 'verification_attribution');
+  assert.equal(row(id).posthog_status, 'blocked');
+  assert.equal(row(id).posthog_verified_at, '');
+  assert.ok(
+    row(id).posthog_target,
+    'surviving profile is unresolved even with verified event status'
   );
 
   // A second claimant owns this row while the first HTTP call is in flight.

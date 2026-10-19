@@ -57,6 +57,8 @@ function alertUnresolved(app) {
     'identity_missing',
     'identity_shared',
     'identity_ambiguous',
+    'identity_oversized',
+    'identity_changed',
     'target_configuration',
     'vendor_shape',
     'vendor_response',
@@ -76,30 +78,34 @@ function alertUnresolved(app) {
       .newQuery(queries.alerts)
       .bind({ now: date(Date.now()) })
       .all(rows);
-    for (const row of rows) {
-      const job = tx.findRecordById('account_deletion_jobs', row.id);
+    const jobs = rows.map(row => tx.findRecordById('account_deletion_jobs', row.id));
+    for (const job of jobs) {
       const reason = reasons.includes(job.getString('last_error'))
         ? job.getString('last_error')
         : 'worker_failure';
       counts[reason] = (counts[reason] || 0) + 1;
+    }
+    total = jobs.length;
+    // Emit before suppression commits. A stop or rollback can duplicate the
+    // warning, but cannot acknowledge a warning that was never attempted.
+    if (total)
+      app
+        .logger()
+        .warn(
+          'Account deletion cleanup unresolved.',
+          'reason',
+          'cleanup_unresolved',
+          'count',
+          total,
+          'categories',
+          JSON.stringify(counts)
+        );
+    for (const job of jobs) {
       job.set('alerted_at', date(Date.now()));
       job.set('next_alert', date(Date.now() + day));
       tx.save(job);
-      total++;
     }
   });
-  if (total)
-    app
-      .logger()
-      .warn(
-        'Account deletion cleanup unresolved.',
-        'reason',
-        'cleanup_unresolved',
-        'count',
-        total,
-        'categories',
-        JSON.stringify(counts)
-      );
   return total;
 }
 
@@ -195,23 +201,30 @@ function targetFor(config, job) {
   ) {
     throw failure('identity_ambiguous', true);
   }
+  return personTarget(config, uuid, job.getString('user_id'));
+}
+
+function personTarget(config, uuid, userId) {
   // List/batch hydration may cap distinct IDs. The retrieve endpoint returns
   // the authoritative full set; never persist a truncated identity manifest.
   const person = request(config, 'GET', `${encodeURIComponent(uuid)}/`).json;
   if (!person || (person.uuid || person.id) !== uuid) throw failure('identity_ambiguous', true);
   if (
     !Array.isArray(person.distinct_ids) ||
-    !person.distinct_ids.includes(job.getString('user_id')) ||
-    person.distinct_ids.some(id => typeof id !== 'string' || !id) ||
-    JSON.stringify(person.distinct_ids).length > 200000
+    !person.distinct_ids.includes(userId) ||
+    person.distinct_ids.some(id => typeof id !== 'string' || !id)
   )
     throw failure('identity_ambiguous', true);
-  return {
+  const target = {
     host: config.host,
     projectId: config.projectId,
     personId: uuid,
     distinctIds: person.distinct_ids,
   };
+  // Encode the entire value as PocketBase stores it, leaving 10 KB headroom
+  // below the JSON field's 250,000-byte limit. Never truncate identities.
+  if (toBytes(target).length > 240000) throw failure('identity_oversized', true);
+  return target;
 }
 
 function processJob(app, claim, config) {
@@ -230,12 +243,12 @@ function processJob(app, claim, config) {
         `deletion_status/?person_uuid=${encodeURIComponent(target.personId)}&status=all`
       )
     );
-    if (entries.some(entry => entry.person_uuid !== target.personId))
+    if (entries.length > 1 || entries.some(entry => entry.person_uuid !== target.personId))
       throw failure('vendor_shape', true);
     if (entries.length) {
       // The vendor deduplicates AsyncDeletion by person UUID and DELETE returns
-      // no operation ID. Neither timestamps nor mixed history attribute a status
-      // to this submission. Keep the target until an attributable API exists.
+      // no operation ID. This adapter establishes no fresh event coverage,
+      // profile absence or recording verification. Keep the target unresolved.
       if (
         entries.some(
           entry =>
@@ -246,8 +259,20 @@ function processJob(app, claim, config) {
       }
       throw failure('verification_pending');
     }
-    // An empty status response after a crash is inconclusive. Retry the same
-    // durable target, never discover a replacement person or claim completion.
+    // A retry must not erase identities merged since the saved snapshot.
+    // Refresh the same UUID, preserve every earlier ID, and reject unsafe changes.
+    let fresh;
+    try {
+      fresh = personTarget(config, target.personId, claim.job.getString('user_id'));
+    } catch (outcome) {
+      throw failure(outcome?.reason || 'identity_ambiguous', true, outcome?.retryAfter || 0);
+    }
+    const freshIds = new Set(fresh.distinctIds);
+    if (target.distinctIds.some(id => !freshIds.has(id))) throw failure('identity_changed', true);
+    if (identityShared(app, fresh, claim.job.getString('user_id')))
+      throw failure('identity_shared', true);
+    if (!updateClaim(app, claim, job => job.set('posthog_target', fresh))) return;
+    target = fresh;
   } else {
     target = targetFor(config, claim.job);
     if (

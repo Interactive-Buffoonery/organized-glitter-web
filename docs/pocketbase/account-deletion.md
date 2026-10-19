@@ -119,12 +119,14 @@ that the account is intact.
 
 ## PostHog worker
 
-**Release blocker: automatic vendor completion is unavailable.** The current
-persons API cannot attribute a deletion status to this submission. The worker
-keeps vendor cleanup pending or blocked, retains the private target, and never
-sets `posthog_status` to `completed`. This is a deliberate fail-closed limitation,
-not evidence that erasure has or has not occurred. Do not enable this adapter for
-release until an attributable vendor verification protocol has been established.
+**Release blocker: automatic vendor completion is unavailable.** This adapter has
+no proven verification protocol covering the person profile, events and recordings.
+An empty status preflight is a candidate for establishing fresh event coverage by
+request ordering, under assumptions described below; it is not full-scope proof.
+The worker keeps cleanup pending or blocked, retains the private target, and never
+sets `posthog_status` to `completed`. Keep the erasure environment variables unset
+until a full-scope completion protocol is established and independently verified.
+No current state proves that erasure has or has not occurred.
 
 The five-minute cron processes at most ten due jobs. Each HTTP request has a
 ten-second timeout, outside database transactions. New deletions wait one hour
@@ -152,11 +154,16 @@ Self-hosted destinations require an explicit reviewed adapter change.
    Require exactly one person and no unresolved pagination. Fetch that person's
    detail record for the full authoritative linked `distinct_ids`; list and
    batch representations can truncate them. Reject missing, ambiguous or
-   oversized identity manifests instead of guessing or truncating.
+   oversized identity manifests instead of guessing or truncating. Encode the
+   complete target, including host/project/UUID metadata, to UTF-8 bytes using
+   PocketBase `toBytes`. The 240,000-byte guard leaves 10,000 bytes below the JSON
+   field limit. A larger target blocks as `identity_oversized`, schedules an
+   immediate alert, and never reaches DELETE; no linked ID is truncated.
 3. Persist the person UUID, host, project, all linked IDs, and request timestamp
    before sending `DELETE persons/:uuid/?delete_events=true&delete_recordings=true`.
    No irreversible call occurs if that save or ownership check fails. The vendor
-   operation targets the whole person, including linked anonymous history.
+   operation targets the whole person. Coverage of all linked anonymous history
+   still requires vendor verification.
    Before dispatch, query the current users collection for every recorded linked
    ID. If another existing user's ID is present, block as `identity_shared` and
    preserve the complete manifest for reconciliation. The check is repeated on
@@ -166,12 +173,27 @@ Self-hosted destinations require an explicit reviewed adapter change.
 4. On subsequent attempts, query `persons/deletion_status/` for that saved UUID
    first. Pending status stays pending. A completed status with a verification
    timestamp blocks as `verification_attribution`, since the API does not tie it
-   to this submission. Old-only status, mixed history, and clock skew never
-   certify completion. A changed project or region blocks the job rather than
+   to full-scope verified erasure in this adapter. More than one row for the saved
+   UUID violates the inspected vendor uniqueness contract and blocks as
+   `vendor_shape`. Old-only status and clock skew never certify completion.
+   A changed project or region blocks the job rather than
    redirecting its target.
 5. API acceptance, an empty status response, a missing person, and a 404 never
-   mean completion. An empty status response retries the same saved UUID;
-   uncertain or missing targets remain private and unresolved for reconciliation.
+   mean completion. Before repeating DELETE after an empty status, retrieve the
+   same saved person's full detail again. If retrieval fails, a recorded ID is
+   missing (`identity_changed`), the refreshed target is oversized, or a linked
+   ID belongs to another existing user (`identity_shared`), block and preserve the
+   original durable target. Safe additions are saved in the full refreshed
+   manifest before dispatch, followed by the transactional shared-ID and lease
+   check. A save failure prevents DELETE. This narrows the retry merge window but
+   cannot prevent external merges after the final retrieval/check.
+6. A plausible partial vendor failure can return 503 while queuing event deletion
+   and leaving the person profile present. Pending event status currently stays
+   unresolved without another DELETE; completed event status remains blocked.
+   The fixture models this case and proves no false completion, not vendor
+   transaction semantics or profile recovery. A future producer must separately
+   establish profile absence via detail 404 and handle a surviving or recreated
+   profile safely; event verification alone cannot do this.
 
 Backoff starts at 15 minutes, doubles to a 24-hour cap and is stored in the job.
 A 429 also honors a longer valid `Retry-After` delay, including HTTP dates;
@@ -180,15 +202,20 @@ beyond year 9999 blocks as `rate_limit_invalid`, stores a one-day retry, release
 the lease, and schedules an alert instead of throwing during persistence.
 401/403, malformed responses, missing identities and configuration mismatch are
 blocked and retried durably. Pending verification is retried without resubmission
-while the vendor reports a matching pending request.
+while the vendor reports pending events for the saved person.
 
 Alert scheduling uses `next_alert` independently of `next_attempt`. New jobs
 become alert-eligible after 14 days; blocked outcomes become eligible immediately
 subject to 24-hour per-job suppression. Every cron run selects at most 100 due
-alerts through a partial index excluding completed receipts, updates their next
-alert time durably, and emits one aggregate warning with a total and allowlisted
-reason counts. Missing-person jobs remain blocked and visible without a daily
-per-job message flood. The oldest due alert is considered first. A valid year-long
+alerts through a partial index excluding completed receipts and emits one
+aggregate warning with a total and allowlisted reason counts before committing
+suppression. A stop before emission leaves rows eligible. A failure after emission
+but before commit can emit duplicates on recovery; that is intentional local
+at-least-once emission behavior. The logger call does not acknowledge external
+transport or delivery. Successful local emission then commits next eligibility.
+Missing-person jobs remain blocked and visible without a daily
+per-job message flood. The oldest due alert is considered first; 24 hours is
+suppression/eligibility, not guaranteed notification cadence. A valid year-long
 vendor rate limit does not delay alerts or cause an earlier vendor request.
 
 Warnings never include job IDs, account IDs, linked IDs, proofs, credentials or
@@ -215,14 +242,38 @@ Current primary source was also inspected at PostHog commit
   return an empty 202 for single-person DELETE; status contains person UUID,
   creation time, status and verification time, but no operation identifier.
 
-Consequently an old completed row can survive another deletion attempt. A
-PocketBase timestamp, arbitrary clock tolerance, accepting any completed row or
-subtracting a preflight history snapshot does not establish current-request
-attribution under deduplication or concurrent vendor operations. This adapter
-needs a documented vendor operation identifier or another verifiable protocol
-before it can produce completion. Source inspection is not deployed-project
-verification. The existing receipt completion/Apple/retention contract is retained
-for a future verified producer, but this worker cannot satisfy it today.
+The same pinned source also establishes:
+
+- [Synchronous single-person dispatch](https://github.com/PostHog/posthog/blob/069e3b3acc87cc880fa0b13423d9c450d36674d2/posthog/api/person.py#L993-L1020)
+  queues the event row before returning 202. Status for one person is zero or one
+  row, not a history list. The former mixed-history fixture is now an unexpected
+  vendor-response test.
+- [Event deletion and verification conditions](https://github.com/PostHog/posthog/blob/069e3b3acc87cc880fa0b13423d9c450d36674d2/posthog/models/async_deletion/delete_events.py#L143-L189)
+  use the row's `created_at` cutoff. Person UUIDs are deterministic and can be
+  reused; conflicts do not refresh that cutoff for a recreated person.
+- [Completion marking](https://github.com/PostHog/posthog/blob/069e3b3acc87cc880fa0b13423d9c450d36674d2/posthog/models/async_deletion/delete.py#L33-L48)
+  records event verification. Recording deletion uses a separate workflow and
+  has no verification status in this person-status response.
+
+An empty-preflight candidate could persist an empty status observation under the
+lease immediately before dispatch. Assuming reads see committed rows and rows
+are not rewritten, a later row would have been inserted after that observation,
+without comparing PocketBase and vendor clocks. A pre-existing row must block
+that candidate because deduplication preserves the old coverage cutoff. A
+concurrent deletion between preflight and submission can establish an earlier
+cutoff than this submission, leaving that interval and later events uncovered.
+Read consistency, rewrite behavior and the concurrency/late-event boundary need
+authorized vendor evidence. This event-only candidate is not implemented and
+does not establish full-scope deletion.
+
+Profile absence, recording verification, late and personless events, and history
+stored under pre-merge person IDs remain unresolved. Source inspection does not
+prove the actual project's behavior. This worker does not implement the candidate
+or any completion transition; `verification_attribution` remains its conservative
+unresolved-completion reason, not a claim that event attribution is impossible.
+No arbitrary clock tolerance or manual completion flag is permitted.
+The existing receipt completion/Apple/retention contract is retained for a future
+verified producer, but this worker cannot satisfy it today.
 
 ## Compatibility and legacy retention
 
@@ -248,6 +299,41 @@ is used to infer a successful deletion or backfill a vendor job. Historical
 accounts deleted before this hook need separate evidence-based reconciliation.
 This source change performs no production audit purge.
 
+## Capacity and operational acceptance
+
+Current bounded ceilings assume every cron runs successfully: 100 audit deletes
+per hour (2,400/day), 100 alert rows per five minutes (28,800/day), and ten vendor
+claims per five minutes (2,880/day). Retries consume claim capacity. Synthetic
+100,000-row backlogs imply at least 41.7 days to drain expired audits or 3.47 days
+to circulate due alerts at those ceilings. These are arithmetic projections, not
+observed production workloads or demonstrated service rates. The current tests
+prove query plans and bounded batches only.
+
+The retention policy target remains expiry by 30 days, meaning zero expired-audit
+lag; hourly selection alone cannot guarantee that deadline. Do not claim the
+30-day policy is met. Before deployment, an operator must measure expected peak
+expiry arrivals, existing backlog, oldest expired creation time, and actual drain
+rate, then demonstrate a bounded retention schedule that meets the policy. Any
+required cadence/batch change needs its own scoped implementation and validation.
+This patch changes neither retention batch size nor cadence.
+
+Alert acceptance target: oldest due alert age at most 15 minutes under the
+expected peak unresolved population, including retries and outage recovery.
+This is an engineering acceptance target, not a measured result or a guarantee
+from `next_alert`. Independently monitor due-alert count/oldest `next_alert`,
+expired-audit count/oldest `created`, due-claim count/oldest `next_attempt`, and cron
+liveness. Report oldest expired age beyond the 30-day cutoff as retention lag;
+report alert age beyond `next_alert` as notification eligibility lag. Keep metrics
+aggregate and never export account IDs or manifests. Gate rollout on measured
+capacity, configured queue-age alarms, verified external alert routing and a
+named operational owner. Those gates are currently unverified.
+
+With no completed producer, blocked jobs remain retained and eventually retry.
+Do not enable vendor configuration while this limitation remains; daily retries
+can exhaust the claim budget. No terminal parking state or indefinite-PII cleanup
+claim has been introduced. Missing configuration prevents external calls but does
+not eliminate the need to monitor retained private jobs and cron capacity.
+
 ## Deployment and remaining release gates
 
 Deploy the forward migration `1792281600_account_deletion_worker.js`, canonical
@@ -265,7 +351,7 @@ erasure or a deployed backend revision. Before release:
 - Run the required local backend-first validation and strict combined `test:pr`.
   Integrate client and native work, including malformed responses, uncertain
   requests, account/session fencing and local cleanup failures.
-- Resolve the current-request attribution blocker before enabling release.
+- Resolve the full-scope verification blocker before enabling release.
   Exercise the adapter in an explicitly authorized disposable vendor project.
   Confirm region, scopes, full linked identity coverage, request and verification
   semantics, personless identified events, late events and session recordings.
@@ -274,7 +360,8 @@ erasure or a deployed backend revision. Before release:
   alone or a one-hour worker delay is insufficient proof.
 - Verify Google and Discord revocation applicability. Existing Apple revocation
   and its encrypted grant queue still gate overall completion.
-- Verify alert routing, worker liveness and an owner for unresolved jobs. Track
+- Meet the capacity/queue-age targets above; verify alert routing, worker liveness
+  and an owner for unresolved jobs. Track
   legacy audit backlogs and historical deletion reconciliation privately.
 - Verify backup expiry within 30 days and rehearse restore while ingress and
   workers are blocked. Reapply the deletion ledger held outside the snapshot,

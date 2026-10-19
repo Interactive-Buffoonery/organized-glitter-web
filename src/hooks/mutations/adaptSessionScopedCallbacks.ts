@@ -18,18 +18,26 @@ export function adaptSessionScopedCallbacks<
 ): MutateOptions<TData, TError, TInnerVariables, TOnMutateResult> | undefined {
   if (!options) return undefined;
 
+  const { onSuccess, onError, onSettled } = options;
+
   return {
-    onSuccess: (data, variables, context, mutationContext) => {
-      if (!isCurrentSessionIdentity(variables.sessionIdentity)) return;
-      return options.onSuccess?.(data, selectVariables(variables), context, mutationContext);
-    },
-    onError: (error, variables, context, mutationContext) => {
-      if (!isCurrentSessionIdentity(variables.sessionIdentity)) return;
-      return options.onError?.(error, selectVariables(variables), context, mutationContext);
-    },
-    onSettled: (data, error, variables, context, mutationContext) => {
-      if (!isCurrentSessionIdentity(variables.sessionIdentity)) return;
-      return options.onSettled?.(data, error, selectVariables(variables), context, mutationContext);
-    },
+    ...(onSuccess && {
+      onSuccess: (data, variables, context, mutationContext) => {
+        if (!isCurrentSessionIdentity(variables.sessionIdentity)) return;
+        return onSuccess(data, selectVariables(variables), context, mutationContext);
+      },
+    }),
+    ...(onError && {
+      onError: (error, variables, context, mutationContext) => {
+        if (!isCurrentSessionIdentity(variables.sessionIdentity)) return;
+        return onError(error, selectVariables(variables), context, mutationContext);
+      },
+    }),
+    ...(onSettled && {
+      onSettled: (data, error, variables, context, mutationContext) => {
+        if (!isCurrentSessionIdentity(variables.sessionIdentity)) return;
+        return onSettled(data, error, selectVariables(variables), context, mutationContext);
+      },
+    }),
   };
 }

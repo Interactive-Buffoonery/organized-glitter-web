@@ -11,7 +11,11 @@ import {
 import { Camera } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import catalog from '@/features/coloring/colorKeys/symbolCatalog.json';
-import { searchSymbols, symbolsByGroup } from '@/features/coloring/colorKeys/symbols';
+import {
+  searchSymbols,
+  symbolsByGroup,
+  type SymbolGroupId,
+} from '@/features/coloring/colorKeys/symbols';
 import { cn } from '@/lib/utils';
 import { ColorKeySheet } from './ColorKeySheet';
 import { SymbolGlyph } from './SymbolGlyph';
@@ -140,7 +144,7 @@ function PickerBody({
       ...catalog.groups.map(group => ({
         id: group.id,
         label: group.label,
-        symbols: symbolsByGroup[group.id].map(symbol => symbol.id),
+        symbols: symbolsByGroup[group.id as SymbolGroupId].map(symbol => symbol.id),
       })),
     ];
   }, [query, recent]);

@@ -83,6 +83,39 @@ export function useDeleteColorKey(pageId: string, userId: string) {
   });
 }
 
+/** Saves `ordered` as positions 0 to n-1, one PATCH per row that moved. */
+export function useReorderColorKeys(pageId: string, userId: string) {
+  const client = useQueryClient();
+  const key = colorKeysKey(userId, pageId);
+  return useMutation({
+    mutationFn: async (ordered: ColorKey[]) => {
+      const saved: ColorKey[] = [];
+      for (const [position, row] of ordered.entries())
+        if (row.position !== position)
+          saved.push(await ColorKeysService.update(row.id, userId, { position }));
+      return saved;
+    },
+    onMutate: async ordered => {
+      await client.cancelQueries({ queryKey: key });
+      const previous = client.getQueryData<ColorKey[]>(key);
+      client.setQueryData<ColorKey[]>(
+        key,
+        ordered.map((row, position) => ({ ...row, position }))
+      );
+      return { previous };
+    },
+    onSuccess: saved =>
+      settle(client, userId, pageId, {
+        update: rows => rows.map(row => saved.find(next => next.id === row.id) ?? row),
+      }),
+    onError: (_error, _ordered, context) => {
+      if (context?.previous) client.setQueryData(key, context.previous);
+      settle(client, userId, pageId);
+    },
+    retry: false,
+  });
+}
+
 export function useSetupColorKeys(pageId: string, userId: string) {
   const client = useQueryClient();
   return useMutation({

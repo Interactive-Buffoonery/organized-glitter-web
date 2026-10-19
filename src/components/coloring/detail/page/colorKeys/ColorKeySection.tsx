@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { ArrowUpDown, Plus } from 'lucide-react';
 import { ClientResponseError } from 'pocketbase';
 import { Section, SectionHeading } from '@/components/shared/Section';
 import { Button } from '@/components/ui/button';
@@ -7,17 +7,20 @@ import { DEFAULT_SETUP_SYMBOLS } from '@/features/coloring/colorKeys/symbols';
 import { useColorKeys, useSymbolRequests } from '@/hooks/queries/coloring/useColorKeys';
 import {
   useCreateColorKey,
+  useReorderColorKeys,
   useSetupColorKeys,
 } from '@/hooks/mutations/coloring/useColorKeyMutations';
 import { useAuth } from '@/hooks/useAuth';
 import { notifyError, notifySuccess } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
+import type { ColorKey } from '@/services/pocketbase/colorKeys.service';
 import { createLogger } from '@/utils/logger';
 import { ColorKeyEntry, type EntrySymbolRequest, type EntryTarget } from './ColorKeyEntry';
+import { ColorKeySortPanel } from './ColorKeySortPanel';
 import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
 import { SymbolRequestDialog } from './SymbolRequestDialog';
-import { colorKeyCopyText, requestFor, safeSwatch, symbolName } from './symbolName';
+import { colorKeyCopyText, colorKeyLabel, requestFor, safeSwatch, symbolName } from './symbolName';
 
 const logger = createLogger('ColorKeySection');
 
@@ -25,6 +28,23 @@ const logger = createLogger('ColorKeySection');
 type RequestTarget =
   { kind: 'add' } | { kind: 'setup' } | { kind: 'entry'; request: EntrySymbolRequest };
 const THANKS = "Thanks for the photo. We'll email you when it's added.";
+const SORT_FAILED = 'Couldn’t save the updated order. Please try again.';
+const SORT_OFFLINE = 'Sorting colors needs a connection. Reconnect and try again.';
+
+const subscribeOnline = (onChange: () => void) => {
+  window.addEventListener('online', onChange);
+  window.addEventListener('offline', onChange);
+  return () => {
+    window.removeEventListener('online', onChange);
+    window.removeEventListener('offline', onChange);
+  };
+};
+const useOnline = () =>
+  useSyncExternalStore(
+    subscribeOnline,
+    () => navigator.onLine,
+    () => true
+  );
 
 export function ColorKeySection({
   pageId,
@@ -67,6 +87,12 @@ function ColorKeyEditor({
   ]).data;
   const setup = useSetupColorKeys(pageId, userId);
   const createKey = useCreateColorKey(pageId, userId);
+  const reorder = useReorderColorKeys(pageId, userId);
+  const online = useOnline();
+  // The panel's working order; null while it is closed.
+  const [sortOrder, setSortOrder] = useState<ColorKey[] | null>(null);
+  const [sortError, setSortError] = useState('');
+  const sorting = sortOrder !== null || reorder.isPending;
   // Kept after closing so focus can return to where the request started.
   const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
   const [requestOpen, setRequestOpen] = useState(false);
@@ -165,6 +191,22 @@ function ColorKeyEditor({
     else notifySuccess(THANKS);
     return true;
   };
+  const finishSort = async () => {
+    const ordered = sortOrder;
+    setSortOrder(null);
+    if (!ordered || ordered.every((row, index) => row.id === rows[index]?.id)) return;
+    setSortError('');
+    // A row that arrived or left while the panel was open would get a wrong position.
+    const current = ordered.map(row => rows.find(next => next.id === row.id));
+    if (current.length !== rows.length || current.some(row => !row))
+      return setSortError(SORT_FAILED);
+    try {
+      await reorder.mutateAsync(current as ColorKey[]);
+    } catch (error) {
+      logger.warn('Could not save the color order', error);
+      setSortError(navigator.onLine ? SORT_FAILED : SORT_OFFLINE);
+    }
+  };
   const focusAfterRequest = (event: Event) => {
     event.preventDefault();
     if (requestTarget?.kind === 'entry') return requestTarget.request.focus();
@@ -176,9 +218,26 @@ function ColorKeyEditor({
 
   return (
     <Section variant="bordered" className="space-y-3" landmark={false}>
-      <SectionHeading id={`color-keys-${pageId}`} tabIndex={-1} className="outline-none">
-        Colors used
-      </SectionHeading>
+      <div className="flex items-center gap-3">
+        <SectionHeading id={`color-keys-${pageId}`} tabIndex={-1} className="flex-1 outline-none">
+          Colors used
+        </SectionHeading>
+        {!showSetup && rows.length > 1 ? (
+          <Button
+            type="button"
+            variant="link"
+            className="px-0"
+            disabled={!online || sorting || setup.isPending || createKey.isPending}
+            onClick={() => {
+              setSortError('');
+              setSortOrder(rows);
+            }}
+          >
+            <ArrowUpDown aria-hidden="true" />
+            Sort
+          </Button>
+        ) : null}
+      </div>
       {query.isPending && <p role="status">Loading colors…</p>}
       {query.isError && (
         <div role="alert">
@@ -271,16 +330,14 @@ function ColorKeyEditor({
             <ul className="divide-border/60 -mx-2 divide-y">
               {rows.map(row => {
                 const request = requestFor(row.symbol, requests);
-                const name = symbolName(row.symbol, request);
                 return (
                   <li key={row.id}>
                     <button
                       type="button"
-                      aria-label={[name, row.code.trim() || 'no code yet', row.color_name]
-                        .filter(Boolean)
-                        .join(', ')}
+                      aria-label={colorKeyLabel(row, request)}
+                      disabled={sorting}
                       onClick={() => setEntry({ row, symbol: row.symbol, position: row.position })}
-                      className="hover:bg-muted/60 flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left"
+                      className="hover:bg-muted/60 flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left disabled:opacity-60"
                     >
                       <span className="flex w-10 shrink-0 justify-center text-3xl">
                         <SymbolGlyph symbol={row.symbol} request={request} />
@@ -313,12 +370,18 @@ function ColorKeyEditor({
               })}
             </ul>
           )}
+          {sortError ? (
+            <p role="alert" className="text-destructive text-sm">
+              {sortError}
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Button
               id={`color-keys-${pageId}-add-symbol`}
               type="button"
               variant="link"
               className="px-0"
+              disabled={sorting}
               onClick={() => setPicker('add')}
             >
               Add symbol
@@ -382,6 +445,16 @@ function ColorKeyEditor({
         bookLabel={bookLabel}
         email={email}
         onSent={onSent}
+      />
+      <ColorKeySortPanel
+        order={sortOrder}
+        onOrderChange={setSortOrder}
+        onDone={() => void finishSort()}
+        onCloseAutoFocus={event => {
+          event.preventDefault();
+          document.getElementById(`color-keys-${pageId}`)?.focus();
+        }}
+        requests={requests}
       />
     </Section>
   );

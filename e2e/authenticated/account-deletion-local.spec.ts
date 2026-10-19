@@ -344,32 +344,95 @@ test('keeps an interrupted sign-out claim visible and releases only its owner', 
   const result = await page.evaluate(
     async ({ backend, id }) => {
       const { deletionIntents } = window.__ogDeletionQa!;
-      const first = await deletionIntents.claimSignOut(backend, id, 'same-epoch', 'first-claim');
-      const concurrent = await deletionIntents.claimSignOut(
-        backend,
-        id,
-        'same-epoch',
-        'second-claim'
-      );
+      const marker = localStorage.getItem('og:session-identity:v1:pocketbase_auth');
+      if (!marker) throw new Error('Session identity unavailable');
+      const { epoch } = JSON.parse(marker) as { epoch: string };
+      const first = await deletionIntents.claimSignOut(backend, id, epoch, 'first-claim');
+      const concurrent = await deletionIntents.claimSignOut(backend, id, epoch, 'second-claim');
       const wrongRelease = await deletionIntents.releaseSignOut(backend, id, 'second-claim');
       return { first, concurrent, wrongRelease };
     },
     { backend: backendUrl, id: accountId }
   );
   expect(result).toEqual({ first: true, concurrent: false, wrongRelease: false });
+  await page.evaluate(() => localStorage.setItem('og:form-draft:v1:interrupted-signout', 'kept'));
   await page.reload();
   await expect(page.getByRole('alert')).toContainText('Sign-out was interrupted');
   await expect(page.getByRole('link', { name: 'Contact support' })).toBeVisible();
-  const released = await page.evaluate(
+  await page.getByRole('button', { name: 'Finish signing out' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect.poll(() => page.evaluate(() => Boolean(window.__ogDeletionQa))).toBe(true);
+  const retained = await page.evaluate(
     async ({ backend, id }) => {
       const { deletionIntents } = window.__ogDeletionQa!;
-      return deletionIntents.releaseSignOut(backend, id, 'first-claim');
+      return {
+        claim: await deletionIntents.get(backend, id),
+        draft: localStorage.getItem('og:form-draft:v1:interrupted-signout'),
+      };
     },
     { backend: backendUrl, id: accountId }
   );
-  expect(released).toBe(true);
-  await page.reload();
+  expect(retained.claim).toMatchObject({ kind: 'signed_out', accountId });
+  expect(retained.claim).not.toHaveProperty('claimId', 'first-claim');
+  expect(retained.draft).toBe('kept');
+  expect(
+    await page.evaluate(
+      async ({ backend, id }) =>
+        window.__ogDeletionQa!.deletionIntents.releaseSignOut(backend, id, 'first-claim'),
+      { backend: backendUrl, id: accountId }
+    )
+  ).toBe(false);
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(fixturePassword);
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  await expect(page).not.toHaveURL(/\/login$/);
+  await page.goto('/delete-account');
   await expect(page.getByRole('heading', { name: 'Delete your account' })).toBeVisible();
+  expect(
+    await page.evaluate(
+      async ({ backend, id }) => window.__ogDeletionQa!.deletionIntents.get(backend, id),
+      { backend: backendUrl, id: accountId }
+    )
+  ).toBeUndefined();
+});
+
+test('keeps the session and drafts if finishing sign-out storage aborts', async ({ page }) => {
+  await page.evaluate(
+    async ({ backend, id }) => {
+      const marker = localStorage.getItem('og:session-identity:v1:pocketbase_auth');
+      if (!marker) throw new Error('Session identity unavailable');
+      const { epoch } = JSON.parse(marker) as { epoch: string };
+      localStorage.setItem('og:form-draft:v1:signout-storage-error', 'kept');
+      await window.__ogDeletionQa!.deletionIntents.claimSignOut(backend, id, epoch);
+    },
+    { backend: backendUrl, id: accountId }
+  );
+  await page.reload();
+  await expect(page.getByRole('alert')).toContainText('Sign-out was interrupted');
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args) {
+      const request = Reflect.apply(put, this, args) as IDBRequest<IDBValidKey>;
+      this.transaction.abort();
+      return request;
+    };
+  });
+  await page.getByRole('button', { name: 'Finish signing out' }).click();
+  await expect(page.getByRole('alert')).toContainText('Could not finish signing out');
+  expect(
+    await page.evaluate(() => ({
+      accountId: window.pb?.authStore.record?.id,
+      draft: localStorage.getItem('og:form-draft:v1:signout-storage-error'),
+    }))
+  ).toEqual({ accountId, draft: 'kept' });
+  await page.reload();
+  await expect(page.getByRole('alert')).toContainText('Sign-out was interrupted');
+  expect(
+    await page.evaluate(
+      async ({ backend, id }) => window.__ogDeletionQa!.deletionIntents.get(backend, id),
+      { backend: backendUrl, id: accountId }
+    )
+  ).toMatchObject({ kind: 'signed_out', accountId });
 });
 
 test('releases only the completed receipt marker after a cleanup interruption', async ({

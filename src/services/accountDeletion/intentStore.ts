@@ -269,6 +269,58 @@ export const deletionIntents = {
     if (released) notify();
     return released;
   },
+  async finishSignOutIfClaim(
+    backendUrl: string,
+    accountId: string,
+    epoch: string,
+    finish: () => boolean
+  ): Promise<boolean> {
+    const claimId = crypto.randomUUID();
+    const claimed = await transaction<boolean>('readwrite', (store, done) => {
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const records = request.result;
+        if (
+          records.some(
+            value => value?.backendUrl === backendUrl && !validIntent(value) && !validClaim(value)
+          )
+        ) {
+          request.transaction?.abort();
+          return;
+        }
+        const claim = records.find(
+          value =>
+            validClaim(value) && value.backendUrl === backendUrl && value.accountId === accountId
+        );
+        if (
+          !validClaim(claim) ||
+          claim.epoch !== epoch ||
+          records.some(
+            value =>
+              validIntent(value) && value.backendUrl === backendUrl && !value.localCleanupDone
+          )
+        ) {
+          done(false);
+          return;
+        }
+        try {
+          store.put({ ...claim, claimId });
+          done(true);
+        } catch {
+          try {
+            request.transaction?.abort();
+          } catch {
+            done(false);
+          }
+        }
+      };
+    });
+    if (!claimed) return false;
+    const current = await deletionIntents.get(backendUrl, accountId);
+    if (!current || !('kind' in current) || current.epoch !== epoch || current.claimId !== claimId)
+      return false;
+    return finish();
+  },
   async markSubmitted(intent: DeletionIntent): Promise<DeletionIntent> {
     const result = await transaction<DeletionIntent>('readwrite', (store, done) => {
       const request = store.get([intent.backendUrl, intent.accountId]);

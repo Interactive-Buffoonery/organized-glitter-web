@@ -96,6 +96,52 @@ describe('deletion analytics transport fence', () => {
     );
   });
 
+  it('drops an extracted retry when held draining first observes completion', () => {
+    const wire = allowSdkDispatch();
+    const retry = mocked.sdk._retryQueue as InstanceType<typeof RetryQueue>;
+    const fenceId = armDeletionTransportFence('http://localhost:8090', 'account-a');
+    mocked.sdk._send_request({ url: '/e/', data: { fixture: 'held' } });
+    expect(retainedDeletionAnalyticsCount()).toBe(1);
+    for (const fixture of [1, 2]) {
+      retry._queue.push({
+        retryAt: Date.now() - 1,
+        requestOptions: { url: '/e/', data: { fixture } },
+      });
+    }
+    const originalLength = Object.getOwnPropertyDescriptor(Storage.prototype, 'length')?.get;
+    if (!originalLength) throw new Error('Storage length getter unavailable');
+    const dispatch = retry.retriableRequest;
+    let injected = false;
+    retry.retriableRequest = (options, transport) => {
+      let reads = 0;
+      const getter = vi.spyOn(Storage.prototype, 'length', 'get').mockImplementation(function (
+        this: Storage
+      ) {
+        reads += 1;
+        if (reads === 2 && !injected) {
+          injected = true;
+          completeInAnotherTab();
+          releaseDeletionTransportFence('http://localhost:8090', 'account-a', fenceId);
+        }
+        return originalLength.call(this);
+      });
+      try {
+        dispatch.call(retry, options, transport);
+      } finally {
+        getter.mockRestore();
+      }
+    };
+    retry._flush();
+    expect(wire).not.toHaveBeenCalled();
+    expect(retainedDeletionAnalyticsCount()).toBe(0);
+    expect(retry._queue).toHaveLength(0);
+    retry.retriableRequest({ url: '/e/', data: { fixture: 'fresh' } });
+    expect(wire).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ data: { fixture: 'fresh' } }),
+      expect.any(Function)
+    );
+  });
+
   it.each(['flush', 'unload'])(
     'drops every installed-SDK batch group extracted before cross-tab completion on %s',
     operation => {

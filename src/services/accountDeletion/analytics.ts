@@ -125,6 +125,7 @@ function installRetryFence(sdk: AnalyticsSDK): void {
     if (isStaleRequest(options)) return;
     stampRequest(options);
     if (!suspended && !hasTransportFence()) flushers.forEach(flush => flush());
+    if (isStaleRequest(options)) return;
     if (suspended || hasTransportFence()) {
       const held = heldRequests.get(sdk);
       const deliver = () => {

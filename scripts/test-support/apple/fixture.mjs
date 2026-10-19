@@ -131,7 +131,12 @@ export async function startAppleFixture() {
     ]) {
       copyFileSync(path.join(root, 'pb_hooks', file), path.join(hooksDir, file));
     }
-    for (const file of ['apple_config.js', 'apple_config_backup.pb.js']) {
+    for (const file of [
+      'apple_config.js',
+      'apple_config_backup.pb.js',
+      'hook_settings.js',
+      'private_json.js',
+    ]) {
       copyFileSync(path.join(root, 'pb_hooks', file), path.join(hooksDir, file));
     }
     copyFileSync(

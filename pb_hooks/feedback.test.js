@@ -18,9 +18,10 @@ function makeRoute() {
       }
     },
     Date,
-    $os: {
-      getenv: key => (key === 'FEEDBACK_TO_EMAIL' ? 'feedback@example.test' : ''),
-    },
+    __hooks: '/hooks',
+    require: () => ({
+      get: (_app, key) => (key === 'FEEDBACK_TO_EMAIL' ? 'feedback@example.test' : ''),
+    }),
   };
   runInNewContext(source, context);
   return handler;

@@ -232,36 +232,40 @@ pb.afterSend = function (
 const prepareSessionRequest = pb.beforeSend;
 pb.beforeSend = async function (url: string, options: SessionTrackedOptions) {
   const identity = sessionIdentityTracker.capture();
-  const prepared = await prepareSessionRequest!(url, options);
   const pathname = new URL(url).pathname;
   const isAccountRequest =
     identity.accountId && !pathname.includes('/auth-') && !pathname.startsWith('/api/auth/');
-  if (isAccountRequest && typeof indexedDB !== 'undefined') {
-    let intent;
+  const checkFence = async () => {
+    if (!isAccountRequest) return;
     try {
-      intent = await deletionIntents.get(POCKETBASE_URL, identity.accountId!);
+      const intent = await deletionIntents.get(POCKETBASE_URL, identity.accountId!);
+      if (intent || !sessionIdentityTracker.isCurrent(identity)) throw new SessionChangedError();
     } catch {
       throw new SessionChangedError();
     }
-    if (intent || !sessionIdentityTracker.isCurrent(identity)) throw new SessionChangedError();
-  }
+  };
+  await checkFence();
+  const prepared = await prepareSessionRequest!(url, options);
+  await checkFence();
   return prepared;
 };
 const finishSessionRequest = pb.afterSend;
 pb.afterSend = function (response: Response, data: unknown, options?: SessionTrackedOptions) {
   const identity = options?.[requestSessionIdentity];
-  if (response.ok && identity?.accountId && typeof indexedDB !== 'undefined') {
+  const identityIsCurrent = identity ? sessionIdentityTracker.isCurrent(identity) : true;
+  const finished = response.ok ? finishSessionRequest!(response, data, options ?? {}) : undefined;
+  if (identity?.accountId && identityIsCurrent) {
     return deletionIntents.get(POCKETBASE_URL, identity.accountId).then(
       intent => {
         if (intent || !sessionIdentityTracker.isCurrent(identity)) throw new SessionChangedError();
-        return finishSessionRequest!(response, data, options ?? {});
+        return response.ok ? finished : finishSessionRequest!(response, data, options ?? {});
       },
       () => {
         throw new SessionChangedError();
       }
     );
   }
-  return finishSessionRequest!(response, data, options ?? {});
+  return response.ok ? finished : finishSessionRequest!(response, data, options ?? {});
 };
 
 // Configure auth store options for better security

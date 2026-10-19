@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { queryClient } from '@/lib/queryClient';
 import { useDeletionRecovery } from '@/services/accountDeletion/recovery';
 import {
+  discardDeletionAnalyticsQueues,
   suspendDeletionAnalytics,
   resumeDeletionAnalytics,
   isDeletionAnalyticsSuspended,
@@ -18,9 +19,7 @@ export function DeletionRecoveryBoundary({ children }: { children: ReactNode }) 
   const { user } = useAuth();
   const location = useLocation();
   const recovery = useDeletionRecovery();
-  const pending = recovery.intents.find(
-    intent => !intent.localCleanupDone && (!user || intent.accountId === user.id)
-  );
+  const pending = recovery.intents.find(intent => !intent.localCleanupDone);
   useEffect(() => {
     if (!pending) return;
     suspendDeletionAnalytics();
@@ -32,6 +31,7 @@ export function DeletionRecoveryBoundary({ children }: { children: ReactNode }) 
       intent => intent.phase === 'deleted' && intent.localCleanupDone
     );
     if (!completed.length) return;
+    discardDeletionAnalyticsQueues();
     posthog.reset();
     completed.forEach(intent => clearRememberedAnalyticsConsent(intent.accountId));
     resumeDeletionAnalytics();

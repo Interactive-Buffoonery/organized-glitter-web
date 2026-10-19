@@ -39,6 +39,28 @@ describe('cross-tab deletion request fence', () => {
       )
     ).rejects.toMatchObject({ name: 'SessionChangedError' });
   });
+  it('does not invalidate the session for a late 401 after intent persistence', async () => {
+    const request = await pb.beforeSend!(`${pb.baseURL}/api/collections/projects/records`, {
+      method: 'GET',
+    });
+    mocks.get.mockResolvedValue({ phase: 'pending' });
+    await expect(
+      Promise.resolve().then(() =>
+        pb.afterSend!(new Response('{}', { status: 401 }), {}, request.options)
+      )
+    ).rejects.toMatchObject({ name: 'SessionChangedError' });
+    expect(pb.authStore.record?.id).toBe('account-a');
+  });
+  it('fails closed when private storage is unavailable', async () => {
+    vi.stubGlobal('indexedDB', undefined);
+    mocks.get.mockRejectedValue(new Error('Storage unavailable'));
+    await expect(
+      pb.beforeSend!(`${pb.baseURL}/api/collections/projects/records`, {
+        method: 'POST',
+        body: '{}',
+      })
+    ).rejects.toMatchObject({ name: 'SessionChangedError' });
+  });
   it('fences account switching while the durable lock is being read', async () => {
     mocks.get.mockImplementation(async () => {
       pb.authStore.clear();

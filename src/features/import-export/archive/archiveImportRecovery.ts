@@ -9,6 +9,7 @@ const LEGACY_RECOVERY_STORAGE_PREFIX = 'og:archive-import-recovery:v1';
 const RECOVERY_STORAGE_PREFIX = 'og:archive-import-recovery:v2';
 const PROJECT_RECOVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const inMemoryRecovery = new Map<string, ArchiveImportRecoveryState>();
+const activeRecoveryHandles = new Map<string, Set<{ revoked: boolean }>>();
 
 export interface ColoringPageMetadataSnapshot {
   status: ColoringPageDTO['status'];
@@ -378,6 +379,10 @@ export function createArchiveImportRecoveryStore(
   archiveFingerprint: string,
   storage: Storage | null = getLocalStorage()
 ): ArchiveImportRecoveryStore {
+  const handle = { revoked: false };
+  const handles = activeRecoveryHandles.get(userId) ?? new Set<{ revoked: boolean }>();
+  handles.add(handle);
+  activeRecoveryHandles.set(userId, handles);
   const encodedUserId = encodeURIComponent(userId);
   const userStoragePrefix = `${RECOVERY_STORAGE_PREFIX}:${encodedUserId}:`;
   const storageNamespace = `${RECOVERY_STORAGE_PREFIX}:${encodedUserId}:${archiveFingerprint}`;
@@ -485,6 +490,7 @@ export function createArchiveImportRecoveryStore(
 
   return {
     getProject(projectRef) {
+      if (handle.revoked) return undefined;
       state = inMemoryRecovery.get(storageNamespace) ?? state;
       if (!Object.prototype.hasOwnProperty.call(state.projects, projectRef)) return undefined;
       const project = state.projects[projectRef];
@@ -500,6 +506,7 @@ export function createArchiveImportRecoveryStore(
       return project ? { ...project } : undefined;
     },
     saveProject(projectRef, checkpoint) {
+      if (handle.revoked) return;
       state = inMemoryRecovery.get(storageNamespace) ?? state;
       const storedCheckpoint = {
         ...checkpoint,
@@ -516,11 +523,13 @@ export function createArchiveImportRecoveryStore(
       }
     },
     getBook(bookRef) {
+      if (handle.revoked) return undefined;
       state = inMemoryRecovery.get(storageNamespace) ?? state;
       const book = state.books[bookRef];
       return book ? cloneBookCheckpoint(book) : undefined;
     },
     saveBook(bookRef, checkpoint) {
+      if (handle.revoked) return;
       state = inMemoryRecovery.get(storageNamespace) ?? state;
       const previousPages = state.books[bookRef]?.pages ?? {};
       const storedCheckpoint = cloneBookCheckpoint(checkpoint);
@@ -547,6 +556,7 @@ export function createArchiveImportRecoveryStore(
       }
     },
     completePage(bookRef, pageRef) {
+      if (handle.revoked) return;
       state = inMemoryRecovery.get(storageNamespace) ?? state;
       const book = state.books[bookRef];
       if (!book) return;
@@ -560,6 +570,7 @@ export function createArchiveImportRecoveryStore(
       }
     },
     completeBook(bookRef) {
+      if (handle.revoked) return;
       state = inMemoryRecovery.get(storageNamespace) ?? state;
       const book = state.books[bookRef];
       if (!book) return;
@@ -591,6 +602,34 @@ export function createArchiveImportRecoveryStore(
       }
     },
   };
+}
+
+export function clearArchiveImportRecoveryForAccount(
+  userId: string,
+  storage: Storage | null = getLocalStorage()
+): boolean {
+  for (const handle of activeRecoveryHandles.get(userId) ?? []) handle.revoked = true;
+  activeRecoveryHandles.delete(userId);
+  const encodedUserId = encodeURIComponent(userId);
+  const prefixes = [
+    `${LEGACY_RECOVERY_STORAGE_PREFIX}:${encodedUserId}:`,
+    `${RECOVERY_STORAGE_PREFIX}:${encodedUserId}:`,
+  ];
+  for (const key of inMemoryRecovery.keys()) {
+    if (key.startsWith(prefixes[1])) inMemoryRecovery.delete(key);
+  }
+  if (!storage) return false;
+  try {
+    const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index));
+    for (const key of keys) {
+      if (key && prefixes.some(prefix => key.startsWith(prefix))) storage.removeItem(key);
+    }
+    return !Array.from({ length: storage.length }, (_, index) => storage.key(index)).some(
+      key => key && prefixes.some(prefix => key.startsWith(prefix))
+    );
+  } catch {
+    return false;
+  }
 }
 
 export async function fingerprintArchiveManifest(manifestJson: string): Promise<string> {

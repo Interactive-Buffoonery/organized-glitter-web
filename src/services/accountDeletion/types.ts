@@ -10,6 +10,9 @@ export type DeletionIntent = {
   phase: 'pending' | 'deleted';
   cleanup: DeletionCleanup;
   localCleanupDone: boolean;
+  // Older receipts without this field may already have been dispatched.
+  dispatch?: 'prepared' | 'submitted';
+  transportFenceId?: string;
 };
 
 export type FreshDeletionProof = {

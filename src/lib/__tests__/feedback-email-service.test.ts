@@ -6,6 +6,9 @@ const authState = vi.hoisted(() => ({
   isCurrentSession: true,
   token: 'session-token',
 }));
+vi.mock('@/services/accountDeletion/intentStore', () => ({
+  deletionIntents: { get: vi.fn().mockResolvedValue(undefined) },
+}));
 
 vi.mock('@/services/auth', () => ({
   getAuthToken: () => (authState.isAuthenticated ? authState.token || null : null),
@@ -233,6 +236,7 @@ describe('sendFeedbackEmail', () => {
       draftId: 'feedback-draft-a',
       message: 'Feedback rejected after the original session ended.',
     });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
     authState.isCurrentSession = false;
     resolveResponse(
       new Response(JSON.stringify({ error: 'Please sign in again to send feedback.' }), {
@@ -271,6 +275,7 @@ describe('sendFeedbackEmail', () => {
       message: 'Feedback from the original session.',
       name: 'Original Account',
     });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
     authState.isCurrentSession = false;
     rejectRequest(new TypeError('Failed to fetch'));
 
@@ -321,6 +326,7 @@ describe('sendFeedbackEmail', () => {
       name: 'Sarah',
       email: 'sarah@example.test',
     });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
     authState.isCurrentSession = false;
     resolveResponse(
       new Response(JSON.stringify({ success: true }), {

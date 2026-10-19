@@ -5,6 +5,8 @@ import type { AuthResult, OAuthProvider } from './types';
 import { authLogger } from './shared';
 import { getStructuredErrorReason } from '@/utils/error/structuredErrorReason';
 import { captureSessionIdentity, isCurrentSessionIdentity } from './sessionIdentity';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
+import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 
 const OAUTH_PROVIDERS: readonly OAuthProvider[] = ['apple', 'google', 'discord'];
 
@@ -173,22 +175,24 @@ export async function authenticateWithOAuth2(
   expectedUserId?: string,
   proof?: FreshSignInMethodProof
 ): Promise<OAuthActionResult> {
+  const initiatingSession = captureSessionIdentity();
   const previousToken = pb.authStore.token;
   const previousRecord = pb.authStore.record;
+  const client = action === 'connect' ? pb : new PocketBase(pb.baseURL, new BaseAuthStore());
 
   try {
     authLogger.debug(`Attempting OAuth2 ${action} with ${provider}`);
 
     // Keep this call before the first await. PocketBase opens its popup synchronously,
     // which preserves Safari's click gesture.
-    const authPromise = pb.collection('users').authWithOAuth2({
+    const authPromise = client.collection('users').authWithOAuth2({
       provider,
       ...(proof ? { createData: { og_step_up_proof: proof.value } } : {}),
     });
     const authData = await authPromise;
 
     if (expectedUserId && authData.record.id !== expectedUserId) {
-      pb.authStore.save(previousToken, previousRecord);
+      if (action === 'connect') pb.authStore.save(previousToken, previousRecord);
       authLogger.warn('OAuth2 account link returned a different user', { provider });
       return {
         success: false,
@@ -197,9 +201,27 @@ export async function authenticateWithOAuth2(
       };
     }
 
+    if (action === 'sign in') {
+      const applied = await deletionIntents.applyAuthIfClear(
+        POCKETBASE_URL,
+        authData.record.id,
+        () => {
+          if (!isCurrentSessionIdentity(initiatingSession)) return false;
+          pb.authStore.save(authData.token, authData.record);
+          return true;
+        }
+      );
+      if (!applied)
+        return {
+          success: false,
+          reason: 'account_changed',
+          error: 'Your session changed. Try again.',
+        };
+    }
+
     return {
       success: true,
-      user: authData.record as PocketBaseUser,
+      user: authData.record as unknown as PocketBaseUser,
     };
   } catch (error) {
     authLogger.error(`OAuth2 ${action} with ${provider} failed`, {
@@ -220,6 +242,8 @@ export async function authenticateWithOAuth2(
       ...(conflict ? { conflict: true } : {}),
       error: oauthErrorMessage(error, provider, action),
     };
+  } finally {
+    if (client !== pb) client.authStore.clear();
   }
 }
 

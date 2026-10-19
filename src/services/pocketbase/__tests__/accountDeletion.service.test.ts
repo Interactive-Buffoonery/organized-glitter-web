@@ -1,11 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  store: { create: vi.fn(), update: vi.fn(), get: vi.fn() },
+  store: {
+    create: vi.fn(),
+    update: vi.fn(),
+    get: vi.fn(),
+    markSubmitted: vi.fn(),
+    cancelPrepared: vi.fn(),
+  },
   identity: { accountId: 'account-a', generation: 1, epoch: 'epoch-a' },
   current: true,
   token: 'test-session',
   stop: vi.fn(),
+  arm: vi.fn(),
+  release: vi.fn(),
+  resume: vi.fn(),
   cancel: vi.fn(),
 }));
 vi.mock('@/services/accountDeletion/intentStore', () => ({ deletionIntents: mocks.store }));
@@ -16,6 +25,7 @@ vi.mock('@/services/auth/sessionIdentity', () => ({
 vi.mock('@/lib/pocketbase', () => ({
   pb: {
     authStore: {
+      record: { id: 'account-a' },
       get token() {
         return mocks.token;
       },
@@ -23,7 +33,13 @@ vi.mock('@/lib/pocketbase', () => ({
   },
 }));
 vi.mock('@/lib/pocketbaseConfig', () => ({ POCKETBASE_URL: 'http://localhost:8090' }));
-vi.mock('@/services/accountDeletion/analytics', () => ({ suspendDeletionAnalytics: mocks.stop }));
+vi.mock('@/services/accountDeletion/analytics', () => ({
+  suspendDeletionAnalytics: mocks.stop,
+  armDeletionTransportFence: mocks.arm,
+  releaseDeletionTransportFence: mocks.release,
+  resumeDeletionAnalytics: mocks.resume,
+}));
+vi.mock('@/services/analytics-preference', () => ({ syncAnalyticsConsent: vi.fn() }));
 vi.mock('@/lib/queryClient', () => ({ queryClient: { cancelQueries: mocks.cancel } }));
 import { AccountDeletionService } from '../accountDeletion.service';
 
@@ -42,6 +58,7 @@ const intent = () => ({
   phase: 'pending' as const,
   cleanup: 'pending' as const,
   localCleanupDone: false,
+  dispatch: 'submitted' as const,
 });
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
@@ -50,8 +67,14 @@ describe('guarded account deletion', () => {
     vi.clearAllMocks();
     mocks.current = true;
     mocks.token = 'test-session';
+    mocks.arm.mockReturnValue('fence-a');
     mocks.store.create.mockImplementation(async value => value);
     mocks.store.update.mockImplementation(async value => value);
+    mocks.store.markSubmitted.mockImplementation(async value => ({
+      ...value,
+      dispatch: 'submitted',
+    }));
+    mocks.store.cancelPrepared.mockResolvedValue(true);
     mocks.store.get.mockResolvedValue(intent());
     mocks.cancel.mockResolvedValue(undefined);
     vi.stubGlobal(
@@ -106,6 +129,31 @@ describe('guarded account deletion', () => {
       reason: 'account_changed',
     });
     expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.store.cancelPrepared).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a submitted receipt uncertain if the fetch fails before a response', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('network'));
+    await expect(AccountDeletionService.deleteAccount(proof())).rejects.toMatchObject({
+      reason: 'uncertain',
+    });
+    expect(mocks.store.markSubmitted).toHaveBeenCalledOnce();
+    expect(mocks.store.cancelPrepared).not.toHaveBeenCalled();
+  });
+  it('bounds a deletion fetch that never returns without replaying it', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
+      const pending = AccountDeletionService.deleteAccount(proof()).then(
+        () => undefined,
+        error => error
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      await expect(pending).resolves.toMatchObject({ reason: 'uncertain' });
+      expect(fetch).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects stale fresh authorization before persisting or sending', async () => {
@@ -157,6 +205,20 @@ describe('guarded account deletion', () => {
       reason: 'uncertain',
     });
     expect(mocks.store.update).not.toHaveBeenCalled();
+  });
+  it('sends one user-initiated authenticated same-proof retry after fresh verification', async () => {
+    await AccountDeletionService.retryAuthenticated(intent(), proof());
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(new Headers(vi.mocked(fetch).mock.calls[0][1]!.headers).get('Authorization')).toBe(
+      'Bearer test-session'
+    );
+    await expect(
+      AccountDeletionService.retryAuthenticated(intent(), {
+        ...proof(),
+        value: 'y'.repeat(43),
+      })
+    ).rejects.toMatchObject({ reason: 'verification' });
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   it('saves confirmed deletion independently from a changed interactive session', async () => {

@@ -67,6 +67,29 @@ describe('action-specific account deletion authorization', () => {
     await expect(pending).resolves.toMatchObject({ success: true });
     expect(mocks.clear).toHaveBeenCalledOnce();
   });
+  it('reverifies an unresolved request using its original proof', async () => {
+    const result = await requestDeletionPasswordProof('password', 'account-a', 'x'.repeat(43));
+    expect(result).toMatchObject({ success: true, proof: { value: 'x'.repeat(43) } });
+    expect(mocks.send).toHaveBeenCalledWith(
+      '/api/auth/step-up/password',
+      expect.objectContaining({ body: expect.objectContaining({ proof: 'x'.repeat(43) }) })
+    );
+  });
+  it('bounds a blocked OAuth popup and restores the verification path', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.oauth.mockReturnValue(new Promise(() => {}));
+      const pending = requestDeletionOAuthProof('google', 'account-a');
+      await vi.advanceTimersByTimeAsync(20_000);
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        error: expect.stringContaining('Allow popups'),
+      });
+      expect(mocks.clear).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('rejects a late password result after an account epoch change', async () => {
     mocks.send.mockImplementation(async () => {
       mocks.current = false;

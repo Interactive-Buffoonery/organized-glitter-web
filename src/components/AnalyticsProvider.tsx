@@ -4,6 +4,7 @@ import posthog, { type PostHogConfig } from 'posthog-js';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { isAllowedAnalyticsEvent, sanitizeAnalyticsEvent } from '@/utils/analytics/sanitizeEvent';
 import { enrichWebAnalyticsEvent } from '@/utils/analytics/webContext';
+import { installDeletionAnalyticsFence } from '@/services/accountDeletion/analytics';
 
 import {
   getAnalyticsEnabled,
@@ -57,7 +58,10 @@ const posthogOptions: Partial<PostHogConfig> = {
 const posthogClient =
   posthogKey?.trim() && posthogHost ? posthog.init(posthogKey, posthogOptions) : undefined;
 
-if (posthogClient) syncAnalyticsConsent();
+if (posthogClient) {
+  installDeletionAnalyticsFence();
+  syncAnalyticsConsent();
+}
 
 /**
  * Side-effect component that runs useAnalytics() inside the provider context.

@@ -20,6 +20,7 @@ import { AccountDeletionService } from '@/services/pocketbase/accountDeletion.se
 import { finishDeletionCleanup } from '@/services/accountDeletion/cleanup';
 import { useDeletionRecovery } from '@/services/accountDeletion/recovery';
 import { deletionIntents } from '@/services/accountDeletion/intentStore';
+import { syncAnalyticsConsent } from '@/services/analytics-preference';
 import {
   AccountDeletionError,
   type DeletionIntent,
@@ -27,7 +28,15 @@ import {
 } from '@/services/accountDeletion/types';
 
 type Phase =
-  'verify' | 'verifying' | 'ready' | 'sending' | 'uncertain' | 'deleted' | 'cleaning' | 'complete';
+  | 'verify'
+  | 'verifying'
+  | 'ready'
+  | 'sending'
+  | 'uncertain'
+  | 'deleted'
+  | 'cleaning'
+  | 'complete'
+  | 'finished';
 type State = { phase: Phase; proof?: FreshDeletionProof; intent?: DeletionIntent; error?: string };
 type Action =
   | { type: 'restore'; intent: DeletionIntent }
@@ -39,7 +48,9 @@ type Action =
   | { type: 'deleted'; intent: DeletionIntent }
   | { type: 'clean' }
   | { type: 'cleanup_failed' }
-  | { type: 'complete'; intent: DeletionIntent };
+  | { type: 'complete'; intent: DeletionIntent }
+  | { type: 'finished' }
+  | { type: 'cancel_prepared' };
 
 function restored(intent?: DeletionIntent): State {
   if (!intent) return { phase: 'verify' };
@@ -54,11 +65,17 @@ function reducer(state: State, action: Action): State {
     case 'restore':
       return ['sending', 'cleaning'].includes(state.phase) ? state : restored(action.intent);
     case 'verify':
-      return state.phase === 'verify' || state.phase === 'ready' ? { phase: 'verifying' } : state;
+      return ['verify', 'ready', 'uncertain'].includes(state.phase)
+        ? { ...state, phase: 'verifying', proof: undefined }
+        : state;
     case 'verified':
-      return state.phase === 'verifying' ? { phase: 'ready', proof: action.proof } : state;
+      return state.phase === 'verifying'
+        ? { ...state, phase: 'ready', proof: action.proof }
+        : state;
     case 'verification_failed':
-      return { phase: 'verify', error: action.error };
+      return state.intent
+        ? { ...state, phase: 'uncertain', proof: undefined, error: action.error }
+        : { phase: 'verify', error: action.error };
     case 'send':
       return { ...state, phase: 'sending', error: undefined };
     case 'uncertain': {
@@ -83,6 +100,10 @@ function reducer(state: State, action: Action): State {
       };
     case 'complete':
       return { phase: 'complete', intent: action.intent };
+    case 'finished':
+      return { phase: 'finished' };
+    case 'cancel_prepared':
+      return { phase: 'verify' };
   }
 }
 
@@ -99,6 +120,21 @@ function DeletionFlow({
   const [password, setPassword] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [methods, setMethods] = useState<AccountSignInMethod[]>([]);
+  const [discoveryError, setDiscoveryError] = useState(false);
+  const [discoveryAttempt, setDiscoveryAttempt] = useState(0);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const previousPhase = useRef(state.phase);
+  useEffect(() => {
+    if (initialIntent) headingRef.current?.focus();
+  }, [initialIntent]);
+  useEffect(() => {
+    if (
+      previousPhase.current !== state.phase &&
+      ['verify', 'uncertain', 'deleted', 'complete', 'finished'].includes(state.phase)
+    )
+      headingRef.current?.focus();
+    previousPhase.current = state.phase;
+  }, [state.phase]);
   useEffect(() => {
     if (initialIntent) dispatch({ type: 'restore', intent: initialIntent });
   }, [initialIntent]);
@@ -111,21 +147,23 @@ function DeletionFlow({
     };
   }, []);
   useEffect(() => {
-    if (!accountId || initialIntent) return;
+    if (!accountId) return;
     let active = true;
     const identity = captureSessionIdentity();
     void listAccountSignInMethods(accountId)
       .then(result => {
-        if (active && isCurrentSessionIdentity(identity))
+        if (active && isCurrentSessionIdentity(identity)) {
+          setDiscoveryError(false);
           setMethods(result.filter(method => method.configured && method.linked));
+        }
       })
       .catch(() => {
-        /* Password verification remains available when provider discovery fails. */
+        if (active) setDiscoveryError(true);
       });
     return () => {
       active = false;
     };
-  }, [accountId, initialIntent]);
+  }, [accountId, initialIntent, discoveryAttempt]);
 
   const verify = async (provider?: OAuthProvider) => {
     if (!accountId || inFlight.current) return;
@@ -133,9 +171,14 @@ function DeletionFlow({
     const identity = captureSessionIdentity();
     dispatch({ type: 'verify' });
     // Do not await anything before the OAuth helper opens its popup.
+    const originalProof =
+      (state.intent ?? recovery.intents.find(intent => intent.accountId === accountId))
+        ?.dispatch === 'prepared'
+        ? undefined
+        : (state.intent ?? recovery.intents.find(intent => intent.accountId === accountId))?.proof;
     const pending = provider
-      ? requestDeletionOAuthProof(provider, accountId)
-      : requestDeletionPasswordProof(password, accountId);
+      ? requestDeletionOAuthProof(provider, accountId, originalProof)
+      : requestDeletionPasswordProof(password, accountId, originalProof);
     setPassword('');
     try {
       const result = await pending;
@@ -174,18 +217,17 @@ function DeletionFlow({
   const send = async (recoveryIntent = state.intent) => {
     if (inFlight.current || (!recoveryIntent && (!confirmed || !state.proof))) return;
     inFlight.current = true;
-    const identity = captureSessionIdentity();
     dispatch({ type: 'send' });
     try {
       const intent = recoveryIntent
         ? await AccountDeletionService.retry(recoveryIntent)
         : await AccountDeletionService.deleteAccount(state.proof!);
-      if (!mounted.current || !isCurrentSessionIdentity(identity)) return;
+      if (!mounted.current) return;
       dispatch({ type: 'deleted', intent });
       if (!intent.localCleanupDone) await clean(intent);
       else dispatch({ type: 'complete', intent });
     } catch (error) {
-      if (!mounted.current || !isCurrentSessionIdentity(identity)) return;
+      if (!mounted.current) return;
       if (
         error instanceof AccountDeletionError &&
         (error.reason === 'storage' ||
@@ -205,6 +247,22 @@ function DeletionFlow({
     }
   };
 
+  const sendAuthenticated = async (intent: DeletionIntent) => {
+    if (inFlight.current || !state.proof || state.proof.value !== intent.proof) return;
+    inFlight.current = true;
+    dispatch({ type: 'send' });
+    try {
+      const result = await AccountDeletionService.retryAuthenticated(intent, state.proof);
+      if (!mounted.current) return;
+      dispatch({ type: 'deleted', intent: result });
+      if (!result.localCleanupDone) await clean(result);
+    } catch {
+      if (mounted.current) dispatch({ type: 'uncertain', intent });
+    } finally {
+      inFlight.current = false;
+    }
+  };
+
   // A newly persisted intent can arrive through the cross-tab subscription before
   // the POST resolves. Once pending, expose only receipt recovery.
   const recovery = useDeletionRecovery();
@@ -212,23 +270,37 @@ function DeletionFlow({
     intent => intent.accountId === (accountId ?? initialIntent?.accountId)
   );
   const visibleIntent = state.intent ?? durable;
-  const isPending =
-    state.phase === 'uncertain' ||
-    (durable && !['sending', 'cleaning', 'deleted', 'complete'].includes(state.phase));
+  const isPending = state.phase === 'uncertain' || visibleIntent?.phase === 'pending';
   const isDeleted =
-    ['deleted', 'cleaning', 'complete'].includes(state.phase) || visibleIntent?.phase === 'deleted';
+    state.phase !== 'finished' &&
+    (['deleted', 'cleaning', 'complete'].includes(state.phase) ||
+      visibleIntent?.phase === 'deleted');
   const isBusy = ['verifying', 'sending', 'cleaning'].includes(state.phase);
   const canStart = accountId && !storageError && !visibleIntent && !isPending && !isDeleted;
 
   return (
     <MainLayout>
       <div className="container mx-auto max-w-2xl space-y-6 px-4 py-8">
-        <h1 className="font-display text-3xl">Delete your account</h1>
-        <GlassPanel className="space-y-6 p-6">
-          {isDeleted ? (
+        <h1 ref={headingRef} tabIndex={-1} className="font-display text-3xl">
+          Delete your account
+        </h1>
+        <GlassPanel className="space-y-6 p-6" aria-busy={isBusy}>
+          {isBusy && state.phase !== 'cleaning' && (
+            <p role="status" aria-live="polite">
+              {state.phase === 'verifying'
+                ? 'Verifying your identity…'
+                : 'Sending your deletion request…'}
+            </p>
+          )}
+          {state.phase === 'finished' ? (
+            <p role="status">
+              Recovery is complete. <Link to="/">Return home</Link>
+            </p>
+          ) : isDeleted ? (
             <>
               <div role="status" aria-live="polite" className="space-y-3">
                 <h2 className="text-lg font-semibold">Account deleted</h2>
+                {state.phase === 'cleaning' && <p>Clearing local account data…</p>}
                 <p>
                   {state.phase === 'complete' || visibleIntent?.localCleanupDone
                     ? 'Local account data has been cleared from this browser.'
@@ -268,6 +340,7 @@ function DeletionFlow({
                   onClick={() => {
                     void deletionIntents
                       .remove(visibleIntent)
+                      .then(() => dispatch({ type: 'finished' }))
                       .catch(() => dispatch({ type: 'cleanup_failed' }));
                   }}
                   disabled={isBusy}
@@ -285,29 +358,107 @@ function DeletionFlow({
             </>
           ) : isPending ? (
             <>
-              <div role="status" aria-live="polite">
-                <p>{new AccountDeletionError('uncertain').message}</p>
-                <p className="mt-3">
-                  This account is paused while the request is unresolved. You can close this tab and
-                  return to check the same request.
-                </p>
-              </div>
-              <Button
-                type="button"
-                disabled={isBusy || !visibleIntent}
-                onClick={() => {
-                  if (visibleIntent) {
-                    void send(visibleIntent);
-                  }
-                }}
-              >
-                Check deletion status
-              </Button>
+              {state.phase !== 'sending' && (
+                <div role="status" aria-live="polite">
+                  <p>{new AccountDeletionError('uncertain').message}</p>
+                  <p className="mt-3">
+                    This account is paused while the request is unresolved. You can close this tab
+                    and return to check the same request.
+                  </p>
+                </div>
+              )}
+              {visibleIntent?.dispatch === 'prepared' ? (
+                <Button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => {
+                    void deletionIntents
+                      .cancelPrepared(visibleIntent)
+                      .then(cancelled => {
+                        if (cancelled) {
+                          syncAnalyticsConsent();
+                          dispatch({ type: 'cancel_prepared' });
+                        }
+                      })
+                      .catch(() => dispatch({ type: 'uncertain', intent: visibleIntent }));
+                  }}
+                >
+                  Cancel unsent request and verify again
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={isBusy || !visibleIntent}
+                  onClick={() => {
+                    if (visibleIntent) {
+                      void send(visibleIntent);
+                    }
+                  }}
+                >
+                  Check deletion status
+                </Button>
+              )}
               <p>
                 <a className="text-primary underline" href="mailto:support@organizedglitter.app">
                   Contact support
                 </a>
               </p>
+              {visibleIntent &&
+                accountId &&
+                accountId === visibleIntent.accountId &&
+                visibleIntent.dispatch !== 'prepared' && (
+                  <div className="space-y-3">
+                    <p>
+                      To retry the original request with your current session, verify again first.
+                    </p>
+                    {discoveryError && (
+                      <div role="alert">
+                        Connected sign-in methods could not be loaded.
+                        <Button
+                          type="button"
+                          onClick={() => setDiscoveryAttempt(value => value + 1)}
+                        >
+                          Retry sign-in methods
+                        </Button>
+                      </div>
+                    )}
+                    <Label htmlFor="deletion-retry-password">Current password</Label>
+                    <Input
+                      id="deletion-retry-password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={event => setPassword(event.target.value)}
+                      disabled={isBusy}
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => void verify()}
+                      disabled={!password || isBusy}
+                    >
+                      Verify password for retry
+                    </Button>
+                    {methods.map(method => (
+                      <Button
+                        key={method.provider}
+                        type="button"
+                        variant="outline"
+                        onClick={() => void verify(method.provider)}
+                        disabled={isBusy}
+                      >
+                        Verify with {method.label} for retry
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="glass-destructive"
+                      disabled={state.phase !== 'ready' || isBusy}
+                      onClick={() => void sendAuthenticated(visibleIntent)}
+                    >
+                      Retry deletion with current session
+                    </Button>
+                  </div>
+                )}
             </>
           ) : !accountId ? (
             <p>
@@ -335,6 +486,14 @@ function DeletionFlow({
                 </p>
               )}
               {state.error && <p role="alert">{state.error}</p>}
+              {discoveryError && (
+                <div role="alert">
+                  Connected sign-in methods could not be loaded.
+                  <Button type="button" onClick={() => setDiscoveryAttempt(value => value + 1)}>
+                    Retry sign-in methods
+                  </Button>
+                </div>
+              )}
               <div className="space-y-3">
                 <Label htmlFor="deletion-password">Current password</Label>
                 <Input
@@ -403,7 +562,9 @@ export default function DeleteAccount() {
   const { user } = useAuth();
   const recovery = useDeletionRecovery();
   if (!recovery.ready) return <div role="status">Checking account recovery…</div>;
-  const intent = recovery.intents.find(intent => (user ? intent.accountId === user.id : true));
+  const intent =
+    recovery.intents.find(intent => !intent.localCleanupDone) ??
+    (user ? recovery.intents.find(intent => intent.accountId === user.id) : recovery.intents[0]);
   return (
     <DeletionFlow
       key={user?.id ?? 'signedout'}

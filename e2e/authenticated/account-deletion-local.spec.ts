@@ -139,12 +139,30 @@ test('keeps an unknown proof uncertain after a failed initial dispatch and reloa
   expect((await admin.collection('users').getOne(accountId)).id === accountId).toBe(true);
 });
 
+test('reverifies the same proof and retries once with the current session', async ({ page }) => {
+  await verify(page);
+  await page.route('**/api/account/delete', route => route.abort('failed'), { times: 1 });
+  await confirm(page);
+  await expect(page.getByRole('status')).toContainText('not confirmed');
+  await page.getByRole('button', { name: 'Check deletion status', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('not confirmed');
+  await page.getByLabel('Current password', { exact: true }).fill(fixturePassword);
+  await page.getByRole('button', { name: 'Verify password for retry' }).click();
+  await page.getByRole('button', { name: 'Retry deletion with current session' }).click();
+  await expect(page.getByRole('status')).toContainText('Account deleted');
+});
+
 test('blocks destructive send if IndexedDB cannot persist the proof', async ({ page }) => {
   await verify(page);
   await page.evaluate(() => {
-    indexedDB.open = () => {
-      throw new Error('Storage unavailable');
-    };
+    Object.defineProperty(window, 'indexedDB', {
+      configurable: true,
+      value: {
+        open: () => {
+          throw new Error('Storage unavailable');
+        },
+      },
+    });
   });
   let posts = 0;
   page.on('request', request => {
@@ -192,6 +210,135 @@ test('locks a second tab and retains one private proof after ambiguity', async (
   expect(summary).toEqual({ count: 1, valid: true, inLocalStorage: false });
 });
 
+test('serializes a two-tab sign-out claim against intent admission', async ({ page, context }) => {
+  const other = await context.newPage();
+  await other.goto('/delete-account');
+  const makeIntent = async () =>
+    page.evaluate(
+      async ({ id, backend }) => {
+        const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
+        const { deletionIntents } = await load();
+        try {
+          await deletionIntents.create({
+            version: 1,
+            backendUrl: backend,
+            accountId: id,
+            proof: 'x'.repeat(43),
+            phase: 'pending',
+            cleanup: 'pending',
+            localCleanupDone: false,
+            dispatch: 'prepared',
+          });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { id: accountId, backend: backendUrl }
+    );
+  const claim = async () =>
+    other.evaluate(
+      async ({ id, backend }) => {
+        const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
+        const { deletionIntents } = await load();
+        return deletionIntents.claimSignOut(backend, id, 'epoch-a');
+      },
+      { id: accountId, backend: backendUrl }
+    );
+  const [created, signedOut] = await Promise.all([makeIntent(), claim()]);
+  expect(created === signedOut).toBe(false);
+});
+
+test('rejects an in-flight account switch when an intent arrives', async ({ page, context }) => {
+  const otherEmail = `deletion-switch-${randomUUID()}@localhost.test`;
+  const other = await admin.collection('users').create({
+    email: otherEmail,
+    password: fixturePassword,
+    passwordConfirm: fixturePassword,
+    username: 'Switch fixture',
+    verified: true,
+  });
+  try {
+    let release!: () => void;
+    let intercepted!: () => void;
+    const reachedRequest = new Promise<void>(resolve => {
+      intercepted = resolve;
+    });
+    await page.route('**/api/collections/users/auth-with-password', async route => {
+      if (!route.request().postData()?.includes(otherEmail)) return route.continue();
+      intercepted();
+      await new Promise<void>(resolve => {
+        release = resolve;
+      });
+      await route.continue();
+    });
+    const login = page.evaluate(
+      async ({ loginEmail, password }) => {
+        const loadAuth = new Function('return import("/src/services/auth/local.ts")');
+        const { loginWithPassword } = await loadAuth();
+        const result = await loginWithPassword({ email: loginEmail, password });
+        const app = window as Window & { pb?: { authStore: { record?: { id: string } } } };
+        return { success: result.success, accountId: app.pb?.authStore.record?.id };
+      },
+      { loginEmail: otherEmail, password: fixturePassword }
+    );
+    await reachedRequest;
+    const otherTab = await context.newPage();
+    await otherTab.goto('/delete-account');
+    await otherTab.evaluate(
+      async ({ id, backend }) => {
+        const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
+        const { deletionIntents } = await load();
+        await deletionIntents.create({
+          version: 1,
+          backendUrl: backend,
+          accountId: id,
+          proof: 'x'.repeat(43),
+          phase: 'pending',
+          cleanup: 'pending',
+          localCleanupDone: false,
+          dispatch: 'prepared',
+        });
+      },
+      { id: accountId, backend: backendUrl }
+    );
+    release();
+    const result = await login;
+    expect(result).toEqual({ success: false, accountId });
+  } finally {
+    await admin.collection('users').delete(other.id);
+  }
+});
+
+test('releases a completed sign-out claim only during fresh login application', async ({
+  page,
+}) => {
+  await page.evaluate(
+    async ({ id, backend }) => {
+      const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
+      const { deletionIntents } = await load();
+      await deletionIntents.claimSignOut(backend, id, 'old-session');
+      const app = window as Window & { pb?: { authStore: { clear(): void } } };
+      app.pb?.authStore.clear();
+    },
+    { id: accountId, backend: backendUrl }
+  );
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(fixturePassword);
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  await expect(page).not.toHaveURL(/\/login$/);
+  const remaining = await page.evaluate(
+    async ({ id, backend }) => {
+      const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
+      const { deletionIntents } = await load();
+      return deletionIntents.get(backend, id);
+    },
+    { id: accountId, backend: backendUrl }
+  );
+  expect(remaining).toBeUndefined();
+});
+
 test('preserves unfinished drafts if Logout is attempted during an unresolved deletion', async ({
   page,
 }) => {
@@ -219,4 +366,83 @@ test('preserves unfinished drafts if Logout is attempted during an unresolved de
     Object.keys(localStorage).some(key => key.startsWith('og:form-draft:v1:'))
   );
   expect(keptDraft).toBe(true);
+});
+
+test('uses the account key and ignores malformed records for another backend', async ({ page }) => {
+  const result = await page.evaluate(
+    async ({ backend, id }) => {
+      const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
+      const { deletionIntents } = await load();
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('og-account-deletion', 1);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const write = (backendUrl: string, accountId: string) =>
+        new Promise<void>((resolve, reject) => {
+          const transaction = database.transaction('intents', 'readwrite');
+          transaction.objectStore('intents').put({ backendUrl, accountId, version: 2 });
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => reject(transaction.error);
+        });
+      await write('http://unrelated.local', id);
+      const foreignIgnored = (await deletionIntents.list(backend)).length === 0;
+      await write(backend, id);
+      const ownRejected = await deletionIntents.get(backend, id).then(
+        () => false,
+        () => true
+      );
+      database.close();
+      return { foreignIgnored, ownRejected };
+    },
+    { backend: backendUrl, id: accountId }
+  );
+  expect(result).toEqual({ foreignIgnored: true, ownRejected: true });
+});
+
+test('admits one proof when two tabs create an intent concurrently', async ({ page, context }) => {
+  const other = await context.newPage();
+  await other.goto('/delete-account');
+  const create = (tab: Page, proof: string) =>
+    tab.evaluate(
+      async ({ backend, id, value }) => {
+        const load = new Function('return import("/src/services/accountDeletion/intentStore.ts")');
+        const { deletionIntents } = await load();
+        const intent = await deletionIntents.create({
+          version: 1,
+          backendUrl: backend,
+          accountId: id,
+          proof: value,
+          phase: 'pending',
+          cleanup: 'pending',
+          localCleanupDone: false,
+          dispatch: 'prepared',
+        });
+        return intent.proof;
+      },
+      { backend: backendUrl, id: accountId, value: proof }
+    );
+  const [first, second] = await Promise.all([
+    create(page, 'a'.repeat(43)),
+    create(other, 'b'.repeat(43)),
+  ]);
+  expect(first).toBe(second);
+  expect(['a'.repeat(43), 'b'.repeat(43)]).toContain(first);
+});
+
+test('shows a bounded recovery error when private storage never opens', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'indexedDB', {
+      configurable: true,
+      value: { open: () => ({}) },
+    });
+  });
+  await page.reload();
+  await expect(page.getByRole('alert')).toContainText(
+    'Account recovery storage could not be checked',
+    {
+      timeout: 8000,
+    }
+  );
+  await expect(page.getByRole('button', { name: 'Retry recovery check' })).toBeVisible();
 });

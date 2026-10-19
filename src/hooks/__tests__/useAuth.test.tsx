@@ -10,6 +10,8 @@ import { ClientResponseError } from 'pocketbase';
 
 const mockNotify = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/notifications', () => ({ notify: mockNotify }));
+const deletionStore = vi.hoisted(() => ({ claimSignOut: vi.fn().mockResolvedValue(true) }));
+vi.mock('@/services/accountDeletion/intentStore', () => ({ deletionIntents: deletionStore }));
 
 const pocketBaseMock = vi.hoisted(() => {
   const createListResult = (items: unknown[] = []) => ({
@@ -228,7 +230,7 @@ describe('useAuth Integration Tests', () => {
       const { result } = renderUseAuthHook();
 
       await waitFor(() => expect(result.current.initialCheckComplete).toBe(true));
-      expect(hasSessionDraft('project-edit', 'account-a')).toBe(true);
+      await waitFor(() => expect(hasSessionDraft('project-edit', 'account-a')).toBe(true));
       unregister();
     });
 

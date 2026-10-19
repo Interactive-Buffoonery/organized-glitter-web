@@ -5,12 +5,16 @@ const mocks = vi.hoisted(() => ({
   token: 'a',
   clear: vi.fn(),
   drafts: vi.fn(),
+  archive: vi.fn(),
+  markers: vi.fn(),
   sessionDrafts: vi.fn(),
   cancel: vi.fn(),
   queries: vi.fn(),
   consent: vi.fn(),
   reset: vi.fn(),
   resume: vi.fn(),
+  discard: vi.fn(),
+  release: vi.fn(),
   sync: vi.fn(),
   update: vi.fn(),
 }));
@@ -32,8 +36,12 @@ vi.mock('@/services/auth/sessionIdentity', () => ({
   isCurrentSessionIdentity: () => mocks.current,
 }));
 vi.mock('@/hooks/drafts/formDraftStorage', () => ({ clearAccountDrafts: mocks.drafts }));
+vi.mock('@/features/import-export/archive/archiveImportRecovery', () => ({
+  clearArchiveImportRecoveryForAccount: mocks.archive,
+}));
 vi.mock('@/services/auth/sessionRecovery', () => ({
   clearSessionDrafts: mocks.sessionDrafts,
+  clearCompletedCreateMarkers: mocks.markers,
   markSessionTokenInactive: vi.fn(),
 }));
 vi.mock('@/lib/queryClient', () => ({
@@ -47,6 +55,8 @@ vi.mock('posthog-js', () => ({ default: { reset: mocks.reset } }));
 vi.mock('../analytics', () => ({
   suspendDeletionAnalytics: vi.fn(),
   resumeDeletionAnalytics: mocks.resume,
+  discardDeletionAnalyticsQueues: mocks.discard,
+  releaseDeletionTransportFence: mocks.release,
 }));
 vi.mock('../intentStore', () => ({ deletionIntents: { update: mocks.update } }));
 import { finishDeletionCleanup } from '../cleanup';
@@ -67,6 +77,8 @@ describe('confirmed deletion local cleanup', () => {
     mocks.accountId = 'account-a';
     mocks.token = 'a';
     mocks.drafts.mockReturnValue(true);
+    mocks.archive.mockReturnValue(true);
+    mocks.markers.mockReturnValue(true);
     mocks.update.mockImplementation(async value => value);
     mocks.cancel.mockResolvedValue(undefined);
     mocks.clear.mockImplementation(() => {
@@ -99,6 +111,13 @@ describe('confirmed deletion local cleanup', () => {
       reason: 'local_cleanup',
     });
     expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.clear).not.toHaveBeenCalled();
+  });
+  it('retains cleanup work when archive recovery cannot be purged', async () => {
+    mocks.archive.mockReturnValue(false);
+    await expect(finishDeletionCleanup(intent())).rejects.toMatchObject({
+      reason: 'local_cleanup',
+    });
     expect(mocks.clear).not.toHaveBeenCalled();
   });
   it('restores signed-out analytics default only after identity reset and consent removal', async () => {

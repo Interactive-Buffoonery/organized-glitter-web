@@ -9,10 +9,13 @@ const mocks = vi.hoisted(() => ({
   oauth: vi.fn(),
   methods: vi.fn(),
   remove: vi.fn(),
+  removeIntent: vi.fn(),
   retry: vi.fn(),
+  authenticatedRetry: vi.fn(),
   cleanup: vi.fn(),
   identity: { accountId: 'account-a', generation: 1, epoch: 'a' },
   current: true,
+  storageError: false,
 }));
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: mocks.accountId ? { id: mocks.accountId } : null }),
@@ -20,7 +23,7 @@ vi.mock('@/hooks/useAuth', () => ({
 vi.mock('@/hooks/useAppReady', () => ({ useAppReady: vi.fn() }));
 vi.mock('@/hooks/usePageMetadata', () => ({ useNoIndexPage: vi.fn() }));
 vi.mock('@/services/accountDeletion/recovery', () => ({
-  useDeletionRecovery: () => ({ ready: true, intents: mocks.intents, error: false }),
+  useDeletionRecovery: () => ({ ready: true, intents: mocks.intents, error: mocks.storageError }),
 }));
 vi.mock('@/services/auth/accountDeletion', () => ({
   requestDeletionPasswordProof: mocks.verify,
@@ -32,10 +35,16 @@ vi.mock('@/services/auth/sessionIdentity', () => ({
   isCurrentSessionIdentity: () => mocks.current,
 }));
 vi.mock('@/services/pocketbase/accountDeletion.service', () => ({
-  AccountDeletionService: { deleteAccount: mocks.remove, retry: mocks.retry },
+  AccountDeletionService: {
+    deleteAccount: mocks.remove,
+    retry: mocks.retry,
+    retryAuthenticated: mocks.authenticatedRetry,
+  },
 }));
 vi.mock('@/services/accountDeletion/cleanup', () => ({ finishDeletionCleanup: mocks.cleanup }));
-vi.mock('@/services/accountDeletion/intentStore', () => ({ deletionIntents: { remove: vi.fn() } }));
+vi.mock('@/services/accountDeletion/intentStore', () => ({
+  deletionIntents: { remove: mocks.removeIntent, cancelPrepared: vi.fn() },
+}));
 vi.mock('@/components/layout/MainLayout', () => ({
   default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
@@ -58,6 +67,8 @@ beforeEach(() => {
   mocks.accountId = 'account-a';
   mocks.intents = [];
   mocks.current = true;
+  mocks.storageError = false;
+  mocks.removeIntent.mockResolvedValue(undefined);
   mocks.methods.mockResolvedValue([
     { provider: 'google', label: 'Google', configured: true, linked: true },
     { provider: 'discord', label: 'Discord', configured: true, linked: false },
@@ -74,6 +85,7 @@ beforeEach(() => {
   });
   mocks.remove.mockResolvedValue({ ...intent(), phase: 'deleted' });
   mocks.retry.mockResolvedValue({ ...intent(), phase: 'deleted' });
+  mocks.authenticatedRetry.mockResolvedValue({ ...intent(), phase: 'deleted' });
   mocks.cleanup.mockImplementation(async value => ({ ...value, localCleanupDone: true }));
 });
 async function verifyAndDelete() {
@@ -125,8 +137,83 @@ describe('account deletion state machine', () => {
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Current password'), 'test-password');
     await user.click(screen.getByRole('button', { name: 'Verify password' }));
+    await user.click(
+      screen.getByLabelText('I understand that this permanently deletes my account')
+    );
+    await user.click(screen.getByRole('button', { name: 'Delete my account' }));
     expect(mocks.remove).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Delete my account' })).toBeDisabled();
+  });
+  it('offers a retry when linked provider discovery fails', async () => {
+    mocks.methods.mockRejectedValueOnce(new Error('offline'));
+    render(<DeleteAccount />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('sign-in methods');
+    await userEvent.click(screen.getByRole('button', { name: 'Retry sign-in methods' }));
+    expect(await screen.findByRole('button', { name: 'Verify with Google' })).toBeVisible();
+  });
+  it('selects an unresolved signed-out receipt ahead of a completed receipt', async () => {
+    mocks.accountId = null;
+    mocks.intents = [
+      { ...intent(), accountId: 'account-a', phase: 'deleted', localCleanupDone: true },
+      { ...intent(), accountId: 'account-b', proof: 'b'.repeat(43) },
+    ];
+    render(<DeleteAccount />);
+    await userEvent.click(screen.getByRole('button', { name: 'Check deletion status' }));
+    expect(mocks.retry).toHaveBeenCalledWith(mocks.intents[1]);
+  });
+  it('announces slow verification and moves focus to a resolved state', async () => {
+    let release!: (value: unknown) => void;
+    mocks.verify.mockReturnValue(
+      new Promise(resolve => {
+        release = resolve;
+      })
+    );
+    render(<DeleteAccount />);
+    await userEvent.type(screen.getByLabelText('Current password'), 'password');
+    await userEvent.click(screen.getByRole('button', { name: 'Verify password' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Verifying your identity');
+    release({ success: false, error: 'Try again.' });
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Delete your account' })).toHaveFocus()
+    );
+  });
+  it('keeps a first-send failure in recovery even when the session epoch changes', async () => {
+    mocks.remove.mockImplementation(async () => {
+      mocks.current = false;
+      throw new Error('network');
+    });
+    render(<DeleteAccount />);
+    await verifyAndDelete();
+    expect(await screen.findByRole('status')).toHaveTextContent('not confirmed');
+  });
+  it('finishes a completed receipt and removes the stale result panel', async () => {
+    mocks.accountId = null;
+    mocks.intents = [
+      { ...intent(), phase: 'deleted', cleanup: 'completed', localCleanupDone: true },
+    ];
+    render(<DeleteAccount />);
+    await userEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Recovery is complete');
+    expect(screen.queryByRole('button', { name: 'Finish' })).not.toBeInTheDocument();
+  });
+  it('offers local cleanup retry only after confirmed deletion', async () => {
+    mocks.accountId = null;
+    mocks.intents = [{ ...intent(), phase: 'deleted' }];
+    render(<DeleteAccount />);
+    await userEvent.click(screen.getByRole('button', { name: 'Retry local cleanup' }));
+    await waitFor(() => expect(mocks.cleanup).toHaveBeenCalledOnce());
+  });
+  it('keeps deletion controls disabled when recovery storage has failed', async () => {
+    mocks.storageError = true;
+    render(<DeleteAccount />);
+    await screen.findByRole('button', { name: 'Verify with Google' });
+    expect(screen.getByRole('alert')).toHaveTextContent('Private browser storage is unavailable');
+    expect(screen.getByRole('button', { name: 'Verify password' })).toBeDisabled();
+  });
+  it('offers only a linked OAuth method for verification', async () => {
+    render(<DeleteAccount />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Verify with Google' }));
+    expect(mocks.oauth).toHaveBeenCalledWith('google', 'account-a', undefined);
   });
 });
 

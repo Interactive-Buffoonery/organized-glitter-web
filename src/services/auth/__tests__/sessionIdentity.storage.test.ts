@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BaseAuthStore, LocalAuthStore } from 'pocketbase';
+const deletionFence = vi.hoisted(() => ({ get: vi.fn() }));
+vi.mock('@/services/accountDeletion/intentStore', () => ({ deletionIntents: deletionFence }));
 
 vi.mock('@/lib/pocketbase', async () => {
   const { LocalAuthStore } = await import('pocketbase');
@@ -39,6 +41,7 @@ describe('session identity across queued storage events', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   beforeEach(() => {
+    deletionFence.get.mockReset().mockResolvedValue(undefined);
     pb.authStore.clear();
     pb.authStore.save('token-a', account);
   });
@@ -88,6 +91,7 @@ describe('session identity across queued storage events', () => {
     const onInvalidSession = vi.fn();
     const unsubscribe = subscribeToInvalidSession(onInvalidSession);
     const request = sendFeedbackRequest({ feedback: 'A useful feedback message' }, 'token-a');
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
     const otherTabStore = new LocalAuthStore();
     createSessionIdentityTracker(otherTabStore, localStorage);
 
@@ -114,6 +118,16 @@ describe('session identity across queued storage events', () => {
 
     expect(onInvalidSession).toHaveBeenCalledOnce();
     expect(onInvalidSession).toHaveBeenCalledWith('token-a');
+  });
+  it('blocks raw feedback before and after a cross-tab deletion intent', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    deletionFence.get.mockResolvedValue({ phase: 'pending' });
+    await expect(sendFeedbackRequest({ feedback: 'draft' }, 'token-a')).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+    deletionFence.get.mockResolvedValueOnce(undefined).mockResolvedValue({ phase: 'pending' });
+    await expect(sendFeedbackRequest({ feedback: 'draft' }, 'token-a')).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 
   it('sees a cross-account change before its storage event is delivered', () => {

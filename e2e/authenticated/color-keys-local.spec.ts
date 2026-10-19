@@ -106,6 +106,7 @@ test('colors used: keyboard flow keeps the sheet, focus and drafts', async ({
 }, testInfo) => {
   test.setTimeout(90000);
   // WebKit has no clipboard permissions to grant, so record what Copy writes.
+  // The stub checks the copied text only, not real user-activation behavior.
   await page.addInitScript(() => {
     const copied: string[] = [];
     Object.assign(window, { __copied: copied });

@@ -67,7 +67,10 @@ export function ColorKeyEntry({ target, onClose, ...props }: ColorKeyEntryProps)
   const formKey = target ? `${target.row?.id ?? 'new'}:${target.symbol}` : '';
   const [changed, setChanged] = useState<{ formKey: string; symbol: string } | null>(null);
   // A closed entry forgets a picked symbol, so reopening the same row starts clean.
+  const [goneKey, setGoneKey] = useState('');
   if (!target && changed) setChanged(null);
+  if (!target && goneKey) setGoneKey('');
+  const gone = Boolean(target) && goneKey === formKey;
   const symbol = changed?.formKey === formKey ? changed.symbol : target?.symbol;
   const request = symbol ? requestFor(symbol, props.requests) : undefined;
   const name = symbol ? symbolDisplayName(symbol, request) : '';
@@ -75,7 +78,7 @@ export function ColorKeyEntry({ target, onClose, ...props }: ColorKeyEntryProps)
     <ColorKeySheet
       open={Boolean(target)}
       onOpenChange={open => !open && onClose()}
-      title={target?.row ? `Edit color: ${name}` : `Add a color: ${name}`}
+      title={target?.row && !gone ? `Edit color: ${name}` : `Add a color: ${name}`}
       description="Record the color you used for this symbol."
       onEscapeKeyDown={event => {
         // An open suggestion list owns Escape; the combobox closes it.
@@ -89,6 +92,8 @@ export function ColorKeyEntry({ target, onClose, ...props }: ColorKeyEntryProps)
           target={target}
           symbol={symbol}
           onSymbolChange={picked => setChanged({ formKey, symbol: picked })}
+          gone={gone}
+          onGone={() => setGoneKey(formKey)}
           onClose={onClose}
           {...props}
         />
@@ -108,10 +113,15 @@ function EntryForm({
   onRequestSymbol,
   symbol,
   onSymbolChange,
+  gone,
+  onGone,
 }: ColorKeyEntryProps & {
   target: EntryTarget;
   symbol: string;
   onSymbolChange: (symbol: string) => void;
+  /** The row was deleted, or is no longer ours to edit; the next save adds it back. */
+  gone: boolean;
+  onGone: () => void;
 }) {
   const id = useId();
   const { row } = target;
@@ -123,8 +133,6 @@ function EntryForm({
   const [triedDraft, setTriedDraft] = useState('');
   const [note, setNote] = useState(row?.note ?? '');
   const [error, setError] = useState<string | null>(null);
-  // The row was deleted, or is no longer ours to edit; the next save adds it back.
-  const [gone, setGone] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
@@ -202,7 +210,7 @@ function EntryForm({
       else await create.mutateAsync(input);
     } catch (saveError) {
       if (row && !gone && saveError instanceof ClientResponseError && saveError.status === 404) {
-        setGone(true);
+        onGone();
         setError(GONE);
         return;
       }

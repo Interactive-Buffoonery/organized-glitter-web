@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Section, SectionHeading } from '@/components/shared/Section';
 import { ClientResponseError } from 'pocketbase';
+import { Section, SectionHeading } from '@/components/shared/Section';
 import { Button } from '@/components/ui/button';
 import { DEFAULT_SETUP_SYMBOLS } from '@/features/coloring/colorKeys/symbols';
 import { useColorKeys, useSymbolRequests } from '@/hooks/queries/coloring/useColorKeys';
@@ -70,13 +70,17 @@ function ColorKeyEditor({
 
   const startSetup = async () => {
     const symbols = setupSymbols.filter(symbol => !off.has(symbol));
+    // The setup grid unmounts with focus inside it; land on the heading instead.
+    const focusHeading = () => document.getElementById(`color-keys-${pageId}`)?.focus();
     try {
       await setup.mutateAsync(symbols);
-      // The setup grid unmounts with focus inside it; land on the heading instead.
-      document.getElementById(`color-keys-${pageId}`)?.focus();
+      focusHeading();
     } catch (error) {
-      // Another device set the page up first; the refetched rows are the answer.
-      if (error instanceof ClientResponseError && error.status === 409) return;
+      // Another device set the page up first; its rows are the answer once they load.
+      if (error instanceof ClientResponseError && error.status === 409) {
+        const refreshed = await query.refetch();
+        if (!refreshed.isError && refreshed.data?.length) return void focusHeading();
+      }
       logger.warn('Could not set up color keys', error);
       notifyError('Could not save the symbols. Try again.');
     }

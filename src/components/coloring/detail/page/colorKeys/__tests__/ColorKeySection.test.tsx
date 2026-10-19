@@ -13,12 +13,18 @@ const state = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   remove: vi.fn(),
+  refetch: vi.fn(),
   error: vi.fn(),
   success: vi.fn(),
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'owner' } }) }));
 vi.mock('@/hooks/queries/coloring/useColorKeys', () => ({
-  useColorKeys: () => ({ data: state.rows, isPending: false, isError: false, refetch: vi.fn() }),
+  useColorKeys: () => ({
+    data: state.rows,
+    isPending: false,
+    isError: false,
+    refetch: state.refetch,
+  }),
   useColorKeyHistory: () => ({ data: state.history }),
   useSymbolRequests: () => ({ data: state.requests }),
 }));
@@ -52,7 +58,8 @@ beforeEach(() => {
   state.rows = [];
   state.history = [];
   state.requests = {};
-  for (const mock of [state.setup, state.create, state.update, state.remove]) mock.mockReset();
+  for (const mock of [state.setup, state.create, state.update, state.remove, state.refetch])
+    mock.mockReset();
   state.error.mockReset();
   state.success.mockReset();
 });
@@ -116,13 +123,25 @@ describe('Colors used setup', () => {
     expect(screen.getByRole('group', { name: 'Symbols on this page' })).toBeInTheDocument();
   });
 
-  it('stays quiet when another device already set up the page', async () => {
+  it('stays quiet and focuses the heading when another device already set up the page', async () => {
     const user = userEvent.setup();
     state.setup.mockRejectedValue(new ClientResponseError({ status: 409 }));
+    state.refetch.mockResolvedValue({ isError: false, data: [key('a', 0, 'u:0031')] });
     render(<ColorKeySection pageId="page-1" />);
     await user.click(screen.getByRole('button', { name: 'Start' }));
-    await waitFor(() => expect(state.setup).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Colors used' })).toHaveFocus());
     expect(state.error).not.toHaveBeenCalled();
+  });
+
+  it('reports the usual error when the 409 refetch finds no rows', async () => {
+    const user = userEvent.setup();
+    state.setup.mockRejectedValue(new ClientResponseError({ status: 409 }));
+    state.refetch.mockResolvedValue({ isError: false, data: [] });
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await waitFor(() =>
+      expect(state.error).toHaveBeenCalledWith('Could not save the symbols. Try again.')
+    );
   });
 });
 
@@ -307,6 +326,7 @@ describe('Colors used entry', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This color is no longer on this page. Save again to add it back.'
     );
+    expect(screen.getByRole('dialog', { name: 'Add a color: One' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('654');
     await user.click(screen.getByRole('button', { name: /^Save$/ }));
     expect(state.create).toHaveBeenCalledWith(

@@ -54,13 +54,18 @@ describe('AppRoutes vertical-access contract', () => {
       '/profile',
       '/change-password',
       '/change-email',
-      '/delete-account',
       '/options',
       '/import',
       '/randomizer',
       '/stats',
       '/notes',
     ]);
+  });
+
+  it('keeps receipt recovery reachable before authentication', () => {
+    const deletion = APP_ROUTES.find(route => route.path === '/delete-account');
+    expect(deletion?.protected).not.toBe(true);
+    expect(deletion?.verticalAccess).toBe('public');
   });
 
   it('captures the current diamond-painting-only route set', () => {

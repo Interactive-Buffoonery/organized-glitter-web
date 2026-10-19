@@ -46,6 +46,7 @@ import {
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
 import { getSessionIdentityTracker } from '@/services/auth/sessionEpoch';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
 
 const authLogger = createLogger('AuthProvider');
 
@@ -346,6 +347,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const signOut = useCallback(async () => {
+    const tracker = getSessionIdentityTracker(pb.authStore);
+    const identity = tracker.capture();
+    const departingUserId = identity.accountId ?? user?.id;
+    if (departingUserId && typeof indexedDB !== 'undefined') {
+      try {
+        const intent = await deletionIntents.get(POCKETBASE_URL, departingUserId);
+        if (!tracker.isCurrent(identity)) {
+          return { success: false, error: new Error('Your session changed. Try again.') };
+        }
+        if (intent && !intent.localCleanupDone) {
+          return {
+            success: false,
+            error: new Error('Resolve your pending account deletion before signing out.'),
+          };
+        }
+      } catch {
+        return {
+          success: false,
+          error: new Error(
+            'Account recovery could not be checked. Your unfinished edits have been kept.'
+          ),
+        };
+      }
+    }
     // Prevent multiple simultaneous logout attempts
     if (isSigningOut.current) {
       authLogger.debug('SignOut already in progress, skipping...');
@@ -354,7 +379,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     isSigningOut.current = true;
     setIsLoading(true);
-    const departingUserId = user?.id ?? getCurrentUser()?.id;
 
     try {
       authLogger.debug('Starting logout process...');

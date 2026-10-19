@@ -1,4 +1,5 @@
-import PocketBase from 'pocketbase';
+import PocketBase, { type SendOptions } from 'pocketbase';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import { createLogger } from '@/utils/logger';
@@ -34,10 +35,9 @@ export const pb = new PocketBase(POCKETBASE_URL) as TypedPocketBase;
 const sessionIdentityTracker = getSessionIdentityTracker(pb.authStore);
 const requestSessionIdentity = Symbol('requestSessionIdentity');
 
-type SessionTrackedOptions = RequestInit &
-  Record<string, unknown> & {
-    [requestSessionIdentity]?: SessionIdentity;
-  };
+type SessionTrackedOptions = SendOptions & {
+  [requestSessionIdentity]?: SessionIdentity;
+};
 
 // Disable PocketBase SDK auto-cancellation in all environments.
 // React Query coordinates request lifecycle (caching, dedup, AbortSignal).
@@ -225,6 +225,43 @@ pb.afterSend = function (
     });
   }
   return data;
+};
+
+// Read IndexedDB at the request boundaries, rather than relying on BroadcastChannel
+// delivery timing. A pending intent in another tab blocks writes and late reads.
+const prepareSessionRequest = pb.beforeSend;
+pb.beforeSend = async function (url: string, options: SessionTrackedOptions) {
+  const identity = sessionIdentityTracker.capture();
+  const prepared = await prepareSessionRequest!(url, options);
+  const pathname = new URL(url).pathname;
+  const isAccountRequest =
+    identity.accountId && !pathname.includes('/auth-') && !pathname.startsWith('/api/auth/');
+  if (isAccountRequest && typeof indexedDB !== 'undefined') {
+    let intent;
+    try {
+      intent = await deletionIntents.get(POCKETBASE_URL, identity.accountId!);
+    } catch {
+      throw new SessionChangedError();
+    }
+    if (intent || !sessionIdentityTracker.isCurrent(identity)) throw new SessionChangedError();
+  }
+  return prepared;
+};
+const finishSessionRequest = pb.afterSend;
+pb.afterSend = function (response: Response, data: unknown, options?: SessionTrackedOptions) {
+  const identity = options?.[requestSessionIdentity];
+  if (response.ok && identity?.accountId && typeof indexedDB !== 'undefined') {
+    return deletionIntents.get(POCKETBASE_URL, identity.accountId).then(
+      intent => {
+        if (intent || !sessionIdentityTracker.isCurrent(identity)) throw new SessionChangedError();
+        return finishSessionRequest!(response, data, options ?? {});
+      },
+      () => {
+        throw new SessionChangedError();
+      }
+    );
+  }
+  return finishSessionRequest!(response, data, options ?? {});
 };
 
 // Configure auth store options for better security

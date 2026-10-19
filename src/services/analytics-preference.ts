@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { isDeletionAnalyticsSuspended } from '@/services/accountDeletion/analytics';
 import { getCurrentUser, onAuthChange } from '@/services/auth';
 import { UsersService } from '@/services/pocketbase/users.service';
 import { createLogger } from '@/utils/logger';
@@ -25,7 +26,12 @@ export function getAnalyticsPreference() {
 }
 
 export function getAnalyticsEnabled(): boolean {
-  return state.ready && state.enabled && (getCurrentUser()?.id ?? null) === state.accountId;
+  return (
+    !isDeletionAnalyticsSuspended() &&
+    state.ready &&
+    state.enabled &&
+    (getCurrentUser()?.id ?? null) === state.accountId
+  );
 }
 
 export function syncAnalyticsConsent(): void {

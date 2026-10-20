@@ -458,18 +458,22 @@ test('releases only the completed receipt marker after a cleanup interruption', 
     { backend: backendUrl, id: accountId }
   );
   await page.reload();
-  const remaining = await page.evaluate(
-    ({ completed, concurrent }) => ({
-      completed: Object.keys(localStorage).some(
-        key => key.endsWith(`:${completed}`) && key.includes('analytics-fence')
-      ),
-      concurrent: Object.keys(localStorage).some(
-        key => key.endsWith(`:${concurrent}`) && key.includes('analytics-fence')
-      ),
-    }),
-    markers
-  );
-  expect(remaining).toEqual({ completed: false, concurrent: true });
+  // Startup recovery releases the marker after an async IndexedDB read.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        ({ completed, concurrent }) => ({
+          completed: Object.keys(localStorage).some(
+            key => key.endsWith(`:${completed}`) && key.includes('analytics-fence')
+          ),
+          concurrent: Object.keys(localStorage).some(
+            key => key.endsWith(`:${concurrent}`) && key.includes('analytics-fence')
+          ),
+        }),
+        markers
+      )
+    )
+    .toEqual({ completed: false, concurrent: true });
 });
 
 test('preserves unfinished drafts if Logout is attempted during an unresolved deletion', async ({

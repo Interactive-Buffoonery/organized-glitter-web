@@ -116,13 +116,26 @@ const scannerArgs = config => [
   '--no-banner',
 ];
 
-export function publicationScanPlan(repository, trackedTree, currentSourceTree) {
+export function historyLogOpts(baseSha, runCommand = commandResult) {
+  if (!baseSha) return '--all';
+  const rulesChanged = runCommand('git', [
+    'diff',
+    '--quiet',
+    baseSha,
+    'HEAD',
+    '--',
+    '.gitleaks.toml',
+  ]);
+  return rulesChanged.status === 0 ? `${baseSha}..HEAD` : '--all';
+}
+
+export function publicationScanPlan(repository, trackedTree, currentSourceTree, logOpts = '--all') {
   const config = path.join(repository, '.gitleaks.toml');
   return [
     {
-      label: 'complete Git history',
+      label: logOpts === '--all' ? 'complete Git history' : `Git history ${logOpts}`,
       target: repository,
-      args: ['git', '--log-opts=--all', ...scannerArgs(config)],
+      args: ['git', `--log-opts=${logOpts}`, ...scannerArgs(config)],
     },
     {
       label: 'clean tracked tree',
@@ -211,7 +224,8 @@ export async function runPublicationValidation() {
   try {
     archiveTrackedTree(trackedTree);
     copyPublicationSourceTree(rootDir, currentSourceTree);
-    for (const scan of publicationScanPlan(rootDir, trackedTree, currentSourceTree)) {
+    const logOpts = historyLogOpts(process.env.PUBLICATION_HISTORY_BASE_SHA);
+    for (const scan of publicationScanPlan(rootDir, trackedTree, currentSourceTree, logOpts)) {
       assertScannerResult(commandResult(scanner, scan.args), scan.label);
     }
   } finally {

@@ -8,6 +8,7 @@ import {
   assertScannerResult,
   copyPublicationSourceTree,
   extractVerifiedGitleaks,
+  historyLogOpts,
   publicationScanPlan,
   resolveGitleaksArchive,
 } from '../run-publication-validation.mjs';
@@ -22,6 +23,16 @@ describe('publication validation', () => {
       archive: 'gitleaks_8.30.1_linux_x64.tar.gz',
       sha256: '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb',
     });
+  });
+
+  it('scans only new commits unless the scanner rules changed or the base is unknown', () => {
+    const unchanged = () => ({ status: 0 });
+    const changed = () => ({ status: 1 });
+    const failed = () => ({ status: 128 });
+    expect(historyLogOpts(undefined, unchanged)).toBe('--all');
+    expect(historyLogOpts('abc123', unchanged)).toBe('abc123..HEAD');
+    expect(historyLogOpts('abc123', changed)).toBe('--all');
+    expect(historyLogOpts('abc123', failed)).toBe('--all');
   });
 
   it('scans complete history, an archived tracked tree, and generated output', () => {

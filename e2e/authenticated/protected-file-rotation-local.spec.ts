@@ -180,6 +180,7 @@ test.describe('active session through protected file token rotation', () => {
     );
     await missingPage.goto('/overview', { waitUntil: 'domcontentloaded' });
     await (await earlierMissingStartup).finished();
+    await expect(missingPage.getByRole('heading', { name: /^Welcome back,/ })).toBeVisible();
     let releaseDeferredImage: () => void = () => {};
     const deferredImage = new Promise<void>(resolve => {
       releaseDeferredImage = resolve;

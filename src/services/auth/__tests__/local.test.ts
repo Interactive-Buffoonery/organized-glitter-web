@@ -39,6 +39,25 @@ const { authStore, authWithPasswordMock, createMock, requestVerificationMock, re
     };
   });
 
+vi.mock('pocketbase', async importOriginal => {
+  const actual = await importOriginal<typeof import('pocketbase')>();
+  return {
+    ...actual,
+    default: class {
+      authStore = { clear: vi.fn() };
+      collection() {
+        return { authWithPassword: authWithPasswordMock };
+      }
+    },
+  };
+});
+
+vi.mock('@/services/accountDeletion/intentStore', () => ({
+  deletionIntents: {
+    applyAuthIfClear: vi.fn(async (_backend, _account, apply: () => boolean) => apply()),
+  },
+}));
+
 vi.mock('@/lib/pocketbase', () => ({
   pb: {
     baseURL: 'http://127.0.0.1:8090',
@@ -74,6 +93,7 @@ describe('local auth service', () => {
 
   it('normalizes email before password login', async () => {
     authWithPasswordMock.mockResolvedValue({
+      token: 'login-token',
       record: {
         id: 'user-1',
         email: 'sarah@example.test',
@@ -107,7 +127,6 @@ describe('local auth service', () => {
           verified: false,
         },
       };
-      authStore.save(authData.token, authData.record);
       return Promise.resolve(authData);
     });
 
@@ -125,7 +144,7 @@ describe('local auth service', () => {
         email: 'sarah@example.test',
       },
     });
-    expect(authStore.clear).toHaveBeenCalledOnce();
+    expect(authStore.clear).not.toHaveBeenCalled();
   });
 
   it('does not dispatch a password login after the initiating session changes', async () => {
@@ -202,7 +221,7 @@ describe('local auth service', () => {
         email: 'sarah@example.test',
       },
     });
-    expect(authStore.clear).toHaveBeenCalledOnce();
+    expect(authStore.clear).not.toHaveBeenCalled();
   });
 
   it('does not clear a newer session when an earlier password login is rejected', async () => {

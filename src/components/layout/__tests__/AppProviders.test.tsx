@@ -29,6 +29,11 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: null, isLoading: false }),
 }));
 
+vi.mock('@/services/accountDeletion/recovery', () => ({
+  initializeDeletionRecovery: vi.fn(),
+  useDeletionRecovery: () => ({ ready: true, intents: [], error: false }),
+}));
+
 vi.mock('@/hooks/queries/useUserProfileQuery', () => ({
   useUserProfileQuery: () => ({ data: undefined }),
 }));
@@ -68,14 +73,14 @@ describe('AppProviders', () => {
     vi.clearAllMocks();
   });
 
-  it('renders children and mounts the shared toaster', () => {
+  it('renders children and mounts the shared toaster', async () => {
     render(
       <AppProviders>
         <div data-testid="app-child">Child content</div>
       </AppProviders>
     );
 
-    expect(screen.getByTestId('app-child')).toBeInTheDocument();
+    expect(await screen.findByTestId('app-child')).toBeInTheDocument();
     expect(screen.getByTestId('app-toaster')).toBeInTheDocument();
     expect(screen.getByTestId('feedback-dialog-provider')).toBeInTheDocument();
   });
@@ -102,12 +107,12 @@ describe('AppProviders', () => {
     expect(setupAutomaticCacheCleaningMock).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps current children across provider rerenders', () => {
+  it('keeps current children across provider rerenders', async () => {
     render(
       <AppProviders>
         <div>Child content</div>
       </AppProviders>
     );
-    expect(screen.getByText('Child content')).toBeInTheDocument();
+    expect(await screen.findByText('Child content')).toBeInTheDocument();
   });
 });

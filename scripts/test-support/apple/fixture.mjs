@@ -8,7 +8,7 @@ import path from 'node:path';
 import { installPocketBase } from '../../install-pocketbase.mjs';
 import { testAppleGrantMigration } from '../apple-grant-migration.mjs';
 
-export async function startAppleFixture() {
+export async function startAppleFixture({ extraHooks = [], testEnv = {} } = {}) {
   const root = process.cwd();
   mkdirSync('.tmp', { recursive: true });
   const runDir = mkdtempSync(path.join(root, '.tmp/native-apple-auth-'));
@@ -124,6 +124,7 @@ export async function startAppleFixture() {
       'auth_sign_in_methods.pb.js',
       'account_deletion.pb.js',
       'account_deletion.js',
+      'account_deletion_posthog.js',
       'apple_grants.pb.js',
       'apple_grant_store.js',
       'apple_web_grant.js',
@@ -149,6 +150,10 @@ export async function startAppleFixture() {
       path.join(root, 'pb_migrations/1790496000_apple_grants.js'),
       path.join(migrationsDir, '1790496000_apple_grants.js')
     );
+
+    for (const hook of extraHooks) {
+      copyFileSync(hook, path.join(hooksDir, path.basename(hook)));
+    }
 
     const binary = await installPocketBase({
       destination: path.join(root, '.tmp/pocketbase-cache/0.40.4/pocketbase'),
@@ -192,6 +197,10 @@ export async function startAppleFixture() {
         cwd: runDir,
         env: {
           ...process.env,
+          POSTHOG_ERASURE_HOST: '',
+          POSTHOG_ERASURE_PROJECT_ID: '',
+          POSTHOG_ERASURE_API_KEY: '',
+          ...testEnv,
           TEST_APPLE_OAUTH_URL: oauthUrl,
           APPLE_NATIVE_CLIENT_ID: '',
           APPLE_TEAM_ID: '',
@@ -215,6 +224,7 @@ export async function startAppleFixture() {
 
     return {
       root,
+      binary,
       runDir,
       dataDir,
       baseUrl,

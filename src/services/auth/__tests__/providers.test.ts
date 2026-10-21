@@ -128,6 +128,22 @@ describe('OAuth provider service', () => {
     ]);
   });
 
+  it('aborts a linked-method lookup that never responds', async () => {
+    vi.useFakeTimers();
+    try {
+      listAuthMethodsMock.mockReturnValue(new Promise(() => {}));
+      listExternalAuthsMock.mockReturnValue(new Promise(() => {}));
+      const pending = listAccountSignInMethods('user-1');
+      const result = expect(pending).rejects.toThrow('timed out');
+      await vi.advanceTimersByTimeAsync(15_000);
+      await result;
+      expect(listAuthMethodsMock.mock.calls[0][0].signal.aborted).toBe(true);
+      expect(listExternalAuthsMock.mock.calls[0][1].signal.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('restores the authenticated account if a missing backend guard returns another user', async () => {
     authWithOAuth2Mock.mockResolvedValue({ record: { id: 'user-2' }, token: 'wrong-token' });
 

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   captureSessionDrafts,
   clearSessionDrafts,
+  clearCompletedCreateMarkers,
   completeSessionRecovery,
   registerSessionDraft,
   takeSessionDraft,
@@ -33,6 +34,19 @@ afterEach(() => {
 });
 
 describe('session recovery', () => {
+  it('purges only the deleted account completed-create markers', () => {
+    retainSignedOutCreateTokens('account-a', ['token-a']);
+    retainSignedOutCreateTokens('account-b', ['token-b']);
+    recordCompletedSessionCreate('token-a', 'projects', 'project-a');
+    recordCompletedSessionCreate('token-a', 'progress_notes', 'note-a');
+    recordCompletedSessionCreate('token-b', 'projects', 'project-b');
+    expect(clearCompletedCreateMarkers('account-a')).toBe(true);
+    expect(peekCompletedSessionDestinations('account-a', '/projects/')).toEqual([]);
+    expect(takeCompletedSessionOtherCreate('account-a')).toEqual([]);
+    expect(peekCompletedSessionDestinations('account-b', '/projects/')).toEqual([
+      '/projects/project-b',
+    ]);
+  });
   it('recognizes a session change wrapped by the service error handler', () => {
     expect(
       isSessionChangedError({

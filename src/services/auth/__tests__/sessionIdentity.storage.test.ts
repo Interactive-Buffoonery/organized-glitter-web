@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BaseAuthStore, LocalAuthStore } from 'pocketbase';
+const deletionFence = vi.hoisted(() => ({
+  get: vi.fn(),
+  list: vi.fn(),
+  finishSignOutIfClaim: vi.fn(),
+}));
+vi.mock('@/services/accountDeletion/intentStore', () => ({ deletionIntents: deletionFence }));
 
 vi.mock('@/lib/pocketbase', async () => {
   const { LocalAuthStore } = await import('pocketbase');
@@ -18,6 +24,8 @@ import {
   takeCompletedSessionDestinations,
 } from '../sessionRecovery';
 import { sendFeedbackRequest } from '@/services/pocketbase/feedback.service';
+import { finishInterruptedSignOut } from '@/services/accountDeletion/recovery';
+import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 
 const authKey = 'pocketbase_auth';
 const epochKey = 'og:session-identity:v1:pocketbase_auth';
@@ -39,6 +47,9 @@ describe('session identity across queued storage events', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   beforeEach(() => {
+    deletionFence.get.mockReset().mockResolvedValue(undefined);
+    deletionFence.list.mockReset().mockResolvedValue([]);
+    deletionFence.finishSignOutIfClaim.mockReset();
     pb.authStore.clear();
     pb.authStore.save('token-a', account);
   });
@@ -88,6 +99,7 @@ describe('session identity across queued storage events', () => {
     const onInvalidSession = vi.fn();
     const unsubscribe = subscribeToInvalidSession(onInvalidSession);
     const request = sendFeedbackRequest({ feedback: 'A useful feedback message' }, 'token-a');
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
     const otherTabStore = new LocalAuthStore();
     createSessionIdentityTracker(otherTabStore, localStorage);
 
@@ -114,6 +126,16 @@ describe('session identity across queued storage events', () => {
 
     expect(onInvalidSession).toHaveBeenCalledOnce();
     expect(onInvalidSession).toHaveBeenCalledWith('token-a');
+  });
+  it('blocks raw feedback before and after a cross-tab deletion intent', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    deletionFence.get.mockResolvedValue({ phase: 'pending' });
+    await expect(sendFeedbackRequest({ feedback: 'draft' }, 'token-a')).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+    deletionFence.get.mockResolvedValueOnce(undefined).mockResolvedValue({ phase: 'pending' });
+    await expect(sendFeedbackRequest({ feedback: 'draft' }, 'token-a')).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 
   it('sees a cross-account change before its storage event is delivered', () => {
@@ -194,6 +216,137 @@ describe('session identity across queued storage events', () => {
 
     expect(signedInCurrentDuringClear).toBe(false);
     expect(signedOutCurrentDuringLogin).toBe(false);
+  });
+
+  it('preserves a failed clear epoch for retry and restart only while the auth session survives', () => {
+    const identity = captureSessionIdentity();
+    const originalEpoch = JSON.parse(localStorage.getItem(epochKey)!).epoch as string;
+    const storagePrototype = Object.getPrototypeOf(localStorage) as Storage;
+    const originalRemoveItem = storagePrototype.removeItem;
+    let failed = false;
+    const removeItem = vi.spyOn(storagePrototype, 'removeItem').mockImplementation(function (
+      this: Storage,
+      key
+    ) {
+      if (key === authKey && !failed) {
+        failed = true;
+        throw new Error('Auth storage unavailable');
+      }
+      originalRemoveItem.call(this, key);
+    });
+
+    expect(() => pb.authStore.clear()).toThrow('Auth storage unavailable');
+    expect(pb.authStore.token).toBe('token-a');
+    expect(JSON.parse(localStorage.getItem(epochKey)!).epoch).toBe(originalEpoch);
+    expect(isCurrentSessionIdentity(identity)).toBe(true);
+
+    const restartedStore = new LocalAuthStore();
+    const restartedTracker = createSessionIdentityTracker(restartedStore, localStorage);
+    expect(restartedTracker.capture().epoch).toBe(originalEpoch);
+    expect(restartedTracker.isCurrent(restartedTracker.capture())).toBe(true);
+
+    removeItem.mockRestore();
+    pb.authStore.clear();
+    expect(isCurrentSessionIdentity(identity)).toBe(false);
+    expect(restartedTracker.capture().accountId).toBeNull();
+  });
+
+  it('does not restore a failed clear over a concurrent session marker', () => {
+    const identity = captureSessionIdentity();
+    const newer = { accountId: 'account-a', epoch: 'newer-tab-epoch' };
+    const storagePrototype = Object.getPrototypeOf(localStorage) as Storage;
+    const removeItem = vi.spyOn(storagePrototype, 'removeItem').mockImplementation(function (
+      this: Storage,
+      key
+    ) {
+      if (key === authKey) {
+        this.setItem(epochKey, JSON.stringify(newer));
+        throw new Error('Auth storage unavailable');
+      }
+    });
+
+    try {
+      expect(() => pb.authStore.clear()).toThrow('Auth storage unavailable');
+      expect(pb.authStore.token).toBe('token-a');
+      expect(JSON.parse(localStorage.getItem(epochKey)!)).toEqual(newer);
+      expect(isCurrentSessionIdentity(identity)).toBe(false);
+    } finally {
+      removeItem.mockRestore();
+    }
+  });
+
+  it('does not restore a failed clear over a newer account session', () => {
+    const identity = captureSessionIdentity();
+    const otherTabStore = new LocalAuthStore();
+    createSessionIdentityTracker(otherTabStore, localStorage);
+    const storagePrototype = Object.getPrototypeOf(localStorage) as Storage;
+    const originalRemoveItem = storagePrototype.removeItem;
+    const removeItem = vi.spyOn(storagePrototype, 'removeItem').mockImplementation(function (
+      this: Storage,
+      key
+    ) {
+      if (key === authKey) {
+        otherTabStore.save('token-b', { id: 'account-b', collectionName: 'users' });
+        throw new Error('Original clear interrupted');
+      }
+      originalRemoveItem.call(this, key);
+    });
+
+    try {
+      expect(() => pb.authStore.clear()).toThrow('Original clear interrupted');
+      expect(pb.authStore.token).toBe('token-b');
+      expect(pb.authStore.record?.id).toBe('account-b');
+      expect(isCurrentSessionIdentity(identity)).toBe(false);
+      expect(JSON.parse(localStorage.getItem(epochKey)!)).toMatchObject({ accountId: 'account-b' });
+    } finally {
+      removeItem.mockRestore();
+    }
+  });
+
+  it('retries interrupted sign-out with the original claim after one failed real auth clear', async () => {
+    const identity = captureSessionIdentity();
+    let claim = {
+      kind: 'signed_out',
+      backendUrl: POCKETBASE_URL,
+      accountId: 'account-a',
+      epoch: identity.epoch,
+      claimId: 'first-claim',
+    };
+    deletionFence.get.mockImplementation(async () => claim);
+    deletionFence.finishSignOutIfClaim.mockImplementation(
+      async (_backend, _account, epoch, apply) => {
+        if (claim.epoch !== epoch) return false;
+        claim = { ...claim, claimId: crypto.randomUUID() };
+        return apply();
+      }
+    );
+    const storagePrototype = Object.getPrototypeOf(localStorage) as Storage;
+    const originalRemoveItem = storagePrototype.removeItem;
+    let failed = false;
+    const removeItem = vi.spyOn(storagePrototype, 'removeItem').mockImplementation(function (
+      this: Storage,
+      key
+    ) {
+      if (key === authKey && !failed) {
+        failed = true;
+        throw new Error('Auth storage unavailable');
+      }
+      originalRemoveItem.call(this, key);
+    });
+
+    try {
+      await expect(finishInterruptedSignOut()).rejects.toThrow('Auth storage unavailable');
+      expect(pb.authStore.token).toBe('token-a');
+      expect(claim.epoch).toBe(identity.epoch);
+      expect(captureSessionIdentity().epoch).toBe(identity.epoch);
+      const restarted = createSessionIdentityTracker(new LocalAuthStore(), localStorage);
+      expect(restarted.capture().epoch).toBe(identity.epoch);
+      await expect(finishInterruptedSignOut()).resolves.toBeUndefined();
+      expect(pb.authStore.token).toBe('');
+      expect(deletionFence.finishSignOutIfClaim).toHaveBeenCalledTimes(2);
+    } finally {
+      removeItem.mockRestore();
+    }
   });
 
   it('preserves work for a same-account token refresh from another tab', () => {

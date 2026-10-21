@@ -200,7 +200,7 @@ test.describe('active session through protected file token rotation', () => {
     const documentsBeforeMissingRecovery = missingDocumentRequests + 1;
     measuringMissingRecovery = true;
     try {
-      await missingPage.goto(`/projects/${project.id}`, { waitUntil: 'domcontentloaded' });
+      await missingPage.goto(`/projects/${project.id}`, { waitUntil: 'commit' });
       const missingCoverContainer = missingPage
         .getByRole('button', { name: `View larger image: ${project.title}` })
         .locator('..');

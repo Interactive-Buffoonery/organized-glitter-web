@@ -1,5 +1,6 @@
 import { pb } from '@/lib/pocketbase';
 import { getCurrentUserId } from '@/services/auth';
+import { isSessionChangedError } from '@/services/auth/sessionRecovery';
 import type {
   ArchiveColorKey,
   ArchiveColorKeyMetadata,
@@ -21,6 +22,14 @@ export class ArchiveRestoreSignInError extends Error {
     super('Sign in again to continue the restore.');
     this.name = 'ArchiveRestoreSignInError';
   }
+}
+
+function isSignInFailure(error: unknown): boolean {
+  return (
+    (error as { status?: unknown } | null)?.status === 401 ||
+    !pb.authStore.isValid ||
+    isSessionChangedError(error)
+  );
 }
 
 function requireOwner(userId: string) {
@@ -48,10 +57,14 @@ export const ArchiveColorKeysService = {
     archiveFingerprint: string
   ): Promise<ArchiveColorKeysRestoreResult> {
     if (!userId || getCurrentUserId() !== userId) throw new ArchiveRestoreSignInError();
-    const result = await pb.send<ArchiveColorKeysRestoreResult>('/api/archive/restore-color-keys', {
-      method: 'POST',
-      body: { pageId, pageRef, keys, archiveFingerprint },
-    });
-    return result;
+    try {
+      return await pb.send<ArchiveColorKeysRestoreResult>('/api/archive/restore-color-keys', {
+        method: 'POST',
+        body: { pageId, pageRef, keys, archiveFingerprint },
+      });
+    } catch (error) {
+      if (isSignInFailure(error)) throw new ArchiveRestoreSignInError();
+      throw error;
+    }
   },
 };

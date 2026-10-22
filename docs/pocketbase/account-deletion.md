@@ -283,18 +283,23 @@ verified producer, but this worker cannot satisfy it today.
 
 ## Compatibility and legacy retention
 
-Existing collection-based owner and superuser user deletes remain available.
-A model deletion hook explicitly wraps job creation and `e.next()` in the same
-transaction, including the existing relation cascades and Apple grant queue.
+Owner collection deletes of `users` records are no longer accepted. The
+collection `deleteRule` is locked, and a request hook rejects every
+non-superuser collection delete, so self-service deletion must use the guarded
+route with a fresh proof and explicit confirmation. Superuser collection
+deletes remain available. A model deletion hook explicitly wraps job creation
+and `e.next()` in the same transaction, including the existing relation cascades
+and Apple grant queue.
 Failure to create the job prevents deletion; failure later in deletion rolls the
 job back. The guarded route inserts its job first and the hook reuses it. A unique
 user index prevents duplicate jobs.
 
-Legacy paths have `source_kind: "legacy"` and an empty optional `proof_hash`.
-They gain durable vendor cleanup but do not gain fresh-proof authorization or a
+Superuser deletes have `source_kind: "legacy"` and an empty optional
+`proof_hash`. They gain durable vendor cleanup but do not gain fresh-proof authorization or a
 completion retry credential. No proof is fabricated. Guarded jobs use
 `source_kind: "guarded"` and a unique nonempty proof hash. New clients must use
-the guarded route; older clients retain their verified-owner rules.
+the guarded route; older clients that still call the collection delete endpoint
+receive 403 until they update.
 
 Legacy `account_deletions` rows are records of attempts, including failed or
 abandoned attempts, not evidence that a user was deleted. Their PII expires by

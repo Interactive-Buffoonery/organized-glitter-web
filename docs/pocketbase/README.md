@@ -71,6 +71,16 @@ Do not sync or upload the whole `pb_migrations/` directory unless the target
 environment's migration history has been reconciled against every file in that
 directory.
 
+Production applied the changes in `1778500000_add_users_coloring_walkthrough_seen.js`,
+`1778600000_int_306_stats_native_readiness.js`, and
+`1778700000_randomizer_spins_owner_update_rule.js` under other filenames, so a
+full-directory deploy runs them. The last two would replace the verified
+`coloring_page_progress_notes` rules and the `randomizer_spins` update rule.
+`1792500000_restore_verified_rules.js` runs after them and restores the
+canonical rules only where those weakened values landed. Its rollback is a
+no-op so it can never reintroduce them. `pnpm pb:test:restore-verified-rules`
+covers weakened, canonical, and custom rules.
+
 For INT-1081, deploy these six protected-file migrations in this order only
 after the token-capable web release is live. The web release works before the
 migration, but old tokenless URLs still work until these migrations run. No iOS

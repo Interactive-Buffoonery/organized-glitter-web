@@ -231,6 +231,25 @@ try {
   assert.deepEqual(applied(result), [GUARD, LEGACY[0]]);
   assert.ok(hasField(noField, 'coloring_walkthrough_seen'), 'walkthrough field added');
 
+  // A suffixed quoted name is a different index, so 1778600000 is not recorded.
+  const suffixed = build('partial-suffixed-index', {
+    ...setup,
+    [LEGACY_STATE]: stateMigration(`
+      const pages = app.findCollectionByNameOrId('coloring_pages');
+      pages.indexes = pages.indexes.map(index =>
+        /\\bidx_coloring_pages_status\\b/.test(index)
+          ? 'CREATE INDEX "idx_coloring_pages_status-old" ON coloring_pages (status)'
+          : index
+      );
+      app.save(pages);
+    `),
+  });
+  result = migrateUp(suffixed, migrationsDir({ ...setup, ...repoFiles([GUARD]) }));
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const suffixedRows = migrationRows(suffixed);
+  assert.ok(!(LEGACY[1] in suffixedRows), 'suffixed index must not count as present');
+  assert.ok(LEGACY[0] in suffixedRows && LEGACY[2] in suffixedRows);
+
   // Rules verified but stats indexes missing: 1778600000 runs and creates them.
   const noIndexes = build('partial-indexes', {
     ...setup,

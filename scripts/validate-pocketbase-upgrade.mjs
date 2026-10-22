@@ -12,6 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import net from 'node:net';
+import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -161,63 +162,6 @@ const stripIndexTerminator = index => index.replace(/;\s*$/, '');
 
 const indexName = index => index.match(/INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?(\w+)/i)?.[1];
 
-const normalizeIndex = index =>
-  stripIndexTerminator(index).replace(/\s+/g, ' ').trim().toLowerCase();
-
-const indexTable = index => index.match(/\sON\s+[`"]?(\w+)/i)?.[1];
-
-const stringEscapes = { n: '\n', r: '\r', t: '\t' };
-
-// Returns the string literals of the first `migrate(...)` argument (the up
-// step), skipping comments. Template literals with substitutions are ignored.
-// Regex literals are not tokenized; any parse failure yields no evidence.
-const upStepStrings = source => {
-  const start = source.search(/^migrate\(/m);
-  if (start < 0) return [];
-  const strings = [];
-  let depth = 0;
-  for (let i = start + 'migrate'.length; i < source.length; i += 1) {
-    const char = source[i];
-    if (char === '/' && source[i + 1] === '/') {
-      i = source.indexOf('\n', i);
-      if (i < 0) return [];
-    } else if (char === '/' && source[i + 1] === '*') {
-      i = source.indexOf('*/', i + 2) + 1;
-      if (i < 1) return [];
-    } else if (char === "'" || char === '"' || char === '`') {
-      let value = '';
-      for (i += 1; source[i] !== char; i += 1) {
-        if (i >= source.length || (char !== '`' && source[i] === '\n')) return [];
-        if (source[i] === '\\') {
-          i += 1;
-          value += stringEscapes[source[i]] ?? source[i];
-        } else {
-          value += source[i];
-        }
-      }
-      if (!(char === '`' && value.includes('${'))) strings.push(value);
-    } else if ('([{'.includes(char)) {
-      depth += 1;
-    } else if (')]}'.includes(char)) {
-      depth -= 1;
-      if (depth === 0) return [];
-    } else if (char === ',' && depth === 1) {
-      return strings;
-    }
-  }
-  return [];
-};
-
-const createsIndex = (source, collectionName, index) => {
-  const expected = normalizeIndex(index);
-  return upStepStrings(source).some(
-    value =>
-      /^\s*CREATE\s/i.test(value) &&
-      indexTable(value) === collectionName &&
-      normalizeIndex(value) === expected
-  );
-};
-
 export function readBaseMigrations({ baseCommit, gitFn = git }) {
   return gitFn(['ls-tree', '--name-only', baseCommit, 'pb_migrations/'])
     .split('\n')
@@ -230,27 +174,23 @@ export function readBaseMigrations({ baseCommit, gitFn = git }) {
 
 // The inventory records production's exact index strings as of
 // `$inventoryThroughMigration`. Any other base-schema index is kept only when
-// a newer base-commit migration's up step creates the same definition on the
-// same collection; otherwise the inventory is stale.
-export function applyIndexInventory(schema, inventory = {}, { migrations = [] } = {}) {
+// replaying the newer base-commit migrations (`replayIndexEvidence`) leaves
+// that exact definition on the same collection; otherwise the inventory is
+// stale.
+export function applyIndexInventory(schema, inventory = {}, { replayedIndexes = {} } = {}) {
   const inventoryThrough = inventory.$inventoryThroughMigration ?? '';
-  const unreleasedSources = migrations
-    .filter(migration => inventoryThrough && migration.name > inventoryThrough)
-    .map(migration => migration.source);
 
   return schema.map(collection => {
     const schemaIndexes = collection.indexes ?? [];
     const productionIndexes = inventory[collection.name] ?? [];
     const production = new Map(productionIndexes.map(index => [indexName(index), index]));
+    const replayed = (replayedIndexes[collection.name] ?? []).map(stripIndexTerminator);
     const indexes = schemaIndexes.map(index => {
       const name = indexName(index);
       if (production.has(name)) return production.get(name);
-      if (
-        indexTable(index) !== collection.name ||
-        !unreleasedSources.some(source => createsIndex(source, collection.name, index))
-      ) {
+      if (!inventoryThrough || !replayed.includes(stripIndexTerminator(index))) {
         throw new Error(
-          `Production index inventory lacks ${collection.name}.${name}, and no migration after ${inventoryThrough || '$inventoryThroughMigration'} creates it. Refresh ${indexInventoryPath} from production.`
+          `Production index inventory lacks ${collection.name}.${name}, and replaying the migrations after ${inventoryThrough || '$inventoryThroughMigration'} does not create it. Refresh ${indexInventoryPath} from production.`
         );
       }
       return index;
@@ -427,6 +367,77 @@ const prepareDataDir = async ({
   return binary;
 };
 
+// Rebuilds production at `$inventoryThroughMigration` (inventoried collections
+// with exactly their inventoried indexes), runs every newer base migration with
+// `migrate up`, and returns the indexes that then exist, per collection.
+export async function replayIndexEvidence({ schema, inventory, migrations, binary, workDir }) {
+  const inventoryThrough = inventory.$inventoryThroughMigration;
+  const unexplained = schema.some(collection =>
+    (collection.indexes ?? []).some(
+      index =>
+        !(inventory[collection.name] ?? []).some(known => indexName(known) === indexName(index))
+    )
+  );
+  const newer = migrations.filter(
+    migration => inventoryThrough && migration.name > inventoryThrough
+  );
+  if (!unexplained || newer.length === 0) return {};
+
+  const migrationDir = path.join(workDir, 'migrations');
+  const dataDir = path.join(workDir, 'data');
+  mkdirSync(migrationDir, { recursive: true });
+  for (const migration of newer) {
+    writeFileSync(path.join(migrationDir, migration.name), migration.source);
+  }
+  const replayBinary = await prepareDataDir({
+    sourceBinary: binary,
+    dataDir,
+    schema: schema
+      .filter(collection => Object.hasOwn(inventory, collection.name))
+      .map(collection => ({
+        ...collection,
+        indexes: inventory[collection.name].map(stripIndexTerminator),
+      })),
+    logPrefix: path.join(workDir, 'boundary-import'),
+  });
+  const result = spawnSync(
+    replayBinary,
+    ['migrate', 'up', '--dir', path.join(dataDir, 'pb_data'), '--migrationsDir', migrationDir],
+    { cwd: dataDir, encoding: 'utf8' }
+  );
+  const logPath = path.join(workDir, 'migrate-up.log');
+  writeFileSync(logPath, `${result.stdout || ''}\n${result.stderr || ''}`);
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `Replaying base migrations after ${inventoryThrough} on the inventoried schema failed, so unreleased indexes cannot be proven. See ${logPath}, or refresh ${indexInventoryPath} from production.`
+    );
+  }
+
+  const db = new DatabaseSync(path.join(dataDir, 'pb_data', 'data.db'), { readOnly: true });
+  try {
+    const physical = new Set(
+      db
+        .prepare("SELECT tbl_name, name FROM sqlite_master WHERE type = 'index'")
+        .all()
+        .map(row => `${row.tbl_name}.${row.name}`)
+    );
+    return Object.fromEntries(
+      db
+        .prepare('SELECT name, indexes FROM _collections')
+        .all()
+        .map(row => [
+          row.name,
+          JSON.parse(row.indexes || '[]').filter(index =>
+            physical.has(`${row.name}.${indexName(index)}`)
+          ),
+        ])
+    );
+  } finally {
+    db.close();
+  }
+}
+
 const inspectDataDir = async ({ binary, dataDir, logPrefix, expectSentinel = false }) => {
   const server = await startPocketBase({ binary, dataDir, logPrefix });
   try {
@@ -501,10 +512,15 @@ export async function validatePocketBaseUpgrade(argv = process.argv.slice(2)) {
   // index inventory (semicolon-stripped) so the upgrade matches deployed
   // metadata without asking 0.40.4 to ingest invalid CREATE INDEX strings.
   // Only base-commit migrations can explain indexes that production lacks.
-  const migrations = readBaseMigrations({ baseCommit });
-  const previousSchema = applyIndexInventory(JSON.parse(baseSchemaSource), inventory, {
-    migrations,
+  const baseSchema = JSON.parse(baseSchemaSource);
+  const replayedIndexes = await replayIndexEvidence({
+    schema: baseSchema,
+    inventory,
+    migrations: readBaseMigrations({ baseCommit }),
+    binary: cachedBaselineBinary,
+    workDir: path.join(runDir, 'index-evidence'),
   });
+  const previousSchema = applyIndexInventory(baseSchema, inventory, { replayedIndexes });
 
   const upgradedBinary = await prepareDataDir({
     sourceBinary: cachedBaselineBinary,

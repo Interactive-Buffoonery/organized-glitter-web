@@ -22,7 +22,11 @@ import {
   POCKETBASE_BASELINE_VERSION,
   POCKETBASE_VERSION,
 } from './install-pocketbase.mjs';
-import { applyIndexInventory, readBaseMigrations } from './validate-pocketbase-upgrade.mjs';
+import {
+  applyIndexInventory,
+  readBaseMigrations,
+  replayIndexEvidence,
+} from './validate-pocketbase-upgrade.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const runRoot = path.join(root, '.tmp', 'protected-file-upgrade');
@@ -234,10 +238,15 @@ try {
   const inventory = JSON.parse(
     readFileSync(path.join(root, 'scripts/fixtures/production-index-inventory.json'), 'utf8')
   );
+  const replayedIndexes = await replayIndexEvidence({
+    schema: priorSchema,
+    inventory,
+    migrations: readBaseMigrations({ baseCommit: 'HEAD' }),
+    binary: baseline,
+    workDir: path.join(runDir, 'index-evidence'),
+  });
   await admin.collections.import(
-    applyIndexInventory(priorSchema, inventory, {
-      migrations: readBaseMigrations({ baseCommit: 'HEAD' }),
-    }),
+    applyIndexInventory(priorSchema, inventory, { replayedIndexes }),
     false
   );
   const ownerUser = await admin.collection('users').create({

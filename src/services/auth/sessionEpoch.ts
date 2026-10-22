@@ -43,7 +43,10 @@ export interface SessionIdentityTracker {
 }
 
 const sharedTrackers = new WeakMap<object, SessionIdentityTracker>();
-const authMutationHooks = new WeakMap<object, Set<(next: StoredSession) => () => void>>();
+const authMutationHooks = new WeakMap<
+  object,
+  Set<(next: StoredSession) => (succeeded: boolean) => void>
+>();
 let observingHistoricalTokens = false;
 let fallbackEpochSequence = 0;
 
@@ -157,15 +160,15 @@ function observeHistoricalTokens(storage: Storage | null | undefined): void {
 
 function registerAuthMutationHook(
   authStore: AuthStoreLike,
-  hook: (next: StoredSession) => () => void
+  hook: (next: StoredSession) => (succeeded: boolean) => void
 ): void {
   let hooks = authMutationHooks.get(authStore);
   if (!hooks) {
     hooks = new Set();
     authMutationHooks.set(authStore, hooks);
 
-    const begin = (next: StoredSession): Array<() => void> => {
-      const finishers: Array<() => void> = [];
+    const begin = (next: StoredSession): Array<(succeeded: boolean) => void> => {
+      const finishers: Array<(succeeded: boolean) => void> = [];
       for (const registeredHook of hooks!) {
         try {
           finishers.push(registeredHook(next));
@@ -175,10 +178,10 @@ function registerAuthMutationHook(
       }
       return finishers;
     };
-    const finish = (finishers: Array<() => void>): void => {
+    const finish = (finishers: Array<(succeeded: boolean) => void>, succeeded: boolean): void => {
       for (const complete of finishers) {
         try {
-          complete();
+          complete(succeeded);
         } catch {
           // Preserve an exception from the underlying auth mutation.
         }
@@ -195,10 +198,13 @@ function registerAuthMutationHook(
             accountId: token && typeof record?.id === 'string' ? record.id : null,
             token,
           });
+          let succeeded = false;
           try {
-            return Reflect.apply(target, thisArg, args);
+            const result = Reflect.apply(target, thisArg, args);
+            succeeded = true;
+            return result;
           } finally {
-            finish(finishers);
+            finish(finishers, succeeded);
           }
         },
       });
@@ -209,10 +215,13 @@ function registerAuthMutationHook(
       authStore.clear = new Proxy(originalClear, {
         apply(target, thisArg, args) {
           const finishers = begin({ accountId: null, token: '' });
+          let succeeded = false;
           try {
-            return Reflect.apply(target, thisArg, args);
+            const result = Reflect.apply(target, thisArg, args);
+            succeeded = true;
+            return result;
           } finally {
-            finish(finishers);
+            finish(finishers, succeeded);
           }
         },
       });
@@ -292,18 +301,21 @@ export function createSessionIdentityTracker(
 
     rememberSession(current);
     const transitionEpoch = nextEpoch();
+    const previousEpoch = epoch;
+    const previousGeneration = generation;
     transitionInProgress = true;
     generation += 1;
     epoch = '';
 
+    const transitionWritten =
+      storage !== null &&
+      writeMarker(storage, {
+        accountId: next.accountId,
+        epoch: transitionEpoch,
+        transition: true,
+      });
     if (storage !== null) {
-      if (
-        writeMarker(storage, {
-          accountId: next.accountId,
-          epoch: transitionEpoch,
-          transition: true,
-        })
-      ) {
+      if (transitionWritten) {
         markerWriteFailed = false;
       } else {
         markerWriteFailed = true;
@@ -311,7 +323,7 @@ export function createSessionIdentityTracker(
       }
     }
 
-    return () => {
+    return succeeded => {
       const actual = liveSession(authStore);
       transitionInProgress = false;
       if (!actual) {
@@ -322,8 +334,45 @@ export function createSessionIdentityTracker(
       }
 
       observed = actual;
+      if (!succeeded && actual.accountId === current.accountId && actual.token === current.token) {
+        if (storage === null) {
+          epoch = previousEpoch;
+          generation = previousGeneration;
+          return;
+        }
+        const marker = readMarker(storage);
+        if (
+          transitionWritten &&
+          shared.kind === 'valid' &&
+          shared.marker.accountId === current.accountId &&
+          shared.marker.epoch === previousEpoch &&
+          marker.kind === 'transition' &&
+          marker.marker.accountId === next.accountId &&
+          marker.marker.epoch === transitionEpoch &&
+          writeMarker(storage, shared.marker)
+        ) {
+          epoch = previousEpoch;
+          generation = previousGeneration;
+          markerWriteFailed = false;
+          return;
+        }
+        epoch = '';
+        markerWriteFailed = true;
+        return;
+      }
       if (storage === null) {
         epoch = transitionEpoch;
+        return;
+      }
+      const marker = readMarker(storage);
+      if (
+        !transitionWritten ||
+        marker.kind !== 'transition' ||
+        marker.marker.accountId !== next.accountId ||
+        marker.marker.epoch !== transitionEpoch
+      ) {
+        epoch = '';
+        markerWriteFailed = true;
         return;
       }
       if (writeMarker(storage, { accountId: actual.accountId, epoch: transitionEpoch })) {

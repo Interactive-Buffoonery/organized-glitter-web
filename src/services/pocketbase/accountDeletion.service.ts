@@ -1,284 +1,182 @@
 import { pb } from '@/lib/pocketbase';
-import { getCurrentUserId, isAuthenticated } from '@/services/auth';
-import type { PocketBaseUser } from '@/contexts/AuthContext';
-import { Collections } from '@/types/pocketbase.types';
-import { createLogger } from '@/utils/logger';
-import { ErrorHandler } from './base/ErrorHandler';
-import type { PocketBaseError } from './base/types';
-
-const logger = createLogger('AccountDeletionService');
-
-type CollectionName = (typeof Collections)[keyof typeof Collections];
-
-type CascadePlanEntry = {
-  collection: CollectionName;
-  relation: string;
-  parentCollection: CollectionName;
-};
-
-type SnapshotCountTarget = {
-  collection: CollectionName;
-  filter: string;
-};
-
-export type AccountDeletionOutcome = {
-  status: 'deleted' | 'already_deleted';
-};
-
-type AccountDeletionUsageSnapshot = {
-  version: 1;
-  requestedAt: string;
-  cascadeCollections: CascadePlanEntry[];
-  counts: Partial<Record<CollectionName, number>>;
-  snapshotErrors: Array<{
-    collection: CollectionName;
-    message: string;
-  }>;
-};
-
-export const ACCOUNT_DELETION_PLAN = {
-  auditCollection: Collections.AccountDeletions,
-  manualDeleteCollections: [Collections.Users],
-  cascadeCollections: [
-    { collection: Collections.Projects, relation: 'user', parentCollection: Collections.Users },
-    {
-      collection: Collections.ProgressNotes,
-      relation: 'project',
-      parentCollection: Collections.Projects,
-    },
-    {
-      collection: Collections.ProjectTags,
-      relation: 'project',
-      parentCollection: Collections.Projects,
-    },
-    { collection: Collections.Tags, relation: 'user', parentCollection: Collections.Users },
-    { collection: Collections.Artists, relation: 'user', parentCollection: Collections.Users },
-    { collection: Collections.Companies, relation: 'user', parentCollection: Collections.Users },
-    {
-      collection: Collections.ColoringBooks,
-      relation: 'user',
-      parentCollection: Collections.Users,
-    },
-    {
-      collection: Collections.ColoringPages,
-      relation: 'book',
-      parentCollection: Collections.ColoringBooks,
-    },
-    {
-      collection: Collections.ColoringPageProgressNotes,
-      relation: 'user',
-      parentCollection: Collections.Users,
-    },
-    {
-      collection: Collections.ColoringPageProgressNotes,
-      relation: 'page',
-      parentCollection: Collections.ColoringPages,
-    },
-    {
-      collection: Collections.BookPublishers,
-      relation: 'user',
-      parentCollection: Collections.Users,
-    },
-    {
-      collection: Collections.BookIllustrators,
-      relation: 'user',
-      parentCollection: Collections.Users,
-    },
-    {
-      collection: Collections.ColoringMediums,
-      relation: 'user',
-      parentCollection: Collections.Users,
-    },
-    { collection: Collections.ColoringTags, relation: 'user', parentCollection: Collections.Users },
-    {
-      collection: Collections.ColoringBookTags,
-      relation: 'book',
-      parentCollection: Collections.ColoringBooks,
-    },
-    {
-      collection: Collections.ColoringBookTags,
-      relation: 'tag',
-      parentCollection: Collections.ColoringTags,
-    },
-    {
-      collection: Collections.RandomizerSpins,
-      relation: 'user',
-      parentCollection: Collections.Users,
-    },
-    {
-      collection: Collections.UserDashboardSettings,
-      relation: 'user',
-      parentCollection: Collections.Users,
-    },
-    {
-      collection: Collections.UserDashboardStats,
-      relation: 'user',
-      parentCollection: Collections.Users,
-    },
-    {
-      collection: Collections.UserYearlyStats,
-      relation: 'user',
-      parentCollection: Collections.Users,
-    },
-  ] satisfies CascadePlanEntry[],
-  snapshotCountTargets: [
-    { collection: Collections.Projects, filter: 'user = {:userId}' },
-    { collection: Collections.ProgressNotes, filter: 'project.user = {:userId}' },
-    { collection: Collections.ProjectTags, filter: 'project.user = {:userId}' },
-    { collection: Collections.Tags, filter: 'user = {:userId}' },
-    { collection: Collections.Artists, filter: 'user = {:userId}' },
-    { collection: Collections.Companies, filter: 'user = {:userId}' },
-    { collection: Collections.ColoringBooks, filter: 'user = {:userId}' },
-    { collection: Collections.ColoringPages, filter: 'book.user = {:userId}' },
-    {
-      collection: Collections.ColoringPageProgressNotes,
-      filter: 'user = {:userId} && page.book.user = {:userId}',
-    },
-    { collection: Collections.BookPublishers, filter: 'user = {:userId}' },
-    { collection: Collections.BookIllustrators, filter: 'user = {:userId}' },
-    { collection: Collections.ColoringMediums, filter: 'user = {:userId}' },
-    { collection: Collections.ColoringTags, filter: 'user = {:userId}' },
-    { collection: Collections.ColoringBookTags, filter: 'book.user = {:userId}' },
-    { collection: Collections.RandomizerSpins, filter: 'user = {:userId}' },
-    { collection: Collections.UserDashboardSettings, filter: 'user = {:userId}' },
-    { collection: Collections.UserDashboardStats, filter: 'user = {:userId}' },
-    { collection: Collections.UserYearlyStats, filter: 'user = {:userId}' },
-  ] satisfies SnapshotCountTarget[],
-} as const;
-
-type DeleteAccountInput = {
-  user: PocketBaseUser;
-  notes?: string;
-};
-
-type SignupMethodCarrier = {
-  id?: string;
-  signup_method?: unknown;
-  signupMethod?: unknown;
-};
-
-function resolveSignupMethod(user: PocketBaseUser): string {
-  const authRecord = pb.authStore.record as SignupMethodCarrier | null;
-  const candidates: unknown[] = [
-    (user as SignupMethodCarrier).signup_method,
-    (user as SignupMethodCarrier).signupMethod,
-  ];
-
-  if (!authRecord?.id || authRecord.id === user.id) {
-    candidates.push(authRecord?.signup_method, authRecord?.signupMethod);
-  }
-
-  const method = candidates.find(
-    candidate => typeof candidate === 'string' && candidate.trim().length > 0
-  );
-  return typeof method === 'string' ? method.trim() : 'unknown';
-}
-
-function requireCurrentUser(user: PocketBaseUser): void {
-  if (!user?.id || !isAuthenticated()) {
-    throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  }
-
-  const currentUserId = getCurrentUserId();
-  if (!currentUserId) {
-    throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  }
-
-  if (currentUserId !== user.id) {
-    throw ErrorHandler.createError(
-      'permission',
-      "You don't have permission to delete this account",
-      false
-    );
-  }
-}
-
-async function getSnapshotCount(target: SnapshotCountTarget, userId: string): Promise<number> {
-  const result = await pb.collection(target.collection).getList(1, 1, {
-    filter: pb.filter(target.filter, { userId }),
-    fields: 'id',
-  });
-  return result.totalItems ?? result.items.length;
-}
-
-async function buildUsageSnapshot(userId: string): Promise<AccountDeletionUsageSnapshot> {
-  const counts: Partial<Record<CollectionName, number>> = {};
-  const snapshotErrors: AccountDeletionUsageSnapshot['snapshotErrors'] = [];
-
-  await Promise.all(
-    ACCOUNT_DELETION_PLAN.snapshotCountTargets.map(async target => {
-      try {
-        counts[target.collection] = await getSnapshotCount(target, userId);
-      } catch (error) {
-        const handled = ErrorHandler.handleError(
-          error,
-          `AccountDeletion.snapshot.${target.collection}`
-        );
-        snapshotErrors.push({
-          collection: target.collection,
-          message: handled.message,
-        });
-      }
-    })
-  );
-
-  return {
-    version: 1,
-    requestedAt: new Date().toISOString(),
-    cascadeCollections: [...ACCOUNT_DELETION_PLAN.cascadeCollections],
-    counts,
-    snapshotErrors,
-  };
-}
-
-function createPostAuditDeleteError(error: PocketBaseError): PocketBaseError {
-  return {
-    type: error.type,
-    message:
-      'Your deletion request was captured, but account removal could not finish. Please contact support.',
-    status: error.status,
-    retryable: error.retryable,
-    cause: error,
-    details: {
-      stage: 'user_delete',
-      auditCaptured: true,
-    },
-  };
-}
+import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
+import { queryClient } from '@/lib/queryClient';
+import { isCurrentSessionIdentity } from '@/services/auth/sessionIdentity';
+import { hasKnownExpiredDeletionSession } from '@/services/auth/deletionSession';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
+import {
+  armDeletionTransportFence,
+  releaseDeletionTransportFence,
+  resumeDeletionAnalytics,
+  suspendDeletionAnalytics,
+} from '@/services/accountDeletion/analytics';
+import { syncAnalyticsConsent } from '@/services/analytics-preference';
+import {
+  AccountDeletionError,
+  type DeletionIntent,
+  type FreshDeletionProof,
+} from '@/services/accountDeletion/types';
 
 export class AccountDeletionService {
-  static async deleteAccount({
-    user,
-    notes = '',
-  }: DeleteAccountInput): Promise<AccountDeletionOutcome> {
-    requireCurrentUser(user);
-
-    const trimmedNotes = notes.trim();
-    const usageSnapshot = await buildUsageSnapshot(user.id);
-
-    await ErrorHandler.handleAsync(async () => {
-      await pb.collection(ACCOUNT_DELETION_PLAN.auditCollection).create({
-        user_id: user.id,
-        user_email: user.email?.trim() || 'unknown',
-        signup_method: resolveSignupMethod(user),
-        ...(trimmedNotes ? { notes: trimmedNotes } : {}),
-        usage_snapshot: usageSnapshot,
-      });
-    }, 'AccountDeletion.createDeletionRequest');
-
+  static async deleteAccount(proof: FreshDeletionProof): Promise<DeletionIntent> {
+    if (
+      proof.action !== 'delete_account' ||
+      proof.accountId !== proof.identity.accountId ||
+      proof.expiresAt <= Date.now() ||
+      !/^[A-Za-z0-9_-]{43}$/.test(proof.value)
+    )
+      throw new AccountDeletionError('verification');
+    if (!isCurrentSessionIdentity(proof.identity))
+      throw new AccountDeletionError('account_changed');
+    const token = pb.authStore.token;
+    let intent: DeletionIntent;
+    let transportFenceId: string | undefined;
     try {
-      await pb.collection(Collections.Users).delete(user.id);
-      logger.info(`Deleted account for user ${user.id}`);
-      return { status: 'deleted' };
+      transportFenceId = armDeletionTransportFence(POCKETBASE_URL, proof.accountId);
+      suspendDeletionAnalytics();
+      intent = await deletionIntents.create({
+        version: 1,
+        backendUrl: POCKETBASE_URL,
+        accountId: proof.accountId,
+        proof: proof.value,
+        phase: 'pending',
+        cleanup: 'pending',
+        localCleanupDone: false,
+        dispatch: 'prepared',
+        transportFenceId,
+      });
     } catch (error) {
-      const handled = ErrorHandler.handleError(error, 'AccountDeletion.deleteUser');
-      if (handled.type === 'not_found' || handled.status === 404) {
-        logger.warn('User record was already deleted after deletion request was captured', {
-          userId: user.id,
-        });
-        return { status: 'already_deleted' };
+      if (transportFenceId) {
+        try {
+          const current = await deletionIntents.get(POCKETBASE_URL, proof.accountId);
+          if (!current || !('proof' in current) || current.proof !== proof.value) {
+            releaseDeletionTransportFence(POCKETBASE_URL, proof.accountId, transportFenceId);
+            if (!current) {
+              resumeDeletionAnalytics();
+              syncAnalyticsConsent();
+            }
+          }
+        } catch {
+          // A possibly committed intent must keep its transport fence.
+        }
       }
-      throw createPostAuditDeleteError(handled);
+      if (error instanceof AccountDeletionError) throw error;
+      throw new AccountDeletionError('storage');
+    }
+    if (intent.proof !== proof.value) {
+      releaseDeletionTransportFence(POCKETBASE_URL, proof.accountId, transportFenceId);
+      throw new AccountDeletionError('pending');
+    }
+    if (!isCurrentSessionIdentity(proof.identity)) {
+      if (!(await deletionIntents.cancelPrepared(intent)))
+        throw new AccountDeletionError('uncertain');
+      syncAnalyticsConsent();
+      throw new AccountDeletionError('account_changed');
+    }
+    if (proof.expiresAt <= Date.now()) {
+      if (!(await deletionIntents.cancelPrepared(intent)))
+        throw new AccountDeletionError('uncertain');
+      syncAnalyticsConsent();
+      throw new AccountDeletionError('verification');
+    }
+    try {
+      await queryClient.cancelQueries();
+    } catch {
+      if (!(await deletionIntents.cancelPrepared(intent)))
+        throw new AccountDeletionError('uncertain');
+      syncAnalyticsConsent();
+      throw new AccountDeletionError('verification');
+    }
+    if (!isCurrentSessionIdentity(proof.identity)) {
+      if (!(await deletionIntents.cancelPrepared(intent)))
+        throw new AccountDeletionError('uncertain');
+      syncAnalyticsConsent();
+      throw new AccountDeletionError('account_changed');
+    }
+    if (proof.expiresAt <= Date.now()) {
+      if (!(await deletionIntents.cancelPrepared(intent)))
+        throw new AccountDeletionError('uncertain');
+      syncAnalyticsConsent();
+      throw new AccountDeletionError('verification');
+    }
+    // Commit the may-have-been-sent state before the first possible network dispatch.
+    const submitted = await deletionIntents.markSubmitted(intent);
+    if (!isCurrentSessionIdentity(proof.identity)) throw new AccountDeletionError('uncertain');
+    return this.send(submitted, token);
+  }
+
+  static async retry(intent: DeletionIntent): Promise<DeletionIntent> {
+    if (intent.backendUrl !== POCKETBASE_URL || !/^[A-Za-z0-9_-]{43}$/.test(intent.proof))
+      throw new AccountDeletionError('verification');
+    if (intent.dispatch === 'prepared') throw new AccountDeletionError('verification');
+    return this.send(intent);
+  }
+
+  static async retryAuthenticated(
+    intent: DeletionIntent,
+    proof: FreshDeletionProof,
+    confirmed: boolean
+  ): Promise<DeletionIntent> {
+    if (
+      confirmed !== true ||
+      intent.dispatch === 'prepared' ||
+      intent.phase !== 'pending' ||
+      intent.backendUrl !== POCKETBASE_URL ||
+      proof.action !== 'delete_account' ||
+      proof.accountId !== intent.accountId ||
+      proof.value !== intent.proof ||
+      proof.expiresAt <= Date.now() ||
+      !isCurrentSessionIdentity(proof.identity) ||
+      pb.authStore.record?.id !== intent.accountId ||
+      !pb.authStore.token ||
+      hasKnownExpiredDeletionSession()
+    )
+      throw new AccountDeletionError('verification');
+    return this.send(intent, pb.authStore.token);
+  }
+
+  private static async send(intent: DeletionIntent, token?: string): Promise<DeletionIntent> {
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      // Dedicated fetch has no auth-refresh, mutation retry, or shared-session hooks.
+      const request = fetch(`${intent.backendUrl}/api/account/delete`, {
+        method: 'POST',
+        signal: controller.signal,
+        credentials: 'omit',
+        cache: 'no-store',
+        redirect: 'error',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ proof: intent.proof, confirmed: true }),
+      });
+      const response = await Promise.race([
+        request,
+        new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => {
+            controller.abort();
+            reject(new AccountDeletionError('uncertain'));
+          }, 30_000);
+        }),
+      ]);
+      if (response.status !== 200) throw new AccountDeletionError('uncertain');
+      const result: unknown = await response.json();
+      if (
+        !result ||
+        typeof result !== 'object' ||
+        !('status' in result) ||
+        result.status !== 'deleted' ||
+        !('cleanup' in result) ||
+        (result.cleanup !== 'pending' && result.cleanup !== 'completed')
+      )
+        throw new AccountDeletionError('uncertain');
+      return await deletionIntents.update({ ...intent, phase: 'deleted', cleanup: result.cleanup });
+    } catch {
+      throw new AccountDeletionError('uncertain');
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }

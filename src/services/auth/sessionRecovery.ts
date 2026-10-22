@@ -332,6 +332,31 @@ export function clearSessionDrafts(accountId?: string): void {
   }
 }
 
+export function clearCompletedCreateMarkers(accountId: string): boolean {
+  pendingCompletedCreateWrites.delete(accountId);
+  pendingCompletedCreateRemovals.delete(accountId);
+  completedCreateSnapshots.delete(accountId);
+  completedOtherCreates.delete(accountId);
+  for (const [token, owner] of signedOutCreateAccounts) {
+    if (owner === accountId) signedOutCreateAccounts.delete(token);
+  }
+  try {
+    const prefixes = [
+      completedCreatesAccountPrefix(accountId),
+      `${COMPLETED_OTHER_PREFIX}${accountId}:`,
+    ];
+    const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index));
+    for (const key of keys) {
+      if (key && prefixes.some(prefix => key.startsWith(prefix))) localStorage.removeItem(key);
+    }
+    return !Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).some(
+      key => key && prefixes.some(prefix => key.startsWith(prefix))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function retainSignedOutCreateTokens(accountId: string, tokens: Iterable<string>): void {
   for (const token of tokens) {
     signedOutCreateAccounts.delete(token);

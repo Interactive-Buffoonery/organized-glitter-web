@@ -4,6 +4,7 @@ import { ThemeProvider } from 'next-themes';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 
+import { DeletionBootstrap } from '@/components/accountDeletion/DeletionBootstrap';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { PrivateFileTokenProvider } from '@/contexts/PrivateFileTokenContext';
 import { MetadataProvider } from '@/contexts/MetadataContext';
@@ -41,21 +42,23 @@ const AppProviderContents: React.FC = () => {
   return (
     <>
       <CacheCleanupHandler />
-      <AuthProvider>
-        <PrivateFileTokenProvider>
-          <AccountThemeSync />
-          <AnalyticsProvider>
-            <MetadataProvider>
-              <FeedbackDialogProvider />
-              <TooltipProvider>
-                {children}
-                <Toaster />
-                <UpdateToast buildId={__APP_BUILD_ID__} />
-              </TooltipProvider>
-            </MetadataProvider>
-          </AnalyticsProvider>
-        </PrivateFileTokenProvider>
-      </AuthProvider>
+      <DeletionBootstrap>
+        <AuthProvider>
+          <PrivateFileTokenProvider>
+            <AccountThemeSync />
+            <AnalyticsProvider>
+              <MetadataProvider>
+                <FeedbackDialogProvider />
+                <TooltipProvider>
+                  {children}
+                  <Toaster />
+                  <UpdateToast buildId={__APP_BUILD_ID__} />
+                </TooltipProvider>
+              </MetadataProvider>
+            </AnalyticsProvider>
+          </PrivateFileTokenProvider>
+        </AuthProvider>
+      </DeletionBootstrap>
     </>
   );
 };

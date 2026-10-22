@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
 import {
   chmodSync,
   closeSync,
@@ -9,9 +10,11 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import net from 'node:net';
+import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -85,7 +88,6 @@ export function collectUpgradeChanges({ baseCommit, gitFn = git }) {
   const untrackedMigrations = gitFn([
     'ls-files',
     '--others',
-    '--ignored',
     '--exclude-standard',
     '--',
     'pb_migrations/*.js',
@@ -160,13 +162,44 @@ export function assertUpgradeChangeContract({ addedMigrations, schemaContractCha
 
 const stripIndexTerminator = index => index.replace(/;\s*$/, '');
 
-export function applyIndexInventory(schema, inventory = {}) {
+const indexName = index => index.match(/INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?(\w+)/i)?.[1];
+
+export function readBaseMigrations({ baseCommit, gitFn = git }) {
+  return gitFn(['ls-tree', '--name-only', baseCommit, 'pb_migrations/'])
+    .split('\n')
+    .filter(filePath => filePath.endsWith('.js'))
+    .map(filePath => ({
+      name: path.basename(filePath),
+      source: gitFn(['show', `${baseCommit}:${filePath}`]),
+    }));
+}
+
+// The inventory records production's exact index strings as of
+// `$inventoryThroughMigration`. Any other base-schema index is kept only when
+// replaying the newer base-commit migrations (`replayIndexEvidence`) leaves
+// that exact definition on the same collection; otherwise the inventory is
+// stale.
+export function applyIndexInventory(schema, inventory = {}, { replayedIndexes = {} } = {}) {
+  const inventoryThrough = inventory.$inventoryThroughMigration ?? '';
+
   return schema.map(collection => {
-    const indexes = inventory[collection.name] ?? collection.indexes ?? [];
-    return {
-      ...collection,
-      indexes: indexes.map(stripIndexTerminator),
-    };
+    const schemaIndexes = collection.indexes ?? [];
+    const productionIndexes = inventory[collection.name] ?? [];
+    const production = new Map(productionIndexes.map(index => [indexName(index), index]));
+    const replayed = (replayedIndexes[collection.name] ?? []).map(stripIndexTerminator);
+    const indexes = schemaIndexes.map(index => {
+      const name = indexName(index);
+      if (production.has(name)) return production.get(name);
+      if (!inventoryThrough || !replayed.includes(stripIndexTerminator(index))) {
+        throw new Error(
+          `Production index inventory lacks ${collection.name}.${name}, and replaying the migrations after ${inventoryThrough || '$inventoryThroughMigration'} does not create it. Refresh ${indexInventoryPath} from production.`
+        );
+      }
+      return index;
+    });
+    const schemaNames = new Set(schemaIndexes.map(indexName));
+    const productionOnly = productionIndexes.filter(index => !schemaNames.has(indexName(index)));
+    return { ...collection, indexes: [...indexes, ...productionOnly].map(stripIndexTerminator) };
   });
 }
 
@@ -201,9 +234,9 @@ const getFreePort = () =>
     });
   });
 
-const waitForHttp = async (url, processHandle, label) => {
+const waitForHttp = async (url, processHandle, label, timeoutMs) => {
   const startedAt = Date.now();
-  while (Date.now() - startedAt < 20_000) {
+  while (Date.now() - startedAt < timeoutMs) {
     if (processHandle.exitCode !== null) {
       throw new Error(`${label} exited before startup with status ${processHandle.exitCode}.`);
     }
@@ -218,19 +251,19 @@ const waitForHttp = async (url, processHandle, label) => {
   throw new Error(`${label} did not become ready at ${url}.`);
 };
 
-const stopProcess = processHandle =>
-  new Promise(resolve => {
-    if (!processHandle || processHandle.exitCode !== null) {
-      resolve();
-      return;
-    }
-    const timeout = setTimeout(resolve, 5_000);
-    processHandle.once('exit', () => {
-      clearTimeout(timeout);
-      resolve();
-    });
-    processHandle.kill('SIGTERM');
-  });
+export async function stopProcess(processHandle, { graceMs = 5_000 } = {}) {
+  if (!processHandle || processHandle.exitCode !== null || processHandle.signalCode !== null) {
+    return;
+  }
+  const exited = once(processHandle, 'exit');
+  processHandle.kill('SIGTERM');
+  const escalation = setTimeout(() => processHandle.kill('SIGKILL'), graceMs);
+  try {
+    await exited;
+  } finally {
+    clearTimeout(escalation);
+  }
+}
 
 const requestJson = async (url, options = {}) => {
   const response = await fetch(url, options);
@@ -242,7 +275,7 @@ const requestJson = async (url, options = {}) => {
   return body ? JSON.parse(body) : null;
 };
 
-const startPocketBase = async ({ binary, dataDir, logPrefix }) => {
+export async function startPocketBase({ binary, dataDir, logPrefix, timeoutMs = 20_000 }) {
   const port = await getFreePort();
   const stdout = openSync(`${logPrefix}.stdout.log`, 'a');
   const stderr = openSync(`${logPrefix}.stderr.log`, 'a');
@@ -252,9 +285,16 @@ const startPocketBase = async ({ binary, dataDir, logPrefix }) => {
     { cwd: dataDir, stdio: ['ignore', stdout, stderr] }
   );
   const url = `http://127.0.0.1:${port}`;
-  await waitForHttp(`${url}/api/health`, processHandle, path.basename(logPrefix));
+  try {
+    await waitForHttp(`${url}/api/health`, processHandle, path.basename(logPrefix), timeoutMs);
+  } catch (error) {
+    await stopProcess(processHandle);
+    closeSync(stdout);
+    closeSync(stderr);
+    throw error;
+  }
   return { processHandle, stderr, stdout, url };
-};
+}
 
 const authenticateSuperuser = async url => {
   const result = await requestJson(`${url}/api/collections/_superusers/auth-with-password`, {
@@ -336,6 +376,111 @@ const prepareDataDir = async ({
   return binary;
 };
 
+const readIndexSql = dataDir => {
+  const db = new DatabaseSync(path.join(dataDir, 'pb_data', 'data.db'), { readOnly: true });
+  try {
+    return new Map(
+      db
+        .prepare("SELECT tbl_name, name, sql FROM sqlite_master WHERE type = 'index'")
+        .all()
+        .map(row => [`${row.tbl_name}.${row.name}`, row.sql])
+    );
+  } finally {
+    db.close();
+  }
+};
+
+const readCollectionIndexes = dataDir => {
+  const db = new DatabaseSync(path.join(dataDir, 'pb_data', 'data.db'), { readOnly: true });
+  try {
+    return db
+      .prepare('SELECT name, indexes FROM _collections')
+      .all()
+      .map(row => [row.name, JSON.parse(row.indexes || '[]')]);
+  } finally {
+    db.close();
+  }
+};
+
+// Rebuilds production at `$inventoryThroughMigration` (inventoried collections
+// with exactly their inventoried indexes), runs every newer base migration with
+// `migrate up`, and returns, per collection, the indexes whose metadata and
+// SQLite definition then exist. PocketBase rewrites index SQL canonically, so
+// the expected SQLite definition comes from importing the base schema as is.
+export async function replayIndexEvidence({ schema, inventory, migrations, binary, workDir }) {
+  const inventoryThrough = inventory.$inventoryThroughMigration;
+  const unexplained = schema.some(collection =>
+    (collection.indexes ?? []).some(
+      index =>
+        !(inventory[collection.name] ?? []).some(known => indexName(known) === indexName(index))
+    )
+  );
+  const newer = migrations.filter(
+    migration => inventoryThrough && migration.name > inventoryThrough
+  );
+  if (!unexplained || newer.length === 0) return {};
+
+  const migrationDir = path.join(workDir, 'migrations');
+  const dataDir = path.join(workDir, 'data');
+  const referenceDir = path.join(workDir, 'reference');
+  try {
+    await prepareDataDir({
+      sourceBinary: binary,
+      dataDir: referenceDir,
+      schema: schema.map(collection => ({
+        ...collection,
+        indexes: (collection.indexes ?? []).map(stripIndexTerminator),
+      })),
+      logPrefix: path.join(workDir, 'reference-import'),
+    });
+    const referenceSql = readIndexSql(referenceDir);
+
+    mkdirSync(migrationDir, { recursive: true });
+    for (const migration of newer) {
+      writeFileSync(path.join(migrationDir, migration.name), migration.source);
+    }
+    const replayBinary = await prepareDataDir({
+      sourceBinary: binary,
+      dataDir,
+      schema: schema
+        .filter(collection => Object.hasOwn(inventory, collection.name))
+        .map(collection => ({
+          ...collection,
+          indexes: inventory[collection.name].map(stripIndexTerminator),
+        })),
+      logPrefix: path.join(workDir, 'boundary-import'),
+    });
+    const result = spawnSync(
+      replayBinary,
+      ['migrate', 'up', '--dir', path.join(dataDir, 'pb_data'), '--migrationsDir', migrationDir],
+      { cwd: dataDir, encoding: 'utf8' }
+    );
+    const logPath = path.join(workDir, 'migrate-up.log');
+    writeFileSync(logPath, `${result.stdout || ''}\n${result.stderr || ''}`);
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+      throw new Error(
+        `Replaying base migrations after ${inventoryThrough} on the inventoried schema failed, so unreleased indexes cannot be proven. See ${logPath}, or refresh ${indexInventoryPath} from production.`
+      );
+    }
+
+    const replayedSql = readIndexSql(dataDir);
+    return Object.fromEntries(
+      readCollectionIndexes(dataDir).map(([name, indexes]) => [
+        name,
+        indexes.filter(index => {
+          const key = `${name}.${indexName(index)}`;
+          return replayedSql.has(key) && replayedSql.get(key) === referenceSql.get(key);
+        }),
+      ])
+    );
+  } finally {
+    for (const directory of [migrationDir, dataDir, referenceDir]) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+}
+
 const inspectDataDir = async ({ binary, dataDir, logPrefix, expectSentinel = false }) => {
   const server = await startPocketBase({ binary, dataDir, logPrefix });
   try {
@@ -409,7 +554,16 @@ export async function validatePocketBaseUpgrade(argv = process.argv.slice(2)) {
   // previous schema with the 0.40.1 baseline after applying the production
   // index inventory (semicolon-stripped) so the upgrade matches deployed
   // metadata without asking 0.40.4 to ingest invalid CREATE INDEX strings.
-  const previousSchema = applyIndexInventory(JSON.parse(baseSchemaSource), inventory);
+  // Only base-commit migrations can explain indexes that production lacks.
+  const baseSchema = JSON.parse(baseSchemaSource);
+  const replayedIndexes = await replayIndexEvidence({
+    schema: baseSchema,
+    inventory,
+    migrations: readBaseMigrations({ baseCommit }),
+    binary: cachedBaselineBinary,
+    workDir: path.join(runDir, 'index-evidence'),
+  });
+  const previousSchema = applyIndexInventory(baseSchema, inventory, { replayedIndexes });
 
   const upgradedBinary = await prepareDataDir({
     sourceBinary: cachedBaselineBinary,

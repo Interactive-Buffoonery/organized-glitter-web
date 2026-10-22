@@ -639,17 +639,41 @@ export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSyste
 
 // Types containing all Records and Responses, useful for creating typing helper functions
 
-export type AccountDeletionJobsRecord = {
-	id: string
-	user_id: string
-	proof_hash: string
-	posthog_status: "pending" | "completed"
-	revenuecat_status: "pending" | "completed"
+export const AccountDeletionJobsPosthogStatusOptions = {
+	"pending": "pending",
+	"requested": "requested",
+	"blocked": "blocked",
+	"completed": "completed",
+} as const
+export type AccountDeletionJobsPosthogStatusOptions = typeof AccountDeletionJobsPosthogStatusOptions[keyof typeof AccountDeletionJobsPosthogStatusOptions]
+
+export const AccountDeletionJobsSourceKindOptions = {
+	"guarded": "guarded",
+	"legacy": "legacy",
+} as const
+export type AccountDeletionJobsSourceKindOptions = typeof AccountDeletionJobsSourceKindOptions[keyof typeof AccountDeletionJobsSourceKindOptions]
+export type AccountDeletionJobsRecord<Tposthog_target = unknown> = {
+	alerted_at?: IsoDateString
+	attempts?: number
 	cleanup_completed?: IsoDateString
-	created?: IsoDateString
-	updated?: IsoDateString
+	created: IsoAutoDateString
+	id: string
+	last_error?: string
+	lease_token?: string
+	lease_until?: IsoDateString
+	next_alert?: IsoDateString
+	next_attempt?: IsoDateString
+	posthog_requested_at?: IsoDateString
+	posthog_status: AccountDeletionJobsPosthogStatusOptions
+	posthog_target?: null | Tposthog_target
+	posthog_verified_at?: IsoDateString
+	proof_hash?: string
+	source_kind: AccountDeletionJobsSourceKindOptions
+	updated: IsoAutoDateString
+	user_id: string
 }
-export type AccountDeletionJobsResponse<Texpand = unknown> = Required<AccountDeletionJobsRecord> & BaseSystemFields<Texpand>
+
+export type AccountDeletionJobsResponse<Tposthog_target = unknown, Texpand = unknown> = Required<AccountDeletionJobsRecord<Tposthog_target>> & BaseSystemFields<Texpand>
 
 export type CollectionRecords = {
 	account_deletion_jobs: AccountDeletionJobsRecord

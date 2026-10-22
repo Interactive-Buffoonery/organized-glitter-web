@@ -83,16 +83,30 @@ export function useDeleteColorKey(pageId: string, userId: string) {
   });
 }
 
-/** Saves `ordered` as positions 0 to n-1, one PATCH per row that moved. */
+/**
+ * Saves `ordered` as positions 0 to n-1, one PATCH per row that moved. If a PATCH fails,
+ * rows already moved go back to their old positions so the strip is not left half sorted.
+ */
 export function useReorderColorKeys(pageId: string, userId: string) {
   const client = useQueryClient();
   const key = colorKeysKey(userId, pageId);
   return useMutation({
     mutationFn: async (ordered: ColorKey[]) => {
       const saved: ColorKey[] = [];
-      for (const [position, row] of ordered.entries())
-        if (row.position !== position)
-          saved.push(await ColorKeysService.update(row.id, userId, { position }));
+      try {
+        for (const [position, row] of ordered.entries())
+          if (row.position !== position)
+            saved.push(await ColorKeysService.update(row.id, userId, { position }));
+      } catch (error) {
+        const before = new Map(ordered.map(row => [row.id, row.position]));
+        // ponytail: best effort; onError refetches, so a failed revert still shows the server order.
+        await Promise.allSettled(
+          saved.map(row =>
+            ColorKeysService.update(row.id, userId, { position: before.get(row.id)! })
+          )
+        );
+        throw error;
+      }
       return saved;
     },
     onMutate: async ordered => {

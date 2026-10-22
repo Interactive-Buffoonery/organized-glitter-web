@@ -124,20 +124,37 @@ describe('color key mutations', () => {
     expect(service.update).not.toHaveBeenCalled();
   });
 
-  it('restores the previous order and reloads when a write fails', async () => {
-    const rows = [row('a', 0), row('b', 1), row('c', 2)];
-    client.setQueryData(listKey, rows);
-    service.update
-      .mockImplementationOnce((id: string, _user: string, input: { position: number }) =>
-        Promise.resolve(row(id, input.position))
-      )
-      .mockRejectedValueOnce(new Error('busy'));
-    const { result } = renderHook(() => useReorderColorKeys('page', 'owner'), { wrapper });
-    await act(() => result.current.mutateAsync([rows[2], rows[1], rows[0]]).catch(() => {}));
-    expect(service.update).toHaveBeenCalledTimes(2);
-    expect(client.getQueryData(listKey)).toEqual(rows);
-    expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
-  });
+  it.each([
+    ['succeeds', () => Promise.resolve(row('c', 2))],
+    ['fails', () => Promise.reject(new Error('offline'))],
+  ])(
+    'reverts saved rows, restores the order and reloads when a write fails and the revert %s',
+    async (_, revert) => {
+      const rows = [row('a', 0), row('b', 1), row('c', 2)];
+      client.setQueryData(listKey, rows);
+      service.update
+        .mockImplementationOnce((id: string, _user: string, input: { position: number }) =>
+          Promise.resolve(row(id, input.position))
+        )
+        .mockRejectedValueOnce(new Error('busy'))
+        .mockImplementationOnce(revert);
+      const { result } = renderHook(() => useReorderColorKeys('page', 'owner'), { wrapper });
+      let failure: unknown;
+      await act(() =>
+        result.current.mutateAsync([rows[2], rows[1], rows[0]]).catch(error => {
+          failure = error;
+        })
+      );
+      expect(failure).toEqual(new Error('busy'));
+      expect(service.update.mock.calls).toEqual([
+        ['c', 'owner', { position: 0 }],
+        ['a', 'owner', { position: 2 }],
+        ['c', 'owner', { position: 2 }],
+      ]);
+      expect(client.getQueryData(listKey)).toEqual(rows);
+      expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
+    }
+  );
 
   it('fills an empty page with the setup rows', async () => {
     client.setQueryData(listKey, []);

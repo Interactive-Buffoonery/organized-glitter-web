@@ -76,11 +76,15 @@ Production applied the changes in `1778500000_add_users_coloring_walkthrough_see
 `1778700000_randomizer_spins_owner_update_rule.js` under other filenames.
 Replaying them would fail on duplicate stats indexes and replace the verified
 `coloring_page_progress_notes` rules and the `randomizer_spins` update rule.
-`1778499999_skip_already_applied_legacy.js` runs first. When the walkthrough
-field exists and those rules already require `@request.auth.verified`, it
-records the three files in `_migrations` so they are skipped. Fresh installs
-lack those effects, so the guard does nothing and the three files run as
-before. No manual `_migrations` edit is needed.
+`1778499999_skip_already_applied_legacy.js` runs first. It checks each file on
+its own and records it in `_migrations` only when that file's effects are
+already present: the walkthrough field, the five stats indexes with verified
+progress-note rules, or a verified `randomizer_spins` update rule. Files whose
+effects are missing still run, so fresh installs run all three as before.
+The guard records them as the oldest history, so `migrate down` of later files
+never reaches their down steps. Rolling back past the oldest history is not
+supported, because their down steps would restore the old public rules.
+No manual `_migrations` edit is needed.
 
 `1792500000_restore_verified_rules.js` is a second safety net. It restores the
 canonical rules only where the weakened values landed. Both rollbacks are

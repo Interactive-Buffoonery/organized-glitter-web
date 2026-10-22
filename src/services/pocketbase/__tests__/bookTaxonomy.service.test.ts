@@ -24,12 +24,14 @@ vi.mock('@/services/auth', () => ({
   getCurrentUserId: vi.fn(() => 'user-123'),
 }));
 
+import { getCurrentUserId } from '@/services/auth';
 import { BookIllustratorsService } from '../bookIllustrators.service';
 import { BookPublishersService } from '../bookPublishers.service';
 
 describe('book taxonomy services', () => {
   beforeEach(() => {
     pbMock.reset();
+    vi.mocked(getCurrentUserId).mockReturnValue('user-123');
     pbMock.collectionMethods.getFirstListItem.mockRejectedValue({
       type: 'not_found',
       message: 'not found',
@@ -73,5 +75,18 @@ describe('book taxonomy services', () => {
       user: 'user-123',
     });
     expect(result.name).toBe('Unknown');
+  });
+
+  it.each([
+    ['publisher', () => BookPublishersService.createIfNotExists({ name: 'Moved' })],
+    ['illustrator', () => BookIllustratorsService.createIfNotExists({ name: 'Moved' })],
+  ])('stops %s creation when the account changes during lookup', async (_kind, run) => {
+    pbMock.collectionMethods.getFirstListItem.mockImplementation(async () => {
+      vi.mocked(getCurrentUserId).mockReturnValue('user-456');
+      throw { type: 'not_found', message: 'not found', retryable: false };
+    });
+
+    await expect(run()).rejects.toMatchObject({ type: 'auth' });
+    expect(pbMock.collectionMethods.create).not.toHaveBeenCalled();
   });
 });

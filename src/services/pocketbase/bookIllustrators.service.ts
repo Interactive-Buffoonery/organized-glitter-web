@@ -11,10 +11,12 @@ import { isAuthenticated, getCurrentUserId } from '@/services/auth';
 import { FilterBuilder } from '@/services/pocketbase/base/filterBuilder';
 import { listAllPages } from '@/services/pocketbase/base/listAllPages';
 
-function requireUserId(): string {
+function requireUserId(expectedUserId?: string): string {
   if (!isAuthenticated()) throw ErrorHandler.createError('auth', 'User not authenticated', false);
   const userId = getCurrentUserId();
-  if (!userId) throw ErrorHandler.createError('auth', 'User not authenticated', false);
+  if (!userId || (expectedUserId && userId !== expectedUserId)) {
+    throw ErrorHandler.createError('auth', 'User not authenticated', false);
+  }
   return userId;
 }
 
@@ -88,8 +90,11 @@ export class BookIllustratorsService {
     }
   }
 
-  static async create(data: { name: string }): Promise<BookIllustratorDTO> {
-    const userId = requireUserId();
+  static async create(
+    data: { name: string },
+    expectedUserId?: string
+  ): Promise<BookIllustratorDTO> {
+    const userId = requireUserId(expectedUserId);
     return ErrorHandler.handleAsync(async () => {
       const name = data.name.trim();
       const existing = await this.findByName(name, userId);
@@ -110,12 +115,15 @@ export class BookIllustratorsService {
     }, 'BookIllustrators.create');
   }
 
-  static async createIfNotExists(data: { name: string }): Promise<BookIllustratorDTO> {
-    const userId = requireUserId();
+  static async createIfNotExists(
+    data: { name: string },
+    expectedUserId?: string
+  ): Promise<BookIllustratorDTO> {
+    const userId = requireUserId(expectedUserId);
     const name = data.name.trim();
     const existing = await this.findByName(name, userId);
     if (existing) return existing;
-    return this.create({ name });
+    return this.create({ name }, userId);
   }
 
   static async update(id: string, data: Partial<{ name: string }>): Promise<BookIllustratorDTO> {

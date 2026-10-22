@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { ClientResponseError } from 'pocketbase';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('browser-image-compression', () => ({
@@ -11,6 +12,7 @@ const { serviceMocks, mockCaptureException } = vi.hoisted(() => ({
     auth: {
       isAuthenticated: vi.fn(),
       getCurrentUser: vi.fn(),
+      getCurrentUserId: vi.fn(),
     },
     archiveFilesService: {
       getPrivateFileToken: vi.fn(),
@@ -20,6 +22,7 @@ const { serviceMocks, mockCaptureException } = vi.hoisted(() => ({
       reconcileColoringBookMetrics: vi.fn(),
     },
     pocketbase: {
+      collection: vi.fn(),
       resolveFileUrl: vi.fn(
         (collectionName: string, recordId: string, filename: string) =>
           `https://pb.example/api/files/${collectionName}/${recordId}/${filename}`
@@ -81,7 +84,11 @@ vi.mock('@/services/analytics-escape-hatch', () => ({
 }));
 
 vi.mock('@/lib/pocketbase', () => ({
-  pb: { authStore: { token: '', record: null, onChange: vi.fn(() => vi.fn()) } },
+  pb: {
+    authStore: { token: '', record: null, onChange: vi.fn(() => vi.fn()) },
+    collection: serviceMocks.pocketbase.collection,
+    filter: (expr: string) => expr,
+  },
   resolveFileUrl: serviceMocks.pocketbase.resolveFileUrl,
 }));
 
@@ -2893,6 +2900,70 @@ describe('archive import', () => {
     serviceMocks.archiveFilesService.restoreColoringPageMetadata.mockResolvedValue(undefined);
     return new File([await zip.generateAsync({ type: 'blob' })], 'session-batches.zip');
   }
+
+  it.each(['publisher', 'illustrator'] as const)(
+    'does not create a %s under a new account after its lookup',
+    async field => {
+      const [{ BookPublishersService }, { BookIllustratorsService }] = await Promise.all([
+        vi.importActual<typeof import('@/services/pocketbase/bookPublishers.service')>(
+          '@/services/pocketbase/bookPublishers.service'
+        ),
+        vi.importActual<typeof import('@/services/pocketbase/bookIllustrators.service')>(
+          '@/services/pocketbase/bookIllustrators.service'
+        ),
+      ]);
+      serviceMocks.bookPublishersService.createIfNotExists.mockImplementation(
+        BookPublishersService.createIfNotExists.bind(BookPublishersService)
+      );
+      serviceMocks.bookIllustratorsService.createIfNotExists.mockImplementation(
+        BookIllustratorsService.createIfNotExists.bind(BookIllustratorsService)
+      );
+      let currentUserId = 'user-1';
+      serviceMocks.auth.getCurrentUserId.mockImplementation(() => currentUserId);
+      const create = vi.fn();
+      serviceMocks.pocketbase.collection.mockReturnValue({
+        getFirstListItem: vi.fn(async () => {
+          currentUserId = 'user-2';
+          throw new ClientResponseError({ status: 404 });
+        }),
+        create,
+      });
+      const zip = new JSZip();
+      zip.file(
+        'manifest.json',
+        JSON.stringify(
+          validManifest({
+            schemaVersion: 2,
+            coloringBooks: [
+              {
+                ref: 'coloring-book:session-taxonomy',
+                oldId: 'session-taxonomy',
+                title: 'Session Taxonomy',
+                isMystery: false,
+                status: 'in_stash',
+                totalPages: 1,
+                [field]: 'Session Name',
+                tags: [],
+                pages: [],
+              },
+            ],
+          })
+        )
+      );
+      const file = new File([await zip.generateAsync({ type: 'blob' })], 'session-taxonomy.zip');
+
+      await expect(
+        importOrganizedGlitterArchive(file, {
+          userId: 'user-1',
+          getCurrentUserId: () => currentUserId,
+        })
+      ).rejects.toThrow('The signed-in account changed during archive import');
+
+      expect(create).not.toHaveBeenCalled();
+      expect(serviceMocks.archiveFilesService.restoreColoringBookBatch).not.toHaveBeenCalled();
+      expect(serviceMocks.coloringService.createBook).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not create a diamond project when the account changes during taxonomy lookup', async () => {
     const zip = new JSZip();

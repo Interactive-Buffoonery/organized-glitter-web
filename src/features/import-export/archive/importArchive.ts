@@ -393,14 +393,23 @@ function getOrCreateColoringTagIds(
   );
 }
 
-async function resolvePublisherId(name: string | undefined): Promise<string | undefined> {
-  if (!name?.trim()) return undefined;
-  return (await BookPublishersService.createIfNotExists({ name })).id;
+interface BookTaxonomyService {
+  createIfNotExists(data: { name: string }, expectedUserId: string): Promise<{ id: string }>;
 }
 
-async function resolveIllustratorId(name: string | undefined): Promise<string | undefined> {
+async function resolveBookTaxonomyId(
+  service: BookTaxonomyService,
+  name: string | undefined,
+  userId: string,
+  assertSession: () => void
+): Promise<string | undefined> {
   if (!name?.trim()) return undefined;
-  return (await BookIllustratorsService.createIfNotExists({ name })).id;
+  try {
+    return (await service.createIfNotExists({ name }, userId)).id;
+  } catch (error) {
+    assertSession();
+    throw error;
+  }
 }
 
 function appendArchiveColoringBookIdentityFields(
@@ -447,11 +456,12 @@ async function restoreArchiveColoringBookRecord(
   archiveFingerprint: string,
   coverFile: File | undefined,
   options: { allowCreate: boolean },
+  userId: string,
   assertSession: () => void
 ): Promise<{ bookId: string; created: boolean; pages: ColoringPageDTO[] }> {
   const [publisher, illustrator] = await Promise.all([
-    resolvePublisherId(book.publisher),
-    resolveIllustratorId(book.illustrator),
+    resolveBookTaxonomyId(BookPublishersService, book.publisher, userId, assertSession),
+    resolveBookTaxonomyId(BookIllustratorsService, book.illustrator, userId, assertSession),
   ]);
   let bookId = '';
   let created = false;
@@ -532,8 +542,8 @@ function createDefaultArchiveImportAdapter(
     },
     async createColoringBook(book, coverFile) {
       const [publisher, illustrator] = await Promise.all([
-        resolvePublisherId(book.publisher),
-        resolveIllustratorId(book.illustrator),
+        resolveBookTaxonomyId(BookPublishersService, book.publisher, userId, assertSession),
+        resolveBookTaxonomyId(BookIllustratorsService, book.illustrator, userId, assertSession),
       ]);
       assertSession();
       return ColoringService.createBook({
@@ -571,6 +581,7 @@ function createDefaultArchiveImportAdapter(
         archiveFingerprint,
         coverFile,
         options,
+        userId,
         assertSession
       );
     },

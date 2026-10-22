@@ -148,8 +148,10 @@ export function placeVerifiedBinary(source, destination, metadata) {
     copyFileSync(source, staged);
     chmodSync(staged, 0o755);
     writeFileSync(stagedMetadata, `${JSON.stringify(metadata, null, 2)}\n`);
-    renameSync(staged, destination);
+    // Metadata goes first: if the binary rename never happens, the old binary
+    // fails its checksum on the next run and both files are rewritten.
     renameSync(stagedMetadata, metadataPathFor(destination));
+    renameSync(staged, destination);
   } finally {
     rmSync(staged, { force: true });
     rmSync(stagedMetadata, { force: true });

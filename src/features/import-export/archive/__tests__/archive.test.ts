@@ -4237,4 +4237,92 @@ describe('color key archives', () => {
     expect(oldResult.refMap[parsed.coloringBooks[0].pages[0].ref]).toBe('new-page');
     expect(restore).not.toHaveBeenCalled();
   });
+  it.each([
+    ['a changed archive', Object.assign(new Error('conflict'), { status: 409 })],
+    ['an expired session', new ArchiveRestoreSignInError()],
+  ])('stops the restore after %s', async (_, failure) => {
+    const pages = [makeColoringPage(), makeColoringPage({ id: 'page-2', pageNumber: 2 })];
+    const key = {
+      id: 'key000000000001',
+      page: 'page-1',
+      user: 'source-user',
+      position: 0,
+      symbol: 'r:abc123def456ghi',
+      code: '001',
+      color_name: 'Rose',
+      swatch: '#ff00aa',
+      tried: [],
+      note: '',
+      created: '2026-01-01 00:00:00.000Z',
+      updated: '2026-02-01 00:00:00.000Z',
+    };
+    const data: ArchiveExportSourceData = {
+      projects: [],
+      projectProgressNotes: [],
+      coloringMediums: [],
+      coloringPageProgressNotes: [
+        {
+          id: 'coloring-note-1',
+          pageId: 'page-1',
+          content: 'after keys',
+          date: '2026-05-02',
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+      coloringBooks: [
+        {
+          id: 'book-1',
+          userId: 'user-1',
+          title: 'Swatch fixture',
+          publisherId: '',
+          illustratorId: '',
+          series: '',
+          theme: '',
+          isbn: '',
+          edition: '',
+          language: '',
+          sourceUrl: '',
+          datePurchased: '',
+          dateReceived: '',
+          dateStarted: '',
+          dateCompleted: '',
+          bookFormat: '',
+          notes: '',
+          coverImage: '',
+          isMystery: false,
+          status: 'in_stash',
+          totalPages: 2,
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+      coloringPagesByBookId: { 'book-1': pages },
+      colorKeys: [key, { ...key, id: 'key000000000002', page: 'page-2' }],
+    };
+    const { blob } = await createArchiveZipFromData(data);
+    const zip = await JSZip.loadAsync(blob);
+    const manifest = validateArchiveManifest(
+      JSON.parse(await zip.file('manifest.json')!.async('string'))
+    );
+    const restore = vi.fn().mockRejectedValue(failure);
+    const adapter = makeImportAdapter({
+      createColoringBook: vi.fn().mockResolvedValue({ id: 'new-book' }),
+      listColoringPages: vi
+        .fn()
+        .mockResolvedValue([
+          makeColoringPage({ id: 'new-page', bookId: 'new-book' }),
+          makeColoringPage({ id: 'new-page-2', bookId: 'new-book', pageNumber: 2 }),
+        ]),
+      restoreColorKeys: restore,
+    });
+    const result = await importArchiveBundle(
+      { zip, manifest, warnings: [], archiveFingerprint: 'keys-fixture' },
+      adapter
+    );
+    expect(restore).toHaveBeenCalledOnce();
+    expect(adapter.createColoringPageProgressNote).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.errors).toHaveLength(1);
+  });
 });

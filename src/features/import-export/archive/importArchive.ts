@@ -968,7 +968,9 @@ export async function importArchiveBundle(
   const fingerprint =
     bundle.archiveFingerprint ??
     (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
+  let restoreStopped = false;
   for (const book of bundle.manifest.coloringBooks) {
+    if (restoreStopped) break;
     const errorCountBeforeBook = result.errors.length;
     try {
       const archiveBookId =
@@ -1329,6 +1331,11 @@ export async function importArchiveBundle(
                 ? error.message
                 : `Color keys for page ${page.pageNumber} in ${book.title} could not be restored. Export again and retry.`
             );
+            // A changed archive or lost session makes every later write unsafe.
+            if (error instanceof ArchiveRestoreSignInError || isArchiveMetadataConflict(error)) {
+              restoreStopped = true;
+              break;
+            }
           }
         }
 

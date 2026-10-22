@@ -32,3 +32,8 @@ it('rejects a missing session or user ID', () => {
 it('rejects a different signed-in user than expected', () => {
   expect(() => requireUserId('user-2')).toThrow(expect.objectContaining(authError));
 });
+
+it('rejects an empty expected user ID', () => {
+  expect(() => requireUserId('')).toThrow(expect.objectContaining(authError));
+  expect(() => requireUserId('  ')).toThrow(expect.objectContaining(authError));
+});

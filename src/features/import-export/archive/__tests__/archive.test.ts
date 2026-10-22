@@ -68,6 +68,10 @@ const { serviceMocks, mockCaptureException } = vi.hoisted(() => ({
       list: vi.fn().mockResolvedValue([]),
       restore: vi.fn(),
     },
+    companiesService: {
+      findByName: vi.fn(),
+      create: vi.fn(),
+    },
   },
 }));
 
@@ -86,6 +90,10 @@ vi.mock('@/services/pocketbase/colorReferences.service', () => ({
 }));
 
 vi.mock('@/services/auth', () => serviceMocks.auth);
+
+vi.mock('@/services/pocketbase/companies.service', () => ({
+  CompaniesService: serviceMocks.companiesService,
+}));
 
 vi.mock('@/services/pocketbase/archiveFiles.service', () => ({
   ArchiveFilesService: serviceMocks.archiveFilesService,
@@ -2836,6 +2844,157 @@ describe('archive import', () => {
 
     expect(navigator.locks.request).not.toHaveBeenCalled();
     expect(serviceMocks.projectsService.getAllForUser).not.toHaveBeenCalled();
+  });
+
+  async function sessionBookArchiveFile(
+    totalPages: number,
+    page: Partial<ArchiveColoringPage> = {}
+  ): Promise<File> {
+    const zip = new JSZip();
+    for (const path of [...(page.photoPaths ?? []), ...(page.colorReference?.photoPaths ?? [])]) {
+      zip.file(path, new Blob([path]));
+    }
+    zip.file(
+      'manifest.json',
+      JSON.stringify(
+        validManifest({
+          schemaVersion: 2,
+          coloringBooks: [
+            {
+              ref: 'coloring-book:session-batches',
+              oldId: 'session-batches',
+              title: 'Session Batches',
+              isMystery: false,
+              status: 'in_stash',
+              totalPages,
+              tags: [],
+              pages: [{ ...archiveColoringPage(1), ...page }],
+            },
+          ],
+        })
+      )
+    );
+    serviceMocks.archiveFilesService.restoreColoringBookBatch.mockImplementation(
+      async (formData: FormData) => {
+        const firstPage = Number(formData.get('firstPage'));
+        return {
+          bookId: 'session-book',
+          created: firstPage === 1,
+          pages: Array.from({ length: Number(formData.get('pageCount')) }, (_, index) =>
+            makeColoringPage({
+              id: `session-page-${firstPage + index}`,
+              bookId: 'session-book',
+              pageNumber: firstPage + index,
+            })
+          ),
+        };
+      }
+    );
+    serviceMocks.archiveFilesService.restoreColoringPageMetadata.mockResolvedValue(undefined);
+    return new File([await zip.generateAsync({ type: 'blob' })], 'session-batches.zip');
+  }
+
+  it('does not create a diamond project when the account changes during taxonomy lookup', async () => {
+    const zip = new JSZip();
+    zip.file(
+      'manifest.json',
+      JSON.stringify(
+        validManifest({
+          schemaVersion: 2,
+          diamondProjects: [
+            {
+              ref: 'project:session-project',
+              oldId: 'session-project',
+              title: 'Session project',
+              status: 'progress',
+              company: 'Session Company',
+              tags: [],
+              progressNotes: [],
+            },
+          ],
+        })
+      )
+    );
+    const file = new File([await zip.generateAsync({ type: 'blob' })], 'session-project.zip');
+    let currentUserId = 'user-1';
+    serviceMocks.companiesService.findByName.mockImplementation(async () => {
+      currentUserId = 'user-2';
+      return { id: 'company-1' };
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        getCurrentUserId: () => currentUserId,
+      })
+    ).rejects.toThrow('The signed-in account changed during archive import');
+
+    expect(serviceMocks.archiveFilesService.restoreDiamondProject).not.toHaveBeenCalled();
+  });
+
+  it('stops coloring book page batches once the import is cancelled', async () => {
+    const file = await sessionBookArchiveFile(200);
+    const controller = new AbortController();
+    const restoreBatch = serviceMocks.archiveFilesService.restoreColoringBookBatch;
+    const respond = restoreBatch.getMockImplementation()!;
+    restoreBatch.mockImplementation(async (formData: FormData) => {
+      controller.abort();
+      return respond(formData);
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        signal: controller.signal,
+        getCurrentUserId: () => 'user-1',
+      })
+    ).rejects.toThrow('Archive import was cancelled');
+
+    expect(restoreBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops page photo batches once the import is cancelled', async () => {
+    const photoPaths = Array.from({ length: 5 }, (_, index) => `photos/session/${index}.jpg`);
+    const file = await sessionBookArchiveFile(1, { status: 'completed', photoPaths });
+    const controller = new AbortController();
+    serviceMocks.coloringService.updatePage.mockImplementation(async () => {
+      controller.abort();
+      return makeColoringPage({ id: 'session-page-1' });
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        signal: controller.signal,
+        getCurrentUserId: () => 'user-1',
+      })
+    ).rejects.toThrow('Archive import was cancelled');
+
+    expect(serviceMocks.coloringService.updatePage).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops color reference photo restores when the account changes', async () => {
+    const file = await sessionBookArchiveFile(1, {
+      colorReference: {
+        ref: 'coloring-color-reference:session',
+        notes: '001',
+        photoPaths: ['swatches/one.png', 'swatches/two.png'],
+      },
+    });
+    let currentUserId = 'user-1';
+    serviceMocks.colorReferencesService.restore.mockImplementation(async () => {
+      currentUserId = 'user-2';
+      return { referenceId: 'reference-1', addedPhotoCount: 1 };
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        getCurrentUserId: () => currentUserId,
+      })
+    ).rejects.toThrow('The signed-in account changed during archive import');
+
+    expect(serviceMocks.colorReferencesService.restore).toHaveBeenCalledTimes(1);
   });
 
   it('resumes bounded coloring book generation after a later batch fails', async () => {

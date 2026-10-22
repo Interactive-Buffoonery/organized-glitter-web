@@ -170,11 +170,15 @@ that ends in a semicolon, so the previous-schema import also applies
 `scripts/fixtures/production-index-inventory.json` and strips those terminators
 before the 0.40.1 collections import. The inventory replaces matching indexes by
 name. Its `$inventoryThroughMigration` key names the last migration the
-inventory reflects. Any other base-schema index, including one on a collection
-with no inventory entry, is kept only when a newer migration from the base
-commit creates it. Any other gap fails as a stale inventory. When refreshing the
-inventory from production, list every production collection and update that
-key:
+inventory reflects. The inventory was refreshed on October 22, 2026 from a
+complete production backup. It lists all 32 production collections and reflects
+migrations through `1792281600_account_deletion_worker.js`. Any other
+base-schema index, including one on a collection with no inventory entry, is
+kept only when replaying the base commit's newer migrations with the 0.40.1
+baseline creates it with the same metadata and SQLite definition. Any other gap
+fails as a stale inventory. When refreshing the inventory from production, list
+every production collection, copy each index definition verbatim, and update
+that key:
 
 ```bash
 pnpm pb:validate:upgrade -- --base-ref=origin/dev
@@ -507,5 +511,7 @@ node scripts/test-auth-verification.mjs --baseline-binary=/path/to/0.40.1/pocket
 The disposable test checks physical index preservation, metadata normalization,
 OAuth account backfill, unverified-token invalidation by rotating the users
 auth-token secret, and verified-user access. Its baseline
-uses the complete production index inventory exported on September 20, 2026,
-including valid indexes absent from the earlier repository snapshot.
+uses the complete production index inventory exported on October 22, 2026. It
+restores the semicolon terminators production carried before
+`1789940323_normalize_legacy_index_metadata.js`, so the normalization check
+still has legacy metadata to repair.

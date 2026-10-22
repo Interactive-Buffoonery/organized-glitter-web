@@ -168,11 +168,7 @@ const replayedIndexes = await withWorkDir(workDir =>
     workDir,
   })
 );
-assert.ok(
-  replayedIndexes.account_deletions.includes(
-    'CREATE INDEX idx_account_deletions_created ON account_deletions (created)'
-  )
-);
+assert.deepEqual(replayedIndexes, {}, 'The production inventory covers every schema index');
 applyIndexInventory(schema, inventory, { replayedIndexes });
 
 console.log(

@@ -169,10 +169,12 @@ import of the current schema. PocketBase 0.40.4 rejects legacy index metadata
 that ends in a semicolon, so the previous-schema import also applies
 `scripts/fixtures/production-index-inventory.json` and strips those terminators
 before the 0.40.1 collections import. The inventory replaces matching indexes by
-name. Its `$deployedThroughMigration` key names the last migration production
-has run. A base-schema index missing from the inventory is kept only when a
-later base-commit migration creates it; any other gap fails as a stale
-inventory. Refresh the inventory and that key after each production release:
+name. Its `$inventoryThroughMigration` key names the last migration the
+inventory reflects. Any other base-schema index, including one on a collection
+with no inventory entry, is kept only when a newer migration from the base
+commit creates it. Any other gap fails as a stale inventory. When refreshing the
+inventory from production, list every production collection and update that
+key:
 
 ```bash
 pnpm pb:validate:upgrade -- --base-ref=origin/dev

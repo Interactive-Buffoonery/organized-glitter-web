@@ -10,6 +10,7 @@ import {
   classifyUpgradeChanges,
   collectUpgradeChanges,
   parseChangedPaths,
+  readBaseMigrations,
   resolveBaseRef,
   resolveUpgradeRunDir,
   schemasHaveSameContract,
@@ -117,7 +118,7 @@ describe('PocketBase prior-schema upgrade gate', () => {
     ).toBe('resolved-base');
   });
 
-  const deployedThroughMigration = '1791260989_add_users_analytics_opt_out.js';
+  const inventoryThroughMigration = '1789940324_enforce_verified_auth.js';
   const unreleasedIndex =
     'CREATE INDEX idx_account_deletions_created ON account_deletions (created)';
 
@@ -138,7 +139,8 @@ describe('PocketBase prior-schema upgrade gate', () => {
         },
       ],
       {
-        $deployedThroughMigration: deployedThroughMigration,
+        $inventoryThroughMigration: inventoryThroughMigration,
+        progress_notes: ['CREATE INDEX idx_progress_notes_project ON progress_notes (project);'],
         coloring_books: [
           'CREATE INDEX `idx_coloring_books_completion_percentage` ON `coloring_books` (`completion_percentage`);\n',
         ],
@@ -164,7 +166,7 @@ describe('PocketBase prior-schema upgrade gate', () => {
   it('keeps an index added by a migration that production has not run', () => {
     const schema = applyIndexInventory(
       [{ id: 'deletions', name: 'account_deletions', indexes: [unreleasedIndex] }],
-      { $deployedThroughMigration: deployedThroughMigration, account_deletions: [] },
+      { $inventoryThroughMigration: inventoryThroughMigration, account_deletions: [] },
       {
         migrations: [
           { name: '1791129600_account_deletion.js', source: '// creates account_deletions' },
@@ -184,24 +186,78 @@ describe('PocketBase prior-schema upgrade gate', () => {
   it.each([
     ['no migration creates it', []],
     [
-      'only a deployed migration creates it',
-      [{ name: '1791129600_account_deletion.js', source: unreleasedIndex }],
+      'only an inventoried migration creates it',
+      [{ name: '1789000000_account_deletion.js', source: unreleasedIndex }],
     ],
   ])('fails when production lacks a schema index and %s', (_label, migrations) => {
     expect(() =>
       applyIndexInventory(
         [{ id: 'deletions', name: 'account_deletions', indexes: [unreleasedIndex] }],
-        { $deployedThroughMigration: deployedThroughMigration, account_deletions: [] },
+        { $inventoryThroughMigration: inventoryThroughMigration, account_deletions: [] },
         { migrations }
       )
     ).toThrow(/production index inventory lacks account_deletions\.idx_account_deletions_created/i);
+  });
+
+  it('fails when an inventoried-era collection has no entry', () => {
+    const grantIndex =
+      'CREATE INDEX idx_apple_grant_user_state ON apple_oauth_grants (user_id, state)';
+    expect(() =>
+      applyIndexInventory(
+        [{ id: 'grants', name: 'apple_oauth_grants', indexes: [grantIndex] }],
+        { $inventoryThroughMigration: inventoryThroughMigration },
+        { migrations: [{ name: '1789000000_apple_grants.js', source: grantIndex }] }
+      )
+    ).toThrow(/production index inventory lacks apple_oauth_grants\.idx_apple_grant_user_state/i);
+  });
+
+  it('accepts a collection created after the inventory boundary', () => {
+    const jobIndex = 'CREATE INDEX idx_jobs_created ON deletion_jobs (created);';
+    expect(
+      applyIndexInventory(
+        [{ id: 'jobs', name: 'deletion_jobs', indexes: [jobIndex] }],
+        { $inventoryThroughMigration: inventoryThroughMigration },
+        { migrations: [{ name: '1792281600_deletion_jobs.js', source: jobIndex }] }
+      )
+    ).toEqual([{ id: 'jobs', name: 'deletion_jobs', indexes: [jobIndex.replace(/;$/, '')] }]);
+  });
+
+  it('ignores branch-local migrations as evidence for a missing index', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'og-upgrade-evidence-'));
+    const gitFn = args => {
+      const result = spawnSync('git', args, { cwd: directory, encoding: 'utf8' });
+      if (result.status !== 0) throw new Error(result.stderr);
+      return result.stdout;
+    };
+    try {
+      gitFn(['init', '-q']);
+      mkdirSync(path.join(directory, 'pb_migrations'));
+      writeFileSync(path.join(directory, '.gitignore'), 'pb_migrations/*_local.js\n');
+      writeFileSync(path.join(directory, 'pb_migrations', '1700000000_base.js'), '// base\n');
+      gitFn(['add', '.']);
+      gitFn(['-c', 'user.name=t', '-c', 'user.email=t@example.test', 'commit', '-qm', 'base']);
+      writeFileSync(path.join(directory, 'pb_migrations', '1800000000_local.js'), unreleasedIndex);
+      writeFileSync(path.join(directory, 'pb_migrations', '1800000001_new.js'), unreleasedIndex);
+
+      const migrations = readBaseMigrations({ baseCommit: 'HEAD', gitFn });
+      expect(migrations).toEqual([{ name: '1700000000_base.js', source: '// base\n' }]);
+      expect(() =>
+        applyIndexInventory(
+          [{ id: 'deletions', name: 'account_deletions', indexes: [unreleasedIndex] }],
+          { $inventoryThroughMigration: '1600000000_old.js', account_deletions: [] },
+          { migrations }
+        )
+      ).toThrow(/production index inventory lacks/i);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('keeps production-only indexes so schema drift still fails the comparison', () => {
     const productionOnly = 'CREATE INDEX idx_artists_name ON artists (name)';
     expect(
       applyIndexInventory([{ id: 'artists', name: 'artists', indexes: [] }], {
-        $deployedThroughMigration: deployedThroughMigration,
+        $inventoryThroughMigration: inventoryThroughMigration,
         artists: [productionOnly],
       })
     ).toEqual([{ id: 'artists', name: 'artists', indexes: [productionOnly] }]);

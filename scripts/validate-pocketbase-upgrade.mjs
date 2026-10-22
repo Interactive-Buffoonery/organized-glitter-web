@@ -8,7 +8,6 @@ import {
   existsSync,
   mkdirSync,
   openSync,
-  readdirSync,
   readFileSync,
   writeFileSync,
 } from 'node:fs';
@@ -162,28 +161,35 @@ const stripIndexTerminator = index => index.replace(/;\s*$/, '');
 
 const indexName = index => index.match(/INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?(\w+)/i)?.[1];
 
-// The inventory records production's exact index strings. An index the base
-// schema has but production lacks is kept only when a migration newer than
-// `$deployedThroughMigration` creates it; otherwise the inventory is stale.
+export function readBaseMigrations({ baseCommit, gitFn = git }) {
+  return gitFn(['ls-tree', '--name-only', baseCommit, 'pb_migrations/'])
+    .split('\n')
+    .filter(filePath => filePath.endsWith('.js'))
+    .map(filePath => ({
+      name: path.basename(filePath),
+      source: gitFn(['show', `${baseCommit}:${filePath}`]),
+    }));
+}
+
+// The inventory records production's exact index strings as of
+// `$inventoryThroughMigration`. Any other base-schema index is kept only when
+// a newer base-commit migration creates it; otherwise the inventory is stale.
 export function applyIndexInventory(schema, inventory = {}, { migrations = [] } = {}) {
-  const deployedThrough = inventory.$deployedThroughMigration ?? '';
+  const inventoryThrough = inventory.$inventoryThroughMigration ?? '';
   const unreleasedSources = migrations
-    .filter(migration => deployedThrough && migration.name > deployedThrough)
+    .filter(migration => inventoryThrough && migration.name > inventoryThrough)
     .map(migration => migration.source);
 
   return schema.map(collection => {
     const schemaIndexes = collection.indexes ?? [];
-    const productionIndexes = inventory[collection.name];
-    if (!productionIndexes) {
-      return { ...collection, indexes: schemaIndexes.map(stripIndexTerminator) };
-    }
+    const productionIndexes = inventory[collection.name] ?? [];
     const production = new Map(productionIndexes.map(index => [indexName(index), index]));
     const indexes = schemaIndexes.map(index => {
       const name = indexName(index);
       if (production.has(name)) return production.get(name);
       if (!unreleasedSources.some(source => new RegExp(`\\b${name}\\b`).test(source))) {
         throw new Error(
-          `Production index inventory lacks ${collection.name}.${name}, and no migration after ${deployedThrough || '$deployedThroughMigration'} creates it. Refresh ${indexInventoryPath} from production.`
+          `Production index inventory lacks ${collection.name}.${name}, and no migration after ${inventoryThrough || '$inventoryThroughMigration'} creates it. Refresh ${indexInventoryPath} from production.`
         );
       }
       return index;
@@ -434,12 +440,7 @@ export async function validatePocketBaseUpgrade(argv = process.argv.slice(2)) {
   // index inventory (semicolon-stripped) so the upgrade matches deployed
   // metadata without asking 0.40.4 to ingest invalid CREATE INDEX strings.
   // Only base-commit migrations can explain indexes that production lacks.
-  const migrations = readdirSync(path.join(rootDir, 'pb_migrations'))
-    .filter(name => name.endsWith('.js') && !addedMigrations.includes(`pb_migrations/${name}`))
-    .map(name => ({
-      name,
-      source: readFileSync(path.join(rootDir, 'pb_migrations', name), 'utf8'),
-    }));
+  const migrations = readBaseMigrations({ baseCommit });
   const previousSchema = applyIndexInventory(JSON.parse(baseSchemaSource), inventory, {
     migrations,
   });

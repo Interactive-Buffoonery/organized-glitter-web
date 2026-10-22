@@ -22,7 +22,7 @@ import {
   POCKETBASE_BASELINE_VERSION,
   POCKETBASE_VERSION,
 } from './install-pocketbase.mjs';
-import { applyIndexInventory } from './validate-pocketbase-upgrade.mjs';
+import { applyIndexInventory, readBaseMigrations } from './validate-pocketbase-upgrade.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const runRoot = path.join(root, '.tmp', 'protected-file-upgrade');
@@ -234,7 +234,12 @@ try {
   const inventory = JSON.parse(
     readFileSync(path.join(root, 'scripts/fixtures/production-index-inventory.json'), 'utf8')
   );
-  await admin.collections.import(applyIndexInventory(priorSchema, inventory), false);
+  await admin.collections.import(
+    applyIndexInventory(priorSchema, inventory, {
+      migrations: readBaseMigrations({ baseCommit: 'HEAD' }),
+    }),
+    false
+  );
   const ownerUser = await admin.collection('users').create({
     email: 'files-owner@localhost.test',
     username: 'files-owner',

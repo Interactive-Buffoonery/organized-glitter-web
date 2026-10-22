@@ -1,4 +1,5 @@
 {
+  "$inventoryThroughMigration": "1792281600_account_deletion_worker.js",
   "users": [
     "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
     "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''",
@@ -9,7 +10,9 @@
     "CREATE UNIQUE INDEX `idx_tokenKey_pbc_3142635823` ON `_superusers` (`tokenKey`)",
     "CREATE UNIQUE INDEX `idx_email_pbc_3142635823` ON `_superusers` (`email`) WHERE `email` != ''"
   ],
-  "account_deletions": [],
+  "account_deletions": [
+    "CREATE INDEX idx_account_deletions_created ON account_deletions (created)"
+  ],
   "artists": ["CREATE INDEX `idx_artists_user` ON `artists` (`user`)"],
   "book_illustrators": [
     "CREATE INDEX `idx_book_illustrators_user` ON `book_illustrators` (`user`)"
@@ -24,11 +27,11 @@
     "CREATE INDEX `idx_coloring_books_user` ON `coloring_books` (`user`)",
     "CREATE INDEX `idx_coloring_books_publisher` ON `coloring_books` (`publisher`)",
     "CREATE INDEX `idx_coloring_books_illustrator` ON `coloring_books` (`illustrator`)",
-    "CREATE INDEX `idx_coloring_books_completion_percentage` ON `coloring_books` (`completion_percentage`);\n",
-    "CREATE INDEX `idx_coloring_books_last_activity_at` ON `coloring_books` (`last_activity_at`);\n",
+    "CREATE INDEX `idx_coloring_books_completion_percentage` ON `coloring_books` (`completion_percentage`)",
+    "CREATE INDEX `idx_coloring_books_last_activity_at` ON `coloring_books` (`last_activity_at`)",
     "CREATE INDEX `idx_coloring_books_status` ON `coloring_books` (`status`)",
-    "CREATE INDEX idx_coloring_books_user_status\nON coloring_books (user, status);",
-    "CREATE INDEX idx_coloring_books_user_last_activity_at ON coloring_books (user, last_activity_at);\n"
+    "CREATE INDEX idx_coloring_books_user_status\nON coloring_books (user, status)",
+    "CREATE INDEX idx_coloring_books_user_last_activity_at ON coloring_books (user, last_activity_at)"
   ],
   "coloring_mediums": [
     "CREATE INDEX `idx_coloring_mediums_user` ON `coloring_mediums` (`user`)",
@@ -46,8 +49,8 @@
     "CREATE UNIQUE INDEX `idx_coloring_pages_book_page_number` ON `coloring_pages` (`book`, `page_number`)",
     "CREATE INDEX `idx_coloring_pages_started_at` ON `coloring_pages` (`started_at`)\n",
     "CREATE INDEX idx_coloring_pages_status ON coloring_pages (status)",
-    "CREATE INDEX idx_coloring_pages_completed_at ON coloring_pages (completed_at);\n",
-    "CREATE INDEX idx_coloring_pages_book_status ON coloring_pages (book, status);\n"
+    "CREATE INDEX idx_coloring_pages_completed_at ON coloring_pages (completed_at)",
+    "CREATE INDEX idx_coloring_pages_book_status ON coloring_pages (book, status)"
   ],
   "coloring_tags": [
     "CREATE INDEX `idx_coloring_tags_user` ON `coloring_tags` (`user`)",
@@ -55,7 +58,7 @@
   ],
   "companies": ["CREATE INDEX `idx_companies_user` ON `companies` (`user`)"],
   "progress_notes": [
-    "CREATE INDEX idx_progress_notes_project ON progress_notes (project);",
+    "CREATE INDEX idx_progress_notes_project ON progress_notes (project)",
     "CREATE INDEX `idx_progress_notes_project_date` ON `progress_notes` (\n  `project`,\n  `date`\n)",
     "CREATE INDEX `idx_progress_notes_date` ON `progress_notes` (`date`)",
     "CREATE INDEX `idx_progress_notes_created` ON `progress_notes` (`created` DESC)",
@@ -73,13 +76,13 @@
     "CREATE INDEX `idx_projects_date_completed` ON `projects` (`date_completed`)",
     "CREATE INDEX `idx_projects_date_started` ON `projects` (`date_started`)",
     "CREATE INDEX `idx_projects_user_date_started` ON `projects` (\n  `user`,\n  `date_started`\n)",
-    "CREATE INDEX idx_projects_user_status_date_started ON projects (user, status, date_started);",
-    "CREATE INDEX idx_projects_user_date_completed ON projects (user, date_completed);",
-    "CREATE INDEX IF NOT EXISTS idx_projects_date_received ON projects (date_received) WHERE date_received IS NOT NULL;",
-    "CREATE INDEX IF NOT EXISTS idx_projects_date_purchased ON projects (date_purchased) WHERE date_purchased IS NOT NULL;",
-    "CREATE INDEX IF NOT EXISTS idx_projects_user_date_received ON projects (user, date_received) WHERE date_received IS NOT NULL;",
-    "CREATE INDEX IF NOT EXISTS idx_projects_user_date_purchased ON projects (user, date_purchased) WHERE date_purchased IS NOT NULL;",
-    "CREATE INDEX IF NOT EXISTS idx_projects_year_completed ON projects (strftime('%Y', date_completed)) WHERE date_completed IS NOT NULL;",
+    "CREATE INDEX idx_projects_user_status_date_started ON projects (user, status, date_started)",
+    "CREATE INDEX idx_projects_user_date_completed ON projects (user, date_completed)",
+    "CREATE INDEX IF NOT EXISTS idx_projects_date_received ON projects (date_received) WHERE date_received IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS idx_projects_date_purchased ON projects (date_purchased) WHERE date_purchased IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS idx_projects_user_date_received ON projects (user, date_received) WHERE date_received IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS idx_projects_user_date_purchased ON projects (user, date_purchased) WHERE date_purchased IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS idx_projects_year_completed ON projects (strftime('%Y', date_completed)) WHERE date_completed IS NOT NULL",
     "CREATE INDEX `idx_projects_user_title` ON `projects` (\n  `user`,\n  `title`\n)",
     "CREATE INDEX `idx_projects_user_updated` ON `projects` (\n  `user`,\n  `updated`\n)",
     "CREATE INDEX `idx_projects_updated` ON `projects` (`updated` DESC)",
@@ -116,5 +119,33 @@
     "CREATE UNIQUE INDEX `idx_externalAuths_collection_provider` ON `_externalAuths` (collectionRef, provider, providerId)"
   ],
   "_mfas": ["CREATE INDEX `idx_mfas_collectionRef_recordRef` ON `_mfas` (collectionRef,recordRef)"],
-  "_otps": ["CREATE INDEX `idx_otps_collectionRef_recordRef` ON `_otps` (collectionRef, recordRef)"]
+  "_otps": [
+    "CREATE INDEX `idx_otps_collectionRef_recordRef` ON `_otps` (collectionRef, recordRef)"
+  ],
+  "account_deletion_jobs": [
+    "CREATE UNIQUE INDEX idx_account_deletion_proof ON account_deletion_jobs (proof_hash) WHERE proof_hash != ''",
+    "CREATE INDEX idx_account_deletion_cleanup ON account_deletion_jobs (cleanup_completed)",
+    "CREATE UNIQUE INDEX idx_account_deletion_user ON account_deletion_jobs (user_id)",
+    "CREATE INDEX idx_account_deletion_work ON account_deletion_jobs (next_attempt, created, id) WHERE posthog_status != 'completed'",
+    "CREATE INDEX idx_account_deletion_alert ON account_deletion_jobs (next_alert, created, id) WHERE posthog_status != 'completed'"
+  ],
+  "apple_oauth_grants": [
+    "CREATE UNIQUE INDEX `idx_apple_grant_identity_client` ON `apple_oauth_grants` (`provider_id_hash`, `client_id`)",
+    "CREATE INDEX `idx_apple_grant_user_state` ON `apple_oauth_grants` (`user_id`, `state`)"
+  ],
+  "archive_restore_items": [
+    "CREATE UNIQUE INDEX `idx_archive_restore_items_identity` ON `archive_restore_items` (`user`, `backup_id`, `item_id`)",
+    "CREATE INDEX `idx_archive_restore_items_user_state` ON `archive_restore_items` (`user`, `state`)"
+  ],
+  "auth_step_up_attempts": [
+    "CREATE UNIQUE INDEX idx_auth_step_up_attempt_user ON auth_step_up_attempts (user)"
+  ],
+  "auth_step_up_proofs": [
+    "CREATE UNIQUE INDEX idx_auth_step_up_proof_hash ON auth_step_up_proofs (proof_hash)",
+    "CREATE UNIQUE INDEX idx_auth_step_up_proof_scope ON auth_step_up_proofs (user, action, target_provider)",
+    "CREATE INDEX idx_auth_step_up_proof_expiry ON auth_step_up_proofs (expires)"
+  ],
+  "mobile_sync_receipts": [
+    "CREATE UNIQUE INDEX `idx_mobile_sync_receipts_user_operation` ON `mobile_sync_receipts` (`user`, `operation_id`)"
+  ]
 }

@@ -37,12 +37,7 @@ routerAdd(
         throw new ForbiddenError('Email verification is required.');
       }
       require(`${__hooks}/account_deletion.js`).requireProof(app, user, hash);
-      const job = new Record(app.findCollectionByNameOrId('account_deletion_jobs'));
-      job.set('user_id', user.id);
-      job.set('proof_hash', hash);
-      job.set('posthog_status', 'pending');
-      job.set('revenuecat_status', 'pending');
-      app.save(job);
+      require(`${__hooks}/account_deletion.js`).ensureJob(app, user.id, hash);
       app.delete(user);
     });
     return e.json(200, { status: 'deleted', cleanup });
@@ -52,4 +47,27 @@ routerAdd(
 
 cronAdd('completed_account_deletion_retention', '15 * * * *', () => {
   require(`${__hooks}/account_deletion.js`).maintainRetention($app);
+});
+
+// This wraps all model deletion paths, including older clients and superusers.
+// Queue creation and the existing cascade/Apple hooks share one transaction.
+onRecordDelete(e => {
+  const originalApp = e.app;
+  try {
+    originalApp.runInTransaction(txApp => {
+      e.app = txApp;
+      require(`${__hooks}/account_deletion.js`).ensureJob(txApp, e.record.id);
+      e.next();
+    });
+  } finally {
+    e.app = originalApp;
+  }
+}, 'users');
+
+cronAdd('account_deletion_posthog', '*/5 * * * *', () => {
+  try {
+    require(`${__hooks}/account_deletion_posthog.js`).processPending($app);
+  } catch (_) {
+    $app.logger().warn('Account deletion worker failed.', 'reason', 'worker_failure');
+  }
 });

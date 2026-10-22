@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ColoringPageDTO } from '@/services/pocketbase/coloring.service';
 import {
   createArchiveImportRecoveryStore,
+  clearArchiveImportRecoveryForAccount,
   isPristineGeneratedColoringPage,
 } from '../archiveImportRecovery';
 
@@ -50,6 +51,18 @@ function createStorage() {
 }
 
 describe('completed archive recovery cleanup', () => {
+  it('purges only one account across legacy, partitioned and memory recovery', () => {
+    const storage = createStorage();
+    const mine = createArchiveImportRecoveryStore('account-a', 'archive', storage);
+    const other = createArchiveImportRecoveryStore('account-b', 'archive', storage);
+    mine.saveBook('coloring-book:one', { bookId: 'a', pages: {} });
+    other.saveBook('coloring-book:one', { bookId: 'b', pages: {} });
+    storage.setItem('og:archive-import-recovery:v1:account-a:old', '{}');
+    expect(clearArchiveImportRecoveryForAccount('account-a', storage)).toBe(true);
+    expect(storage.key(0)).toContain('account-b');
+    expect(mine.getBook('coloring-book:one')).toBeUndefined();
+    expect(other.getBook('coloring-book:one')?.bookId).toBe('b');
+  });
   it('removes expired diamond project checkpoints', () => {
     const storage = createStorage();
     const namespace = 'og:archive-import-recovery:v2:user1:expired-project';

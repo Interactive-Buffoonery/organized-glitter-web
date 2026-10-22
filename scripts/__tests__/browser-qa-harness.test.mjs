@@ -1,24 +1,45 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  linkSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { createHash } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 
-import ciConfig from '../../playwright.ci.config';
+import ciConfig, * as ciConfigModule from '../../playwright.ci.config';
 import {
+  createQaSuperuserCredentials,
+  deletionPlaywrightEnvironment,
   parseArgs,
   parseListedInventory,
   parseListedTestCount,
   parseRandomizerFixtureIds,
   pocketBaseCachePath,
+  qaEnvironment,
+  redactQaCredentials,
   resolveQaFixtures,
+  runSync,
+  runPlaywright,
   seedRandomizerFixturesForSuite,
   validateManagedPlaywrightReport,
   waitForHttp,
+  withoutQaSuperuser,
+  writeReport,
 } from '../run-local-release-qa.mjs';
 import {
   hasVerifiedCachedBinary,
   downloadPocketBaseArchive,
   installPocketBase,
+  placeVerifiedBinary,
   POCKETBASE_BASELINE_VERSION,
   POCKETBASE_VERSION,
   resolveArchive,
@@ -150,6 +171,34 @@ describe('PocketBase installer', () => {
     }
   });
 
+  it('replaces a cached executable without rewriting the file another install may be running', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'og-pocketbase-place-'));
+    const source = path.join(directory, 'extracted');
+    const destination = path.join(directory, 'cache', 'pocketbase');
+    const running = path.join(directory, 'running');
+    try {
+      writeFileSync(source, 'old');
+      placeVerifiedBinary(source, destination, { version: 'old' });
+      linkSync(destination, running);
+      writeFileSync(source, 'next');
+      placeVerifiedBinary(source, destination, { version: 'next' });
+      expect(readFileSync(running, 'utf8')).toBe('old');
+      expect(readFileSync(destination, 'utf8')).toBe('next');
+      expect(statSync(running).ino).not.toBe(statSync(destination).ino);
+      expect(statSync(destination).mode & 0o777).toBe(0o755);
+      expect(JSON.parse(readFileSync(`${destination}.release.json`, 'utf8'))).toEqual({
+        version: 'next',
+      });
+      expect(readdirSync(path.dirname(destination)).sort()).toEqual([
+        'pocketbase',
+        'pocketbase.release.json',
+      ]);
+      expect(existsSync(source)).toBe(true);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('bounds a stalled download with an abort signal', async () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'og-pocketbase-fetch-'));
     const fetchFn = vi.fn(async (_url, options) => {
@@ -173,6 +222,197 @@ describe('PocketBase installer', () => {
 });
 
 describe('browser QA harness safeguards', () => {
+  it('streams split Playwright failures without exposing the run credential', async () => {
+    const credential = createQaSuperuserCredentials();
+    const env = {
+      LOCAL_POCKETBASE_ADMIN_EMAIL: credential.email,
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: credential.password,
+    };
+    let stdout = '';
+    let stderr = '';
+    let streamedBeforeClose = false;
+    const result = await runPlaywright('pnpm', ['exec', 'playwright', 'test'], env, {
+      spawnCommand: (_command, _args, options) => {
+        expect(options.stdio).toEqual(['ignore', 'pipe', 'pipe']);
+        const child = new EventEmitter();
+        child.stdout = new PassThrough();
+        child.stderr = new PassThrough();
+        queueMicrotask(() => {
+          child.stdout.write(`Running test\nFailure: ${credential.password.slice(0, 12)}`);
+          streamedBeforeClose = stdout.includes('Running test\n');
+          child.stdout.write(`${credential.password.slice(12)}\nNext test\n`);
+          child.stderr.write(`Request for ${credential.email.slice(0, 8)}`);
+          child.stderr.end(`${credential.email.slice(8)} failed\n`);
+          child.stdout.end();
+          setImmediate(() => child.emit('close', 3, null));
+        });
+        return child;
+      },
+      stdoutWrite: chunk => {
+        stdout += chunk;
+      },
+      stderrWrite: chunk => {
+        stderr += chunk;
+      },
+    });
+
+    expect(result.status).toBe(3);
+    expect(streamedBeforeClose).toBe(true);
+    expect(stdout.includes('Running test')).toBe(true);
+    expect(stdout.includes('Failure: [redacted]\nNext test')).toBe(true);
+    expect(stderr.includes('Request for [redacted] failed')).toBe(true);
+    expect(stdout.includes(credential.password)).toBe(false);
+    expect(stderr.includes(credential.email)).toBe(false);
+  });
+
+  it('retains only safe Playwright reports and removes test output', () => {
+    expect(ciConfig.preserveOutput).toBe('never');
+    expect(ciConfig.reporter).toEqual([
+      ['list'],
+      ['./scripts/playwright-safe-qa-reporter.mjs', expect.any(Object)],
+    ]);
+  });
+
+  it('flushes a final unterminated diagnostic when Playwright closes', async () => {
+    const credential = createQaSuperuserCredentials();
+    const env = {
+      LOCAL_POCKETBASE_ADMIN_EMAIL: credential.email,
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: credential.password,
+    };
+    let output = '';
+    const result = await runPlaywright('pnpm', [], env, {
+      spawnCommand: () => {
+        const child = new EventEmitter();
+        child.stdout = new PassThrough();
+        child.stderr = new PassThrough();
+        queueMicrotask(() => {
+          child.stdout.write(`failure ${credential.password}`);
+          child.emit('close', 2, null);
+        });
+        return child;
+      },
+      stdoutWrite: chunk => {
+        output += chunk;
+      },
+      stderrWrite: () => {},
+    });
+    expect(result.status).toBe(2);
+    expect(output === 'failure [redacted]').toBe(true);
+  });
+
+  it('keeps the run superuser out of ordinary backend and app children', () => {
+    const parent = {
+      PATH: '/bin',
+      LOCAL_POCKETBASE_ADMIN_EMAIL: 'admin@localhost.test',
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: 'run-password',
+      E2E_DELETION_ADMIN_PASSWORD: 'run-password',
+    };
+    const child = withoutQaSuperuser(parent);
+    expect(child).toEqual({ PATH: '/bin' });
+    expect(parent.LOCAL_POCKETBASE_ADMIN_PASSWORD).toBe('run-password');
+  });
+
+  it('generates distinct run credentials for setup and Playwright without logging them', () => {
+    const first = createQaSuperuserCredentials();
+    const second = createQaSuperuserCredentials();
+    const digest = value => createHash('sha256').update(value).digest('hex');
+    const firstEnv = {
+      LOCAL_POCKETBASE_ADMIN_EMAIL: first.email,
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: first.password,
+    };
+    const secondEnv = {
+      LOCAL_POCKETBASE_ADMIN_EMAIL: second.email,
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: second.password,
+    };
+
+    expect(first.email).toBe('admin@localhost.test');
+    expect(second.email).toBe(first.email);
+    expect(first.password.length).toBeGreaterThanOrEqual(40);
+    expect(digest(first.password) === digest(second.password)).toBe(false);
+    expect(
+      deletionPlaywrightEnvironment(firstEnv).E2E_DELETION_ADMIN_PASSWORD === first.password
+    ).toBe(true);
+    expect(
+      deletionPlaywrightEnvironment(secondEnv).E2E_DELETION_ADMIN_PASSWORD === second.password
+    ).toBe(true);
+
+    let report = '';
+    writeReport({
+      appUrl: 'http://127.0.0.1:3000',
+      error: `Setup failed for ${first.email} with ${first.password}`,
+      env: firstEnv,
+      logsDir: '/tmp/logs',
+      pbUrl: 'http://127.0.0.1:8090',
+      playwrightArgs: [],
+      reportPath: '/tmp/report.md',
+      runDir: '/tmp/run',
+      status: 'failed',
+      suite: 'smoke',
+      writeFile: (_path, content) => {
+        report = content;
+      },
+    });
+    expect(report.includes('Failure: Setup failed for [redacted] with [redacted]')).toBe(true);
+    expect(report.includes(first.password)).toBe(false);
+    expect(report.includes(first.email)).toBe(false);
+    expect(
+      redactQaCredentials(`child: ${second.password}`, secondEnv) === 'child: [redacted]'
+    ).toBe(true);
+
+    let commandLog = '';
+    runSync(
+      {
+        command: 'fixture',
+        args: [],
+        env: firstEnv,
+        logPath: '/tmp/fixture.log',
+        label: 'fixture',
+      },
+      {
+        spawnCommand: () => ({
+          status: 0,
+          stdout: `stdout ${first.password}`,
+          stderr: `stderr ${first.email}`,
+        }),
+        writeFile: (_path, content) => {
+          commandLog = content;
+        },
+      }
+    );
+    expect(commandLog.includes('stdout [redacted]')).toBe(true);
+    expect(commandLog.includes('stderr [redacted]')).toBe(true);
+    expect(commandLog.includes(first.password)).toBe(false);
+    expect(commandLog.includes(first.email)).toBe(false);
+  });
+
+  it('runs disposable account deletion in managed Chromium and WebKit projects', () => {
+    const spec = '/repo/e2e/authenticated/account-deletion-local.spec.ts';
+    const matches = inventory => inventory?.some(pattern => pattern.test(spec));
+    const mobileSmoke = ciConfig.projects?.find(project => project.name === 'mobile-webkit-smoke');
+
+    expect(matches(ciConfigModule.chromiumSmokeInventory)).toBe(true);
+    expect(matches(ciConfigModule.chromiumFullInventory)).toBe(true);
+    expect(matches(ciConfigModule.webkitFlowInventory)).toBe(true);
+    expect(matches(mobileSmoke?.testMatch)).toBe(true);
+  });
+
+  it("passes only this run's disposable backend superuser to Playwright", () => {
+    const base = {
+      LOCAL_POCKETBASE_ADMIN_EMAIL: 'run-admin@localhost.test',
+      LOCAL_POCKETBASE_ADMIN_PASSWORD: 'run-only-password',
+      E2E_DELETION_ADMIN_EMAIL: 'inherited@example.test',
+      E2E_DELETION_ADMIN_PASSWORD: 'inherited-password',
+    };
+    const playwright = deletionPlaywrightEnvironment(base);
+
+    expect(playwright.E2E_DELETION_ADMIN_EMAIL).toBe(base.LOCAL_POCKETBASE_ADMIN_EMAIL);
+    expect(playwright.E2E_DELETION_ADMIN_PASSWORD).toBe(base.LOCAL_POCKETBASE_ADMIN_PASSWORD);
+    expect(base.E2E_DELETION_ADMIN_EMAIL).toBe('inherited@example.test');
+    expect(() => deletionPlaywrightEnvironment({})).toThrow(/local backend superuser/i);
+    expect(qaEnvironment(base)).not.toHaveProperty('E2E_DELETION_ADMIN_EMAIL');
+    expect(qaEnvironment(base)).not.toHaveProperty('E2E_DELETION_ADMIN_PASSWORD');
+  });
+
   it('keeps legacy Playwright positional filters working', () => {
     const parsed = parseArgs(['--', '--project=authenticated', 'e2e/example.spec.ts']);
     expect(parsed.harness.suite).toBe('legacy');
@@ -238,24 +478,24 @@ describe('browser QA harness safeguards', () => {
   });
 
   it('requires the exact managed inventory for smoke and full suites', () => {
-    expect(parseListedInventory('Total: 83 tests in 23 files', 'smoke')).toEqual({
-      files: 23,
-      tests: 83,
+    expect(parseListedInventory('Total: 115 tests in 24 files', 'smoke')).toEqual({
+      files: 24,
+      tests: 115,
     });
-    expect(parseListedInventory('Total: 298 tests in 40 files', 'full')).toEqual({
-      files: 40,
-      tests: 298,
+    expect(parseListedInventory('Total: 330 tests in 41 files', 'full')).toEqual({
+      files: 41,
+      tests: 330,
     });
-    expect(() => parseListedInventory('Total: 297 tests in 40 files', 'full')).toThrow(
-      /expected 298 tests in 40 files/i
+    expect(() => parseListedInventory('Total: 329 tests in 41 files', 'full')).toThrow(
+      /expected 330 tests in 41 files/i
     );
-    expect(() => parseListedInventory('Total: 76 tests in 23 files', 'smoke')).toThrow(
-      /expected 83 tests in 23 files/i
+    expect(() => parseListedInventory('Total: 88 tests in 24 files', 'smoke')).toThrow(
+      /expected 115 tests in 24 files/i
     );
   });
 
   it('accepts a reconciled smoke report with no skipped tests', () => {
-    const tests = Array.from({ length: 83 }, (_, index) => ({
+    const tests = Array.from({ length: 115 }, (_, index) => ({
       projectName: 'authenticated-chromium-smoke',
       expectedStatus: 'passed',
       status: 'expected',
@@ -264,6 +504,7 @@ describe('browser QA harness safeguards', () => {
       title: `test ${index}`,
     }));
     const report = {
+      runStatus: 'passed',
       suites: [
         {
           title: 'e2e/example.spec.ts',
@@ -271,13 +512,13 @@ describe('browser QA harness safeguards', () => {
         },
       ],
       errors: [],
-      stats: { expected: 83, unexpected: 0, flaky: 0, skipped: 0 },
+      stats: { expected: 115, unexpected: 0, flaky: 0, skipped: 0 },
     };
 
     expect(validateManagedPlaywrightReport(report, 'smoke')).toEqual({
-      expected: 83,
+      expected: 115,
       skipped: 0,
-      total: 83,
+      total: 115,
     });
   });
 
@@ -286,6 +527,7 @@ describe('browser QA harness safeguards', () => {
     expect(() =>
       validateManagedPlaywrightReport(
         {
+          runStatus: 'passed',
           suites: [
             {
               title: 'e2e/example.spec.ts',
@@ -293,7 +535,7 @@ describe('browser QA harness safeguards', () => {
             },
           ],
           errors: [],
-          stats: { expected: 83, unexpected: 0, flaky: 0, skipped: 0 },
+          stats: { expected: 115, unexpected: 0, flaky: 0, skipped: 0 },
         },
         'smoke'
       )
@@ -301,7 +543,7 @@ describe('browser QA harness safeguards', () => {
   });
 
   it('allows only the exact conditional full-suite skip', () => {
-    const passing = Array.from({ length: 297 }, (_, index) => ({
+    const passing = Array.from({ length: 329 }, (_, index) => ({
       projectName: 'authenticated-chromium-full',
       expectedStatus: 'passed',
       status: 'expected',
@@ -323,6 +565,7 @@ describe('browser QA harness safeguards', () => {
       title: 'bottom nav remains anchored during scroll',
     };
     const report = {
+      runStatus: 'passed',
       suites: [
         {
           title: 'e2e/authenticated/mobile-touch-targets.spec.ts',
@@ -346,13 +589,13 @@ describe('browser QA harness safeguards', () => {
         },
       ],
       errors: [],
-      stats: { expected: 297, unexpected: 0, flaky: 0, skipped: 1 },
+      stats: { expected: 329, unexpected: 0, flaky: 0, skipped: 1 },
     };
 
     expect(validateManagedPlaywrightReport(report, 'full')).toEqual({
-      expected: 297,
+      expected: 329,
       skipped: 1,
-      total: 298,
+      total: 330,
     });
 
     allowedSkip.annotations[0].description = 'different reason';

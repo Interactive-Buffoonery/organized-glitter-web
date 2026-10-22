@@ -205,18 +205,17 @@ try {
   assert.equal(
     (await request(`/api/collections/users/records/${other.id}`, other.token, undefined, 'DELETE'))
       .status,
-    204,
-    'older client deletion remains compatible'
+    403,
+    'owner collection deletion requires the guarded route'
   );
-  const legacyJob = db
-    .prepare('SELECT * FROM account_deletion_jobs WHERE user_id = ?')
-    .get(other.id);
-  assert.ok(legacyJob, 'legacy deletion creates a private job');
-  assert.equal(legacyJob.source_kind, 'legacy');
-  assert.equal(legacyJob.proof_hash, '', 'legacy deletion never fabricates a receipt proof');
   assert.ok(
-    Date.parse(legacyJob.next_attempt) >= Date.now() + 3500_000,
-    'initial worker attempt allows in-flight batches to settle'
+    db.prepare('SELECT id FROM users WHERE id = ?').get(other.id),
+    'rejected owner collection deletion keeps the user'
+  );
+  assert.equal(
+    db.prepare('SELECT id FROM account_deletion_jobs WHERE user_id = ?').get(other.id),
+    undefined,
+    'rejected owner collection deletion creates no job'
   );
   const adminDeleted = await makeUser('adminremoved');
   db.exec(
@@ -251,11 +250,15 @@ try {
       .status,
     204
   );
-  assert.equal(
-    db
-      .prepare('SELECT source_kind FROM account_deletion_jobs WHERE user_id = ?')
-      .get(adminDeleted.id).source_kind,
-    'legacy'
+  const legacyJob = db
+    .prepare('SELECT * FROM account_deletion_jobs WHERE user_id = ?')
+    .get(adminDeleted.id);
+  assert.ok(legacyJob, 'superuser deletion creates a private job');
+  assert.equal(legacyJob.source_kind, 'legacy');
+  assert.equal(legacyJob.proof_hash, '', 'legacy deletion never fabricates a receipt proof');
+  assert.ok(
+    Date.parse(legacyJob.next_attempt) >= Date.now() + 3500_000,
+    'initial worker attempt allows in-flight batches to settle'
   );
   assert.equal(
     db
@@ -500,7 +503,7 @@ try {
     'audit is not deletion evidence'
   );
   console.log(
-    'Account deletion: authentication, proof binding, rollback, retry, cascades, Apple queue, and older clients passed.'
+    'Account deletion: authentication, proof binding, rollback, retry, cascades, Apple queue, and legacy collection deletes passed.'
   );
 } finally {
   db?.close();

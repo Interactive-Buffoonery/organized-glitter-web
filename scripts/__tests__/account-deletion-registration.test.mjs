@@ -27,6 +27,7 @@ describe('account deletion backend gate registration', () => {
       'pnpm pb:test:account-deletion',
       'pnpm pb:test:restore-verified-rules',
       'pnpm pb:test:legacy-migration-guard',
+      'pnpm pb:test:color-keys',
     ]);
     for (const profile of ['backend', 'pr', 'cloud']) {
       expect(buildPhasePlan(profile)[0]).toEqual(['backend', 'test:ci:backend']);

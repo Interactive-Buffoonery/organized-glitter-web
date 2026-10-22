@@ -73,13 +73,20 @@ directory.
 
 Production applied the changes in `1778500000_add_users_coloring_walkthrough_seen.js`,
 `1778600000_int_306_stats_native_readiness.js`, and
-`1778700000_randomizer_spins_owner_update_rule.js` under other filenames, so a
-full-directory deploy runs them. The last two would replace the verified
+`1778700000_randomizer_spins_owner_update_rule.js` under other filenames.
+Replaying them would fail on duplicate stats indexes and replace the verified
 `coloring_page_progress_notes` rules and the `randomizer_spins` update rule.
-`1792500000_restore_verified_rules.js` runs after them and restores the
-canonical rules only where those weakened values landed. Its rollback is a
-no-op so it can never reintroduce them. `pnpm pb:test:restore-verified-rules`
-covers weakened, canonical, and custom rules.
+`1778499999_skip_already_applied_legacy.js` runs first. When the walkthrough
+field exists and those rules already require `@request.auth.verified`, it
+records the three files in `_migrations` so they are skipped. Fresh installs
+lack those effects, so the guard does nothing and the three files run as
+before. No manual `_migrations` edit is needed.
+
+`1792500000_restore_verified_rules.js` is a second safety net. It restores the
+canonical rules only where the weakened values landed. Both rollbacks are
+no-ops so they can never reintroduce weaker rules.
+`pnpm pb:test:legacy-migration-guard` and `pnpm pb:test:restore-verified-rules`
+cover these cases.
 
 For INT-1081, deploy these six protected-file migrations in this order only
 after the token-capable web release is live. The web release works before the

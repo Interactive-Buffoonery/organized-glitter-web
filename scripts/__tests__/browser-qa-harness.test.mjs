@@ -1,4 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  linkSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { tmpdir } from 'node:os';
@@ -30,6 +39,7 @@ import {
   hasVerifiedCachedBinary,
   downloadPocketBaseArchive,
   installPocketBase,
+  placeVerifiedBinary,
   POCKETBASE_BASELINE_VERSION,
   POCKETBASE_VERSION,
   resolveArchive,
@@ -156,6 +166,34 @@ describe('PocketBase installer', () => {
     try {
       writeFileSync(binary, 'tampered');
       expect(hasVerifiedCachedBinary(binary, resolveArchive('linux', 'x64'))).toBe(false);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('replaces a cached executable without rewriting the file another install may be running', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'og-pocketbase-place-'));
+    const source = path.join(directory, 'extracted');
+    const destination = path.join(directory, 'cache', 'pocketbase');
+    const running = path.join(directory, 'running');
+    try {
+      writeFileSync(source, 'old');
+      placeVerifiedBinary(source, destination, { version: 'old' });
+      linkSync(destination, running);
+      writeFileSync(source, 'next');
+      placeVerifiedBinary(source, destination, { version: 'next' });
+      expect(readFileSync(running, 'utf8')).toBe('old');
+      expect(readFileSync(destination, 'utf8')).toBe('next');
+      expect(statSync(running).ino).not.toBe(statSync(destination).ino);
+      expect(statSync(destination).mode & 0o777).toBe(0o755);
+      expect(JSON.parse(readFileSync(`${destination}.release.json`, 'utf8'))).toEqual({
+        version: 'next',
+      });
+      expect(readdirSync(path.dirname(destination)).sort()).toEqual([
+        'pocketbase',
+        'pocketbase.release.json',
+      ]);
+      expect(existsSync(source)).toBe(true);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

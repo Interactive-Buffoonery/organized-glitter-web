@@ -89,23 +89,12 @@ function assertArchiveImportSession(session: ArchiveV3ImportSession): void {
   }
 }
 
-function rethrowIfImportStopped(error: unknown): void {
+function captureRecoverableImportError(
+  error: unknown,
+  properties: Parameters<typeof captureImportExportException>[1]
+): void {
   if (error instanceof ArchiveImportStoppedError) throw error;
-}
-
-function guardArchiveImportAdapter(
-  adapter: ArchiveImportAdapter,
-  assertSession: () => void
-): ArchiveImportAdapter {
-  return Object.fromEntries(
-    Object.entries(adapter).map(([key, method]) => [
-      key,
-      async (...args: unknown[]) => {
-        assertSession();
-        return (method as (...args: unknown[]) => Promise<unknown>)(...args);
-      },
-    ])
-  ) as unknown as ArchiveImportAdapter;
+  captureImportExportException(error, properties);
 }
 
 export function withArchiveImportLock<T>(
@@ -171,7 +160,7 @@ export async function restoreArchivedColorReference(
     }
     return { referenceId, addedPhotoCount };
   } catch (error) {
-    rethrowIfImportStopped(error);
+    if (error instanceof ArchiveImportStoppedError) throw error;
     throw new PartialColorReferenceRestoreError(
       error instanceof Error ? error.message : 'Color reference restore failed',
       { addedPhotoCount, referenceId, cause: error }
@@ -520,6 +509,7 @@ function createDefaultArchiveImportAdapter(
       return ProgressNotesService.listByProject(projectId);
     },
     async createDiamondProgressNote(projectId, note, imageFile) {
+      assertSession();
       return ProgressNotesService.create({
         project: projectId,
         content: note.content as MarkdownString,
@@ -594,7 +584,8 @@ function createDefaultArchiveImportAdapter(
     async listColoringMediums() {
       return (await ColoringMediumsService.listColoringMediums(userId)).items;
     },
-    createColoringMedium(medium) {
+    async createColoringMedium(medium) {
+      assertSession();
       return ColoringMediumsService.createColoringMedium({
         name: medium.name,
         type: medium.type,
@@ -606,10 +597,12 @@ function createDefaultArchiveImportAdapter(
     async listColoringPages(bookId) {
       return ColoringService.listAllPages({ bookId });
     },
-    restoreColoringPageMetadata(input) {
+    async restoreColoringPageMetadata(input) {
+      assertSession();
       return ArchiveFilesService.restoreColoringPageMetadata(input);
     },
-    reconcileColoringBookMetrics(bookId) {
+    async reconcileColoringBookMetrics(bookId) {
+      assertSession();
       return ArchiveFilesService.reconcileColoringBookMetrics(bookId);
     },
     async restoreColorReference(pageId, notes, photoPaths, loadPhoto, restoreKey) {
@@ -623,7 +616,8 @@ function createDefaultArchiveImportAdapter(
         assertSession
       );
     },
-    appendColoringPagePhotos(pageId, photoFiles) {
+    async appendColoringPagePhotos(pageId, photoFiles) {
+      assertSession();
       return ColoringService.updatePage(pageId, {
         'photos+': photoFiles,
       });
@@ -632,6 +626,7 @@ function createDefaultArchiveImportAdapter(
       return ColoringPageProgressNotesService.listByPage(pageId);
     },
     async createColoringPageProgressNote(pageId, note, imageFile) {
+      assertSession();
       return ColoringPageProgressNotesService.create({
         page: pageId,
         content: note.content as MarkdownString,
@@ -703,8 +698,7 @@ async function resolveArchiveColoringMediums(
       mappedIds.set(medium.ref, currentMedium.id);
       refMap[medium.ref] = currentMedium.id;
     } catch (error) {
-      rethrowIfImportStopped(error);
-      captureImportExportException(error, {
+      captureRecoverableImportError(error, {
         source: 'archive_import',
         operation: 'map_coloring_medium',
         archive_schema_version: archiveSchemaVersion,
@@ -1029,8 +1023,7 @@ export async function importArchiveBundle(
         }
       }
     } catch (error) {
-      rethrowIfImportStopped(error);
-      captureImportExportException(error, {
+      captureRecoverableImportError(error, {
         source: 'archive_import',
         operation: 'import_diamond_project',
         archive_schema_version: result.archiveSchemaVersion,
@@ -1211,8 +1204,7 @@ export async function importArchiveBundle(
               });
               recoveryStore?.completePage(book.ref, page.ref);
             } catch (error) {
-              rethrowIfImportStopped(error);
-              captureImportExportException(error, {
+              captureRecoverableImportError(error, {
                 source: 'archive_import',
                 operation: 'restore_coloring_page_metadata',
                 archive_schema_version: result.archiveSchemaVersion,
@@ -1291,8 +1283,7 @@ export async function importArchiveBundle(
               result.importedPhotoCount += photoFiles.length;
             }
           } catch (error) {
-            rethrowIfImportStopped(error);
-            captureImportExportException(error, {
+            captureRecoverableImportError(error, {
               source: 'archive_import',
               operation: 'append_coloring_page_photos',
               archive_schema_version: result.archiveSchemaVersion,
@@ -1356,11 +1347,7 @@ export async function importArchiveBundle(
             );
             applyColorReferenceRestoreProgress(result, reference.ref, restored);
           } catch (error) {
-            rethrowIfImportStopped(error);
-            if (error instanceof PartialColorReferenceRestoreError && page.colorReference) {
-              applyColorReferenceRestoreProgress(result, page.colorReference.ref, error);
-            }
-            captureImportExportException(error, {
+            captureRecoverableImportError(error, {
               source: 'archive_import',
               operation: 'restore_coloring_color_reference',
               archive_schema_version: result.archiveSchemaVersion,
@@ -1368,6 +1355,9 @@ export async function importArchiveBundle(
               failed_count: result.errors.length + 1,
               warning_count: warnings.length,
             });
+            if (error instanceof PartialColorReferenceRestoreError && page.colorReference) {
+              applyColorReferenceRestoreProgress(result, page.colorReference.ref, error);
+            }
             result.errors.push(
               error instanceof Error
                 ? `Page ${page.pageNumber} in ${book.title}: ${error.message}`
@@ -1415,8 +1405,7 @@ export async function importArchiveBundle(
         recoveryStore?.completeBook(book.ref);
       }
     } catch (error) {
-      rethrowIfImportStopped(error);
-      captureImportExportException(error, {
+      captureRecoverableImportError(error, {
         source: 'archive_import',
         operation: 'import_coloring_book',
         archive_schema_version: result.archiveSchemaVersion,
@@ -1454,14 +1443,13 @@ export async function importOrganizedGlitterArchive(
     bundle.archiveFingerprint ??
     (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
   assertArchiveImportSession(importSession);
-  return withArchiveImportLock(`organized-glitter:archive-import:${user.id}`, async () => {
+  const { userId } = importSession;
+  return withArchiveImportLock(`organized-glitter:archive-import:${userId}`, async () => {
     assertArchiveImportSession(importSession);
-    const assertSession = () => assertArchiveImportSession(importSession);
-    const adapter = guardArchiveImportAdapter(
-      createDefaultArchiveImportAdapter(user.id, assertSession),
-      assertSession
+    const adapter = createDefaultArchiveImportAdapter(userId, () =>
+      assertArchiveImportSession(importSession)
     );
-    const recoveryStore = createArchiveImportRecoveryStore(user.id, archiveFingerprint);
+    const recoveryStore = createArchiveImportRecoveryStore(userId, archiveFingerprint);
     return importArchiveBundle(bundle, adapter, recoveryStore);
   });
 }

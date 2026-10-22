@@ -84,7 +84,8 @@ before. No manual `_migrations` edit is needed.
 
 `1792500000_restore_verified_rules.js` is a second safety net. It restores the
 canonical rules only where the weakened values landed. Both rollbacks are
-no-ops so they can never reintroduce weaker rules.
+no-ops so they can never reintroduce weaker rules. `1792600000_projects_color_count_min_zero.js`
+lowers `projects.color_count` min from 1 to 0 to match the schema JSON.
 `pnpm pb:test:legacy-migration-guard` and `pnpm pb:test:restore-verified-rules`
 cover these cases.
 

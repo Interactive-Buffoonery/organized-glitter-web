@@ -21,6 +21,7 @@ const LEGACY = [
   '1778600000_int_306_stats_native_readiness.js',
   '1778700000_randomizer_spins_owner_update_rule.js',
 ];
+const COLOR_COUNT = '1792600000_projects_color_count_min_zero.js';
 const IMPORT = '1700000000_import_canonical_schema.js';
 const LEGACY_STATE = '1700000001_legacy_state.js';
 
@@ -98,6 +99,10 @@ const migrationRows = dataDir =>
   Object.fromEntries(
     query(dataDir, 'SELECT file, applied FROM _migrations').map(row => [row.file, row.applied])
   );
+const colorCountMin = dataDir =>
+  JSON.parse(
+    query(dataDir, "SELECT fields FROM _collections WHERE name = 'projects'")[0].fields
+  ).find(field => field.name === 'color_count').min;
 
 const setup = {
   [IMPORT]: `migrate(app => app.importCollectionsByMarshaledJSON(${JSON.stringify(schemaJson)}, false));`,
@@ -155,7 +160,28 @@ try {
     assert.ok(Number.isInteger(rows[file]) && rows[file] > 1e15, `${file} history row`);
   }
 
-  console.log('legacy migration guard checks passed');
+  // color_count.min moves from 1 to 0 and otherwise stays put.
+  for (const [label, start, expected] of [
+    ['min-one', 1, 0],
+    ['min-zero', 0, 0],
+    ['min-five', 5, 5],
+  ]) {
+    const dataDir = copy(prodBase, label);
+    const fields = JSON.parse(
+      query(dataDir, "SELECT fields FROM _collections WHERE name = 'projects'")[0].fields
+    );
+    fields.find(field => field.name === 'color_count').min = start;
+    query(
+      dataDir,
+      "UPDATE _collections SET fields = ? WHERE name = 'projects'",
+      JSON.stringify(fields)
+    );
+    result = migrateUp(dataDir, migrationsDir({ ...setup, ...repoFiles([COLOR_COUNT]) }));
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(colorCountMin(dataDir), expected, label);
+  }
+
+  console.log('legacy migration guard and color count checks passed');
 } finally {
   rmSync(runDir, { recursive: true, force: true });
 }

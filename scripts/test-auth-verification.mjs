@@ -132,7 +132,7 @@ const productionIndexes = JSON.parse(
 );
 assert.deepEqual(
   Object.keys(productionIndexes).filter(
-    name => !baselineSchema.some(collection => collection.name === name)
+    name => !name.startsWith('$') && !baselineSchema.some(collection => collection.name === name)
   ),
   [],
   'Every production collection must be represented in the upgrade fixture'

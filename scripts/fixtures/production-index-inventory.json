@@ -1,4 +1,5 @@
 {
+  "$deployedThroughMigration": "1791260989_add_users_analytics_opt_out.js",
   "users": [
     "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
     "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''",

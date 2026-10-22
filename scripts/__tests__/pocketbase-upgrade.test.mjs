@@ -117,13 +117,19 @@ describe('PocketBase prior-schema upgrade gate', () => {
     ).toBe('resolved-base');
   });
 
-  it('strips legacy index terminators when applying the production inventory', () => {
+  const deployedThroughMigration = '1791260989_add_users_analytics_opt_out.js';
+  const unreleasedIndex =
+    'CREATE INDEX idx_account_deletions_created ON account_deletions (created)';
+
+  it('normalizes legacy index terminators from the production inventory', () => {
     const schema = applyIndexInventory(
       [
         {
           id: 'books',
           name: 'coloring_books',
-          indexes: ['CREATE INDEX leftover ON coloring_books (status);'],
+          indexes: [
+            'CREATE INDEX `idx_coloring_books_completion_percentage` ON `coloring_books` (`completion_percentage`)',
+          ],
         },
         {
           id: 'notes',
@@ -132,6 +138,7 @@ describe('PocketBase prior-schema upgrade gate', () => {
         },
       ],
       {
+        $deployedThroughMigration: deployedThroughMigration,
         coloring_books: [
           'CREATE INDEX `idx_coloring_books_completion_percentage` ON `coloring_books` (`completion_percentage`);\n',
         ],
@@ -152,6 +159,52 @@ describe('PocketBase prior-schema upgrade gate', () => {
         indexes: ['CREATE INDEX idx_progress_notes_project ON progress_notes (project)'],
       },
     ]);
+  });
+
+  it('keeps an index added by a migration that production has not run', () => {
+    const schema = applyIndexInventory(
+      [{ id: 'deletions', name: 'account_deletions', indexes: [unreleasedIndex] }],
+      { $deployedThroughMigration: deployedThroughMigration, account_deletions: [] },
+      {
+        migrations: [
+          { name: '1791129600_account_deletion.js', source: '// creates account_deletions' },
+          {
+            name: '1792281600_account_deletion_worker.js',
+            source: `db.newQuery("${unreleasedIndex}")`,
+          },
+        ],
+      }
+    );
+
+    expect(schema).toEqual([
+      { id: 'deletions', name: 'account_deletions', indexes: [unreleasedIndex] },
+    ]);
+  });
+
+  it.each([
+    ['no migration creates it', []],
+    [
+      'only a deployed migration creates it',
+      [{ name: '1791129600_account_deletion.js', source: unreleasedIndex }],
+    ],
+  ])('fails when production lacks a schema index and %s', (_label, migrations) => {
+    expect(() =>
+      applyIndexInventory(
+        [{ id: 'deletions', name: 'account_deletions', indexes: [unreleasedIndex] }],
+        { $deployedThroughMigration: deployedThroughMigration, account_deletions: [] },
+        { migrations }
+      )
+    ).toThrow(/production index inventory lacks account_deletions\.idx_account_deletions_created/i);
+  });
+
+  it('keeps production-only indexes so schema drift still fails the comparison', () => {
+    const productionOnly = 'CREATE INDEX idx_artists_name ON artists (name)';
+    expect(
+      applyIndexInventory([{ id: 'artists', name: 'artists', indexes: [] }], {
+        $deployedThroughMigration: deployedThroughMigration,
+        artists: [productionOnly],
+      })
+    ).toEqual([{ id: 'artists', name: 'artists', indexes: [productionOnly] }]);
   });
 
   it.each(['', '.', '..', '/tmp/outside'])('rejects unsafe upgrade run id %j', runId => {

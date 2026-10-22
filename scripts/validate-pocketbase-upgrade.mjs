@@ -8,6 +8,7 @@ import {
   existsSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   writeFileSync,
 } from 'node:fs';
@@ -159,13 +160,37 @@ export function assertUpgradeChangeContract({ addedMigrations, schemaContractCha
 
 const stripIndexTerminator = index => index.replace(/;\s*$/, '');
 
-export function applyIndexInventory(schema, inventory = {}) {
+const indexName = index => index.match(/INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?(\w+)/i)?.[1];
+
+// The inventory records production's exact index strings. An index the base
+// schema has but production lacks is kept only when a migration newer than
+// `$deployedThroughMigration` creates it; otherwise the inventory is stale.
+export function applyIndexInventory(schema, inventory = {}, { migrations = [] } = {}) {
+  const deployedThrough = inventory.$deployedThroughMigration ?? '';
+  const unreleasedSources = migrations
+    .filter(migration => deployedThrough && migration.name > deployedThrough)
+    .map(migration => migration.source);
+
   return schema.map(collection => {
-    const indexes = inventory[collection.name] ?? collection.indexes ?? [];
-    return {
-      ...collection,
-      indexes: indexes.map(stripIndexTerminator),
-    };
+    const schemaIndexes = collection.indexes ?? [];
+    const productionIndexes = inventory[collection.name];
+    if (!productionIndexes) {
+      return { ...collection, indexes: schemaIndexes.map(stripIndexTerminator) };
+    }
+    const production = new Map(productionIndexes.map(index => [indexName(index), index]));
+    const indexes = schemaIndexes.map(index => {
+      const name = indexName(index);
+      if (production.has(name)) return production.get(name);
+      if (!unreleasedSources.some(source => new RegExp(`\\b${name}\\b`).test(source))) {
+        throw new Error(
+          `Production index inventory lacks ${collection.name}.${name}, and no migration after ${deployedThrough || '$deployedThroughMigration'} creates it. Refresh ${indexInventoryPath} from production.`
+        );
+      }
+      return index;
+    });
+    const schemaNames = new Set(schemaIndexes.map(indexName));
+    const productionOnly = productionIndexes.filter(index => !schemaNames.has(indexName(index)));
+    return { ...collection, indexes: [...indexes, ...productionOnly].map(stripIndexTerminator) };
   });
 }
 
@@ -408,7 +433,16 @@ export async function validatePocketBaseUpgrade(argv = process.argv.slice(2)) {
   // previous schema with the 0.40.1 baseline after applying the production
   // index inventory (semicolon-stripped) so the upgrade matches deployed
   // metadata without asking 0.40.4 to ingest invalid CREATE INDEX strings.
-  const previousSchema = applyIndexInventory(JSON.parse(baseSchemaSource), inventory);
+  // Only base-commit migrations can explain indexes that production lacks.
+  const migrations = readdirSync(path.join(rootDir, 'pb_migrations'))
+    .filter(name => name.endsWith('.js') && !addedMigrations.includes(`pb_migrations/${name}`))
+    .map(name => ({
+      name,
+      source: readFileSync(path.join(rootDir, 'pb_migrations', name), 'utf8'),
+    }));
+  const previousSchema = applyIndexInventory(JSON.parse(baseSchemaSource), inventory, {
+    migrations,
+  });
 
   const upgradedBinary = await prepareDataDir({
     sourceBinary: cachedBaselineBinary,

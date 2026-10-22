@@ -49,7 +49,16 @@ cronAdd('completed_account_deletion_retention', '15 * * * *', () => {
   require(`${__hooks}/account_deletion.js`).maintainRetention($app);
 });
 
-// This wraps all model deletion paths, including older clients and superusers.
+onRecordDeleteRequest(e => {
+  if (e.hasSuperuserAuth()) {
+    e.next();
+    return;
+  }
+
+  throw new ForbiddenError('Use the guarded account deletion route to delete an account.');
+}, 'users');
+
+// This wraps all model deletion paths, including the guarded route and superusers.
 // Queue creation and the existing cascade/Apple hooks share one transaction.
 onRecordDelete(e => {
   const originalApp = e.app;

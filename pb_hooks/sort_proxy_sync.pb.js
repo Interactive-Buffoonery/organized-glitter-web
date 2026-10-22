@@ -82,8 +82,8 @@ onRecordCreate(e => {
     record.set('title_sort', stripLeading(title).toLowerCase());
     record.set('company_name_sort', companyName);
     record.set('artist_name_sort', artistName);
-    record.set('company_sort_order', company ? 0 : 1);
-    record.set('artist_sort_order', artist ? 0 : 1);
+    record.set('company_sort_order', companyName ? 0 : 1);
+    record.set('artist_sort_order', artistName ? 0 : 1);
     record.set('status_order', statusOrderByStatus[status] || 0);
     record.set('date_purchased_has_value', datePurchased ? 0 : 1);
     record.set('date_received_has_value', dateReceived ? 0 : 1);
@@ -166,8 +166,8 @@ onRecordUpdate(e => {
     record.set('title_sort', stripLeading(title).toLowerCase());
     record.set('company_name_sort', companyName);
     record.set('artist_name_sort', artistName);
-    record.set('company_sort_order', company ? 0 : 1);
-    record.set('artist_sort_order', artist ? 0 : 1);
+    record.set('company_sort_order', companyName ? 0 : 1);
+    record.set('artist_sort_order', artistName ? 0 : 1);
     record.set('status_order', statusOrderByStatus[status] || 0);
     record.set('date_purchased_has_value', datePurchased ? 0 : 1);
     record.set('date_received_has_value', dateReceived ? 0 : 1);

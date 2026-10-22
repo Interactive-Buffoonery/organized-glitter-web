@@ -269,9 +269,12 @@ try {
     company: sortCompany.id,
   });
   assert.equal(ownedSortProject.company_name_sort, 'sort company');
+  assert.equal(ownedSortProject.company_sort_order, 0);
   const assertNoForeignSortNames = (record, context) => {
     assert.equal(record.company_name_sort, '', `${context}: company_name_sort`);
     assert.equal(record.artist_name_sort, '', `${context}: artist_name_sort`);
+    assert.equal(record.company_sort_order, 1, `${context}: company_sort_order`);
+    assert.equal(record.artist_sort_order, 1, `${context}: artist_sort_order`);
   };
   assertNoForeignSortNames(
     await ownerClient.collection('projects').getOne(poisoned.id),
@@ -304,7 +307,10 @@ try {
   try {
     legacyDb.exec('PRAGMA busy_timeout = 5000');
     legacyDb
-      .prepare('UPDATE projects SET company_name_sort = ?, artist_name_sort = ? WHERE id = ?')
+      .prepare(
+        `UPDATE projects SET company_name_sort = ?, artist_name_sort = ?,
+         company_sort_order = 0, artist_sort_order = 0 WHERE id = ?`
+      )
       .run('renamed private', 'renamed artist', poisoned.id);
   } finally {
     legacyDb.close();
@@ -328,6 +334,10 @@ try {
   assert.equal(
     (await admin.collection('projects').getOne(ownedSortProject.id)).company_name_sort,
     'renamed sort'
+  );
+  assert.equal(
+    (await admin.collection('projects').getOne(ownedSortProject.id)).company_sort_order,
+    0
   );
   await admin.collection('projects').delete(ownedSortProject.id);
   await admin.collection('companies').delete(sortCompany.id);

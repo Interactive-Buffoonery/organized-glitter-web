@@ -7,18 +7,9 @@ import { ClientResponseError } from 'pocketbase';
 import { pb } from '@/lib/pocketbase';
 import { Collections, BookIllustratorsResponse } from '@/types/pocketbase.types';
 import { ErrorHandler } from './base/ErrorHandler';
-import { isAuthenticated, getCurrentUserId } from '@/services/auth';
+import { requireUserId } from './base/requireUserId';
 import { FilterBuilder } from '@/services/pocketbase/base/filterBuilder';
 import { listAllPages } from '@/services/pocketbase/base/listAllPages';
-
-function requireUserId(expectedUserId?: string): string {
-  if (!isAuthenticated()) throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  const userId = getCurrentUserId();
-  if (!userId || (expectedUserId && userId !== expectedUserId)) {
-    throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  }
-  return userId;
-}
 
 export interface BookIllustratorDTO {
   id: string;

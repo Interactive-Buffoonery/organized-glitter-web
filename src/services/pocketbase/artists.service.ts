@@ -8,7 +8,7 @@ import { pb } from '@/lib/pocketbase';
 import { Collections, ArtistsResponse } from '@/types/pocketbase.types';
 import { ArtistDTO } from '@/services/types';
 import { ErrorHandler } from './base/ErrorHandler';
-import { isAuthenticated, getCurrentUserId } from '@/services/auth';
+import { requireUserId } from './base/requireUserId';
 import { FilterBuilder } from '@/services/pocketbase/base/filterBuilder';
 import {
   captureSessionIdentity,
@@ -16,17 +16,6 @@ import {
   type SessionIdentity,
 } from '@/services/auth/sessionIdentity';
 import { SessionChangedError, isSessionChangedError } from '@/services/auth/sessionRecovery';
-
-function requireUserId(): string {
-  if (!isAuthenticated()) {
-    throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  }
-  const userId = getCurrentUserId();
-  if (!userId) {
-    throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  }
-  return userId;
-}
 
 /** Narrowed list item - only the fields actually fetched by list() */
 export interface ArtistListItem {

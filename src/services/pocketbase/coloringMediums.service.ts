@@ -7,18 +7,11 @@ import type {
   ColoringMediumType,
 } from '@/types/coloringMedium';
 import { ColoringMediumTypeOptions } from '@/types/coloringMedium';
-import { getCurrentUserId, isAuthenticated } from '@/services/auth';
 import { ErrorHandler } from './base/ErrorHandler';
+import { requireUserId } from './base/requireUserId';
 import { FilterBuilder } from '@/services/pocketbase/base/filterBuilder';
 
 const COLORING_MEDIUMS_COLLECTION = Collections.ColoringMediums;
-
-function requireUserId(): string {
-  if (!isAuthenticated()) throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  const userId = getCurrentUserId();
-  if (!userId) throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  return userId;
-}
 
 function toRecord(record: ColoringMediumsResponse): ColoringMediumRecord {
   return {

@@ -190,7 +190,7 @@ onRecordUpdate(e => {
       $app
         .db()
         .newQuery(
-          `UPDATE projects SET company_name_sort = {:name} WHERE company = {:id} AND user = {:owner}`
+          `UPDATE projects SET company_name_sort = {:name}, company_sort_order = CASE WHEN {:name} = '' THEN 1 ELSE 0 END WHERE company = {:id} AND user = {:owner}`
         )
         .bind({ name: newName.toLowerCase(), id: e.record.id, owner: e.record.getString('user') })
         .execute();
@@ -209,7 +209,7 @@ onRecordUpdate(e => {
       $app
         .db()
         .newQuery(
-          `UPDATE projects SET artist_name_sort = {:name} WHERE artist = {:id} AND user = {:owner}`
+          `UPDATE projects SET artist_name_sort = {:name}, artist_sort_order = CASE WHEN {:name} = '' THEN 1 ELSE 0 END WHERE artist = {:id} AND user = {:owner}`
         )
         .bind({ name: newName.toLowerCase(), id: e.record.id, owner: e.record.getString('user') })
         .execute();

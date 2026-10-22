@@ -11,6 +11,7 @@ migrate(
       .newQuery(
         `UPDATE projects SET company_name_sort = '', company_sort_order = 1
          WHERE company != ''
+           AND (company_name_sort != '' OR company_sort_order != 1)
            AND NOT EXISTS (
              SELECT 1 FROM companies
              WHERE companies.id = projects.company AND companies.user = projects.user
@@ -22,6 +23,7 @@ migrate(
       .newQuery(
         `UPDATE projects SET artist_name_sort = '', artist_sort_order = 1
          WHERE artist != ''
+           AND (artist_name_sort != '' OR artist_sort_order != 1)
            AND NOT EXISTS (
              SELECT 1 FROM artists
              WHERE artists.id = projects.artist AND artists.user = projects.user

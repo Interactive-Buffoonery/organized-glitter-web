@@ -5,7 +5,7 @@
     "viewRule": "@request.auth.verified = true && (id = @request.auth.id)",
     "createRule": "",
     "updateRule": "@request.auth.verified = true && (id = @request.auth.id)",
-    "deleteRule": "@request.auth.verified = true && (id = @request.auth.id)",
+    "deleteRule": null,
     "name": "users",
     "type": "auth",
     "fields": [

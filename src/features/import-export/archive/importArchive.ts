@@ -67,11 +67,46 @@ import {
   type ColoringBookRecoveryCheckpoint,
   type ColoringPageMetadataSnapshot,
 } from '@/features/import-export/archive/archiveImportRecovery';
+import type { ArchiveV3ImportSession } from '@/features/import-export/archive/v3/import';
 
 const DEFAULT_TAG_COLOR_HEX = TAG_COLOR_PALETTE[0].hex;
 const ARCHIVE_PAGE_PHOTO_BATCH_SIZE = 4;
 const archiveImportQueues = new Map<string, Promise<unknown>>();
 const AMBIGUOUS_PROJECT_MATCH = Symbol('ambiguous-project-match');
+
+class ArchiveImportStoppedError extends Error {
+  override name = 'ArchiveImportStoppedError';
+}
+
+function assertArchiveImportSession(session: ArchiveV3ImportSession): void {
+  if (session.signal?.aborted) {
+    throw new ArchiveImportStoppedError('Archive import was cancelled');
+  }
+  if (session.getCurrentUserId() !== session.userId) {
+    throw new ArchiveImportStoppedError(
+      'The signed-in account changed during archive import. Import was stopped.'
+    );
+  }
+}
+
+function rethrowIfImportStopped(error: unknown): void {
+  if (error instanceof ArchiveImportStoppedError) throw error;
+}
+
+function guardArchiveImportAdapter(
+  adapter: ArchiveImportAdapter,
+  session: ArchiveV3ImportSession
+): ArchiveImportAdapter {
+  return Object.fromEntries(
+    Object.entries(adapter).map(([key, method]) => [
+      key,
+      async (...args: unknown[]) => {
+        assertArchiveImportSession(session);
+        return (method as (...args: unknown[]) => Promise<unknown>)(...args);
+      },
+    ])
+  ) as unknown as ArchiveImportAdapter;
+}
 
 export function withArchiveImportLock<T>(
   name: string,
@@ -608,6 +643,7 @@ async function resolveArchiveColoringMediums(
       mappedIds.set(medium.ref, currentMedium.id);
       refMap[medium.ref] = currentMedium.id;
     } catch (error) {
+      rethrowIfImportStopped(error);
       captureImportExportException(error, {
         source: 'archive_import',
         operation: 'map_coloring_medium',
@@ -933,6 +969,7 @@ export async function importArchiveBundle(
         }
       }
     } catch (error) {
+      rethrowIfImportStopped(error);
       captureImportExportException(error, {
         source: 'archive_import',
         operation: 'import_diamond_project',
@@ -1114,6 +1151,7 @@ export async function importArchiveBundle(
               });
               recoveryStore?.completePage(book.ref, page.ref);
             } catch (error) {
+              rethrowIfImportStopped(error);
               captureImportExportException(error, {
                 source: 'archive_import',
                 operation: 'restore_coloring_page_metadata',
@@ -1193,6 +1231,7 @@ export async function importArchiveBundle(
               result.importedPhotoCount += photoFiles.length;
             }
           } catch (error) {
+            rethrowIfImportStopped(error);
             captureImportExportException(error, {
               source: 'archive_import',
               operation: 'append_coloring_page_photos',
@@ -1257,6 +1296,7 @@ export async function importArchiveBundle(
             );
             applyColorReferenceRestoreProgress(result, reference.ref, restored);
           } catch (error) {
+            rethrowIfImportStopped(error);
             if (error instanceof PartialColorReferenceRestoreError && page.colorReference) {
               applyColorReferenceRestoreProgress(result, page.colorReference.ref, error);
             }
@@ -1315,6 +1355,7 @@ export async function importArchiveBundle(
         recoveryStore?.completeBook(book.ref);
       }
     } catch (error) {
+      rethrowIfImportStopped(error);
       captureImportExportException(error, {
         source: 'archive_import',
         operation: 'import_coloring_book',
@@ -1331,7 +1372,10 @@ export async function importArchiveBundle(
   return result;
 }
 
-export async function importOrganizedGlitterArchive(file: File): Promise<ArchiveImportResult> {
+export async function importOrganizedGlitterArchive(
+  file: File,
+  session?: ArchiveV3ImportSession
+): Promise<ArchiveImportResult> {
   if (!isAuthenticated()) {
     throw new Error('You must be logged in to import an archive');
   }
@@ -1339,13 +1383,23 @@ export async function importOrganizedGlitterArchive(file: File): Promise<Archive
   if (!user?.id) {
     throw new Error('You must be logged in to import an archive');
   }
+  const importSession = session ?? {
+    userId: user.id,
+    getCurrentUserId: () => getCurrentUser()?.id ?? null,
+  };
+  assertArchiveImportSession(importSession);
 
   const bundle = await readOrganizedGlitterArchive(file);
   const archiveFingerprint =
     bundle.archiveFingerprint ??
     (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
-  return withArchiveImportLock(`organized-glitter:archive-import:${user.id}`, () => {
-    const adapter = createDefaultArchiveImportAdapter(user.id);
+  assertArchiveImportSession(importSession);
+  return withArchiveImportLock(`organized-glitter:archive-import:${user.id}`, async () => {
+    assertArchiveImportSession(importSession);
+    const adapter = guardArchiveImportAdapter(
+      createDefaultArchiveImportAdapter(user.id),
+      importSession
+    );
     const recoveryStore = createArchiveImportRecoveryStore(user.id, archiveFingerprint);
     return importArchiveBundle(bundle, adapter, recoveryStore);
   });

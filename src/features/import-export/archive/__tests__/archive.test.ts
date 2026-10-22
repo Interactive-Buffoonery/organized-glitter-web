@@ -2751,6 +2751,93 @@ describe('archive import', () => {
     }
   );
 
+  async function sessionArchiveFile(): Promise<File> {
+    const manifest = validManifest({
+      schemaVersion: 2,
+      coloringMediums: [
+        {
+          ref: 'coloring-medium:session-medium',
+          oldId: 'session-medium',
+          name: 'Session medium',
+          type: 'colored_pencil',
+        },
+      ],
+      coloringBooks: [
+        {
+          ref: 'coloring-book:session-book',
+          oldId: 'session-book',
+          title: 'Session Book',
+          isMystery: false,
+          status: 'in_stash',
+          totalPages: 1,
+          tags: [],
+          pages: [],
+        },
+      ],
+    });
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify(manifest));
+    return new File([await zip.generateAsync({ type: 'blob' })], 'session.zip');
+  }
+
+  it('stops a legacy import when the signed-in account changes mid-import', async () => {
+    const file = await sessionArchiveFile();
+    let currentUserId = 'user-1';
+    serviceMocks.coloringMediumsService.listColoringMediums.mockImplementation(async () => {
+      currentUserId = 'user-2';
+      return { items: [], totalItems: 0, totalPages: 0 };
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        getCurrentUserId: () => currentUserId,
+      })
+    ).rejects.toThrow('The signed-in account changed during archive import');
+
+    expect(serviceMocks.coloringMediumsService.createColoringMedium).not.toHaveBeenCalled();
+    expect(serviceMocks.archiveFilesService.restoreColoringBookBatch).not.toHaveBeenCalled();
+    expect(serviceMocks.coloringService.createBook).not.toHaveBeenCalled();
+  });
+
+  it('stops a legacy import once its signal is aborted', async () => {
+    const file = await sessionArchiveFile();
+    const controller = new AbortController();
+    serviceMocks.coloringMediumsService.listColoringMediums.mockImplementation(async () => {
+      controller.abort();
+      return { items: [], totalItems: 0, totalPages: 0 };
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        signal: controller.signal,
+        getCurrentUserId: () => 'user-1',
+      })
+    ).rejects.toThrow('Archive import was cancelled');
+
+    expect(serviceMocks.coloringMediumsService.createColoringMedium).not.toHaveBeenCalled();
+    expect(serviceMocks.archiveFilesService.restoreColoringBookBatch).not.toHaveBeenCalled();
+    expect(serviceMocks.coloringService.createBook).not.toHaveBeenCalled();
+  });
+
+  it('does not start a legacy import with an already aborted signal', async () => {
+    const file = await sessionArchiveFile();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        signal: controller.signal,
+        getCurrentUserId: () => 'user-1',
+      })
+    ).rejects.toThrow('Archive import was cancelled');
+
+    expect(navigator.locks.request).not.toHaveBeenCalled();
+    expect(serviceMocks.projectsService.getAllForUser).not.toHaveBeenCalled();
+  });
+
   it('resumes bounded coloring book generation after a later batch fails', async () => {
     const pages = Array.from({ length: 600 }, (_, index) => ({
       ref: `coloring-page:legacy-${index + 1}` as const,

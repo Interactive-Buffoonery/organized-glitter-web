@@ -80,10 +80,19 @@ describe('archive import dispatcher', () => {
       success: true,
     });
 
-    const result = await importOrganizedGlitterArchives([file]);
+    const controller = new AbortController();
+
+    const result = await importOrganizedGlitterArchives([file], { signal: controller.signal });
 
     expect(result.schemaVersion).toBe(2);
-    expect(mocks.importLegacy).toHaveBeenCalledWith(file);
+    expect(mocks.importLegacy).toHaveBeenCalledWith(file, {
+      userId: 'user-1',
+      signal: controller.signal,
+      getCurrentUserId: expect.any(Function),
+    });
+    const session = mocks.importLegacy.mock.calls[0][1] as { getCurrentUserId(): string | null };
+    mocks.getCurrentUser.mockReturnValueOnce({ id: 'user-2' });
+    expect(session.getCurrentUserId()).toBe('user-2');
     expect(mocks.getCapabilities).not.toHaveBeenCalled();
     expect(mocks.importV3).not.toHaveBeenCalled();
   });

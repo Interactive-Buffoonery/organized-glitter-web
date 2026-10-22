@@ -9,6 +9,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -135,6 +136,28 @@ export async function downloadPocketBaseArchive(url, { fetchFn = fetch, sleepFn 
   }
 }
 
+/**
+ * Renames finished files into place so concurrent installs sharing one cache
+ * never overwrite a binary another process is running or verifying.
+ */
+export function placeVerifiedBinary(source, destination, metadata) {
+  mkdirSync(path.dirname(destination), { recursive: true });
+  const staged = `${destination}.${process.pid}.tmp`;
+  const stagedMetadata = `${metadataPathFor(destination)}.${process.pid}.tmp`;
+  try {
+    copyFileSync(source, staged);
+    chmodSync(staged, 0o755);
+    writeFileSync(stagedMetadata, `${JSON.stringify(metadata, null, 2)}\n`);
+    // Metadata goes first: if the binary rename never happens, the old binary
+    // fails its checksum on the next run and both files are rewritten.
+    renameSync(stagedMetadata, metadataPathFor(destination));
+    renameSync(staged, destination);
+  } finally {
+    rmSync(staged, { force: true });
+    rmSync(stagedMetadata, { force: true });
+  }
+}
+
 export async function installPocketBase({
   destination,
   fetchFn = fetch,
@@ -177,13 +200,7 @@ export async function installPocketBase({
       throw new Error('Extracted PocketBase executable did not match the pinned binary checksum.');
     }
 
-    mkdirSync(path.dirname(destination), { recursive: true });
-    copyFileSync(extractedBinary, destination);
-    chmodSync(destination, 0o755);
-    writeFileSync(
-      metadataPathFor(destination),
-      `${JSON.stringify({ version, ...release }, null, 2)}\n`
-    );
+    placeVerifiedBinary(extractedBinary, destination, { version, ...release });
     return destination;
   } finally {
     rmSync(temporaryDir, { recursive: true, force: true });

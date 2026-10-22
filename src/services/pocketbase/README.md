@@ -48,15 +48,11 @@ UI save flow, duplicate-submit guard, and cache invalidation checklist.
 
 ### AccountDeletionService (`accountDeletion.service.ts`)
 
-Account deletion orchestration for the `/delete-account` page.
-
-- Creates an `account_deletions` audit/request record before deleting the user.
-- Deletes only the `users` record directly and relies on PocketBase
-  `cascadeDelete` relations for user-owned records.
-- Captures a best-effort pre-delete usage snapshot. Count failures are recorded
-  in the snapshot and do not block the deletion.
-- Does not use PocketBase batch operations because the audit/request record must
-  survive even if the final user deletion fails.
+Account deletion orchestration for the `/delete-account` page. It obtains fresh
+authentication, keeps the deletion proof in private browser storage until the
+server confirms deletion, and sends the proof to the account deletion route.
+The server owns deletion and vendor cleanup; see the
+[account deletion contract](../../../docs/pocketbase/account-deletion.md).
 
 ### Base Services (`base/`)
 

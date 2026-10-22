@@ -46,6 +46,7 @@ import {
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
 import { getSessionIdentityTracker } from '@/services/auth/sessionEpoch';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
 
 const authLogger = createLogger('AuthProvider');
 
@@ -191,7 +192,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             queryClient.prefetchQuery(artistsOptions(currentUser.id));
             queryClient.prefetchQuery(tagsOptions(currentUser.id));
           } else {
-            if (pb.authStore.token) pb.authStore.clear();
             authLogger.debug('No valid session found');
             authLogger.debug('Initial auth check: User IS NOT valid or present.');
             setUser(null);
@@ -270,15 +270,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const removeInvalidSessionListener = subscribeToInvalidSession(token => {
       if (token !== pb.authStore.token || !pb.authStore.record) return;
       const invalidAccountId = pb.authStore.record.id;
-      const activeAccountId = activeUserIdRef.current;
-      retireSessionTokens(sessionTokensRef.current, activeAccountId);
-      markSessionTokenInactive(token);
-      retainSignedOutCreateTokens(invalidAccountId, [token]);
-      if (!activeAccountId || activeAccountId === invalidAccountId) {
-        captureSessionDrafts(invalidAccountId, token);
-      }
-      void queryClient.cancelQueries();
-      pb.authStore.clear();
+      const invalidIdentity = getSessionIdentityTracker(pb.authStore).capture();
+      const claimId = crypto.randomUUID();
+      void deletionIntents
+        .claimSignOut(POCKETBASE_URL, invalidAccountId, invalidIdentity.epoch, claimId)
+        .then(async claimed => {
+          if (
+            !claimed ||
+            token !== pb.authStore.token ||
+            !getSessionIdentityTracker(pb.authStore).isCurrent(invalidIdentity)
+          ) {
+            if (claimed)
+              await deletionIntents.releaseSignOut(POCKETBASE_URL, invalidAccountId, claimId);
+            return;
+          }
+          const activeAccountId = activeUserIdRef.current;
+          retireSessionTokens(sessionTokensRef.current, activeAccountId);
+          markSessionTokenInactive(token);
+          retainSignedOutCreateTokens(invalidAccountId, [token]);
+          if (!activeAccountId || activeAccountId === invalidAccountId) {
+            captureSessionDrafts(invalidAccountId, token);
+          }
+          void queryClient.cancelQueries();
+          pb.authStore.clear();
+        })
+        .catch(() => {
+          authLogger.warn('Account recovery could not be checked; retaining session and drafts');
+        });
     });
     const removeListener = initializeAuth();
     const sessionIdentityTracker = getSessionIdentityTracker(pb.authStore);
@@ -346,15 +364,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const signOut = useCallback(async () => {
-    // Prevent multiple simultaneous logout attempts
+    const tracker = getSessionIdentityTracker(pb.authStore);
+    const identity = tracker.capture();
+    const originalToken = pb.authStore.token;
+    const departingUserId = identity.accountId ?? user?.id;
     if (isSigningOut.current) {
       authLogger.debug('SignOut already in progress, skipping...');
       return { success: true, error: null };
     }
-
     isSigningOut.current = true;
+    if (departingUserId) {
+      try {
+        const claimId = crypto.randomUUID();
+        const claimed = await deletionIntents.claimSignOut(
+          POCKETBASE_URL,
+          departingUserId,
+          identity.epoch,
+          claimId
+        );
+        if (!tracker.isCurrent(identity) || pb.authStore.token !== originalToken) {
+          if (claimed)
+            await deletionIntents.releaseSignOut(POCKETBASE_URL, departingUserId, claimId);
+          isSigningOut.current = false;
+          return { success: false, error: new Error('Your session changed. Try again.') };
+        }
+        if (!claimed) {
+          isSigningOut.current = false;
+          return {
+            success: false,
+            error: new Error('Resolve your pending account deletion before signing out.'),
+          };
+        }
+      } catch {
+        isSigningOut.current = false;
+        return {
+          success: false,
+          error: new Error(
+            'Account recovery could not be checked. Your unfinished edits have been kept.'
+          ),
+        };
+      }
+    }
     setIsLoading(true);
-    const departingUserId = user?.id ?? getCurrentUser()?.id;
 
     try {
       authLogger.debug('Starting logout process...');

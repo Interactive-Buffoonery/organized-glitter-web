@@ -273,10 +273,9 @@ export const APP_ROUTES: RouteDef[] = [
   {
     path: '/delete-account',
     element: DeleteAccount,
-    verticalAccess: 'shared',
+    verticalAccess: 'public',
     metadata: { title: 'Delete account | Organized Glitter' },
     pageOwnsMetadata: true,
-    protected: true,
     suspense: 'layout',
   },
   {

@@ -10,6 +10,11 @@ import { ClientResponseError } from 'pocketbase';
 
 const mockNotify = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/notifications', () => ({ notify: mockNotify }));
+const deletionStore = vi.hoisted(() => ({
+  claimSignOut: vi.fn().mockResolvedValue(true),
+  releaseSignOut: vi.fn().mockResolvedValue(true),
+}));
+vi.mock('@/services/accountDeletion/intentStore', () => ({ deletionIntents: deletionStore }));
 
 const pocketBaseMock = vi.hoisted(() => {
   const createListResult = (items: unknown[] = []) => ({
@@ -191,6 +196,8 @@ const setupMockAuthState = (
 describe('useAuth Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    deletionStore.claimSignOut.mockResolvedValue(true);
+    deletionStore.releaseSignOut.mockResolvedValue(true);
     pocketBaseMock.reset();
     queryClient.clear();
     clearSessionDrafts();
@@ -228,7 +235,7 @@ describe('useAuth Integration Tests', () => {
       const { result } = renderUseAuthHook();
 
       await waitFor(() => expect(result.current.initialCheckComplete).toBe(true));
-      expect(hasSessionDraft('project-edit', 'account-a')).toBe(true);
+      await waitFor(() => expect(hasSessionDraft('project-edit', 'account-a')).toBe(true));
       unregister();
     });
 
@@ -611,6 +618,54 @@ describe('useAuth Integration Tests', () => {
   });
 
   describe('SignOut Function', () => {
+    it('releases its invalid-session claim when the token changes before clearing auth', async () => {
+      const account = createMockUser({ id: 'invalid-claim-abort-user' });
+      setupMockAuthState(true, account);
+      let finishClaim!: (value: boolean) => void;
+      deletionStore.claimSignOut.mockReturnValue(
+        new Promise(resolve => {
+          finishClaim = resolve;
+        })
+      );
+      const { result } = renderUseAuthHook();
+      await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+      act(() => reportInvalidSession('mock-token'));
+      expect(deletionStore.claimSignOut).toHaveBeenCalled();
+      pocketBaseMock.authStore.token = 'refreshed-token';
+      await act(async () => finishClaim(true));
+      await waitFor(() =>
+        expect(deletionStore.releaseSignOut).toHaveBeenCalledWith(
+          POCKETBASE_URL,
+          account.id,
+          expect.any(String)
+        )
+      );
+      expect(pb.authStore.clear).not.toHaveBeenCalled();
+    });
+    it('releases only its claim when the same account receives a new token before logout', async () => {
+      const account = createMockUser({ id: 'claim-abort-user' });
+      setupMockAuthState(true, account);
+      let finishClaim!: (value: boolean) => void;
+      deletionStore.claimSignOut.mockReturnValue(
+        new Promise(resolve => {
+          finishClaim = resolve;
+        })
+      );
+      const { result } = renderUseAuthHook();
+      await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+      await act(async () => {
+        const pending = result.current.signOut();
+        pocketBaseMock.authStore.token = 'same-account-new-token';
+        finishClaim(true);
+        await expect(pending).resolves.toMatchObject({ success: false });
+      });
+      expect(deletionStore.releaseSignOut).toHaveBeenCalledWith(
+        POCKETBASE_URL,
+        account.id,
+        expect.any(String)
+      );
+      expect(pb.authStore.clear).not.toHaveBeenCalled();
+    });
     it('preserves local drafts when clearing the auth store fails', async () => {
       const mockUser = createMockUser({ id: 'draft-signout-user' });
       setupMockAuthState(true, mockUser);

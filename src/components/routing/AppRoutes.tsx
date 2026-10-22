@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
+import { DeletionRecoveryBoundary } from '@/components/accountDeletion/DeletionRecoveryBoundary';
 import { ProtectedLazyRoute } from '@/components/routing/ProtectedLazyRoute';
 import { useAuth } from '@/hooks/useAuth';
 import { useHideSplash } from '@/hooks/useAppReady';
@@ -143,9 +144,11 @@ const AppRouteElement: React.FC<{ route: RouteDef }> = ({ route }) => {
 };
 
 export const AppRoutes: React.FC = () => (
-  <Routes>
-    {APP_ROUTES.map(r => (
-      <Route key={r.path} path={r.path} element={<AppRouteElement route={r} />} />
-    ))}
-  </Routes>
+  <DeletionRecoveryBoundary>
+    <Routes>
+      {APP_ROUTES.map(r => (
+        <Route key={r.path} path={r.path} element={<AppRouteElement route={r} />} />
+      ))}
+    </Routes>
+  </DeletionRecoveryBoundary>
 );

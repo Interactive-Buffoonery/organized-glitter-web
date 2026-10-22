@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import {
   chmodSync,
   closeSync,
@@ -33,17 +34,54 @@ export const pocketBaseCachePath = path.join(
 const defaultTestEmail = 'sarah-local@example.test';
 const defaultTestPassword = 'local-test-password-123';
 const adminEmail = 'admin@localhost.test';
-const adminPassword = 'admin-local-release-qa-123';
 const randomizerFixtureCount = 8;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-export const qaEnvironment = env => ({
-  ...env,
-  POSTHOG_CLI_TOKEN: '',
-  POSTHOG_CLI_API_KEY: '',
-  RESEND_API_KEY: '',
+export const createQaSuperuserCredentials = () => ({
+  email: adminEmail,
+  password: randomBytes(32).toString('base64url'),
 });
+
+export const redactQaCredentials = (output, env) => {
+  let redacted = String(output);
+  for (const value of [env.LOCAL_POCKETBASE_ADMIN_PASSWORD, env.LOCAL_POCKETBASE_ADMIN_EMAIL]) {
+    if (value) redacted = redacted.replaceAll(value, '[redacted]');
+  }
+  return redacted;
+};
+
+export const withoutQaSuperuser = env => {
+  const environment = { ...env };
+  delete environment.LOCAL_POCKETBASE_ADMIN_EMAIL;
+  delete environment.LOCAL_POCKETBASE_ADMIN_PASSWORD;
+  delete environment.E2E_DELETION_ADMIN_EMAIL;
+  delete environment.E2E_DELETION_ADMIN_PASSWORD;
+  return environment;
+};
+
+export const qaEnvironment = env => {
+  const environment = { ...env };
+  delete environment.E2E_DELETION_ADMIN_EMAIL;
+  delete environment.E2E_DELETION_ADMIN_PASSWORD;
+  return {
+    ...environment,
+    POSTHOG_CLI_TOKEN: '',
+    POSTHOG_CLI_API_KEY: '',
+    RESEND_API_KEY: '',
+  };
+};
+
+export const deletionPlaywrightEnvironment = env => {
+  if (!env.LOCAL_POCKETBASE_ADMIN_EMAIL || !env.LOCAL_POCKETBASE_ADMIN_PASSWORD) {
+    throw new Error('Playwright requires the disposable local backend superuser.');
+  }
+  return {
+    ...env,
+    E2E_DELETION_ADMIN_EMAIL: env.LOCAL_POCKETBASE_ADMIN_EMAIL,
+    E2E_DELETION_ADMIN_PASSWORD: env.LOCAL_POCKETBASE_ADMIN_PASSWORD,
+  };
+};
 
 export const assertPortAvailable = port =>
   new Promise((resolve, reject) => {
@@ -294,11 +332,19 @@ const preparePocketBaseBinary = async pbDir => {
   return target;
 };
 
-const runSync = ({ command, args, env, logPath, label }) => {
-  const result = spawnSync(command, args, { cwd: rootDir, env, encoding: 'utf8' });
-  writeFileSync(
+export const runSync = (
+  { command, args, env, logPath, label },
+  { spawnCommand = spawnSync, writeFile = writeFileSync } = {}
+) => {
+  const result = spawnCommand(command, args, { cwd: rootDir, env, encoding: 'utf8' });
+  writeFile(
     logPath,
-    [`$ ${[command, ...args].join(' ')}`, '', result.stdout || '', result.stderr || ''].join('\n')
+    redactQaCredentials(
+      [`$ ${[command, ...args].join(' ')}`, '', result.stdout || '', result.stderr || ''].join(
+        '\n'
+      ),
+      env
+    )
   );
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -306,6 +352,54 @@ const runSync = ({ command, args, env, logPath, label }) => {
   }
   return result;
 };
+
+const writeRedactedLines = (stream, write, env) => {
+  let pending = '';
+  let flushed = false;
+  stream.setEncoding('utf8');
+  stream.on('data', chunk => {
+    pending += chunk;
+    while (true) {
+      const boundary = pending.search(/[\r\n]/);
+      if (boundary < 0) break;
+      write(redactQaCredentials(pending.slice(0, boundary + 1), env));
+      pending = pending.slice(boundary + 1);
+    }
+  });
+  const flush = () => {
+    if (flushed) return;
+    flushed = true;
+    if (pending) write(redactQaCredentials(pending, env));
+  };
+  stream.on('end', flush);
+  return flush;
+};
+
+export const runPlaywright = (
+  command,
+  args,
+  env,
+  {
+    spawnCommand = spawn,
+    stdoutWrite = chunk => process.stdout.write(chunk),
+    stderrWrite = chunk => process.stderr.write(chunk),
+  } = {}
+) =>
+  new Promise((resolve, reject) => {
+    const child = spawnCommand(command, args, {
+      cwd: rootDir,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const flushStdout = writeRedactedLines(child.stdout, stdoutWrite, env);
+    const flushStderr = writeRedactedLines(child.stderr, stderrWrite, env);
+    child.once('error', reject);
+    child.once('close', (status, signal) => {
+      flushStdout();
+      flushStderr();
+      resolve({ status: status ?? 1, signal });
+    });
+  });
 
 export function seedRandomizerFixturesForSuite({ suite, env, logsDir, runCommand = runSync }) {
   if (suite !== 'full') return [];
@@ -328,8 +422,8 @@ export function parseListedTestCount(output) {
 }
 
 const managedInventory = {
-  smoke: { files: 23, tests: 83 },
-  full: { files: 40, tests: 298 },
+  smoke: { files: 24, tests: 115 },
+  full: { files: 41, tests: 330 },
 };
 
 export function parseListedInventory(output, suite) {
@@ -387,6 +481,7 @@ export function validateManagedPlaywrightReport(report, suite) {
   if (!expected || !report || !Array.isArray(report.suites) || !report.stats) {
     throw new Error('Playwright structured report is missing or malformed.');
   }
+  if (report.runStatus !== 'passed') throw new Error('Playwright run did not pass.');
   const tests = collectReportTests(report.suites);
   if (tests.length === 0) throw new Error('Playwright structured report contained no tests.');
   if (tests.length !== expected.tests) {
@@ -445,8 +540,9 @@ const stopProcess = async processHandle => {
   });
 };
 
-const writeReport = ({
+export const writeReport = ({
   appUrl,
+  env,
   error,
   listedTestCount,
   logsDir,
@@ -457,6 +553,7 @@ const writeReport = ({
   runDir,
   status,
   suite,
+  writeFile = writeFileSync,
 }) => {
   const commandArgs = [suite === 'legacy' ? '' : `--suite=${suite}`, ...playwrightArgs].filter(
     Boolean
@@ -482,9 +579,8 @@ const writeReport = ({
     '',
     'Artifacts:',
     '',
-    `- Playwright report: ${path.join(runDir, 'artifacts', 'playwright-report')}`,
-    `- Structured results: ${path.join(runDir, 'artifacts', 'playwright-results.json')}`,
-    `- Playwright test results: ${path.join(runDir, 'artifacts', 'test-results')}`,
+    `- Safe structured results: ${path.join(runDir, 'artifacts', 'playwright-results.json')}`,
+    '- Per-test output and rich HTML results are not retained.',
     `- Logs: ${logsDir}`,
     '',
     'Cleanup:',
@@ -493,7 +589,7 @@ const writeReport = ({
     '- Isolated PocketBase data remains in the run directory for inspection.',
     '',
   ].join('\n');
-  writeFileSync(reportPath, content);
+  writeFile(reportPath, redactQaCredentials(content, env));
 };
 
 export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
@@ -517,6 +613,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
   mkdirSync(artifactsDir, { recursive: true });
   mkdirSync(path.join(runDir, 'auth'), { recursive: true });
 
+  const qaSuperuser = createQaSuperuserCredentials();
   const env = {
     ...qaEnvironment(process.env),
     APP_TEST_ENV: 'test',
@@ -526,14 +623,13 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     E2E_STORAGE_STATE: path.join(runDir, 'auth', 'user.json'),
     E2E_TEST_EMAIL: defaultTestEmail,
     E2E_TEST_PASSWORD: defaultTestPassword,
-    LOCAL_POCKETBASE_ADMIN_EMAIL: adminEmail,
-    LOCAL_POCKETBASE_ADMIN_PASSWORD: adminPassword,
+    LOCAL_POCKETBASE_ADMIN_EMAIL: qaSuperuser.email,
+    LOCAL_POCKETBASE_ADMIN_PASSWORD: qaSuperuser.password,
     LOCAL_POCKETBASE_ALLOWED_ORIGINS: appUrl,
     LOCAL_POCKETBASE_DIR: pbDir,
     LOCAL_POCKETBASE_TEST_USER_EMAIL: defaultTestEmail,
     LOCAL_POCKETBASE_TEST_USER_PASSWORD: defaultTestPassword,
     LOCAL_POCKETBASE_URL: pbUrl,
-    PLAYWRIGHT_HTML_REPORT: path.join(artifactsDir, 'playwright-report'),
     PLAYWRIGHT_JSON_OUTPUT_FILE: path.join(artifactsDir, 'playwright-results.json'),
     PLAYWRIGHT_OUTPUT_DIR: path.join(artifactsDir, 'test-results'),
     PORT: String(appPort),
@@ -542,6 +638,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     VITE_APP_VERSION: `release-qa-${harness.runId}`,
     VITE_POCKETBASE_URL: pbUrl,
   };
+  const unprivilegedEnv = withoutQaSuperuser(env);
 
   let appProcess;
   let listedTestCount;
@@ -557,8 +654,8 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     upsertLocalPocketBaseSuperuser({
       pocketbaseBinary,
       localDir: pbDir,
-      email: adminEmail,
-      password: adminPassword,
+      email: env.LOCAL_POCKETBASE_ADMIN_EMAIL,
+      password: env.LOCAL_POCKETBASE_ADMIN_PASSWORD,
     });
 
     const pbStdout = openSync(path.join(logsDir, 'pocketbase.stdout.log'), 'a');
@@ -567,7 +664,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     pbProcess = spawn(
       pocketbaseBinary,
       ['serve', `--http=127.0.0.1:${pbPort}`, `--origins=${appUrl}`],
-      { cwd: pbDir, env, stdio: ['ignore', pbStdout, pbStderr] }
+      { cwd: pbDir, env: unprivilegedEnv, stdio: ['ignore', pbStdout, pbStderr] }
     );
     await waitForHttp(`${pbUrl}/api/health`, 'PocketBase', { processHandle: pbProcess });
 
@@ -580,7 +677,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     });
     const randomizerProjectIds = seedRandomizerFixturesForSuite({
       suite: harness.suite,
-      env,
+      env: unprivilegedEnv,
       logsDir,
     });
     const fixtures = await resolveQaFixtures({
@@ -602,7 +699,7 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     runSync({
       command: pnpm,
       args: ['build'],
-      env,
+      env: unprivilegedEnv,
       logPath: path.join(logsDir, 'build.log'),
       label: 'Production build',
     });
@@ -612,16 +709,17 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     handles.push(appStdout, appStderr);
     appProcess = spawn(process.execPath, ['server/local-build-server.js'], {
       cwd: rootDir,
-      env,
+      env: unprivilegedEnv,
       stdio: ['ignore', appStdout, appStderr],
     });
     await waitForHttp(appUrl, 'local build server', { processHandle: appProcess });
 
     const basePlaywrightArgs = ['exec', 'playwright', 'test', '--config', configPath];
+    const playwrightEnv = deletionPlaywrightEnvironment(env);
     const listResult = runSync({
       command: pnpm,
       args: [...basePlaywrightArgs, ...playwrightArgs, '--list'],
-      env,
+      env: playwrightEnv,
       logPath: path.join(logsDir, 'playwright-list.log'),
       label: 'Playwright inventory preflight',
     });
@@ -631,12 +729,11 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
         ? parseListedTestCount(listedOutput)
         : parseListedInventory(listedOutput, harness.suite).tests;
 
-    const result = spawnSync(pnpm, [...basePlaywrightArgs, ...playwrightArgs, '--retries=0'], {
-      cwd: rootDir,
-      env,
-      stdio: 'inherit',
-    });
-    if (result.error) throw result.error;
+    const result = await runPlaywright(
+      pnpm,
+      [...basePlaywrightArgs, ...playwrightArgs, '--retries=0'],
+      playwrightEnv
+    );
     exitStatus = result.status ?? 1;
     if (exitStatus !== 0) failure = `Playwright failed with status ${exitStatus}.`;
     if (harness.suite !== 'legacy') {
@@ -662,13 +759,14 @@ export async function runLocalReleaseQa(argv = process.argv.slice(2)) {
     console.log(`Report: ${reportPath}`);
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);
-    console.error(failure);
+    console.error(redactQaCredentials(failure, env));
   } finally {
     await stopProcess(appProcess);
     await stopProcess(pbProcess);
     for (const handle of handles) closeSync(handle);
     writeReport({
       appUrl,
+      env,
       error: failure,
       listedTestCount,
       logsDir,

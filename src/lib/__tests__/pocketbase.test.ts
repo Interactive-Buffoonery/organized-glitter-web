@@ -20,6 +20,9 @@ import PocketBase, { LocalAuthStore, type SendOptions } from 'pocketbase';
 const { mockCapture } = vi.hoisted(() => ({
   mockCapture: vi.fn(),
 }));
+vi.mock('@/services/accountDeletion/intentStore', () => ({
+  deletionIntents: { get: vi.fn().mockResolvedValue(undefined) },
+}));
 
 vi.mock('@/utils/logger', () => ({
   createLogger: () => ({

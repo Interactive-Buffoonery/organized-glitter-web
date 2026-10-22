@@ -59,7 +59,9 @@ onRecordCreate(e => {
     if (company) {
       try {
         const companyRecord = $app.findRecordById('companies', company);
-        companyName = (companyRecord.get('name') || '').toLowerCase();
+        if (companyRecord.getString('user') === record.getString('user')) {
+          companyName = (companyRecord.get('name') || '').toLowerCase();
+        }
       } catch (e) {
         companyName = '';
       }
@@ -69,7 +71,9 @@ onRecordCreate(e => {
     if (artist) {
       try {
         const artistRecord = $app.findRecordById('artists', artist);
-        artistName = (artistRecord.get('name') || '').toLowerCase();
+        if (artistRecord.getString('user') === record.getString('user')) {
+          artistName = (artistRecord.get('name') || '').toLowerCase();
+        }
       } catch (e) {
         artistName = '';
       }
@@ -139,7 +143,9 @@ onRecordUpdate(e => {
     if (company) {
       try {
         const companyRecord = $app.findRecordById('companies', company);
-        companyName = (companyRecord.get('name') || '').toLowerCase();
+        if (companyRecord.getString('user') === record.getString('user')) {
+          companyName = (companyRecord.get('name') || '').toLowerCase();
+        }
       } catch (e) {
         companyName = '';
       }
@@ -149,7 +155,9 @@ onRecordUpdate(e => {
     if (artist) {
       try {
         const artistRecord = $app.findRecordById('artists', artist);
-        artistName = (artistRecord.get('name') || '').toLowerCase();
+        if (artistRecord.getString('user') === record.getString('user')) {
+          artistName = (artistRecord.get('name') || '').toLowerCase();
+        }
       } catch (e) {
         artistName = '';
       }
@@ -181,8 +189,10 @@ onRecordUpdate(e => {
     if (newName !== oldName) {
       $app
         .db()
-        .newQuery(`UPDATE projects SET company_name_sort = {:name} WHERE company = {:id}`)
-        .bind({ name: newName.toLowerCase(), id: e.record.id })
+        .newQuery(
+          `UPDATE projects SET company_name_sort = {:name} WHERE company = {:id} AND user = {:owner}`
+        )
+        .bind({ name: newName.toLowerCase(), id: e.record.id, owner: e.record.getString('user') })
         .execute();
     }
   } catch (err) {
@@ -198,8 +208,10 @@ onRecordUpdate(e => {
     if (newName !== oldName) {
       $app
         .db()
-        .newQuery(`UPDATE projects SET artist_name_sort = {:name} WHERE artist = {:id}`)
-        .bind({ name: newName.toLowerCase(), id: e.record.id })
+        .newQuery(
+          `UPDATE projects SET artist_name_sort = {:name} WHERE artist = {:id} AND user = {:owner}`
+        )
+        .bind({ name: newName.toLowerCase(), id: e.record.id, owner: e.record.getString('user') })
         .execute();
     }
   } catch (err) {

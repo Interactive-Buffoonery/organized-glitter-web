@@ -3,6 +3,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import net from 'node:net';
 import PocketBase from 'pocketbase';
@@ -228,6 +229,9 @@ try {
     patch: { company: otherCompany.id },
   });
   assert.equal(foreignRelation.status, 400);
+  const otherArtist = await admin
+    .collection('artists')
+    .create({ user: other.id, name: 'Private artist' });
   const ownCompany = await admin
     .collection('companies')
     .create({ user: owner.id, name: 'My company' });
@@ -252,7 +256,81 @@ try {
     status: 'stash',
     kit_category: 'full',
     company: otherCompany.id,
+    artist: otherArtist.id,
   });
+  const sortCompany = await admin
+    .collection('companies')
+    .create({ user: owner.id, name: 'Sort company' });
+  const ownedSortProject = await admin.collection('projects').create({
+    user: owner.id,
+    title: 'Owned relation',
+    status: 'stash',
+    kit_category: 'full',
+    company: sortCompany.id,
+  });
+  assert.equal(ownedSortProject.company_name_sort, 'sort company');
+  const assertNoForeignSortNames = (record, context) => {
+    assert.equal(record.company_name_sort, '', `${context}: company_name_sort`);
+    assert.equal(record.artist_name_sort, '', `${context}: artist_name_sort`);
+  };
+  assertNoForeignSortNames(
+    await ownerClient.collection('projects').getOne(poisoned.id),
+    'owner view of legacy project'
+  );
+  const poisonedApply = await request(ownerClient, 'apply', {
+    operationId: 'test-operation-0010',
+    collection: 'projects',
+    recordId: poisoned.id,
+    base: { title: 'Legacy mixed relation' },
+    patch: { title: 'Legacy renamed' },
+  });
+  assert.equal(poisonedApply.status, 200, `${await poisonedApply.clone().text()}\n${output}`);
+  const poisonedApplyRecord = (await poisonedApply.json()).record;
+  assertNoForeignSortNames(poisonedApplyRecord, 'apply response');
+  assert.equal(poisonedApplyRecord.expand.company, undefined);
+  assert.equal(poisonedApplyRecord.expand.artist, undefined);
+  await otherClient.collection('companies').update(otherCompany.id, { name: 'Renamed private' });
+  await otherClient.collection('artists').update(otherArtist.id, { name: 'Renamed artist' });
+  assertNoForeignSortNames(
+    await admin.collection('projects').getOne(poisoned.id),
+    'after foreign rename'
+  );
+  await ownerClient.collection('companies').update(sortCompany.id, { name: 'Renamed sort' });
+  assert.equal(
+    (await admin.collection('projects').getOne(ownedSortProject.id)).company_name_sort,
+    'renamed sort'
+  );
+  const legacyDb = new DatabaseSync(path.join(dataDir, 'data.db'));
+  try {
+    legacyDb.exec('PRAGMA busy_timeout = 5000');
+    legacyDb
+      .prepare('UPDATE projects SET company_name_sort = ?, artist_name_sort = ? WHERE id = ?')
+      .run('renamed private', 'renamed artist', poisoned.id);
+  } finally {
+    legacyDb.close();
+  }
+  const migrationsDir = path.join(directory, 'migrations');
+  mkdirSync(migrationsDir);
+  copyFileSync(
+    path.join(root, 'pb_migrations', '1792400000_clear_foreign_taxonomy_sort_names.js'),
+    path.join(migrationsDir, '1792400000_clear_foreign_taxonomy_sort_names.js')
+  );
+  const migrated = spawnSync(
+    binary,
+    ['migrate', 'up', `--dir=${dataDir}`, `--migrationsDir=${migrationsDir}`],
+    { encoding: 'utf8' }
+  );
+  assert.equal(migrated.status, 0, migrated.stderr || migrated.stdout);
+  assertNoForeignSortNames(
+    await admin.collection('projects').getOne(poisoned.id),
+    'after legacy cleanup migration'
+  );
+  assert.equal(
+    (await admin.collection('projects').getOne(ownedSortProject.id)).company_name_sort,
+    'renamed sort'
+  );
+  await admin.collection('projects').delete(ownedSortProject.id);
+  await admin.collection('companies').delete(sortCompany.id);
   const book = await admin
     .collection('coloring_books')
     .create({ user: owner.id, title: 'Book', status: 'in_stash', total_pages: 1 });

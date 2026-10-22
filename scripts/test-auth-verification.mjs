@@ -132,13 +132,36 @@ const productionIndexes = JSON.parse(
 );
 assert.deepEqual(
   Object.keys(productionIndexes).filter(
-    name => !baselineSchema.some(collection => collection.name === name)
+    name => !name.startsWith('$') && !baselineSchema.some(collection => collection.name === name)
   ),
   [],
   'Every production collection must be represented in the upgrade fixture'
 );
+// Production metadata before 1789940323 ended these indexes with a semicolon.
+const legacyTerminatedIndexes = new Set([
+  'idx_coloring_books_completion_percentage',
+  'idx_coloring_books_last_activity_at',
+  'idx_coloring_books_user_status',
+  'idx_coloring_books_user_last_activity_at',
+  'idx_coloring_pages_completed_at',
+  'idx_coloring_pages_book_status',
+  'idx_progress_notes_project',
+  'idx_projects_user_status_date_started',
+  'idx_projects_user_date_completed',
+  'idx_projects_date_received',
+  'idx_projects_date_purchased',
+  'idx_projects_user_date_received',
+  'idx_projects_user_date_purchased',
+  'idx_projects_year_completed',
+]);
+const withLegacyTerminator = index =>
+  legacyTerminatedIndexes.has(index.match(/INDEX\s+(?:IF NOT EXISTS\s+)?`?(\w+)/)?.[1])
+    ? `${index};\n`
+    : index;
 for (const collection of baselineSchema) {
-  collection.indexes = productionIndexes[collection.name] ?? collection.indexes;
+  collection.indexes = (productionIndexes[collection.name] ?? collection.indexes).map(
+    withLegacyTerminator
+  );
   if (collection.name === 'users') collection.authRule = '';
   for (const field of ['listRule', 'viewRule', 'createRule', 'updateRule', 'deleteRule']) {
     collection[field] = stripVerifiedRule(collection[field]);

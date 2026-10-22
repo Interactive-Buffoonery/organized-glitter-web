@@ -80,8 +80,8 @@ try {
     retained.close();
   }
   copyFileSync(
-    path.join(root, 'pb_migrations', '1792300002_archive_color_keys.js'),
-    path.join(migrationsDir, '1792300002_archive_color_keys.js')
+    path.join(root, 'pb_migrations', '1792700002_archive_color_keys.js'),
+    path.join(migrationsDir, '1792700002_archive_color_keys.js')
   );
   result = migrate('up');
   assert.equal(result.status, 0, result.stderr || result.stdout);

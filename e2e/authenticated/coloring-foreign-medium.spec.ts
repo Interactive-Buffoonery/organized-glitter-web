@@ -142,8 +142,18 @@ test.describe('Foreign coloring-medium rejection on page update', () => {
       await safeDelete(() => secondUserPb.collection('coloring_mediums').delete(foreignMediumId!));
     }
     // Removes the transient prod user created for this run.
-    if (secondUserId)
-      await safeDelete(() => secondUserPb.collection('users').delete(secondUserId!));
+    if (secondUserId) {
+      await safeDelete(async () => {
+        const admin = new PocketBase(pocketBaseUrl);
+        await admin
+          .collection('_superusers')
+          .authWithPassword(
+            process.env.LOCAL_POCKETBASE_ADMIN_EMAIL ?? '',
+            process.env.LOCAL_POCKETBASE_ADMIN_PASSWORD ?? ''
+          );
+        await admin.collection('users').delete(secondUserId!);
+      });
+    }
   });
 
   test("rejects attaching another user's medium to an owned page", async () => {

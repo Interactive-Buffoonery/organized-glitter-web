@@ -134,7 +134,16 @@ test.describe('Coloring write safety', () => {
       await safeDelete(() => secondUser.collection('coloring_books').delete(secondBookId!));
     }
     if (secondUserId) {
-      await safeDelete(() => secondUser.collection('users').delete(secondUserId!));
+      await safeDelete(async () => {
+        const admin = new PocketBase(pocketBaseUrl);
+        await admin
+          .collection('_superusers')
+          .authWithPassword(
+            process.env.LOCAL_POCKETBASE_ADMIN_EMAIL ?? '',
+            process.env.LOCAL_POCKETBASE_ADMIN_PASSWORD ?? ''
+          );
+        await admin.collection('users').delete(secondUserId!);
+      });
     }
   });
 

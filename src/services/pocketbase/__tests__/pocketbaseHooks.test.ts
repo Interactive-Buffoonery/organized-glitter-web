@@ -252,9 +252,10 @@ describe('PocketBase production hooks', () => {
     expect(users).toMatchObject({
       authRule: 'verified = true',
       createRule: '',
+      deleteRule: null,
     });
 
-    for (const field of ['listRule', 'viewRule', 'updateRule', 'deleteRule'] as const) {
+    for (const field of ['listRule', 'viewRule', 'updateRule'] as const) {
       expect(users?.[field], `users.${field}`).toMatch(/^@request\.auth\.verified = true/);
     }
 

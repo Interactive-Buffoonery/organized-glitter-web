@@ -14,6 +14,7 @@ describe('account deletion backend gate registration', () => {
       'pnpm pb:validate:schema',
       'pnpm pb:validate:migrations',
       'pnpm pb:validate:upgrade',
+      'pnpm pb:test:index-evidence',
       'pnpm pb:test:protected-file-upgrade',
       'pnpm pb:test:auth-verification',
       'pnpm pb:test:feedback',

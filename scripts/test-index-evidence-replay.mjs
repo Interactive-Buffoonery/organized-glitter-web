@@ -4,7 +4,7 @@
 // the inventory lacks is excused only when a newer migration actually leaves
 // that exact definition on the same collection.
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,20 +48,30 @@ ${down}
 const addStatusIndex = index => `    notes.indexes = [...notes.indexes, ${JSON.stringify(index)}];
     app.save(notes);`;
 
-const evidenceFor = async ({ source, schema = [notes], name = '1800000000_case.js' }) => {
-  const inventory = { $inventoryThroughMigration: boundary, notes: [] };
-  const replayedIndexes = await replayIndexEvidence({
-    schema,
-    inventory,
-    migrations: [
-      { name: boundary, source: 'migrate(() => {}, () => {});\n' },
-      { name, source },
-    ],
-    binary,
-    workDir: mkdtempSync(path.join(runRoot, 'case-')),
-  });
-  return applyIndexInventory(schema, inventory, { replayedIndexes });
+const withWorkDir = async run => {
+  const workDir = mkdtempSync(path.join(runRoot, 'case-'));
+  try {
+    return await run(workDir);
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
 };
+
+const evidenceFor = ({ source, schema = [notes], name = '1800000000_case.js' }) =>
+  withWorkDir(async workDir => {
+    const inventory = { $inventoryThroughMigration: boundary, notes: [] };
+    const replayedIndexes = await replayIndexEvidence({
+      schema,
+      inventory,
+      migrations: [
+        { name: boundary, source: 'migrate(() => {}, () => {});\n' },
+        { name, source },
+      ],
+      binary,
+      workDir,
+    });
+    return applyIndexInventory(schema, inventory, { replayedIndexes });
+  });
 
 const rejected = {
   'only a comment names it': migration(`    // ${addStatusIndex(statusIndex)}`),
@@ -80,6 +90,15 @@ const rejected = {
   ),
   'the up step creates it and then drops it in SQL': migration(
     `${addStatusIndex(statusIndex)}\n    app.db().newQuery('DROP INDEX idx_notes_status').execute();`
+  ),
+  'SQL replaces it with different columns under the same name': migration(
+    `${addStatusIndex(statusIndex)}\n    app.db().newQuery('DROP INDEX idx_notes_status').execute();\n    app.db().newQuery("CREATE INDEX idx_notes_status ON notes (id) WHERE status = 'ACTIVE'").execute();`
+  ),
+  'SQL replaces it with a unique index under the same name': migration(
+    `${addStatusIndex(statusIndex)}\n    app.db().newQuery('DROP INDEX idx_notes_status').execute();\n    app.db().newQuery(${JSON.stringify(statusIndex.replace('CREATE INDEX', 'CREATE UNIQUE INDEX'))}).execute();`
+  ),
+  'SQL replaces it without the predicate under the same name': migration(
+    `${addStatusIndex(statusIndex)}\n    app.db().newQuery('DROP INDEX idx_notes_status').execute();\n    app.db().newQuery('CREATE INDEX idx_notes_status ON notes (status)').execute();`
   ),
   'only the down step creates it': migration('', addStatusIndex(statusIndex)),
   'a quoted literal differs in case': migration(
@@ -140,13 +159,15 @@ const inventory = JSON.parse(
 const schema = JSON.parse(
   readFileSync(path.join(root, 'docs/pocketbase/collections.schema.json'), 'utf8')
 );
-const replayedIndexes = await replayIndexEvidence({
-  schema,
-  inventory,
-  migrations: readBaseMigrations({ baseCommit: 'HEAD' }),
-  binary,
-  workDir: mkdtempSync(path.join(runRoot, 'repository-')),
-});
+const replayedIndexes = await withWorkDir(workDir =>
+  replayIndexEvidence({
+    schema,
+    inventory,
+    migrations: readBaseMigrations({ baseCommit: 'HEAD' }),
+    binary,
+    workDir,
+  })
+);
 assert.ok(
   replayedIndexes.account_deletions.includes(
     'CREATE INDEX idx_account_deletions_created ON account_deletions (created)'

@@ -1,5 +1,5 @@
-import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -14,7 +14,53 @@ import {
   resolveBaseRef,
   resolveUpgradeRunDir,
   schemasHaveSameContract,
+  startPocketBase,
+  stopProcess,
 } from '../validate-pocketbase-upgrade.mjs';
+
+const isRunning = pid => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+describe('PocketBase process cleanup', () => {
+  const fakeBinary = (directory, script) => {
+    const binary = path.join(directory, 'pocketbase');
+    writeFileSync(binary, `#!/bin/sh\n${script}\n`);
+    chmodSync(binary, 0o755);
+    return binary;
+  };
+
+  it('kills a server that never becomes healthy and closes its logs', async () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'og-upgrade-start-'));
+    try {
+      const binary = fakeBinary(directory, 'echo $$ > pid\nexec sleep 30');
+      await expect(
+        startPocketBase({
+          binary,
+          dataDir: directory,
+          logPrefix: path.join(directory, 'never-ready'),
+          timeoutMs: 500,
+        })
+      ).rejects.toThrow(/did not become ready/);
+      expect(isRunning(Number(readFileSync(path.join(directory, 'pid'), 'utf8')))).toBe(false);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('escalates to SIGKILL and waits for exit', async () => {
+    const child = spawn('sh', ['-c', "trap '' TERM; exec sleep 30"], { stdio: 'ignore' });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await stopProcess(child, { graceMs: 200 });
+    expect(child.signalCode).toBe('SIGKILL');
+    expect(isRunning(child.pid)).toBe(false);
+  });
+});
 
 describe('PocketBase prior-schema upgrade gate', () => {
   it('accepts only newly added forward migrations', () => {

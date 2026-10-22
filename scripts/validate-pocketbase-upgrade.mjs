@@ -161,6 +161,63 @@ const stripIndexTerminator = index => index.replace(/;\s*$/, '');
 
 const indexName = index => index.match(/INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?(\w+)/i)?.[1];
 
+const normalizeIndex = index =>
+  stripIndexTerminator(index).replace(/\s+/g, ' ').trim().toLowerCase();
+
+const indexTable = index => index.match(/\sON\s+[`"]?(\w+)/i)?.[1];
+
+const stringEscapes = { n: '\n', r: '\r', t: '\t' };
+
+// Returns the string literals of the first `migrate(...)` argument (the up
+// step), skipping comments. Template literals with substitutions are ignored.
+// Regex literals are not tokenized; any parse failure yields no evidence.
+const upStepStrings = source => {
+  const start = source.search(/^migrate\(/m);
+  if (start < 0) return [];
+  const strings = [];
+  let depth = 0;
+  for (let i = start + 'migrate'.length; i < source.length; i += 1) {
+    const char = source[i];
+    if (char === '/' && source[i + 1] === '/') {
+      i = source.indexOf('\n', i);
+      if (i < 0) return [];
+    } else if (char === '/' && source[i + 1] === '*') {
+      i = source.indexOf('*/', i + 2) + 1;
+      if (i < 1) return [];
+    } else if (char === "'" || char === '"' || char === '`') {
+      let value = '';
+      for (i += 1; source[i] !== char; i += 1) {
+        if (i >= source.length || (char !== '`' && source[i] === '\n')) return [];
+        if (source[i] === '\\') {
+          i += 1;
+          value += stringEscapes[source[i]] ?? source[i];
+        } else {
+          value += source[i];
+        }
+      }
+      if (!(char === '`' && value.includes('${'))) strings.push(value);
+    } else if ('([{'.includes(char)) {
+      depth += 1;
+    } else if (')]}'.includes(char)) {
+      depth -= 1;
+      if (depth === 0) return [];
+    } else if (char === ',' && depth === 1) {
+      return strings;
+    }
+  }
+  return [];
+};
+
+const createsIndex = (source, collectionName, index) => {
+  const expected = normalizeIndex(index);
+  return upStepStrings(source).some(
+    value =>
+      /^\s*CREATE\s/i.test(value) &&
+      indexTable(value) === collectionName &&
+      normalizeIndex(value) === expected
+  );
+};
+
 export function readBaseMigrations({ baseCommit, gitFn = git }) {
   return gitFn(['ls-tree', '--name-only', baseCommit, 'pb_migrations/'])
     .split('\n')
@@ -173,7 +230,8 @@ export function readBaseMigrations({ baseCommit, gitFn = git }) {
 
 // The inventory records production's exact index strings as of
 // `$inventoryThroughMigration`. Any other base-schema index is kept only when
-// a newer base-commit migration creates it; otherwise the inventory is stale.
+// a newer base-commit migration's up step creates the same definition on the
+// same collection; otherwise the inventory is stale.
 export function applyIndexInventory(schema, inventory = {}, { migrations = [] } = {}) {
   const inventoryThrough = inventory.$inventoryThroughMigration ?? '';
   const unreleasedSources = migrations
@@ -187,7 +245,10 @@ export function applyIndexInventory(schema, inventory = {}, { migrations = [] } 
     const indexes = schemaIndexes.map(index => {
       const name = indexName(index);
       if (production.has(name)) return production.get(name);
-      if (!unreleasedSources.some(source => new RegExp(`\\b${name}\\b`).test(source))) {
+      if (
+        indexTable(index) !== collection.name ||
+        !unreleasedSources.some(source => createsIndex(source, collection.name, index))
+      ) {
         throw new Error(
           `Production index inventory lacks ${collection.name}.${name}, and no migration after ${inventoryThrough || '$inventoryThroughMigration'} creates it. Refresh ${indexInventoryPath} from production.`
         );

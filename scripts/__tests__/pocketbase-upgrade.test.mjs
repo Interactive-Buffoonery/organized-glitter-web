@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -121,6 +122,27 @@ describe('PocketBase prior-schema upgrade gate', () => {
   const inventoryThroughMigration = '1789940324_enforce_verified_auth.js';
   const unreleasedIndex =
     'CREATE INDEX idx_account_deletions_created ON account_deletions (created)';
+  const migrationSource = (up, down = '') => `/// <reference path="../pb_data/types.d.ts" />
+
+migrate(
+  app => {
+${up}
+  },
+  app => {
+${down}
+  }
+);
+`;
+  const addAuditIndex =
+    index => `    const audits = app.findCollectionByNameOrId('account_deletions');
+    audits.indexes = [...audits.indexes, '${index}'];
+    app.save(audits);`;
+  const applyWithUnreleased = source =>
+    applyIndexInventory(
+      [{ id: 'deletions', name: 'account_deletions', indexes: [unreleasedIndex] }],
+      { $inventoryThroughMigration: inventoryThroughMigration, account_deletions: [] },
+      { migrations: [{ name: '1792281600_account_deletion_worker.js', source }] }
+    );
 
   it('normalizes legacy index terminators from the production inventory', () => {
     const schema = applyIndexInventory(
@@ -172,7 +194,11 @@ describe('PocketBase prior-schema upgrade gate', () => {
           { name: '1791129600_account_deletion.js', source: '// creates account_deletions' },
           {
             name: '1792281600_account_deletion_worker.js',
-            source: `db.newQuery("${unreleasedIndex}")`,
+            source: migrationSource(
+              addAuditIndex(
+                'create   index IDX_account_deletions_created\\n      ON account_deletions (created);'
+              )
+            ),
           },
         ],
       }
@@ -199,6 +225,55 @@ describe('PocketBase prior-schema upgrade gate', () => {
     ).toThrow(/production index inventory lacks account_deletions\.idx_account_deletions_created/i);
   });
 
+  it.each([
+    [
+      'only a comment names it',
+      migrationSource(
+        `    // TODO: add idx_account_deletions_created later\n    app.save(app.findCollectionByNameOrId('account_deletions'));`
+      ),
+    ],
+    [
+      'only a commented-out create names it',
+      migrationSource(`    /* ${addAuditIndex(unreleasedIndex)} */`),
+    ],
+    [
+      'the up step only drops it',
+      migrationSource(
+        "    app.db().newQuery('DROP INDEX IF EXISTS idx_account_deletions_created').execute();"
+      ),
+    ],
+    ['only the down step creates it', migrationSource('', addAuditIndex(unreleasedIndex))],
+    [
+      'the up step creates a different definition',
+      migrationSource(
+        addAuditIndex('CREATE INDEX idx_account_deletions_created ON account_deletions (updated)')
+      ),
+    ],
+    [
+      'the up step creates it on a different collection',
+      migrationSource(
+        addAuditIndex(
+          'CREATE INDEX idx_account_deletions_created ON account_deletion_jobs (created)'
+        )
+      ),
+    ],
+    ['the source is not a migration', `db.newQuery("${unreleasedIndex}")`],
+  ])('rejects index evidence when %s', (_label, source) => {
+    expect(() => applyWithUnreleased(source)).toThrow(
+      /production index inventory lacks account_deletions\.idx_account_deletions_created/i
+    );
+  });
+
+  it('accepts the real account deletion worker migration as evidence', () => {
+    const source = readFileSync(
+      path.join(process.cwd(), 'pb_migrations/1792281600_account_deletion_worker.js'),
+      'utf8'
+    );
+    expect(applyWithUnreleased(source)).toEqual([
+      { id: 'deletions', name: 'account_deletions', indexes: [unreleasedIndex] },
+    ]);
+  });
+
   it('fails when an inventoried-era collection has no entry', () => {
     const grantIndex =
       'CREATE INDEX idx_apple_grant_user_state ON apple_oauth_grants (user_id, state)';
@@ -217,7 +292,16 @@ describe('PocketBase prior-schema upgrade gate', () => {
       applyIndexInventory(
         [{ id: 'jobs', name: 'deletion_jobs', indexes: [jobIndex] }],
         { $inventoryThroughMigration: inventoryThroughMigration },
-        { migrations: [{ name: '1792281600_deletion_jobs.js', source: jobIndex }] }
+        {
+          migrations: [
+            {
+              name: '1792281600_deletion_jobs.js',
+              source: migrationSource(
+                `    app.save(new Collection({ name: 'deletion_jobs', indexes: ['${jobIndex}'] }));`
+              ),
+            },
+          ],
+        }
       )
     ).toEqual([{ id: 'jobs', name: 'deletion_jobs', indexes: [jobIndex.replace(/;$/, '')] }]);
   });

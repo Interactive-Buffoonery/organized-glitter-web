@@ -85,7 +85,6 @@ export function collectUpgradeChanges({ baseCommit, gitFn = git }) {
   const untrackedMigrations = gitFn([
     'ls-files',
     '--others',
-    '--ignored',
     '--exclude-standard',
     '--',
     'pb_migrations/*.js',

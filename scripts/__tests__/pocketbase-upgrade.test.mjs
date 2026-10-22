@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -54,7 +55,30 @@ describe('PocketBase prior-schema upgrade gate', () => {
     ).toThrow(/without a new deployable migration/i);
   });
 
-  it('includes tracked worktree changes and ignored untracked migrations', () => {
+  it('detects an uncommitted new migration in a real worktree', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'og-upgrade-git-'));
+    const gitFn = args => {
+      const result = spawnSync('git', args, { cwd: directory, encoding: 'utf8' });
+      if (result.status !== 0) throw new Error(result.stderr);
+      return result.stdout;
+    };
+    try {
+      gitFn(['init', '-q']);
+      mkdirSync(path.join(directory, 'pb_migrations'));
+      writeFileSync(path.join(directory, 'pb_migrations', '1700000000_base.js'), '// base\n');
+      gitFn(['add', '.']);
+      gitFn(['-c', 'user.name=t', '-c', 'user.email=t@example.test', 'commit', '-qm', 'base']);
+      writeFileSync(path.join(directory, 'pb_migrations', '1800000000_new.js'), '// new\n');
+
+      expect(collectUpgradeChanges({ baseCommit: 'HEAD', gitFn })).toEqual([
+        { path: 'pb_migrations/1800000000_new.js', previousPath: null, status: 'A' },
+      ]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('includes tracked worktree changes and untracked migrations', () => {
     const gitFn = vi.fn(args => {
       if (args[0] === 'diff') {
         expect(args).not.toContain('HEAD');

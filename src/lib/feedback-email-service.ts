@@ -196,13 +196,21 @@ export async function sendFeedbackEmail({
     };
 
     // PocketBase owns feedback for both the web and native app.
-    const response = await sendFeedbackRequest(feedbackData, token, sessionIdentity);
+    const { response, sessionBlocked } = await sendFeedbackRequest(
+      feedbackData,
+      token,
+      sessionIdentity
+    );
 
     const responseData = await readFeedbackResponse(response);
 
     logger.log('Feedback API response:', responseData);
 
-    if (isSessionTokenInactive(token) || !isCurrentSessionIdentity(sessionIdentity)) {
+    if (
+      sessionBlocked ||
+      isSessionTokenInactive(token) ||
+      !isCurrentSessionIdentity(sessionIdentity)
+    ) {
       if (response.ok && responseData.success) {
         const completedFeedback = {
           draftId,
@@ -237,7 +245,10 @@ export async function sendFeedbackEmail({
       emailId: 'feedback-api-sent',
     };
   } catch (error) {
-    if (sessionIdentity && !isCurrentSessionIdentity(sessionIdentity)) {
+    if (
+      error instanceof SessionChangedError ||
+      (sessionIdentity && !isCurrentSessionIdentity(sessionIdentity))
+    ) {
       return getSessionChangedResult();
     }
 

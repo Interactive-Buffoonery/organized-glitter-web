@@ -105,7 +105,7 @@ routerAdd(
         .replace(/'/g, '&#039;');
     const accountEmail = e.auth.getString('email');
     const sender = e.app.settings().meta;
-    const feedbackToEmail = String($os.getenv('FEEDBACK_TO_EMAIL') || '').trim();
+    const feedbackToEmail = require(`${__hooks}/hook_settings.js`).get(e.app, 'FEEDBACK_TO_EMAIL');
     if (!feedbackToEmail) {
       e.app
         .logger()

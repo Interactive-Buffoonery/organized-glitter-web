@@ -152,8 +152,8 @@ const TagMultiSelectFilter = ({
             aria-expanded={inlineOpen}
             aria-label={
               selectedValues.length > 0
-                ? `${label} filter. ${selectedValues.length} ${itemLabel.plural} selected.`
-                : `${label} filter. No ${itemLabel.plural} selected.`
+                ? `${triggerLabel}. ${label} filter. ${selectedValues.length} ${itemLabel.plural} selected.`
+                : `${triggerLabel}. ${label} filter. No ${itemLabel.plural} selected.`
             }
             data-testid="tag-multi-select-trigger"
             onClick={() => setInlineOpen(open => !open)}
@@ -168,7 +168,9 @@ const TagMultiSelectFilter = ({
                 {triggerLabel}
               </span>
               {selectedValues.length > 1 && (
-                <Badge variant="secondary">{selectedValues.length}</Badge>
+                <Badge variant="secondary" aria-hidden="true">
+                  {selectedValues.length}
+                </Badge>
               )}
             </span>
             <ChevronDown
@@ -193,8 +195,8 @@ const TagMultiSelectFilter = ({
             className="bg-background w-full justify-between text-left font-normal"
             aria-label={
               selectedValues.length > 0
-                ? `${label} filter. ${selectedValues.length} ${itemLabel.plural} selected.`
-                : `${label} filter. No ${itemLabel.plural} selected.`
+                ? `${triggerLabel}. ${label} filter. ${selectedValues.length} ${itemLabel.plural} selected.`
+                : `${triggerLabel}. ${label} filter. No ${itemLabel.plural} selected.`
             }
             data-testid="tag-multi-select-trigger"
           >
@@ -205,7 +207,9 @@ const TagMultiSelectFilter = ({
             </span>
             <span className="flex items-center gap-2">
               {selectedValues.length > 1 && (
-                <Badge variant="secondary">{selectedValues.length}</Badge>
+                <Badge variant="secondary" aria-hidden="true">
+                  {selectedValues.length}
+                </Badge>
               )}
               <ChevronDown aria-hidden="true" />
             </span>

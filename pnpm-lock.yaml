@@ -5,6 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
+  '@internationalized/date': 3.12.4
   '@typescript/old': npm:typescript@6.0.3
   rollup: npm:@rollup/wasm-node@^4.55.1
   esbuild: 0.25.4
@@ -45,7 +46,7 @@ importers:
         specifier: ^1.1.10
         version: 1.1.10(react@19.2.6)
       '@internationalized/date':
-        specifier: ^3.12.4
+        specifier: 3.12.4
         version: 3.12.4
       '@posthog/react':
         specifier: ^1.11.3
@@ -1610,9 +1611,6 @@ packages:
     engines: {node: '>=20.9.0'}
     cpu: [x64]
     os: [win32]
-
-  '@internationalized/date@3.12.1':
-    resolution: {integrity: sha512-6IedsVWXyq4P9Tj+TxuU8WGWM70hYLl12nbYU8jkikVpa6WXapFazPUcHUMDMoWftIDE2ILDkFFte6W2nFCkRQ==}
 
   '@internationalized/date@3.12.4':
     resolution: {integrity: sha512-M1dEn4c1U1HsSlaVR8upZtSqvXrTkHDfv18H01uCSJyjVLDxnBR38v/fMxecmlwXKR4i9HeZcmgQAPE6A+aGJQ==}
@@ -8196,10 +8194,6 @@ snapshots:
   '@img/sharp-win32-x64@0.35.4':
     optional: true
 
-  '@internationalized/date@3.12.1':
-    dependencies:
-      '@swc/helpers': 0.5.21
-
   '@internationalized/date@3.12.4':
     dependencies:
       '@swc/helpers': 0.5.21
@@ -12513,7 +12507,7 @@ snapshots:
 
   react-aria-components@1.17.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
     dependencies:
-      '@internationalized/date': 3.12.1
+      '@internationalized/date': 3.12.4
       '@react-types/shared': 3.34.0(react@19.2.6)
       '@swc/helpers': 0.5.21
       client-only: 0.0.1
@@ -12524,7 +12518,7 @@ snapshots:
 
   react-aria@3.48.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
     dependencies:
-      '@internationalized/date': 3.12.1
+      '@internationalized/date': 3.12.4
       '@internationalized/number': 3.6.6
       '@internationalized/string': 3.2.8
       '@react-types/shared': 3.34.0(react@19.2.6)
@@ -12608,7 +12602,7 @@ snapshots:
 
   react-stately@3.46.0(react@19.2.6):
     dependencies:
-      '@internationalized/date': 3.12.1
+      '@internationalized/date': 3.12.4
       '@internationalized/number': 3.6.6
       '@internationalized/string': 3.2.8
       '@react-types/shared': 3.34.0(react@19.2.6)

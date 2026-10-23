@@ -425,6 +425,26 @@ describe('useAuth Integration Tests', () => {
       );
     });
 
+    const tokenExpiringIn = (seconds: number) =>
+      `header.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + seconds }))}.sig`;
+
+    it.each([
+      ['renews a session that is more than a day old', 3 * 86400, true],
+      ['leaves a session from the last day alone', 6.9 * 86400, false],
+    ])('%s', async (_name, secondsLeft, shouldRefresh) => {
+      const refresh = vi
+        .spyOn(UsersService, 'refreshDetachedSession')
+        .mockReturnValue(new Promise(() => {}));
+      setupMockAuthState(true, createMockUser({ id: 'sliding-account' }));
+      (pb.authStore as { token: string }).token = tokenExpiringIn(secondsLeft);
+
+      const { result } = renderUseAuthHook();
+      await waitFor(() => expect(result.current.initialCheckComplete).toBe(true));
+
+      expect(refresh).toHaveBeenCalledTimes(shouldRefresh ? 1 : 0);
+      refresh.mockRestore();
+    });
+
     it('guards every refreshed token when the session ends', async () => {
       let onChange: ((token: string | null, record: unknown) => void) | undefined;
       const account = createMockUser({ id: 'refreshed-account' });

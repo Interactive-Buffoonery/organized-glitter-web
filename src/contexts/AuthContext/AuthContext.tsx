@@ -48,6 +48,8 @@ import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
 import { getSessionIdentityTracker } from '@/services/auth/sessionEpoch';
 import { deletionIntents } from '@/services/accountDeletion/intentStore';
 
+const SESSION_RENEW_WINDOW_SECONDS = 6 * 24 * 60 * 60;
+
 const authLogger = createLogger('AuthProvider');
 
 const retireSessionTokens = (tokens: Set<string>, accountId: string | null) => {
@@ -309,7 +311,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         reportInvalidSession(token);
         return;
       }
-      if (!isTokenExpired(token, 120)) return;
+      // Renews about once a day while in use; tuned for the 7-day users token.
+      if (!isTokenExpired(token, SESSION_RENEW_WINDOW_SECONDS)) return;
       const generation = sessionGenerationRef.current;
       const sessionIdentity = sessionIdentityTracker.capture();
       refreshPromise = UsersService.refreshDetachedSession(token, pb.authStore.record)

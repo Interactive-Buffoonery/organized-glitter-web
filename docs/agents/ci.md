@@ -2,9 +2,11 @@
 
 GitHub Actions retains scope, static, unit/server, React, build/budget and
 publication gates and adds `Complete PR validation` on GitHub-hosted
-`ubuntu-24.04`. It runs the existing strict `pnpm test:pr` orchestration rather
-than maintaining a second test inventory. `CI result` fails closed unless every
-expected job succeeds, including complete PR validation.
+`ubuntu-24.04`. It runs `pnpm test:pr:ci`, the `pnpm test:pr` phase plan
+minus the static, unit, React, build and publication phases that sibling jobs
+already run. Its report marks each of those phases `delegated-to-<job>`.
+`CI result` fails closed unless every expected job succeeds, including complete
+PR validation.
 
 ## Cloud drafts and complete validation
 

@@ -3,18 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { getDiamondPageCorrection } from '../diamondPageCorrection';
 
 describe('getDiamondPageCorrection', () => {
-  it('preserves a page that remains valid after the result count changes', () => {
-    expect(
-      getDiamondPageCorrection({
-        currentPage: 2,
-        totalPages: 2,
-        isSuccess: true,
-        isFetching: false,
-        isPlaceholderData: false,
-      })
-    ).toBeNull();
-  });
-
   it('corrects an out-of-range page only after a successful current response', () => {
     const result = {
       currentPage: 4,

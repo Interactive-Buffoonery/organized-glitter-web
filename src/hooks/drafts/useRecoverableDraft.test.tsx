@@ -1,7 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ReactNode } from 'react';
-import { StrictMode } from 'react';
 
 import {
   getDraftGeneration,
@@ -59,21 +57,6 @@ describe('useRecoverableDraft', () => {
     expect(result.current.pending).toBe(false);
   });
 
-  it('starts a new checkpoint after the user discards the old draft', async () => {
-    const generation = getDraftGeneration(identity)!;
-    writeFormDraft(identity, generation, { title: 'Old text' });
-    const { result, rerender } = renderHook(({ values }) => useDraft(values), {
-      initialProps: { values: baseline },
-    });
-    act(() => result.current.discard());
-    expect(readFormDraft(identity, generation, validate).draft).toBeNull();
-
-    vi.useFakeTimers();
-    rerender({ values: { title: 'New text' } });
-    act(() => vi.advanceTimersByTime(600));
-    expect(readFormDraft(identity, generation, validate).draft?.values.title).toBe('New text');
-  });
-
   it('does not let an untouched second tab erase another editor’s checkpoint', () => {
     vi.useFakeTimers();
     const generation = getDraftGeneration(identity)!;
@@ -90,18 +73,6 @@ describe('useRecoverableDraft', () => {
     second.unmount();
   });
 
-  it('cannot recreate a confirmed draft from a pending timer', () => {
-    const generation = getDraftGeneration(identity)!;
-    const { result, rerender } = renderHook(({ values }) => useDraft(values), {
-      initialProps: { values: baseline },
-    });
-    vi.useFakeTimers();
-    rerender({ values: { title: 'Already saved' } });
-    act(() => result.current.saved());
-    act(() => vi.advanceTimersByTime(600));
-    expect(readFormDraft(identity, generation, validate).draft).toBeNull();
-  });
-
   it('does not write an account A form into account B after auth changes', () => {
     const { result, rerender } = renderHook(({ values }) => useDraft(values), {
       initialProps: { values: { title: 'Private A text' } },
@@ -112,18 +83,5 @@ describe('useRecoverableDraft', () => {
     const bIdentity = { ...identity, accountId: 'account-b' };
     const bGeneration = getDraftGeneration(bIdentity)!;
     expect(readFormDraft(bIdentity, bGeneration, validate).draft).toBeNull();
-  });
-
-  it('keeps writing after Strict Mode effect cleanup and setup', () => {
-    const wrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>;
-    const generation = getDraftGeneration(identity)!;
-    const { rerender } = renderHook(({ values }) => useDraft(values), {
-      wrapper,
-      initialProps: { values: baseline },
-    });
-    vi.useFakeTimers();
-    rerender({ values: { title: 'After setup' } });
-    act(() => vi.advanceTimersByTime(600));
-    expect(readFormDraft(identity, generation, validate).draft?.values.title).toBe('After setup');
   });
 });

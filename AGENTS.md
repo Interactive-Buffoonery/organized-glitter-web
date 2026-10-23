@@ -79,9 +79,10 @@ exception also applies to the local browser requirement above; backend source
 changes still require the backend run and its report before a draft.
 
 Before merge, require `CI result` and `Complete PR validation` to succeed on the
-latest PR commit. The latter runs strict `pnpm test:pr` on GitHub-hosted Ubuntu,
-including checksum-verified disposable PocketBase, migration/upgrade checks and
-all browser phases. `pnpm test:pr` and `pnpm pr:create` remain strict. Do not
+latest PR commit. The latter runs `pnpm test:pr:ci` on GitHub-hosted Ubuntu:
+checksum-verified disposable PocketBase, migration/upgrade checks and all
+browser phases. Static, unit, React, build and publication phases run in their
+own required jobs. `pnpm test:pr` and `pnpm pr:create` remain strict. Do not
 merge with failing or incomplete backend/browser phases. Report baseline
 comparisons and genuine application failures without weakening tests.
 

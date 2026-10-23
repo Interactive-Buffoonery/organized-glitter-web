@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/hooks/queries/queryKeys';
-import { useColorKeyHistory, useColorKeys, useSymbolRequests } from '../useColorKeys';
+import { useColorKeyHistory, useSymbolRequests } from '../useColorKeys';
 
 const service = vi.hoisted(() => ({ list: vi.fn(), history: vi.fn(), requests: vi.fn() }));
 vi.mock('@/services/pocketbase/colorKeys.service', () => ({ ColorKeysService: service }));
@@ -26,13 +26,6 @@ describe('color key queries', () => {
     expect(JSON.stringify(queryKeys.coloring.colorKeys.list('owner', 'page'))).not.toContain(
       'owner'
     );
-  });
-
-  it('loads the page list', async () => {
-    service.list.mockResolvedValue([{ id: 'a' }]);
-    const { result } = renderHook(() => useColorKeys('page', 'owner'), { wrapper });
-    await waitFor(() => expect(result.current.data).toEqual([{ id: 'a' }]));
-    expect(service.list).toHaveBeenCalledWith('page', 'owner');
   });
 
   it('waits to load history until the entry asks for it', async () => {

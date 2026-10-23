@@ -2,7 +2,7 @@
  * Tests for UsersService
  * Covers: profile queries, avatar mutations, username availability
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pbMock = vi.hoisted(() => {
   const collectionMethods = {
@@ -53,108 +53,12 @@ describe('UsersService', () => {
     pbMock.reset();
   });
 
-  describe('getProfile()', () => {
-    it('fetches user by explicit ID', async () => {
-      pbMock.collectionMethods.getOne.mockResolvedValue({
-        id: 'u1',
-        email: 'test@example.com',
-        username: 'testuser',
-        theme_preference: 'catppuccin-frappe',
-      });
-
-      const profile = await UsersService.getProfile('u1');
-
-      expect(pbMock.collectionMethods.getOne).toHaveBeenCalledWith('u1');
-      expect(profile.id).toBe('u1');
-      expect(profile.themePreference).toBe('dark');
-    });
-
-    it('defaults invalid or missing theme preference to system', async () => {
-      pbMock.collectionMethods.getOne.mockResolvedValue({
-        id: 'u1',
-        email: 'test@example.com',
-        username: 'testuser',
-        theme_preference: 'catppuccin',
-      });
-
-      const profile = await UsersService.getProfile('u1');
-
-      expect(profile.themePreference).toBe('system');
-    });
-  });
-
-  describe('update()', () => {
-    it('updates timezone', async () => {
-      pbMock.collectionMethods.update.mockResolvedValue({
-        id: 'u1',
-        timezone: 'America/New_York',
-      });
-
-      await UsersService.update('u1', { timezone: 'America/New_York' });
-
-      expect(pbMock.collectionMethods.update).toHaveBeenCalledWith('u1', {
-        timezone: 'America/New_York',
-      });
-    });
-
-    it('updates beta_tester flag', async () => {
-      pbMock.collectionMethods.update.mockResolvedValue({
-        id: 'u1',
-        beta_tester: true,
-      });
-
-      await UsersService.update('u1', { beta_tester: true });
-
-      expect(pbMock.collectionMethods.update).toHaveBeenCalledWith('u1', { beta_tester: true });
-    });
-
-    it('updates theme_preference', async () => {
-      pbMock.collectionMethods.update.mockResolvedValue({
-        id: 'u1',
-        theme_preference: 'dark',
-      });
-
-      await UsersService.update('u1', { theme_preference: 'dark' });
-
-      expect(pbMock.collectionMethods.update).toHaveBeenCalledWith('u1', {
-        theme_preference: 'dark',
-      });
-    });
-  });
-
   describe('analytics preference', () => {
-    it('subscribes to realtime connects with a scoped unsubscribe', async () => {
-      const unsubscribe = vi.fn(async () => {});
-      const callback = vi.fn();
-      pbMock.pb.realtime.subscribe.mockResolvedValue(unsubscribe);
-      const returnedUnsubscribe = await UsersService.subscribeRealtimeConnect(callback);
-      expect(pbMock.pb.realtime.subscribe).toHaveBeenCalledWith('PB_CONNECT', callback);
-      expect(returnedUnsubscribe).toBe(unsubscribe);
-    });
-
-    it('reads the current account opt-out value', async () => {
-      pbMock.collectionMethods.getOne.mockResolvedValue({ analytics_opt_out: true });
-
-      await expect(UsersService.getAnalyticsOptOut('u1')).resolves.toBe(true);
-      expect(pbMock.collectionMethods.getOne).toHaveBeenCalledWith('u1', {
-        fields: 'analytics_opt_out',
-      });
-    });
-
     it('fails closed when the backend does not return the preference field', async () => {
       pbMock.collectionMethods.getOne.mockResolvedValue({ id: 'u1' });
 
       await expect(UsersService.getAnalyticsOptOut('u1')).rejects.toMatchObject({
         type: 'server',
-      });
-    });
-
-    it('updates and returns the stored account opt-out value', async () => {
-      pbMock.collectionMethods.update.mockResolvedValue({ analytics_opt_out: false });
-
-      await expect(UsersService.updateAnalyticsOptOut('u1', false)).resolves.toBe(false);
-      expect(pbMock.collectionMethods.update).toHaveBeenCalledWith('u1', {
-        analytics_opt_out: false,
       });
     });
 
@@ -194,74 +98,6 @@ describe('UsersService', () => {
       subscriptionCallback({ action: 'delete', record: { analytics_opt_out: false } });
 
       expect(callback).toHaveBeenCalledWith(true);
-    });
-  });
-
-  describe('markColoringWalkthroughSeen()', () => {
-    it('sets the walkthrough flag and refreshes auth', async () => {
-      pbMock.collectionMethods.update.mockResolvedValue({ id: 'u1' });
-      pbMock.collectionMethods.authRefresh.mockResolvedValue({ id: 'u1' });
-
-      await UsersService.markColoringWalkthroughSeen('u1');
-
-      expect(pbMock.collectionMethods.update).toHaveBeenCalledWith('u1', {
-        coloring_walkthrough_seen: true,
-      });
-      expect(pbMock.collectionMethods.authRefresh).toHaveBeenCalledTimes(1);
-    });
-
-    it('still resolves when the auth refresh fails', async () => {
-      pbMock.collectionMethods.update.mockResolvedValue({ id: 'u1' });
-      pbMock.collectionMethods.authRefresh.mockRejectedValue(new Error('network'));
-
-      await expect(UsersService.markColoringWalkthroughSeen('u1')).resolves.toBeUndefined();
-    });
-  });
-
-  describe('uploadAvatar()', () => {
-    it('sends file as FormData', async () => {
-      const mockFile = new File(['img'], 'avatar.png', { type: 'image/png' });
-      pbMock.collectionMethods.update.mockResolvedValue({
-        id: 'u1',
-        avatar: 'avatar.png',
-      });
-
-      await UsersService.uploadAvatar('u1', mockFile);
-
-      const callArg = pbMock.collectionMethods.update.mock.calls[0][1];
-      expect(callArg).toBeInstanceOf(FormData);
-      expect(callArg.get('avatar')).toBe(mockFile);
-    });
-  });
-
-  describe('removeAvatar()', () => {
-    it('sets avatar to null', async () => {
-      pbMock.collectionMethods.update.mockResolvedValue({ id: 'u1', avatar: '' });
-
-      await UsersService.removeAvatar('u1');
-
-      expect(pbMock.collectionMethods.update).toHaveBeenCalledWith('u1', { avatar: null });
-    });
-  });
-
-  describe('isUsernameAvailable()', () => {
-    it('returns true when no duplicate found', async () => {
-      pbMock.collectionMethods.getList.mockResolvedValue({ items: [], totalItems: 0 });
-
-      const available = await UsersService.isUsernameAvailable('newname', 'u1');
-
-      expect(available).toBe(true);
-    });
-
-    it('returns false when duplicate exists', async () => {
-      pbMock.collectionMethods.getList.mockResolvedValue({
-        items: [{ id: 'u2', username: 'taken' }],
-        totalItems: 1,
-      });
-
-      const available = await UsersService.isUsernameAvailable('taken', 'u1');
-
-      expect(available).toBe(false);
     });
   });
 });

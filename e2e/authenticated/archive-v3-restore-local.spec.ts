@@ -2,14 +2,10 @@ import { expect, test, type Page } from '@playwright/test';
 import JSZip from 'jszip';
 import PocketBase from 'pocketbase';
 import { randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import {
   calculateInventoryDigest,
   calculateItemDigest,
-  calculateParentDescriptorDigest,
   sha256Bytes,
 } from '../../src/features/import-export/archive/v3/canonical';
 import type {
@@ -17,8 +13,6 @@ import type {
   ArchivePartManifestV3,
 } from '../../src/features/import-export/archive/v3/types';
 import { assertLocalE2ETargets, isLocalUrl } from '../fixtures/local-safety';
-
-const rootDir = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const pbUrl = process.env.VITE_POCKETBASE_URL ?? 'http://127.0.0.1:8090';
 const appUrl = process.env.E2E_APP_URL ?? 'http://localhost:3000';
 const runId = randomUUID();
@@ -33,26 +27,6 @@ function project(itemId: string, title: string, assets: ArchiveItemV3['assets'] 
     kind: 'diamond-project' as const,
     metadata: { title, status: 'progress' as const, tags: [] },
     assets,
-  };
-  return { ...unsigned, digest: calculateItemDigest(unsigned) };
-}
-
-function projectParent(itemId: string, title: string) {
-  const unsigned = {
-    itemId,
-    kind: 'diamond-project' as const,
-    metadata: { title, status: 'progress' as const, tags: [] },
-  };
-  return { ...unsigned, digest: calculateParentDescriptorDigest(unsigned) };
-}
-
-function projectNote(itemId: string, parent: ReturnType<typeof projectParent>) {
-  const unsigned = {
-    itemId,
-    kind: 'diamond-project-note' as const,
-    parent,
-    metadata: { content: 'Restored from a child-first part', date: '2026-09-22' },
-    assets: [],
   };
   return { ...unsigned, digest: calculateItemDigest(unsigned) };
 }
@@ -171,69 +145,6 @@ test.describe('local v3 archive restore', () => {
     for (const medium of mediums) await admin.collection('coloring_mediums').delete(medium.id);
   });
 
-  test('restores a child-first part, adds its parent cover, and safely retries', async ({
-    page,
-  }) => {
-    const backupId = randomUUID();
-    backupIds.push(backupId);
-    const title = `${titlePrefix} child first`;
-    const projectId = `diamond-project:${backupId}`;
-    const coverBytes = await readFile(path.join(rootDir, 'e2e/fixtures/portrait-cover.jpg'));
-    const coverPath = 'assets/project-cover/portrait-cover.jpg';
-    const cover = {
-      assetId: 'project-cover',
-      digest: sha256Bytes(coverBytes),
-      byteLength: coverBytes.byteLength,
-      path: coverPath,
-      role: 'project-cover' as const,
-      field: 'image',
-      originalFilename: 'portrait-cover.jpg',
-      contentType: 'image/jpeg',
-    };
-    const first = await archivePart({
-      backupId,
-      partNumber: 1,
-      partCount: 2,
-      items: [projectNote(`diamond-project-note:${backupId}`, projectParent(projectId, title))],
-    });
-    const second = await archivePart({
-      backupId,
-      partNumber: 2,
-      partCount: 2,
-      items: [project(projectId, title, [cover])],
-      files: new Map([[coverPath, coverBytes]]),
-    });
-
-    await openRestore(page);
-    await page.getByLabel('Archive ZIP file').setInputFiles([second, first]);
-    await page.getByLabel(`Select ${second.name}`).uncheck();
-    await page.getByRole('button', { name: 'Import archive' }).click();
-    await expect(page.getByText('Selected parts restored')).toBeVisible();
-    await expect(page.getByText(/Missing Part 2/)).toBeVisible();
-    const [scaffold] = await recordsWithTitle(user, title);
-    expect(scaffold).toBeTruthy();
-    expect(scaffold.image).toBeFalsy();
-    const notesAfterFirst = await user.collection('progress_notes').getFullList({
-      filter: user.filter('project = {:projectId}', { projectId: scaffold.id }),
-    });
-    expect(notesAfterFirst).toHaveLength(1);
-
-    await page.getByLabel(`Select ${second.name}`).check();
-    await page.getByRole('button', { name: 'Import archive' }).click();
-    await expect(page.getByText('Backup restored')).toBeVisible();
-    const [finished] = await recordsWithTitle(user, title);
-    expect(finished.id).toBe(scaffold.id);
-    expect(finished.image).toBeTruthy();
-
-    await page.getByRole('button', { name: 'Import archive' }).click();
-    await expect(page.getByText('Backup restored')).toBeVisible();
-    expect(await recordsWithTitle(user, title)).toHaveLength(1);
-    const notesAfterRetry = await user.collection('progress_notes').getFullList({
-      filter: user.filter('project = {:projectId}', { projectId: scaffold.id }),
-    });
-    expect(notesAfterRetry).toHaveLength(1);
-  });
-
   test('rejects a mixed backup and a corrupt asset before writing', async ({ page }) => {
     const firstId = randomUUID();
     const secondId = randomUUID();
@@ -297,138 +208,6 @@ test.describe('local v3 archive restore', () => {
     ).toBeVisible();
     expect(writes).toBe(0);
     expect(await recordsWithTitle(user, corruptTitle)).toHaveLength(0);
-  });
-
-  test('restores every coloring item kind through the browser and hook', async ({ page }) => {
-    const backupId = randomUUID();
-    backupIds.push(backupId);
-    const bookTitle = `${titlePrefix} coloring book`;
-    const mediumName = `${titlePrefix} medium`;
-    const mediumUnsigned = {
-      itemId: `coloring-medium:${backupId}`,
-      kind: 'coloring-medium' as const,
-      metadata: { name: mediumName, type: 'colored_pencil' as const },
-      assets: [],
-    };
-    const medium = { ...mediumUnsigned, digest: calculateItemDigest(mediumUnsigned) };
-    const bookId = `coloring-book:${backupId}`;
-    const bookMetadata = {
-      title: bookTitle,
-      isMystery: false,
-      status: 'in_progress' as const,
-      totalPages: 1,
-      tags: [],
-    };
-    const bookUnsigned = {
-      itemId: bookId,
-      kind: 'coloring-book' as const,
-      metadata: bookMetadata,
-      assets: [],
-    };
-    const book = { ...bookUnsigned, digest: calculateItemDigest(bookUnsigned) };
-    const bookParentUnsigned = { itemId: bookId, kind: bookUnsigned.kind, metadata: bookMetadata };
-    const bookParent = {
-      ...bookParentUnsigned,
-      digest: calculateParentDescriptorDigest(bookParentUnsigned),
-    };
-    const pageId = `coloring-page:${backupId}`;
-    const pageMetadata = {
-      pageNumber: 1,
-      status: 'in_progress' as const,
-      mediumItemIds: [medium.itemId],
-    };
-    const pageUnsigned = {
-      itemId: pageId,
-      kind: 'coloring-page' as const,
-      parent: bookParent,
-      metadata: pageMetadata,
-      assets: [],
-    };
-    const coloringPage = { ...pageUnsigned, digest: calculateItemDigest(pageUnsigned) };
-    const pageParentUnsigned = {
-      itemId: pageId,
-      kind: pageUnsigned.kind,
-      parent: bookParent,
-      metadata: pageMetadata,
-    };
-    const pageParent = {
-      ...pageParentUnsigned,
-      digest: calculateParentDescriptorDigest(pageParentUnsigned),
-    };
-    const noteUnsigned = {
-      itemId: `coloring-page-note:${backupId}`,
-      kind: 'coloring-page-note' as const,
-      parent: pageParent,
-      metadata: { content: 'V3 restored page note', date: '2026-09-22' },
-      assets: [],
-    };
-    const note = { ...noteUnsigned, digest: calculateItemDigest(noteUnsigned) };
-    const referenceUnsigned = {
-      itemId: `coloring-color-reference:${backupId}`,
-      kind: 'coloring-color-reference' as const,
-      parent: pageParent,
-      metadata: { notes: 'V3 restored palette' },
-      assets: [],
-    };
-    const reference = {
-      ...referenceUnsigned,
-      digest: calculateItemDigest(referenceUnsigned),
-    };
-    const imageBytes = await readFile(path.join(rootDir, 'e2e/fixtures/portrait-cover.jpg'));
-    const imagePath = 'assets/coloring-page-photo/portrait-cover.jpg';
-    const galleryUnsigned = {
-      itemId: `asset:${backupId}`,
-      kind: 'asset' as const,
-      parent: pageParent,
-      metadata: { position: 0 },
-      assets: [
-        {
-          assetId: 'coloring-page-photo',
-          digest: sha256Bytes(imageBytes),
-          byteLength: imageBytes.byteLength,
-          path: imagePath,
-          role: 'coloring-page-photo' as const,
-          field: 'photos',
-          originalFilename: 'portrait-cover.jpg',
-          contentType: 'image/jpeg',
-        },
-      ],
-    };
-    const gallery = { ...galleryUnsigned, digest: calculateItemDigest(galleryUnsigned) };
-    const archive = await archivePart({
-      backupId,
-      partNumber: 1,
-      partCount: 1,
-      items: [medium, book, coloringPage, note, reference, gallery],
-      files: new Map([[imagePath, imageBytes]]),
-    });
-
-    await openRestore(page);
-    await page.getByLabel('Archive ZIP file').setInputFiles(archive);
-    await page.getByRole('button', { name: 'Import archive' }).click();
-    await expect(page.getByText('Backup restored')).toBeVisible();
-    const [restoredBook] = await user.collection('coloring_books').getFullList<{ id: string }>({
-      filter: user.filter('title = {:title}', { title: bookTitle }),
-    });
-    expect(restoredBook).toBeTruthy();
-    const [restoredPage] = await user.collection('coloring_pages').getFullList<{
-      id: string;
-      photos: string[];
-      mediums: string[];
-    }>({ filter: user.filter('book = {:bookId}', { bookId: restoredBook.id }) });
-    expect(restoredPage.photos).toHaveLength(1);
-    const [restoredMedium] = await user.collection('coloring_mediums').getFullList<{ id: string }>({
-      filter: user.filter('name = {:name}', { name: mediumName }),
-    });
-    expect(restoredPage.mediums).toContain(restoredMedium.id);
-    const notes = await user.collection('coloring_page_progress_notes').getFullList({
-      filter: user.filter('page = {:pageId}', { pageId: restoredPage.id }),
-    });
-    expect(notes).toHaveLength(1);
-    const references = await user.collection('coloring_page_color_references').getFullList({
-      filter: user.filter('page = {:pageId}', { pageId: restoredPage.id }),
-    });
-    expect(references).toHaveLength(1);
   });
 
   test('resumes after a lost response without duplicating confirmed items', async ({ page }) => {

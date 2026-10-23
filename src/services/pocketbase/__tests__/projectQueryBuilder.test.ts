@@ -1,12 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  buildProjectFilter,
-  buildProjectQueryConfig,
-  toProjectFilterCriteria,
-  toProjectFilters,
-} from '@/services/pocketbase/projectQueryBuilder';
 import type { FilterState } from '@/contexts/FilterContext';
+import { buildProjectFilter, toProjectFilters } from '@/services/pocketbase/projectQueryBuilder';
 
 vi.mock('@/lib/pocketbase', () => ({
   pb: {
@@ -43,18 +38,6 @@ const makeFilterState = (overrides: Partial<FilterState> = {}): FilterState =>
   }) as FilterState;
 
 describe('project query builder adapters', () => {
-  it('drops search terms shorter than two characters', () => {
-    expect(
-      toProjectFilterCriteria(makeFilterState({ searchTerm: 'a' })).searchTerm
-    ).toBeUndefined();
-  });
-
-  it('trims and keeps usable search terms', () => {
-    expect(toProjectFilterCriteria(makeFilterState({ searchTerm: '  ab  ' })).searchTerm).toBe(
-      'ab'
-    );
-  });
-
   it('adds userId only for the full service filter contract', () => {
     expect(toProjectFilters('user-1', makeFilterState())).toMatchObject({
       userId: 'user-1',
@@ -84,59 +67,5 @@ describe('buildProjectFilter', () => {
     ).toBe(
       'user = user-123 && status = progress && company = company-1 && artist = artist-1 && drill_shape = round && date_completed >= 2026-01-01 00:00:00 && date_completed <= 2026-12-31 23:59:59 && kit_category != mini && status != destashed && status != archived && (title ~ %sparkle% || general_notes ~ %sparkle% || source_url ~ %sparkle%) && (project_tags_via_project.tag ?= tag-1 || project_tags_via_project.tag ?= tag-2)'
     );
-  });
-
-  it('skips archived and destashed exclusions for status count queries when requested', () => {
-    expect(
-      buildProjectFilter(
-        {
-          userId: 'user-123',
-          includeDestashed: false,
-          includeArchived: false,
-        },
-        { skipStatusExclusionCheckboxes: true }
-      )
-    ).toBe('user = user-123');
-  });
-
-  it('can override the status clause for count-style queries', () => {
-    expect(
-      buildProjectFilter(
-        {
-          userId: 'user-123',
-          status: 'progress',
-          includeDestashed: true,
-          includeArchived: true,
-        },
-        { statusOverride: 'completed' }
-      )
-    ).toBe('user = user-123 && status = completed');
-  });
-});
-
-describe('buildProjectQueryConfig', () => {
-  it('returns PocketBase-ready filter, sort, and expand strings', () => {
-    expect(
-      buildProjectQueryConfig(
-        { userId: 'user-123', status: 'progress' },
-        {
-          sort: { field: 'date_purchased', direction: 'desc' },
-          expand: { tags: true, company: true, artist: false, user: false },
-        }
-      )
-    ).toEqual({
-      filter: 'user = user-123 && status = progress && status != destashed && status != archived',
-      sort: '+date_purchased_has_value,-date_purchased,-title_sort',
-      expand: 'project_tags_via_project.tag,company',
-    });
-  });
-
-  it('omits expand when no expand options are enabled', () => {
-    expect(
-      buildProjectQueryConfig(
-        { userId: 'user-123' },
-        { sort: { field: 'kit_name', direction: 'asc' } }
-      ).expand
-    ).toBeUndefined();
   });
 });

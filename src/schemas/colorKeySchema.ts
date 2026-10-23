@@ -1,14 +1,9 @@
 import { z } from 'zod';
 import { isSymbolId } from '@/features/coloring/colorKeys/symbols';
+import { COLOR_KEY_LIMITS, colorKeyText } from '@/schemas/colorKeyFields';
+export { COLOR_KEY_LIMITS } from '@/schemas/colorKeyFields';
 
-export const COLOR_KEY_LIMITS = { code: 100, colorName: 100, tried: 20, note: 2000 } as const;
-
-// PocketBase counts text length in characters, so astral symbols count once.
-const text = (label: string, max: number) =>
-  z
-    .string()
-    .transform(value => value.trim())
-    .refine(value => Array.from(value).length <= max, `${label} can be up to ${max} characters.`);
+const text = (label: string, max: number) => colorKeyText(label, max, true);
 
 export const colorKeyInputSchema = z.object({
   symbol: z.string().refine(isSymbolId, 'Choose a valid symbol.'),

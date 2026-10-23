@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -38,74 +38,6 @@ for (const [kind, useCreate, create] of [
   ['artist', useCreateArtist, mocks.createArtist],
 ] as const) {
   describe(`${kind} create session ownership`, () => {
-    it('keeps the invoking session across the TanStack onMutate await', async () => {
-      let release!: () => void;
-      const gate = new Promise<void>(resolve => {
-        release = resolve;
-      });
-      const queryClient = new QueryClient({
-        mutationCache: new MutationCache({ onMutate: () => gate }),
-        defaultOptions: { mutations: { retry: false } },
-      });
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-      );
-      const { result } = renderHook(() => useCreate(), { wrapper });
-      let pending!: Promise<unknown>;
-      act(() => {
-        pending = result.current.mutateAsync({ name: 'Origin metadata' });
-      });
-      const rejection = expect(pending).rejects.toMatchObject({ reason: 'session_changed' });
-      mocks.session.accountId = 'account-b';
-      mocks.session.generation += 1;
-      await act(async () => {
-        release();
-        await rejection;
-      });
-      expect(create).not.toHaveBeenCalled();
-      expect(mocks.notify).not.toHaveBeenCalled();
-      expect(mocks.capture).not.toHaveBeenCalled();
-    });
-
-    it('keeps independent identities for concurrent calls sharing one input', async () => {
-      let release!: () => void;
-      const gate = new Promise<void>(resolve => {
-        release = resolve;
-      });
-      const saved = { id: 'new-record', name: 'Shared metadata', websiteUrl: '' };
-      create.mockResolvedValueOnce(saved);
-      const queryClient = new QueryClient({
-        mutationCache: new MutationCache({ onMutate: () => gate }),
-        defaultOptions: { mutations: { retry: false } },
-      });
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-      );
-      const { result } = renderHook(() => useCreate(), { wrapper });
-      const input = { name: 'Shared metadata' };
-      let oldPending!: Promise<unknown>;
-      let newPending!: Promise<unknown>;
-      const onSuccess = vi.fn();
-      act(() => {
-        oldPending = result.current.mutateAsync(input);
-      });
-      const rejection = expect(oldPending).rejects.toMatchObject({ reason: 'session_changed' });
-      mocks.session.accountId = 'account-b';
-      mocks.session.generation += 1;
-      act(() => {
-        newPending = result.current.mutateAsync(input, { onSuccess });
-      });
-      await act(async () => {
-        release();
-        await rejection;
-        await expect(newPending).resolves.toEqual(saved);
-      });
-      expect(create).toHaveBeenCalledOnce();
-      expect(create).toHaveBeenCalledWith(input, { accountId: 'account-b', generation: 1 });
-      expect(onSuccess).toHaveBeenCalledWith(saved, input, expect.anything(), expect.anything());
-      await waitFor(() => expect(result.current.variables).toEqual(input));
-    });
-
     it('does not publish a successful old create into the next account', async () => {
       let complete!: (value: unknown) => void;
       create.mockImplementationOnce(

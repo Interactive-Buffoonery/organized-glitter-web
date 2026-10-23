@@ -84,8 +84,8 @@ export function useDeleteColorKey(pageId: string, userId: string) {
 }
 
 /**
- * Saves `ordered` as positions 0 to n-1, one PATCH per row that moved. If a PATCH fails,
- * rows already moved go back to their old positions so the strip is not left half sorted.
+ * Saves `ordered` as positions 0 to n-1, one PATCH per row that moved.
+ * Restores moved rows on failure where possible, then refetches the server order.
  */
 export function useReorderColorKeys(pageId: string, userId: string) {
   const client = useQueryClient();
@@ -118,10 +118,12 @@ export function useReorderColorKeys(pageId: string, userId: string) {
       );
       return { previous };
     },
-    onSuccess: saved =>
+    onSuccess: saved => {
+      const savedById = new Map(saved.map(row => [row.id, row]));
       settle(client, userId, pageId, {
-        update: rows => rows.map(row => saved.find(next => next.id === row.id) ?? row),
-      }),
+        update: rows => rows.map(row => savedById.get(row.id) ?? row),
+      });
+    },
     onError: (_error, _ordered, context) => {
       if (context?.previous) client.setQueryData(key, context.previous);
       settle(client, userId, pageId);

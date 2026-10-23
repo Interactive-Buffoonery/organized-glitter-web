@@ -205,11 +205,12 @@ function ColorKeyEditor({
     if (!ordered || ordered.every((row, index) => row.id === rows[index]?.id)) return;
     setSortError('');
     // A row that arrived or left while the panel was open would get a wrong position.
-    const current = ordered.map(row => rows.find(next => next.id === row.id));
-    if (current.length !== rows.length || current.some(row => !row))
+    const rowsById = new Map(rows.map(row => [row.id, row]));
+    const current = ordered.flatMap(row => rowsById.get(row.id) ?? []);
+    if (ordered.length !== rows.length || current.length !== ordered.length)
       return setSortError(SORT_FAILED);
     try {
-      await reorder.mutateAsync(current as ColorKey[]);
+      await reorder.mutateAsync(current);
     } catch (error) {
       logger.warn('Could not save the color order', error);
       setSortError(navigator.onLine ? SORT_FAILED : SORT_OFFLINE);

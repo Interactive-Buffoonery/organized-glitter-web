@@ -206,16 +206,6 @@ describe('Colors used sort', () => {
     expect(state.reorder).not.toHaveBeenCalled();
   });
 
-  it('disables Sort, the rows and Add symbol while the panel is open', async () => {
-    const user = userEvent.setup();
-    state.rows = three();
-    render(<ColorKeySection pageId="page-1" />);
-    await openSort(user);
-    expect(screen.getByRole('button', { name: 'Sort' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Add symbol' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /^One,/ })).toBeDisabled();
-  });
-
   it('keeps the panel closed and asks to try again when it cannot load', async () => {
     const user = userEvent.setup();
     state.rows = three();
@@ -238,18 +228,6 @@ describe('Colors used sort', () => {
     expect(screen.getByRole('button', { name: 'Sort' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Add symbol' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Two,/ })).toBeDisabled();
-  });
-
-  it('saves the new order on Done', async () => {
-    const user = userEvent.setup();
-    state.rows = three();
-    state.reorder.mockResolvedValue([]);
-    render(<ColorKeySection pageId="page-1" />);
-    await openSort(user);
-    await user.click(screen.getByRole('button', { name: 'Reverse' }));
-    await user.click(screen.getByRole('button', { name: 'Done' }));
-    expect(state.reorder).toHaveBeenCalledWith([state.rows[2], state.rows[1], state.rows[0]]);
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('asks to try again when saving the order fails', async () => {

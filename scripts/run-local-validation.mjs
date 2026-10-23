@@ -17,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const summaryRoot = path.join(rootDir, '.tmp', 'local-validation');
-const profiles = new Set(['pr', 'release', 'backend', 'cloud']);
+const profiles = new Set(['pr', 'release', 'backend', 'cloud', 'ci']);
 
 const sharedPhases = [
   ['backend', 'test:ci:backend'],
@@ -36,10 +36,22 @@ const trailingBrowserPhases = [
   ['blog-browser', 'qa:blog'],
 ];
 
+// Sibling jobs in .github/workflows/ci.yml that the ci profile relies on.
+const ciJobs = {
+  static: 'static-checks',
+  unit: 'unit-tests',
+  react: 'react-doctor',
+  build: 'publication-security',
+  publication: 'publication-security',
+};
+
+export const ciJobForPhase = name => ciJobs[name];
+
 export function buildPhasePlan(profile) {
   if (!profiles.has(profile)) throw new Error(`Unknown validation profile: ${profile}`);
   if (profile === 'backend') return [['backend', 'test:ci:backend']];
   if (profile === 'cloud') return sharedPhases.slice(0, 6);
+  if (profile === 'ci') return buildPhasePlan('pr').filter(([name]) => !ciJobForPhase(name));
   return [
     ...sharedPhases,
     profile === 'release' ? ['browser-full', 'qa:browser:full'] : ['browser-smoke', 'qa:browser'],
@@ -236,6 +248,9 @@ export function formatValidationReport(summary) {
           'Complete PR validation: not established by this cloud profile.',
         ]
       : []),
+    ...(summary.profile === 'ci'
+      ? ['Static, unit, React, build, and publication: run by sibling CI jobs.']
+      : []),
     `Computer: ${summary.platform.operatingSystem}/${summary.platform.architecture}`,
     `Source: ${summary.repository.head?.commit ?? 'unavailable'}`,
     `Comparison baseline: ${summary.repository.base.sha ?? summary.repository.base.ref}`,
@@ -329,14 +344,17 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
     tools: null,
     inputs: null,
     nativeSync: { outcome: 'not-run', reason: 'PocketBase validation must pass first.' },
-    phases: buildPhasePlan(profile === 'cloud' ? 'pr' : profile).map(([name, script]) => ({
-      name,
-      script,
-      outcome:
-        profile === 'cloud' && !buildPhasePlan('cloud').some(([phase]) => phase === name)
-          ? 'delegated-to-ci'
-          : 'not-run',
-    })),
+    phases: buildPhasePlan(['cloud', 'ci'].includes(profile) ? 'pr' : profile).map(
+      ([name, script]) => ({
+        name,
+        script,
+        outcome: buildPhasePlan(profile).some(([phase]) => phase === name)
+          ? 'not-run'
+          : profile === 'ci'
+            ? `delegated-to-${ciJobForPhase(name)}`
+            : 'delegated-to-ci',
+      })
+    ),
   };
   writeSummary(summaryPath, summary);
   process.stdout.write(`Local validation summary: ${summaryPath}\n`);

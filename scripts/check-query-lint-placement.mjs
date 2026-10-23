@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Check that the real ESLint configuration applies the query option rules to the right files.
 // Loading the full configuration and its plugins takes seconds, so this runs in the static phase
-// (test:ci:static); scripts/__tests__/query-refetch-lint.test.mjs covers the selectors cheaply.
+// (test:ci:static).
 import { ESLint } from 'eslint';
 import { pathToFileURL } from 'node:url';
 

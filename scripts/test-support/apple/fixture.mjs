@@ -5,7 +5,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { copyFileSync, mkdirSync, mkdtempSync, openSync, closeSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { installPocketBase } from '../../install-pocketbase.mjs';
+import { installPocketBase, POCKETBASE_VERSION } from '../../install-pocketbase.mjs';
 import { testAppleGrantMigration } from '../apple-grant-migration.mjs';
 
 export async function startAppleFixture({ extraHooks = [], testEnv = {} } = {}) {
@@ -132,7 +132,12 @@ export async function startAppleFixture({ extraHooks = [], testEnv = {} } = {}) 
     ]) {
       copyFileSync(path.join(root, 'pb_hooks', file), path.join(hooksDir, file));
     }
-    for (const file of ['apple_config.js', 'apple_config_backup.pb.js']) {
+    for (const file of [
+      'apple_config.js',
+      'apple_config_backup.pb.js',
+      'hook_settings.js',
+      'private_json.js',
+    ]) {
       copyFileSync(path.join(root, 'pb_hooks', file), path.join(hooksDir, file));
     }
     copyFileSync(
@@ -156,7 +161,7 @@ export async function startAppleFixture({ extraHooks = [], testEnv = {} } = {}) 
     }
 
     const binary = await installPocketBase({
-      destination: path.join(root, '.tmp/pocketbase-cache/0.40.4/pocketbase'),
+      destination: path.join(root, '.tmp/pocketbase-cache', POCKETBASE_VERSION, 'pocketbase'),
     });
     testAppleGrantMigration(binary, root, runDir);
     const adminEmail = 'apple-test-admin@localhost.test';

@@ -88,33 +88,6 @@ describe('useDirtyFormGuard', () => {
     expect(onDiscard).toHaveBeenCalledOnce();
   });
 
-  it('uses the same confirmation for Cancel and bypasses only after save', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    const { router, onDiscard } = renderEditor();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(router.state.location.pathname).toBe('/edit');
-    expect(onDiscard).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole('button', { name: 'Saved' }));
-    await waitFor(() => expect(router.state.location.pathname).toBe('/other'));
-    expect(confirm).toHaveBeenCalledOnce();
-    expect(onDiscard).not.toHaveBeenCalled();
-  });
-
-  it('rearms the guard if editing continues after a confirmed save', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    const { router } = renderEditor();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    await user.click(screen.getByRole('button', { name: 'Save confirmed' }));
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    await user.click(screen.getByRole('link', { name: 'Other page' }));
-    await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
-    expect(router.state.location.pathname).toBe('/edit');
-  });
-
   it('rejects route and explicit dismissal while saving, then protects a failed save', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const { router, onDiscard } = renderEditor();

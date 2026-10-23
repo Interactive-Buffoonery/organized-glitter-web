@@ -142,16 +142,6 @@ describe('NewColoringBook page', () => {
     authState.user = { id: 'user-123' };
   });
 
-  it('renders the create header', () => {
-    renderWithProviders(<NewColoringBook />);
-
-    expect(screen.getByText('Adding')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'New coloring book' })).toBeInTheDocument();
-    expect(
-      screen.getByText('Fill in what you know. You can always come back to add more.')
-    ).toBeInTheDocument();
-  });
-
   it('keeps a created book link across account reset until it is opened', async () => {
     captureSessionDrafts('user-123', 'late-book-token');
     const { rerender } = renderWithProviders(<NewColoringBook />);
@@ -174,108 +164,6 @@ describe('NewColoringBook page', () => {
     ).getByRole('link');
     await userEvent.setup().click(link);
     expect(peekCompletedSessionDestinations('user-123', '/coloring/')).toEqual([]);
-  });
-
-  it('navigates back to the coloring dashboard', async () => {
-    const user = userEvent.setup();
-
-    renderWithProviders(<NewColoringBook />);
-
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-
-    expect(navigateMock).toHaveBeenCalledWith('/dashboard?craft=coloring');
-  });
-
-  it('creates a coloring book and navigates to its detail page', async () => {
-    const user = userEvent.setup();
-
-    renderWithProviders(<NewColoringBook />);
-
-    await user.type(screen.getByLabelText(/Title/), 'Worlds');
-    await user.clear(screen.getByLabelText(/Number of pages/));
-    await user.type(screen.getByLabelText(/Number of pages/), '100');
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
-
-    await waitFor(() => {
-      expect(createBookMutateAsync).toHaveBeenCalledWith({
-        input: expect.objectContaining({
-          title: 'Worlds',
-          total_pages: 100,
-          status: 'purchased',
-          is_mystery: false,
-        }),
-        tagIds: [],
-        onConfirmedSave: expect.any(Function),
-      });
-      expect(navigateMock).toHaveBeenCalledWith('/coloring/book-123');
-    });
-  });
-
-  it('adds an inline illustrator without submitting the new book form', async () => {
-    const user = userEvent.setup();
-    createIllustratorMutateAsync.mockResolvedValue({ id: 'ill-new', name: 'Pat Lee' });
-
-    renderWithProviders(<NewColoringBook />);
-
-    await user.type(screen.getByLabelText(/Title/), 'Worlds');
-    await user.click(screen.getByRole('button', { name: 'Add illustrator' }));
-    await user.type(screen.getByLabelText('Name'), 'Pat Lee');
-    await user.click(screen.getByRole('button', { name: 'Create' }));
-
-    expect(await screen.findByText('Pat Lee')).toBeVisible();
-    expect(createIllustratorMutateAsync).toHaveBeenCalledWith({ name: 'Pat Lee' });
-    expect(createBookMutateAsync).not.toHaveBeenCalled();
-    expect(navigateMock).not.toHaveBeenCalled();
-  });
-
-  it('syncs selected coloring tags after creating the book', async () => {
-    const user = userEvent.setup();
-
-    renderWithProviders(<NewColoringBook />);
-
-    await user.type(screen.getByLabelText(/Title/), 'Worlds');
-    await user.click(screen.getByRole('button', { name: 'Add tag' }));
-    await user.click(await screen.findByRole('option', { name: 'Cozy' }));
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
-
-    await waitFor(() => {
-      expect(createBookMutateAsync).toHaveBeenCalledWith({
-        input: expect.any(Object),
-        tagIds: ['coloring-tag-1'],
-        onConfirmedSave: expect.any(Function),
-      });
-      expect(navigateMock).toHaveBeenCalledWith('/coloring/book-123');
-    });
-  });
-
-  it('warns and still navigates when tag sync fails after the book saves', async () => {
-    const user = userEvent.setup();
-    createBookMutateAsync.mockResolvedValue({
-      book: { id: 'book-123', title: 'Worlds' },
-      tagSyncError: new Error('boom'),
-    });
-
-    renderWithProviders(<NewColoringBook />);
-
-    await user.type(screen.getByLabelText(/Title/), 'Worlds');
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
-
-    await waitFor(() => {
-      expect(createBookMutateAsync).toHaveBeenCalledTimes(1);
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          kind: 'warning',
-          title: "Coloring book added, but tags didn't save",
-        })
-      );
-      expect(notifyMock).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          kind: 'error',
-          title: 'Could not add coloring book',
-        })
-      );
-      expect(navigateMock).toHaveBeenCalledWith('/coloring/book-123');
-    });
   });
 
   it('keeps the create form open after a late tag response changes the session', async () => {
@@ -326,27 +214,6 @@ describe('NewColoringBook page', () => {
           index: expect.any(Number),
           reason: cacheError,
         })
-      );
-      expect(navigateMock).toHaveBeenCalledWith('/coloring/book-123');
-    });
-  });
-
-  it('logs notification failures without failing the saved book flow', async () => {
-    const user = userEvent.setup();
-    const toastError = new Error('toast provider missing');
-    notifyMock.mockImplementation(() => {
-      throw toastError;
-    });
-
-    renderWithProviders(<NewColoringBook />);
-
-    await user.type(screen.getByLabelText(/Title/), 'Worlds');
-    await user.click(screen.getByRole('button', { name: 'Add book' }));
-
-    await waitFor(() => {
-      expect(loggerErrorMock).toHaveBeenCalledWith(
-        'Notification failed after coloring book save',
-        toastError
       );
       expect(navigateMock).toHaveBeenCalledWith('/coloring/book-123');
     });

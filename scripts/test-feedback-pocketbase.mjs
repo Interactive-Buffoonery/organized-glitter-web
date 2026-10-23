@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
@@ -14,11 +22,24 @@ const hooksDir = path.join(directory, 'hooks');
 const migrationsDir = path.join(directory, 'migrations');
 mkdirSync(hooksDir);
 mkdirSync(migrationsDir);
-copyFileSync(path.join(root, 'pb_hooks/feedback.pb.js'), path.join(hooksDir, 'feedback.pb.js'));
+for (const file of ['feedback.pb.js', 'hook_settings.js', 'private_json.js']) {
+  copyFileSync(path.join(root, 'pb_hooks', file), path.join(hooksDir, file));
+}
+// --file supplies the recipient through the private hook settings file, as on
+// hosts without custom environment variables.
+const fromFile = process.argv.includes('--file');
+const recipient = fromFile ? 'file-feedback@example.test' : 'feedback@example.test';
+if (fromFile) {
+  const settingsDir = path.join(dataDir, 'hook-settings-private');
+  mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
+  const settingsPath = path.join(settingsDir, 'config.json');
+  writeFileSync(settingsPath, JSON.stringify({ FEEDBACK_TO_EMAIL: recipient }));
+  chmodSync(settingsPath, 0o600);
+}
 // Omitting e.next() stops PocketBase before SMTP or sendmail while recording the handoff.
 writeFileSync(
   path.join(hooksDir, 'test-mail.pb.js'),
-  `onMailerSend(e => { console.log('FEEDBACK_TEST_MAIL:' + e.message.subject); });\n`
+  `onMailerSend(e => { console.log('FEEDBACK_TEST_MAIL:' + e.message.to[0].address + ':' + e.message.subject); });\n`
 );
 
 const binary = await installPocketBase({
@@ -48,7 +69,7 @@ const server = spawn(
   ],
   {
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, FEEDBACK_TO_EMAIL: 'feedback@example.test' },
+    env: { ...process.env, FEEDBACK_TO_EMAIL: fromFile ? '' : recipient },
   }
 );
 server.stdout.on('data', chunk => (output += chunk.toString()));
@@ -94,7 +115,10 @@ try {
     body: JSON.stringify({ feedback: 'A controlled test message.', type: 'bug' }),
   });
   assert.equal(accepted.status, 200, await accepted.text());
-  assert.match(output, /FEEDBACK_TEST_MAIL:New bug Feedback - Organized Glitter/);
+  assert.ok(
+    output.includes(`FEEDBACK_TEST_MAIL:${recipient}:New bug Feedback - Organized Glitter`),
+    output
+  );
   for (let i = 0; i < 4; i++) {
     const response = await fetch(endpoint, {
       method: 'POST',

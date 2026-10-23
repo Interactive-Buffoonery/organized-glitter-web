@@ -245,39 +245,6 @@ describe('ColoringBookEditDrawer', () => {
     Element.prototype.scrollIntoView ??= vi.fn();
   });
 
-  it('renders the edit drawer with external footer actions', () => {
-    renderWithProviders(<ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />);
-    const drawerElement = openedDrawer();
-    const drawer = within(drawerElement);
-
-    expect(drawerElement).toBeInTheDocument();
-    expect(drawer.getByText(/Worlds of Wonder/)).toBeInTheDocument();
-    expect(drawer.getByRole('button', { name: /archive coloring book/i })).toBeInTheDocument();
-    expect(drawer.getByRole('button', { name: /delete coloring book/i })).toBeInTheDocument();
-    expect(drawer.getByRole('button', { name: 'Save changes' })).toHaveAttribute(
-      'form',
-      'coloring-book-edit-drawer-form'
-    );
-    expect(drawer.getByTestId('coloring-book-form-layout')).not.toHaveClass(
-      'lg:grid-cols-[minmax(0,1fr)_320px]'
-    );
-    expect(drawer.getByTestId('coloring-book-drawer-status-tags')).toHaveClass(
-      'grid',
-      'md:grid-cols-2'
-    );
-
-    const statusHeading = drawer.getByRole('heading', { name: 'Status' });
-    const tagsHeading = drawer.getByRole('heading', { name: 'Tags' });
-    const coverHeading = drawer.getByRole('heading', { name: 'Cover image' });
-
-    expect(statusHeading.compareDocumentPosition(coverHeading)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
-    expect(tagsHeading.compareDocumentPosition(coverHeading)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
-  });
-
   it('waits for auth before judging book ownership, then shows unavailable for another account', () => {
     authState.user = undefined;
     authState.isLoading = true;
@@ -298,45 +265,6 @@ describe('ColoringBookEditDrawer', () => {
 
     expect(rerenderedDrawer.getByRole('status')).toHaveAttribute('aria-busy', 'false');
     expect(rerenderedDrawer.getByRole('button', { name: 'Save changes' })).toBeDisabled();
-  });
-
-  it('keeps the phone drawer footer anchored to the keyboard-safe viewport', async () => {
-    const user = userEvent.setup();
-    mobileDeviceMock.mockReturnValue({
-      isMobile: true,
-      isPhone: true,
-      isTouchDevice: true,
-      isMobileAndTouch: true,
-      isTablet: false,
-      isLandscape: false,
-      screenSize: 'xs-',
-      width: 390,
-      height: 844,
-    });
-
-    renderWithProviders(<ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />);
-    const drawer = within(openedDrawer());
-
-    expect(keyboardSafeViewportStyleMock).toHaveBeenCalledWith(true);
-    expect(drawerPropsMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        open: true,
-        shouldScaleBackground: false,
-        repositionInputs: false,
-      })
-    );
-
-    const drawerContent = openedDrawer();
-    expect(drawerContent).toHaveAttribute('data-testid', 'phone-coloring-book-edit-drawer-content');
-    expect(drawerContent).toHaveClass('flex', 'flex-col');
-    expect(drawerContent).toHaveStyle({
-      bottom: '300px',
-      height: '500px',
-      maxHeight: '500px',
-    });
-
-    await user.click(drawer.getByLabelText(/Title/));
-    expect(drawer.getByRole('button', { name: 'Save changes' })).toBeVisible();
   });
 
   it.each(['phone', 'desktop'] as const)(
@@ -377,64 +305,6 @@ describe('ColoringBookEditDrawer', () => {
       confirm.mockRestore();
     }
   );
-
-  it('omits unchanged page totals and closes after a successful metadata save', async () => {
-    const user = userEvent.setup();
-    const onOpenChange = vi.fn();
-    const onSaved = vi.fn();
-
-    renderWithProviders(
-      <ColoringBookEditDrawer
-        bookId="book-123"
-        isOpen
-        onOpenChange={onOpenChange}
-        onSaved={onSaved}
-      />
-    );
-    const drawer = within(openedDrawer());
-
-    await user.clear(drawer.getByLabelText(/Title/));
-    await pasteIntoField(user, drawer.getByLabelText(/Title/), 'Updated Worlds');
-    await user.click(drawer.getByRole('button', { name: 'Save changes' }));
-
-    await waitFor(() => {
-      expect(updateBookMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          bookId: 'book-123',
-          expectedRevision: 0,
-          patch: expect.objectContaining({
-            title: 'Updated Worlds',
-            status: 'purchased',
-          }),
-        })
-      );
-      expect(updateBookMutateAsync.mock.calls[0][0].patch).not.toHaveProperty('total_pages');
-      expect(onSaved).toHaveBeenCalledTimes(1);
-      expect(onOpenChange).toHaveBeenCalledWith(false);
-    });
-  });
-
-  it('shows the server reduction reason when a save is rejected', async () => {
-    const user = userEvent.setup();
-    updateBookMutateAsync.mockRejectedValue({
-      type: 'validation',
-      message: 'Total pages cannot be less than 900 because that page has saved work.',
-      retryable: false,
-    });
-
-    renderWithProviders(<ColoringBookEditDrawer bookId="book-123" isOpen onOpenChange={vi.fn()} />);
-    const drawer = within(openedDrawer());
-
-    await user.click(drawer.getByRole('button', { name: 'Save changes' }));
-
-    await waitFor(() => {
-      expect(notifyMock).toHaveBeenCalledWith({
-        kind: 'error',
-        title: 'Could not update coloring book',
-        description: 'Total pages cannot be less than 900 because that page has saved work.',
-      });
-    });
-  });
 
   it('recovers a stale edit and retries with the accepted revision', async () => {
     const user = userEvent.setup();

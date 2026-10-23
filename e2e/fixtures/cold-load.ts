@@ -152,7 +152,7 @@ export class ColdLoad {
 
 export const test = base.extend<{ coldLoad: ColdLoad }>({
   coldLoad: async ({ context, baseURL }, runTest, testInfo) => {
-    expect(baseURL, 'run through playwright.cold-load.config.ts').toBeTruthy();
+    expect(baseURL, 'run through playwright.built-app.config.ts').toBeTruthy();
     expect(await context.storageState(), 'no cookies or auth state before navigation').toEqual({
       cookies: [],
       origins: [],

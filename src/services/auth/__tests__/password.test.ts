@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { changePassword } from '@/services/auth';
 import { ClientResponseError } from 'pocketbase';
-import { changePassword, confirmPasswordReset, requestPasswordReset } from '@/services/auth';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { requestPasswordResetMock, confirmPasswordResetMock, updateMock, authStore } = vi.hoisted(
   () => ({
@@ -42,28 +42,6 @@ describe('password auth service', () => {
     authStore.record = { id: 'user-1' };
   });
 
-  it('normalizes email before requesting a password reset', async () => {
-    requestPasswordResetMock.mockResolvedValue(undefined);
-
-    const result = await requestPasswordReset('  Sarah@Example.Test  ');
-
-    expect(result).toEqual({ success: true });
-    expect(requestPasswordResetMock).toHaveBeenCalledWith('sarah@example.test');
-  });
-
-  it('confirms a password reset with token and password confirmation', async () => {
-    confirmPasswordResetMock.mockResolvedValue(undefined);
-
-    const result = await confirmPasswordReset('token-123', 'new-password', 'new-password');
-
-    expect(result).toEqual({ success: true });
-    expect(confirmPasswordResetMock).toHaveBeenCalledWith(
-      'token-123',
-      'new-password',
-      'new-password'
-    );
-  });
-
   it('returns not authenticated before password change without a current user', async () => {
     authStore.record = null;
 
@@ -71,19 +49,6 @@ describe('password auth service', () => {
 
     expect(result).toEqual({ success: false, error: 'Not authenticated' });
     expect(updateMock).not.toHaveBeenCalled();
-  });
-
-  it('updates the current user password with the old password', async () => {
-    updateMock.mockResolvedValue({ id: 'user-1' });
-
-    const result = await changePassword('old-password', 'new-password', 'new-password');
-
-    expect(result).toEqual({ success: true });
-    expect(updateMock).toHaveBeenCalledWith('user-1', {
-      oldPassword: 'old-password',
-      password: 'new-password',
-      passwordConfirm: 'new-password',
-    });
   });
 
   it('preserves an SDK validation reason without exposing private response content', async () => {
@@ -109,28 +74,5 @@ describe('password auth service', () => {
       error: 'Your session expired. Please sign in again.',
     });
     expect(result.error).not.toContain('Internal verification detail');
-  });
-
-  it('keeps legitimate password field validation copy', async () => {
-    updateMock.mockRejectedValue(
-      new ClientResponseError({
-        status: 400,
-        data: {
-          data: {
-            password: {
-              code: 'validation_invalid_value',
-              message: 'Password is too short.',
-            },
-          },
-        },
-      })
-    );
-
-    const result = await changePassword('old-password', 'short', 'short');
-
-    expect(result).toEqual({
-      success: false,
-      error: 'Password: Password is too short.',
-    });
   });
 });

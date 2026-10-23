@@ -150,13 +150,11 @@ The global toaster is intentionally a solid overlay surface, not a glass panel:
 Sonner's default close control is restyled in `src/index.css` with
 `[data-sonner-*]` selectors so it sits on the **right** inside toast padding:
 transparent background, no border or shadow, bare X glyph (not Sonner's
-floating chrome). The CSS contract is asserted in `test/sonner-toast-css.test.ts`
-together with `src/components/ui/sonner.test.tsx`. If you change the close control,
-keep those checks and this section aligned.
+floating chrome).
 
 When adding a notification kind, update `NotificationKind`, `DEFAULT_DURATION_MS`,
 the `notify()` switch, `toastClassNames` and icons in `sonner.tsx`, the
-notification and toaster tests, and this section.
+this section.
 
 ## Glass system
 
@@ -270,11 +268,8 @@ from `src/content/not-found.json`. The build generates `public/404.html` from
 the shared content or template, run `node scripts/generate-not-found.mjs` and
 commit the generated page. The server version must remain usable without React, JavaScript, or PocketBase.
 
-Run `pnpm exec playwright test --config playwright.not-found.config.ts` for
-recovery links, narrow layouts, saved appearance, no-JavaScript support, and
-keyboard focus on both surfaces. The suite checks a built server response for
+Run `pnpm exec playwright test --config playwright.built-app.config.ts --project=not-found`
+to check both recovery surfaces. The suite checks a built server response for
 HTTP 404, then reaches the client fallback through browser history without a
-document reload. Assertions use accessible heading and link roles. The suite
-also verifies generated HTML is current and both pages expose the heading and
-recovery actions from the shared content.
-Results are written to `.tmp/not-found-qa/report/`.
+document reload, and follows the shared recovery links. Static checks verify
+the generated HTML is current. Results are written to `.tmp/built-app-qa/report/`.

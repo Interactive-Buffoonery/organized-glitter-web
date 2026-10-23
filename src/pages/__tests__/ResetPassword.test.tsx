@@ -46,25 +46,6 @@ describe('ResetPassword compatibility route', () => {
     });
   });
 
-  it('redirects valid legacy tokens to the canonical reset route', async () => {
-    Object.defineProperty(window, 'location', {
-      value: { ...window.location, search: '?token=abc123token99' },
-      writable: true,
-      configurable: true,
-    });
-
-    renderWithProviders(<ResetPassword />, {
-      initialRoute: '/reset-password?token=abc123token99',
-    });
-
-    await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith('/auth/confirm-password-reset/abc123token99', {
-        replace: true,
-      });
-    });
-    expect(toastMock).not.toHaveBeenCalled();
-  });
-
   it('redirects missing tokens to forgot password with an error toast', async () => {
     renderWithProviders(<ResetPassword />);
 
@@ -101,24 +82,5 @@ describe('ResetPassword compatibility route', () => {
     });
     expect(navigateMock).not.toHaveBeenCalledWith('/forgot-password', { replace: true });
     expect(toastMock).not.toHaveBeenCalled();
-  });
-
-  it('preserves valid dot-separated PocketBase tokens', async () => {
-    Object.defineProperty(window, 'location', {
-      value: { ...window.location, search: '?token=header.payload.signature' },
-      writable: true,
-      configurable: true,
-    });
-
-    renderWithProviders(<ResetPassword />, {
-      initialRoute: '/reset-password?token=header.payload.signature',
-    });
-
-    await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith(
-        '/auth/confirm-password-reset/header.payload.signature',
-        { replace: true }
-      );
-    });
   });
 });

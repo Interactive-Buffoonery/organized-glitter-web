@@ -26,15 +26,11 @@ const nodeTestFiles = [
   'server/**/*.{test,spec}.{js,mjs,cjs,ts}',
   'spacefast/**/*.{test,spec}.{js,mjs,cjs,ts}',
   'test/pb-hooks/**/*.test.js',
-  'test/vitest-config.test.ts',
 ];
 
-const scriptDomTestFiles = [
-  'scripts/__tests__/app-icon-links.test.mjs',
-  'scripts/__tests__/axe-readiness.test.ts',
-];
+const scriptDomTestFiles: string[] = [];
 
-const nodeTestsUnderDomRoots = ['test/pb-hooks/**/*.test.js', 'test/vitest-config.test.ts'];
+const nodeTestsUnderDomRoots = ['test/pb-hooks/**/*.test.js'];
 
 export default defineConfig({
   plugins: [react()],

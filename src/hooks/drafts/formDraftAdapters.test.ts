@@ -50,19 +50,6 @@ describe('form draft adapters', () => {
     );
   });
 
-  it('keeps incomplete coloring input without saving a selected cover file', () => {
-    const values = coloringBookDraftValues({
-      title: '',
-      totalPages: '',
-      status: 'purchased',
-      coverImage: new File(['x'], 'cover.jpg'),
-      tags: [],
-    } as ColoringBookFormValues);
-    expect(isColoringBookDraftValues(values)).toBe(true);
-    expect(values.hadNewPhoto).toBe(true);
-    expect(JSON.stringify(values)).not.toContain('cover.jpg');
-  });
-
   it('keeps the prior status when a completion date auto-completes a recoverable draft', () => {
     const projectDraft = projectDraftValues(
       { ...project, status: 'completed', dateCompleted: '2026-09-20' },

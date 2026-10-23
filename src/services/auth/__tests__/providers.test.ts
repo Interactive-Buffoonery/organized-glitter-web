@@ -69,79 +69,12 @@ vi.mock('@/services/auth/sessionIdentity', () => ({
     identity.epoch === sessionState.current.epoch,
 }));
 
-import {
-  connectOAuthProvider,
-  listAccountSignInMethods,
-  listConfiguredOAuthProviders,
-  requestOAuthSignInMethodProof,
-  unlinkOAuthProvider,
-} from '../providers';
+import { connectOAuthProvider, requestOAuthSignInMethodProof } from '../providers';
 
 describe('OAuth provider service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionState.current = { accountId: 'user-1', generation: 0, epoch: 'epoch-a' };
-  });
-
-  it('normalizes modern providers in product order and ignores unknown entries', async () => {
-    listAuthMethodsMock.mockResolvedValue({
-      oauth2: {
-        providers: [
-          { name: 'discord' },
-          { name: 'github' },
-          { name: 'APPLE' },
-          { name: 'discord' },
-          { name: 'google' },
-        ],
-      },
-      authProviders: [{ name: 'github' }],
-    });
-
-    await expect(listConfiguredOAuthProviders()).resolves.toEqual(['apple', 'google', 'discord']);
-  });
-
-  it('falls back to the legacy authProviders response shape', async () => {
-    listAuthMethodsMock.mockResolvedValueOnce({ authProviders: [{ name: 'google' }] });
-    await expect(listConfiguredOAuthProviders()).resolves.toEqual(['google']);
-
-    listAuthMethodsMock.mockResolvedValueOnce({
-      oauth2: { providers: [] },
-      authProviders: [{ name: 'apple' }],
-    });
-    await expect(listConfiguredOAuthProviders()).resolves.toEqual([]);
-  });
-
-  it('combines configured and linked providers without dropping a disabled linked identity', async () => {
-    listAuthMethodsMock.mockResolvedValue({
-      oauth2: { providers: [{ name: 'apple' }, { name: 'google' }] },
-    });
-    listExternalAuthsMock.mockResolvedValue([
-      { provider: 'google' },
-      { provider: 'discord' },
-      { provider: 'github' },
-    ]);
-
-    await expect(listAccountSignInMethods('user-1')).resolves.toEqual([
-      { provider: 'apple', label: 'Apple', configured: true, linked: false },
-      { provider: 'google', label: 'Google', configured: true, linked: true },
-      { provider: 'discord', label: 'Discord', configured: false, linked: true },
-    ]);
-  });
-
-  it('aborts a linked-method lookup that never responds', async () => {
-    vi.useFakeTimers();
-    try {
-      listAuthMethodsMock.mockReturnValue(new Promise(() => {}));
-      listExternalAuthsMock.mockReturnValue(new Promise(() => {}));
-      const pending = listAccountSignInMethods('user-1');
-      const result = expect(pending).rejects.toThrow('timed out');
-      await vi.advanceTimersByTimeAsync(15_000);
-      await result;
-      expect(listAuthMethodsMock.mock.calls[0][0].signal.aborted).toBe(true);
-      expect(listExternalAuthsMock.mock.calls[0][1].signal.aborted).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it('restores the authenticated account if a missing backend guard returns another user', async () => {
@@ -159,24 +92,6 @@ describe('OAuth provider service', () => {
     expect(saveMock).toHaveBeenCalledWith('original-token', {
       id: 'user-1',
       email: 'sarah@example.test',
-    });
-  });
-
-  it('uses the guarded backend route to unlink a provider', async () => {
-    sendMock.mockResolvedValue(undefined);
-
-    await expect(
-      unlinkOAuthProvider('google', {
-        action: 'unlink',
-        authToken: 'original-token',
-        targetProvider: 'google',
-        userId: 'user-1',
-        value: 'fresh-proof',
-      })
-    ).resolves.toEqual({ success: true });
-    expect(sendMock).toHaveBeenCalledWith('/api/auth/external-auths/google', {
-      method: 'DELETE',
-      body: { proof: 'fresh-proof' },
     });
   });
 

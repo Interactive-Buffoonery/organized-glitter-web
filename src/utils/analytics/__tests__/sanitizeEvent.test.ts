@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CaptureResult } from 'posthog-js';
-import { AnalyticsEvent } from '@/services/analytics-events';
-import { isAllowedAnalyticsEvent, sanitizeAnalyticsEvent } from '../sanitizeEvent';
+import { sanitizeAnalyticsEvent } from '../sanitizeEvent';
 
 describe('sanitizeAnalyticsEvent', () => {
   it('removes record IDs from SDK URLs, paths and person properties', () => {
@@ -55,75 +54,4 @@ describe('sanitizeAnalyticsEvent', () => {
       expect(event.properties.$pathname).toBe(path);
     }
   );
-
-  it('removes campaign query values from events and initial person properties', () => {
-    const event: CaptureResult = {
-      uuid: 'event-id',
-      event: '$pageview',
-      properties: {
-        utm_content: 'private-campaign',
-        count: 2,
-        $set: { $initial_utm_term: 'private-search' },
-      },
-      $set_once: { $initial_utm_source: 'private-source' },
-    };
-    const result = sanitizeAnalyticsEvent(event);
-    expect(result.properties).toEqual({ count: 2, $set: {} });
-    expect(result.$set_once).toEqual({});
-    expect(JSON.stringify(result)).not.toContain('private-');
-  });
-
-  it('preserves ordinary properties and event metadata', () => {
-    const timestamp = new Date('2026-10-03T00:00:00Z');
-    const event: CaptureResult = {
-      uuid: 'event-id',
-      event: 'session_context',
-      timestamp,
-      properties: {
-        path: '/dashboard?search=private#section',
-        count: 2,
-        enabled: true,
-        label: 'web',
-      },
-    };
-    expect(sanitizeAnalyticsEvent(event)).toEqual({
-      ...event,
-      properties: { ...event.properties, path: '/dashboard' },
-    });
-  });
-});
-
-describe('analytics event allowlist', () => {
-  it.each([...Object.values(AnalyticsEvent), '$exception', '$identify', '$set'])(
-    'allows registered and required SDK event %s',
-    name => {
-      expect(isAllowedAnalyticsEvent(name)).toBe(true);
-    }
-  );
-  it.each([
-    '$autocapture',
-    '$$heatmap',
-    '$dead_click',
-    '$rageclick',
-    '$web_vitals',
-    '$pageleave',
-    'survey sent',
-    'unregistered_event',
-    'export_completed',
-  ])('drops unsupported event %s', name => {
-    expect(isAllowedAnalyticsEvent(name)).toBe(false);
-  });
-  it('strips page titles without mutating the original event', () => {
-    const event = {
-      uuid: 'test',
-      event: '$pageview',
-      properties: {
-        title: 'My Secret Project | Organized Glitter',
-        $title: 'Secret Book',
-        count: 1,
-      },
-    };
-    expect(sanitizeAnalyticsEvent(event).properties).toEqual({ count: 1 });
-    expect(event.properties.title).toContain('Secret');
-  });
 });

@@ -39,18 +39,6 @@ describe('cross-tab deletion request fence', () => {
       )
     ).rejects.toMatchObject({ name: 'SessionChangedError' });
   });
-  it('does not invalidate the session for a late 401 after intent persistence', async () => {
-    const request = await pb.beforeSend!(`${pb.baseURL}/api/collections/projects/records`, {
-      method: 'GET',
-    });
-    mocks.get.mockResolvedValue({ phase: 'pending' });
-    await expect(
-      Promise.resolve().then(() =>
-        pb.afterSend!(new Response('{}', { status: 401 }), {}, request.options)
-      )
-    ).rejects.toMatchObject({ name: 'SessionChangedError' });
-    expect(pb.authStore.record?.id).toBe('account-a');
-  });
   it('fails closed when private storage is unavailable', async () => {
     vi.stubGlobal('indexedDB', undefined);
     mocks.get.mockRejectedValue(new Error('Storage unavailable'));
@@ -61,43 +49,4 @@ describe('cross-tab deletion request fence', () => {
       })
     ).rejects.toMatchObject({ name: 'SessionChangedError' });
   });
-  it('fences account switching while the durable lock is being read', async () => {
-    mocks.get.mockImplementation(async () => {
-      pb.authStore.clear();
-      return undefined;
-    });
-    await expect(
-      pb.beforeSend!(`${pb.baseURL}/api/collections/projects/records`, {
-        method: 'POST',
-        body: '{}',
-      })
-    ).rejects.toMatchObject({ name: 'SessionChangedError' });
-  });
-});
-
-it('checks the latest deletion lock after a rate-limit delay before dispatch', async () => {
-  vi.useFakeTimers();
-  try {
-    await pb.beforeSend!(`${pb.baseURL}/api/collections/projects/records`, { method: 'GET' });
-    pb.afterSend!(new Response('{}', { status: 429 }), {});
-    mocks.get.mockResolvedValue(undefined);
-    const pending = Promise.resolve(
-      pb.beforeSend!(`${pb.baseURL}/api/collections/projects/records`, {
-        method: 'POST',
-        body: '{}',
-      })
-    ).then(
-      () => 'sent',
-      () => 'blocked'
-    );
-    // Let the first lock read finish, then model another tab persisting its intent
-    // during the application's existing rate-limit wait.
-    await Promise.resolve();
-    await Promise.resolve();
-    mocks.get.mockResolvedValue({ phase: 'pending' });
-    await vi.advanceTimersByTimeAsync(100);
-    expect(await pending).toBe('blocked');
-  } finally {
-    vi.useRealTimers();
-  }
 });

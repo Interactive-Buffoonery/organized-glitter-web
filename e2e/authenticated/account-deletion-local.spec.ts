@@ -40,10 +40,7 @@ test.beforeEach(async ({ page }) => {
   });
   accountId = account.id;
   await page.goto('/login');
-  await page.getByLabel('Email', { exact: true }).fill(email);
-  await page.getByLabel('Password', { exact: true }).fill(fixturePassword);
-  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
-  await expect(page).not.toHaveURL(/\/login$/);
+  await signIn(page);
   await page.goto('/delete-account');
   await expect(
     page.getByRole('heading', { name: 'Delete your account', exact: true })
@@ -60,6 +57,19 @@ test.afterEach(async () => {
       throw new Error('Disposable account cleanup failed.');
   }
 });
+
+// WebKit reports an internal error when page.goto interrupts the post-login
+// /overview load, so wait for Overview to render before navigating again. The
+// first-run onboarding dialog can hide the heading, so only require it in the DOM.
+async function signIn(page: Page) {
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(fixturePassword);
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  await expect(page).toHaveURL(/\/overview(\?|$)/);
+  await expect(
+    page.getByRole('heading', { name: /^Welcome back,/, includeHidden: true })
+  ).toBeAttached();
+}
 
 async function verify(page: Page, password = fixturePassword) {
   await page.getByLabel('Current password', { exact: true }).fill(password);
@@ -382,10 +392,7 @@ test('keeps an interrupted sign-out claim visible and releases only its owner', 
       { backend: backendUrl, id: accountId }
     )
   ).toBe(false);
-  await page.getByLabel('Email', { exact: true }).fill(email);
-  await page.getByLabel('Password', { exact: true }).fill(fixturePassword);
-  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
-  await expect(page).not.toHaveURL(/\/login$/);
+  await signIn(page);
   await page.goto('/delete-account');
   await expect(page.getByRole('heading', { name: 'Delete your account' })).toBeVisible();
   expect(

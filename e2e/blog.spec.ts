@@ -711,7 +711,10 @@ async function saveBlogSession(page: Page, expired = false, themePreference = 'l
       if (sessionStorage.getItem('blog-session-initialized')) return;
       sessionStorage.setItem('blog-session-initialized', 'true');
       const payload = btoa(
-        JSON.stringify({ exp: Math.floor(Date.now() / 1000) + (expired ? -60 : 3600), id: user.id })
+        JSON.stringify({
+          exp: Math.floor(Date.now() / 1000) + (expired ? -60 : 7 * 24 * 3600),
+          id: user.id,
+        })
       );
       localStorage.setItem(
         'pocketbase_auth',

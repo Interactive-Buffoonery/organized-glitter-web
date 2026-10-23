@@ -38,39 +38,28 @@ delivery. See [Cold-load regression tests](./testing-cold-load.md) for its
 integration contract, local port override, and artifacts. It runs separately
 from the normal public project and disposable PocketBase smoke inventory.
 
-The smoke inventory covers public startup and login accessibility, real UI
-login, project create and edit persistence, coloring book creation through the
-UI and generated page editing, archive recovery, the notes timeline, structural
-accessibility, and four mobile WebKit menu and drawer interactions. It sets
-retries to zero and runs a list preflight, so a bad filter or retry cannot turn a
-missing test into a green result. Required seed fixtures are checked before
-Playwright starts.
+The smoke inventory covers public and authenticated accessibility, project
+create and edit persistence, cover upload, atomic project delete, coloring book
+creation, archive restore, import and export, session expiry, account deletion
+recovery, safe-area layout, and mobile WebKit menu and drawer interactions. It
+sets retries to zero and runs a list preflight, so a bad filter or retry cannot
+turn a missing test into a green result. Required seed fixtures are checked
+before Playwright starts.
 
-For the curated Chromium and WebKit release inventory, use:
-
-```bash
-pnpm qa:browser:full
-```
-
-The full inventory adds slower disposable-fixture regressions that do not need
-to run on every pull request: session-expiry recovery, import/export, image
-replacement, metadata rollback, mobile touch targets, mobile interactive
-accessibility, and signed-in contrast in light and dark mode. Fixture-dependent
-tests fail when selected by the managed smoke or full harness if their required
-local targets or seeded records are unavailable. Interactive hosted runs with
-`CI` unset keep reporting those local-only tests as skipped. Hosted CI fails
-when a required fixture is unavailable.
+`pnpm qa:browser:full` runs the same 29 tests as smoke. Release PRs rely on the
+separate blog, standalone 404, PWA navigation, cold-load, and protected-file
+rotation gates for anything smoke does not cover.
 
 Every Playwright spec has one coverage role. The inventory check fails when a
 new spec is not assigned or when a spec appears in more than one role.
 
-| Role              | Runs                                                                 | Decision                                                                                          |
-| ----------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| PR                | `qa:browser`                                                         | Stable public, authenticated, and mobile checks needed on each pull request                       |
-| Affected/release  | `qa:browser:full`, adjacent release gates, or focused local commands | Slower or feature-specific coverage; this role does not mean every spec runs in `qa:browser:full` |
-| Manual visual     | Screen-review commands                                               | Screenshot atlas that needs human review rather than a correctness pass                           |
-| Hosted deployment | Hosted preview commands                                              | Deployment integration that cannot be proved by the disposable local stack                        |
-| Obsolete          | None currently                                                       | Retained as an explicit category so retired specs are removed deliberately                        |
+| Role              | Runs                    | Decision                                                       |
+| ----------------- | ----------------------- | -------------------------------------------------------------- |
+| PR                | `qa:browser`            | Critical journeys checked on each pull request                 |
+| Affected/release  | Dedicated release gates | Specs that need their own server, fixture, or browser config   |
+| Manual visual     | Screen-review commands  | Screenshot atlas that needs human review                       |
+| Hosted deployment | Hosted preview commands | Deployment integration the disposable local stack cannot prove |
+| Obsolete          | None currently          | Kept so retired specs are removed deliberately                 |
 
 Run the inventory check without starting browsers:
 
@@ -89,25 +78,6 @@ node scripts/check-browser-discovery.mjs
 Both commands run in `pnpm test:ci:static`, locally and in CI. When a spec is
 added to or removed from a managed suite, update the counts in
 `scripts/run-local-release-qa.mjs`.
-
-`qa:browser:full` adds eight spec files to the managed inventory: mobile state
-accessibility, signed-in page contrast, format-chip contrast, image selection,
-import/export, mobile touch targets, metadata rollback, and session-expiry
-recovery. The release orchestrator separately runs the blog, standalone 404,
-PWA navigation, and protected-file rotation browser gates.
-
-The remaining affected/release specs stay focused because loading every local
-mutation and presentation scenario into one shared fixture run would increase
-contention and make failures harder to attribute.
-
-| Coverage kept outside `qa:browser:full`                                                                                                                    | Command                                                   | Reason                                                             |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------ |
-| Blog archive journeys                                                                                                                                      | `pnpm qa:blog`                                            | Uses its own WordPress fixture and build                           |
-| Standalone 404 and PWA navigation                                                                                                                          | `pnpm test:not-found`; `pnpm test:pwa:navigation`         | Use dedicated server and service-worker configurations             |
-| Protected-file rotation                                                                                                                                    | `pnpm test:protected-file-rotation-browser`               | Uses a purpose-built upgrade fixture                               |
-| Color references, reductions, foreign mediums, coloring safety, cover updates, project color counts, randomizer flow, tag selection, and theme preferences | `pnpm qa:release:local -- --project=authenticated <spec>` | Mutating or feature-specific scenarios run when their area changes |
-| Authenticated titles and React Doctor browser regressions                                                                                                  | `pnpm qa:release:local -- --project=authenticated <spec>` | Narrow routing and regression checks run when affected             |
-| Public link accessibility and safe-area layout                                                                                                             | `pnpm qa:release:local -- --project=public <spec>`        | Narrow public presentation checks run when affected                |
 
 The manual visual inventory remains `e2e/screen-review/screen-review.spec.ts`.
 Hosted deployment coverage remains `e2e/hosted/authenticated.spec.ts`,

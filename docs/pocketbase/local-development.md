@@ -48,7 +48,7 @@ It does not export the hosted account or copy its auth state. See
 ## One-Time Setup
 
 Use the latest tested PocketBase executable for local development. The repository
-installer pins PocketBase 0.40.4 and verifies its archive and binary checksums. The authentication upgrade test also installs a pinned 0.40.1 baseline.
+installer pins PocketBase 0.40.5 and verifies its archive and binary checksums. The authentication upgrade test also installs a pinned 0.40.1 baseline.
 
 Place the executable here:
 
@@ -69,13 +69,13 @@ the official pinned SHA-256 checksum, and can place the executable there:
 pnpm pb:install:test -- --destination=local-pb-db/pocketbase
 ```
 
-Cursor Cloud and other Linux amd64 checkouts can install the matching 0.40.4
+Cursor Cloud and other Linux amd64 checkouts can install the matching 0.40.5
 binary with:
 
 ```bash
 mkdir -p local-pb-db
-curl -fsSL https://github.com/pocketbase/pocketbase/releases/download/v0.40.4/pocketbase_0.40.4_linux_amd64.zip -o /tmp/pocketbase_0.40.4_linux_amd64.zip
-unzip -o /tmp/pocketbase_0.40.4_linux_amd64.zip pocketbase -d local-pb-db
+curl -fsSL https://github.com/pocketbase/pocketbase/releases/download/v0.40.5/pocketbase_0.40.5_linux_amd64.zip -o /tmp/pocketbase_0.40.5_linux_amd64.zip
+unzip -o /tmp/pocketbase_0.40.5_linux_amd64.zip pocketbase -d local-pb-db
 chmod +x local-pb-db/pocketbase
 ```
 
@@ -164,7 +164,7 @@ uses it to create a fresh disposable PocketBase directory under
 Local migration validation uses a separate disposable directory under
 `.tmp/pocketbase-upgrade/`. Given a base commit, it imports that commit's
 sanitized schema with the pinned 0.40.1 baseline, applies only new migration
-files added by the change, then compares the result with a PocketBase 0.40.4
+files added by the change, then compares the result with a PocketBase 0.40.5
 import of the current schema. PocketBase 0.40.4 rejects legacy index metadata
 that ends in a semicolon, so the previous-schema import also applies
 `scripts/fixtures/production-index-inventory.json` and strips those terminators
@@ -502,10 +502,10 @@ preserves custom definitions, and leaves physical indexes unchanged. Its rollbac
 keeps the valid metadata rather than restoring definitions that 0.40.4 rejects.
 
 The required `pnpm pb:test:auth-verification` check defaults to checksum-verified
-0.40.1 and 0.40.4 binaries. To use separately verified executables:
+0.40.1 and 0.40.5 binaries. To use separately verified executables:
 
 ```bash
-node scripts/test-auth-verification.mjs --baseline-binary=/path/to/0.40.1/pocketbase --binary=/path/to/0.40.4/pocketbase
+node scripts/test-auth-verification.mjs --baseline-binary=/path/to/0.40.1/pocketbase --binary=/path/to/0.40.5/pocketbase
 ```
 
 The disposable test checks physical index preservation, metadata normalization,

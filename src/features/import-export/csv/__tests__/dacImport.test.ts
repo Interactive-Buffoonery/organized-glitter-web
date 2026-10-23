@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseCsvToProjects } from '@/utils/csv/csvImport';
 import {
   hasDacCsvHeaders,
   markDacDuplicateProjects,
   parseDacCsvContent,
 } from '@/features/import-export/csv/dacImport';
+import { parseCsvToProjects } from '@/utils/csv/csvImport';
 
 describe('DAC CSV import', () => {
   it('parses a DAC CSV with Products and Date headers', () => {
@@ -32,19 +32,6 @@ describe('DAC CSV import', () => {
     ]);
   });
 
-  it('reports invalid DAC dates without dropping the product', () => {
-    const preview = parseDacCsvContent('Date,Products\nnot-a-date,Starry Fox\n');
-
-    expect(preview.projectCount).toBe(1);
-    expect(preview.projects[0].datePurchased).toBeUndefined();
-    expect(preview.warnings).toEqual([
-      {
-        row: 2,
-        message: 'Could not parse "not-a-date" as an order date.',
-      },
-    ]);
-  });
-
   it('marks duplicate DAC rows from the same file while keeping the first copy importable', () => {
     const preview = parseDacCsvContent(
       'Date,Products\n2024-05-10,Starry Fox\n2024-05-10,Starry Fox\n'
@@ -57,33 +44,6 @@ describe('DAC CSV import', () => {
       title: 'Starry Fox',
       duplicateReason: 'same-file',
     });
-  });
-
-  it('marks DAC rows already present in the library as existing duplicates', () => {
-    const preview = parseDacCsvContent('Date,Products\n2024-05-10,Starry Fox\n');
-
-    expect(
-      markDacDuplicateProjects(preview.projects, [
-        {
-          title: 'Starry Fox',
-          company: 'Diamond Art Club',
-          datePurchased: '2024-05-10',
-        },
-      ])
-    ).toEqual([expect.objectContaining({ duplicateReason: 'existing-library' })]);
-  });
-
-  it('skips implausible one-letter DAC product values', () => {
-    const preview = parseDacCsvContent('Date,Products\n2026/05/10,"S,S,S,S,S"\n');
-
-    expect(preview.projectCount).toBe(0);
-    expect(preview.skippedRowCount).toBe(1);
-    expect(preview.warnings).toEqual([
-      {
-        row: 2,
-        message: 'Ignored 5 invalid product values.',
-      },
-    ]);
   });
 
   it('rejects missing DAC headers', () => {

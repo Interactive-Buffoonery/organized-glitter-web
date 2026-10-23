@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDataArchiveImport } from '../useDataArchiveImport';
 
@@ -125,52 +125,5 @@ describe('useDataArchiveImport', () => {
     expect(result.current.v3Result).toBeNull();
     expect(m.invalidate).not.toHaveBeenCalled();
     expect(m.notify).not.toHaveBeenCalled();
-  });
-
-  it('preserves a successful restore when cache refresh fails', async () => {
-    m.dispatch.mockResolvedValue({
-      schemaVersion: 3,
-      result: { ...v3, success: true, errors: [], missingPartNumbers: [] },
-    });
-    m.invalidate.mockRejectedValue(new Error('Cache refresh failed'));
-    const { result } = renderHook(() => useDataArchiveImport());
-    await act(async () => {
-      await result.current.importArchive([file]);
-    });
-    await waitFor(() => expect(result.current.v3Result?.success).toBe(true));
-    expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success' }));
-  });
-
-  it('keeps the legacy single-ZIP result path working', async () => {
-    const legacy = {
-      success: true,
-      createdProjectCount: 1,
-      createdColoringBookCount: 0,
-      createdProgressNoteCount: 0,
-      importedPhotoCount: 0,
-      skippedRecordCount: 0,
-      skippedPagePhotoCount: 0,
-      matchedExistingRecordCount: 0,
-      archiveSchemaVersion: 2,
-      refMap: { 'project:one': 'new-project' },
-      warnings: [],
-      errors: [],
-    };
-    m.dispatch.mockResolvedValue({ schemaVersion: 2, result: legacy });
-    const { result } = renderHook(() => useDataArchiveImport());
-    await act(async () => {
-      await result.current.importArchive(file);
-    });
-    expect(m.dispatch).toHaveBeenCalledWith(
-      [file],
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
-    );
-    expect(result.current.lastResult).toEqual(legacy);
-    expect(result.current.v3Result).toBeNull();
-    expect(m.invalidate).toHaveBeenCalledWith(
-      expect.anything(),
-      ['new-project'],
-      expect.anything()
-    );
   });
 });

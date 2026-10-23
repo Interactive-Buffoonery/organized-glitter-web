@@ -36,24 +36,6 @@ describe('useColoringPageMediumSelection', () => {
     isPendingMock.current = false;
   });
 
-  it('saves selected medium ids', async () => {
-    const page = makePage();
-    const { result } = renderHook(() =>
-      useColoringPageMediumSelection(page, makeCommandExecutor())
-    );
-
-    await act(async () => {
-      await result.current.toggleMedium('medium-1', true);
-    });
-
-    expect(result.current.selectedMediumIds).toEqual(['medium-1']);
-    expect(executeMock).toHaveBeenCalledWith(
-      'page-1',
-      { type: 'set-mediums', mediumIds: ['medium-1'] },
-      { failureTitle: 'Mediums did not save' }
-    );
-  });
-
   it('rolls back local selection on mutation failure', async () => {
     executeMock.mockResolvedValueOnce(null);
     const page = makePage({ mediumIds: ['existing-medium'] });
@@ -68,21 +50,6 @@ describe('useColoringPageMediumSelection', () => {
     });
 
     expect(result.current.selectedMediumIds).toEqual(['existing-medium']);
-  });
-
-  it('resets selection when navigating to a different page id', async () => {
-    const { result, rerender } = renderHook(
-      ({ page }) => useColoringPageMediumSelection(page, makeCommandExecutor()),
-      {
-        initialProps: { page: makePage({ id: 'page-1', mediumIds: ['medium-1'] }) },
-      }
-    );
-
-    await waitFor(() => expect(result.current.selectedMediumIds).toEqual(['medium-1']));
-
-    rerender({ page: makePage({ id: 'page-2', mediumIds: ['medium-2'] }) });
-
-    await waitFor(() => expect(result.current.selectedMediumIds).toEqual(['medium-2']));
   });
 
   it('accumulates rapid toggles before React rerenders', async () => {

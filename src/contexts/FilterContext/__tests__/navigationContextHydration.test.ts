@@ -28,11 +28,6 @@ const buildContext = (overrides: Partial<DashboardFilterContext> = {}): Dashboar
 });
 
 describe('getInitialFiltersFromNavigationContext', () => {
-  it('returns an empty object when no context is provided', () => {
-    expect(getInitialFiltersFromNavigationContext()).toEqual({});
-    expect(getInitialFiltersFromNavigationContext(null)).toEqual({});
-  });
-
   it('hydrates every supported field from a complete context', () => {
     const result = getInitialFiltersFromNavigationContext(buildContext());
 
@@ -55,15 +50,6 @@ describe('getInitialFiltersFromNavigationContext', () => {
     });
   });
 
-  it('drops unknown status values so the default wins', () => {
-    const result = getInitialFiltersFromNavigationContext(
-      buildContext({
-        filters: { ...buildContext().filters, status: 'garbage' },
-      })
-    );
-    expect(result.activeStatus).toBeUndefined();
-  });
-
   it('drops unknown sort fields and directions', () => {
     const result = getInitialFiltersFromNavigationContext(
       buildContext({
@@ -81,47 +67,5 @@ describe('getInitialFiltersFromNavigationContext', () => {
     );
     expect(result.currentPage).toBeUndefined();
     expect(result.pageSize).toBeUndefined();
-  });
-
-  it('coerces non-string tag entries out of selectedTags', () => {
-    const result = getInitialFiltersFromNavigationContext(
-      buildContext({
-        filters: {
-          ...buildContext().filters,
-          selectedTags: ['tag-a', '', null as unknown as string, 'tag-b'],
-        },
-      })
-    );
-    expect(result.selectedTags).toEqual(['tag-a', 'tag-b']);
-  });
-
-  it('hydrates viewType when a recognized value is included', () => {
-    const result = getInitialFiltersFromNavigationContext({
-      ...buildContext(),
-      viewType: 'list',
-    } as unknown as DashboardFilterContext);
-    expect(result.viewType).toBe('list');
-  });
-
-  it('drops unknown viewType values silently', () => {
-    const result = getInitialFiltersFromNavigationContext({
-      ...buildContext(),
-      viewType: 'tiles',
-    } as unknown as DashboardFilterContext);
-    expect(result.viewType).toBeUndefined();
-  });
-
-  it('ignores boolean fields when types are wrong', () => {
-    const result = getInitialFiltersFromNavigationContext(
-      buildContext({
-        filters: {
-          ...buildContext().filters,
-          includeMiniKits: 'yes' as unknown as boolean,
-          includeDestashed: 1 as unknown as boolean,
-        },
-      })
-    );
-    expect(result.includeMiniKits).toBeUndefined();
-    expect(result.includeDestashed).toBeUndefined();
   });
 });

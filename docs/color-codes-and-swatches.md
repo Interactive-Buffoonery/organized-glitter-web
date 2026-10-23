@@ -123,21 +123,11 @@ No schema migration is required for these recovery and bookkeeping fixes.
   archive batches, and lifecycle cleanup. It leaves fixture directories under
   `.tmp` and stops its own server.
 - `pnpm test:pr`: supported full repository gate.
-- `e2e/authenticated/color-references.spec.ts`: actual app upload, retry, notes,
-  viewer, keyboard, light/dark appearance, removal, and isolation from page data.
 
 Physical iPhone camera/photo-library permissions, software keyboard behavior,
 and finger-driven panning still require a device walkthrough. Desktop emulation
 and automated iPhone WebKit runs do not certify those OS interactions.
 
-The feature-specific browser suite passed eight cases across Chromium and iPhone
-WebKit. Both engines displayed an EXIF-rotated JPEG correctly. WebKit decoded and
-saved the HEIC/HEIF fixtures; Chromium rejected them with conversion guidance.
-The viewer passed the automated accessibility scan and mobile 44px control checks.
-The review-fix browser run verified a committed upload with its response dropped,
-then retried the same receipt without adding duplicate photos in both engines.
-That targeted local run bypassed CSP because the production image policy excludes
-local PocketBase origins. The production browser smoke gate kept CSP enabled.
 The disposable backend suite passed 20 checks, including notes-only archive
 restore without a photo part and safe retry, and restore-receipt recovery
 after a mid-restore photo removal.

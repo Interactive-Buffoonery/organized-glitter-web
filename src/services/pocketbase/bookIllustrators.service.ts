@@ -7,16 +7,9 @@ import { ClientResponseError } from 'pocketbase';
 import { pb } from '@/lib/pocketbase';
 import { Collections, BookIllustratorsResponse } from '@/types/pocketbase.types';
 import { ErrorHandler } from './base/ErrorHandler';
-import { isAuthenticated, getCurrentUserId } from '@/services/auth';
+import { requireUserId } from './base/requireUserId';
 import { FilterBuilder } from '@/services/pocketbase/base/filterBuilder';
 import { listAllPages } from '@/services/pocketbase/base/listAllPages';
-
-function requireUserId(): string {
-  if (!isAuthenticated()) throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  const userId = getCurrentUserId();
-  if (!userId) throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  return userId;
-}
 
 export interface BookIllustratorDTO {
   id: string;
@@ -88,8 +81,11 @@ export class BookIllustratorsService {
     }
   }
 
-  static async create(data: { name: string }): Promise<BookIllustratorDTO> {
-    const userId = requireUserId();
+  static async create(
+    data: { name: string },
+    expectedUserId?: string
+  ): Promise<BookIllustratorDTO> {
+    const userId = requireUserId(expectedUserId);
     return ErrorHandler.handleAsync(async () => {
       const name = data.name.trim();
       const existing = await this.findByName(name, userId);
@@ -110,12 +106,15 @@ export class BookIllustratorsService {
     }, 'BookIllustrators.create');
   }
 
-  static async createIfNotExists(data: { name: string }): Promise<BookIllustratorDTO> {
-    const userId = requireUserId();
+  static async createIfNotExists(
+    data: { name: string },
+    expectedUserId?: string
+  ): Promise<BookIllustratorDTO> {
+    const userId = requireUserId(expectedUserId);
     const name = data.name.trim();
     const existing = await this.findByName(name, userId);
     if (existing) return existing;
-    return this.create({ name });
+    return this.create({ name }, userId);
   }
 
   static async update(id: string, data: Partial<{ name: string }>): Promise<BookIllustratorDTO> {

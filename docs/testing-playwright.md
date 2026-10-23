@@ -28,49 +28,38 @@ This local server does not run Spacefast Functions. Use
 For built-artifact cold-load recovery without accounts or a backend process:
 
 ```bash
-pnpm exec playwright test --config playwright.cold-load.config.ts
+pnpm exec playwright test --config playwright.built-app.config.ts --project=cold-load
 ```
 
-This dedicated Chromium and mobile WebKit suite injects resource 429s and 404s
+This dedicated Chromium suite injects resource 429s and 404s
 in fresh contexts with service workers and HTTP caching disabled. It checks
 bounded recovery, Retry-After, static public content, and protected-route
 delivery. See [Cold-load regression tests](./testing-cold-load.md) for its
 integration contract, local port override, and artifacts. It runs separately
 from the normal public project and disposable PocketBase smoke inventory.
 
-The smoke inventory covers public startup and login accessibility, real UI
-login, project create and edit persistence, coloring book creation through the
-UI and generated page editing, archive recovery, the notes timeline, structural
-accessibility, and four mobile WebKit menu and drawer interactions. It sets
-retries to zero and runs a list preflight, so a bad filter or retry cannot turn a
-missing test into a green result. Required seed fixtures are checked before
-Playwright starts.
+The smoke inventory covers public and authenticated accessibility, project
+create and edit persistence, cover upload, atomic project delete, coloring book
+creation, archive restore, import and export, session expiry, account deletion
+recovery, safe-area layout, and mobile WebKit menu and drawer interactions. It
+sets retries to zero and runs a list preflight, so a bad filter or retry cannot
+turn a missing test into a green result. Required seed fixtures are checked
+before Playwright starts.
 
-For the curated Chromium and WebKit release inventory, use:
-
-```bash
-pnpm qa:browser:full
-```
-
-The full inventory adds slower disposable-fixture regressions that do not need
-to run on every pull request: session-expiry recovery, import/export, image
-replacement, metadata rollback, mobile touch targets, mobile interactive
-accessibility, and signed-in contrast in light and dark mode. Fixture-dependent
-tests fail when selected by the managed smoke or full harness if their required
-local targets or seeded records are unavailable. Interactive hosted runs with
-`CI` unset keep reporting those local-only tests as skipped. Hosted CI fails
-when a required fixture is unavailable.
+`pnpm qa:browser:full` runs the same 29 tests as smoke. Release PRs rely on the
+separate blog, standalone 404, PWA navigation, cold-load, and protected-file
+rotation gates for anything smoke does not cover.
 
 Every Playwright spec has one coverage role. The inventory check fails when a
 new spec is not assigned or when a spec appears in more than one role.
 
-| Role              | Runs                                                                 | Decision                                                                                          |
-| ----------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| PR                | `qa:browser`                                                         | Stable public, authenticated, and mobile checks needed on each pull request                       |
-| Affected/release  | `qa:browser:full`, adjacent release gates, or focused local commands | Slower or feature-specific coverage; this role does not mean every spec runs in `qa:browser:full` |
-| Manual visual     | Screen-review commands                                               | Screenshot atlas that needs human review rather than a correctness pass                           |
-| Hosted deployment | Hosted preview commands                                              | Deployment integration that cannot be proved by the disposable local stack                        |
-| Obsolete          | None currently                                                       | Retained as an explicit category so retired specs are removed deliberately                        |
+| Role              | Runs                    | Decision                                                       |
+| ----------------- | ----------------------- | -------------------------------------------------------------- |
+| PR                | `qa:browser`            | Critical journeys checked on each pull request                 |
+| Affected/release  | Dedicated release gates | Specs that need their own server, fixture, or browser config   |
+| Manual visual     | Screen-review commands  | Screenshot atlas that needs human review                       |
+| Hosted deployment | Hosted preview commands | Deployment integration the disposable local stack cannot prove |
+| Obsolete          | None currently          | Kept so retired specs are removed deliberately                 |
 
 Run the inventory check without starting browsers:
 
@@ -89,25 +78,6 @@ node scripts/check-browser-discovery.mjs
 Both commands run in `pnpm test:ci:static`, locally and in CI. When a spec is
 added to or removed from a managed suite, update the counts in
 `scripts/run-local-release-qa.mjs`.
-
-`qa:browser:full` adds eight spec files to the managed inventory: mobile state
-accessibility, signed-in page contrast, format-chip contrast, image selection,
-import/export, mobile touch targets, metadata rollback, and session-expiry
-recovery. The release orchestrator separately runs the blog, standalone 404,
-PWA navigation, and protected-file rotation browser gates.
-
-The remaining affected/release specs stay focused because loading every local
-mutation and presentation scenario into one shared fixture run would increase
-contention and make failures harder to attribute.
-
-| Coverage kept outside `qa:browser:full`                                                                                                                    | Command                                                   | Reason                                                             |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------ |
-| Blog archive journeys                                                                                                                                      | `pnpm qa:blog`                                            | Uses its own WordPress fixture and build                           |
-| Standalone 404 and PWA navigation                                                                                                                          | `pnpm test:not-found`; `pnpm test:pwa:navigation`         | Use dedicated server and service-worker configurations             |
-| Protected-file rotation                                                                                                                                    | `pnpm test:protected-file-rotation-browser`               | Uses a purpose-built upgrade fixture                               |
-| Color references, reductions, foreign mediums, coloring safety, cover updates, project color counts, randomizer flow, tag selection, and theme preferences | `pnpm qa:release:local -- --project=authenticated <spec>` | Mutating or feature-specific scenarios run when their area changes |
-| Authenticated titles and React Doctor browser regressions                                                                                                  | `pnpm qa:release:local -- --project=authenticated <spec>` | Narrow routing and regression checks run when affected             |
-| Public link accessibility and safe-area layout                                                                                                             | `pnpm qa:release:local -- --project=public <spec>`        | Narrow public presentation checks run when affected                |
 
 The manual visual inventory remains `e2e/screen-review/screen-review.spec.ts`.
 Hosted deployment coverage remains `e2e/hosted/authenticated.spec.ts`,
@@ -139,12 +109,7 @@ Default artifacts:
 - `.tmp/pocketbase-release-qa/<run-id>/artifacts/test-results/`
 
 The harness and direct-mutating E2E specs refuse non-local app or PocketBase
-URLs. Use them only with fake local records. The older focused interface remains
-available through `qa:release:local`; pass normal Playwright filters after `--`:
-
-```bash
-pnpm qa:release:local -- --project=authenticated e2e/authenticated/route-mount.spec.ts
-```
+URLs. Use them only with fake local records.
 
 Run the focused accessibility subset with:
 
@@ -208,13 +173,6 @@ reach full opacity, and fonts to settle before scanning. A visible main element
 can still be fading in or covered by the splash, which changes the contrast
 measured by Linux WebKit.
 
-`e2e/authenticated/mobile-touch-targets.spec.ts` reuses that settle path, then
-waits for coarse-pointer media and the bottom nav (so `useMobileDevice` has
-left its desktop initial state) before size asserts. Touch-target checks poll
-until the box is frame-stable at >= 44px rather than reading `boundingBox()`
-once after `toBeVisible`. That keeps the WCAG/HIG sizing contract while
-avoiding the INT-1057 flake under full-suite contention.
-
 Install browser engines locally before running the full browser matrix:
 
 ```bash
@@ -239,48 +197,6 @@ mobile presentation: photo-import review uses cards, and Manage Lists is inside
 the account menu. Opening that menu must preserve its accessible dialog name and
 description without Radix title warnings. Let the drawer primitives generate and
 connect their title and description IDs.
-
-## Randomizer interruption regression
-
-`e2e/authenticated/randomizer-interruption-local.spec.ts` covers three
-interruption scenarios on the `/randomizer` route against local PocketBase:
-
-1. **Clear/restore cancellation**: deselecting all items during an active spin
-   cancels the session and allows a fresh spin after restoring the selection.
-2. **Wheel click activation**: clicking the wheel element starts a spin the same
-   way the button does.
-3. **Keyboard page pick**: after a coloring-book spin result, the page-pick
-   action is reachable via keyboard (Enter) and announces the picked page.
-
-The spec runs in both Chromium and iPhone WebKit inventories within the
-disposable QA harness. It requires `reducedMotion: 'no-preference'` so the wheel
-animation fires completion events.
-
-## Local image-selection regression
-
-The avatar crop regression saves a 1:1 avatar through both compression passes
-and checks the 200px preview before upload. It then reloads the page and checks
-that the saved avatar loads from PocketBase. The local build server permits the
-configured loopback PocketBase origin in `connect-src` and `img-src` only when
-`APP_TEST_ENV=test`; production response headers keep their existing policy.
-Run it with disposable local fixtures:
-
-```bash
-pnpm qa:release:local -- --project=authenticated e2e/authenticated/avatar-crop-local.spec.ts --retries=0
-```
-
-The focused legacy project uses Chromium. Run `pnpm qa:browser:full` when the
-avatar regression also needs its managed iPhone WebKit coverage. Managed smoke
-and full inventories do not accept project or file filters.
-
-The local image-selection regression replaces a large image while compression is
-pending, crops the replacement, and checks the pixels saved to PocketBase. Run it
-against disposable local fixtures in both engines:
-
-```bash
-pnpm qa:release:local -- --project=authenticated e2e/authenticated/image-selection-local.spec.ts --retries=0
-E2E_IMAGE_BROWSER=webkit pnpm qa:release:local -- --project=authenticated e2e/authenticated/image-selection-local.spec.ts --retries=0
-```
 
 ## Hosted preview runs
 

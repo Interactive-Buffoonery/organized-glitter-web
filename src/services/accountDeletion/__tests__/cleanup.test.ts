@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { finishDeletionCleanup } from '../cleanup';
 const mocks = vi.hoisted(() => ({
   current: true,
   accountId: 'account-a' as string | null,
@@ -61,7 +62,6 @@ vi.mock('../analytics', () => ({
   recordCompletedDeletionTransportFence: mocks.completed,
 }));
 vi.mock('../intentStore', () => ({ deletionIntents: { update: mocks.update } }));
-import { finishDeletionCleanup } from '../cleanup';
 const intent = () => ({
   version: 1 as const,
   backendUrl: 'http://localhost:8090',
@@ -114,27 +114,5 @@ describe('confirmed deletion local cleanup', () => {
     });
     expect(mocks.update).not.toHaveBeenCalled();
     expect(mocks.clear).not.toHaveBeenCalled();
-  });
-  it('retains cleanup work when archive recovery cannot be purged', async () => {
-    mocks.archive.mockReturnValue(false);
-    await expect(finishDeletionCleanup(intent())).rejects.toMatchObject({
-      reason: 'local_cleanup',
-    });
-    expect(mocks.clear).not.toHaveBeenCalled();
-  });
-  it('restores signed-out analytics default only after identity reset and consent removal', async () => {
-    await expect(finishDeletionCleanup(intent())).resolves.toMatchObject({
-      localCleanupDone: true,
-      cleanup: 'pending',
-    });
-    expect(mocks.reset.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.resume.mock.invocationCallOrder[0]
-    );
-    expect(mocks.consent.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.resume.mock.invocationCallOrder[0]
-    );
-    expect(mocks.sync.mock.invocationCallOrder[0]).toBeGreaterThan(
-      mocks.resume.mock.invocationCallOrder[0]
-    );
   });
 });

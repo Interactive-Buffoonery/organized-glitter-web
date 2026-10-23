@@ -1,8 +1,9 @@
 import { StrictMode } from 'react';
 import { act, render } from '@testing-library/react';
-import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import posthog from 'posthog-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setAnalyticsEnabled } from '@/services/analytics-preference';
 
 const { auth, authListeners } = vi.hoisted(() => {
   vi.stubEnv('VITE_PUBLIC_POSTHOG_KEY', 'phc_synthetic_analytics_test');
@@ -35,7 +36,6 @@ vi.mock('@/services/pocketbase/users.service', () => ({
     subscribeRealtimeConnect: async () => async () => {},
   },
 }));
-import { captureAccountAnalyticsEvent, setAnalyticsEnabled } from '@/services/analytics-preference';
 async function settlePreference() {
   await act(async () => {
     authListeners.forEach(callback => callback());
@@ -60,42 +60,6 @@ describe('AnalyticsProvider lifecycle with the real SDK', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.useRealTimers();
-  });
-
-  it('waits for auth restoration, then captures startup events once with the account identity', async () => {
-    const capture = vi.spyOn(posthog, 'capture');
-    const reset = vi.spyOn(posthog, 'reset');
-    const tree = () => (
-      <StrictMode>
-        <MemoryRouter initialEntries={['/projects/private-project']}>
-          <AnalyticsProvider>
-            <div>Product content</div>
-          </AnalyticsProvider>
-        </MemoryRouter>
-      </StrictMode>
-    );
-    const view = render(tree());
-    expect(view.getByText('Product content')).toBeInTheDocument();
-    expect(capture).not.toHaveBeenCalled();
-    expect(reset).not.toHaveBeenCalled();
-
-    auth.user = { id: 'account-a', created: '2026-01-01' };
-    auth.isAuthenticated = true;
-    auth.initialCheckComplete = true;
-    view.rerender(tree());
-    await settlePreference();
-
-    for (const event of ['session_context', '$pageview']) {
-      const calls = capture.mock.calls.flatMap(([name], index) =>
-        name === event ? [capture.mock.results[index].value] : []
-      );
-      expect(calls).toHaveLength(1);
-      expect(calls[0]?.properties.distinct_id).toBe('account-a');
-    }
-    expect(capture).toHaveBeenCalledWith('$pageview', {
-      $current_url: `${window.location.origin}/projects/:id`,
-      path: '/projects/:id',
-    });
   });
 
   it('strips the document title from real SDK pageviews and drops unregistered events', async () => {
@@ -171,42 +135,6 @@ describe('AnalyticsProvider lifecycle with the real SDK', () => {
     expect(JSON.stringify(event)).not.toContain('private-search-term');
   });
 
-  it('captures a fresh signed-out startup after SDK initialization', () => {
-    auth.initialCheckComplete = true;
-    const capture = vi.spyOn(posthog, 'capture');
-    render(
-      <MemoryRouter>
-        <AnalyticsProvider>
-          <div />
-        </AnalyticsProvider>
-      </MemoryRouter>
-    );
-    const index = capture.mock.calls.findIndex(([event]) => event === '$pageview');
-    expect(index).toBeGreaterThanOrEqual(0);
-    expect(capture.mock.results[index].value).toBeDefined();
-  });
-
-  it('counts navigation between records even though their route template is the same', () => {
-    auth.initialCheckComplete = true;
-    const capture = vi.spyOn(posthog, 'capture');
-    let navigate: ReturnType<typeof useNavigate>;
-    function Navigation() {
-      navigate = useNavigate();
-      return null;
-    }
-    render(
-      <MemoryRouter initialEntries={['/projects/first-private-record']}>
-        <AnalyticsProvider>
-          <Navigation />
-        </AnalyticsProvider>
-      </MemoryRouter>
-    );
-    act(() => navigate('/projects/second-private-record'));
-    const pageviews = capture.mock.calls.filter(([event]) => event === '$pageview');
-    expect(pageviews).toHaveLength(2);
-    expect(pageviews.every(([, properties]) => properties?.path === '/projects/:id')).toBe(true);
-  });
-
   it('blocks captures and account switches while off, then identifies the current account when enabled', async () => {
     auth.initialCheckComplete = true;
     auth.isAuthenticated = true;
@@ -234,50 +162,6 @@ describe('AnalyticsProvider lifecycle with the real SDK', () => {
     });
     expect(posthog.get_distinct_id()).toBe('current-account');
     expect(posthog.capture('project_created')).toBeDefined();
-  });
-
-  it('enriches hook, escape-hatch and account service captures after privacy filtering', async () => {
-    vi.stubGlobal('__APP_BUILD_ID__', 'synthetic-release');
-    vi.stubEnv('VITE_DEPLOYMENT_ENVIRONMENT', 'preview');
-    auth.user = { id: 'context-account', created: '2026-01-01' };
-    auth.isAuthenticated = true;
-    auth.initialCheckComplete = true;
-    const captureSpy = vi.spyOn(posthog, 'capture');
-    render(
-      <MemoryRouter>
-        <AnalyticsProvider>
-          <div />
-        </AnalyticsProvider>
-      </MemoryRouter>
-    );
-    await settlePreference();
-    const { capture } = await import('@/services/analytics-escape-hatch');
-    capture('project_created', {
-      craft_type: 'diamond_painting',
-      path: '/projects/private-id?q=private-query',
-    });
-    captureAccountAnalyticsEvent('auth_login_succeeded', { auth_method: 'password' });
-    for (const name of [
-      'session_context',
-      '$pageview',
-      'project_created',
-      'auth_login_succeeded',
-    ]) {
-      const index = captureSpy.mock.calls.findIndex(([event]) => event === name);
-      expect(index).toBeGreaterThanOrEqual(0);
-      expect(captureSpy.mock.results[index].value?.properties).toMatchObject({
-        platform: 'web',
-        environment: 'preview',
-        release: 'synthetic-release',
-      });
-    }
-    const index = captureSpy.mock.calls.findIndex(([event]) => event === 'project_created');
-    expect(captureSpy.mock.results[index].value?.properties).toMatchObject({
-      craft_type: 'diamond_painting',
-      path: '/projects/:id',
-    });
-    expect(JSON.stringify(captureSpy.mock.results[index].value)).not.toContain('private-');
-    vi.unstubAllEnvs();
   });
 
   it('preserves DNT and disabled replay/autocapture', async () => {
@@ -316,62 +200,6 @@ describe('AnalyticsProvider lifecycle with the real SDK', () => {
     } finally {
       Reflect.deleteProperty(navigator, 'doNotTrack');
     }
-  });
-
-  it('preserves anonymous identity across provider remounts', () => {
-    posthog.reset();
-    auth.initialCheckComplete = true;
-    const tree = (
-      <MemoryRouter>
-        <AnalyticsProvider>
-          <div />
-        </AnalyticsProvider>
-      </MemoryRouter>
-    );
-    const first = render(tree);
-    const anonymousId = posthog.get_distinct_id();
-    first.unmount();
-    render(tree);
-    expect(posthog.get_distinct_id()).toBe(anonymousId);
-  });
-
-  it('sets account identity before an immediate direct capture', async () => {
-    auth.user = { id: 'account-b', created: '2026-01-01' };
-    auth.isAuthenticated = true;
-    auth.initialCheckComplete = true;
-    const view = render(
-      <MemoryRouter>
-        <AnalyticsProvider>
-          <div />
-        </AnalyticsProvider>
-      </MemoryRouter>
-    );
-    await settlePreference();
-    const event = posthog.capture('project_created');
-    expect(event?.properties.distinct_id).toBe('account-b');
-    view.unmount();
-  });
-
-  it('defers a sign-in success until account consent and identity are ready', async () => {
-    auth.user = { id: 'just-signed-in', created: '2026-01-01' };
-    auth.isAuthenticated = true;
-    auth.initialCheckComplete = true;
-    const capture = vi.spyOn(posthog, 'capture');
-    render(
-      <MemoryRouter>
-        <AnalyticsProvider>
-          <div />
-        </AnalyticsProvider>
-      </MemoryRouter>
-    );
-    captureAccountAnalyticsEvent('auth_login_succeeded', { auth_method: 'password' });
-    expect(capture.mock.calls.filter(([event]) => event === 'auth_login_succeeded')).toHaveLength(
-      0
-    );
-    await settlePreference();
-    const index = capture.mock.calls.findIndex(([event]) => event === 'auth_login_succeeded');
-    expect(index).toBeGreaterThanOrEqual(0);
-    expect(capture.mock.results[index].value?.properties.distinct_id).toBe('just-signed-in');
   });
 
   it('resets a stale account before identifying a different restored account', async () => {

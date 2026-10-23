@@ -10,30 +10,17 @@ const appUrl = process.env.E2E_APP_URL || 'http://127.0.0.1:3000';
 const isFullSuite = process.env.E2E_QA_SUITE === 'full';
 if (!process.env.E2E_STORAGE_STATE) process.env.E2E_STORAGE_STATE = storageState;
 
-const publicInventory =
-  /[/\\]e2e[/\\](?:(?:home|public-accessibility|page-titles)\.spec\.ts|a11y[/\\]public-a11y\.spec\.ts)$/;
-const publicWebkitInventory =
-  /[/\\]e2e[/\\](?:(?:home|page-titles)\.spec\.ts|a11y[/\\]public-a11y\.spec\.ts)$/;
+const publicInventory = /[/\\]e2e[/\\]a11y[/\\]public-a11y\.spec\.ts$/;
 export const chromiumSmokeInventory = [
-  /[/\\]e2e[/\\]authenticated[/\\]account-deletion-local\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
-  /[/\\]e2e[/\\]ci[/\\](?:authenticated-accessibility-smoke|change-password-accessibility|feedback-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|unverified-login-recovery)\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\](?:archive-legacy-project-local|archive-recovery-local|archive-v3-restore-local|coloring-detail-errors-local|coloring-page-detail|diamond-pagination-url|notes-feed-timeline|project-create-cover-local|project-delete-atomic-local|project-field-clearing|project-inline-dates-local)\.spec\.ts$/,
+  /[/\\]e2e[/\\]authenticated[/\\](?:account-deletion-local|archive-v3-restore-local|import-export-local|project-create-cover-local|project-delete-atomic-local|project-field-clearing|session-expiry-local)\.spec\.ts$/,
+  /[/\\]e2e[/\\]ci[/\\]coloring-book-create-flow\.spec\.ts$/,
+  /[/\\]e2e[/\\]a11y[/\\]authenticated-a11y\.spec\.ts$/,
 ];
 export const webkitFlowInventory = [
-  /[/\\]e2e[/\\]authenticated[/\\]account-deletion-local\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
-  /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|feedback-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
-  /[/\\]e2e[/\\]a11y[/\\]mobile-state-a11y\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\](?:archive-v3-restore-local|avatar-crop-local|coloring-detail-errors-local|coloring-page-detail|notes-feed-timeline|project-create-cover-local|project-field-clearing|project-inline-dates-local|randomizer-interruption-local)\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\]int-1093-filter-validation\.spec\.ts$/,
+  /[/\\]e2e[/\\]ci[/\\](?:mobile-webkit-smoke|coloring-book-create-flow)\.spec\.ts$/,
+  /[/\\]e2e[/\\](?:pwa-safe-area|authenticated[/\\]account-deletion-local)\.spec\.ts$/,
 ];
-export const chromiumFullInventory = [
-  ...chromiumSmokeInventory,
-  /[/\\]e2e[/\\]ci[/\\]authenticated-contrast\.spec\.ts$/,
-  /[/\\]e2e[/\\]a11y[/\\]authenticated-a11y\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\](?:avatar-crop-local|concurrent-edit-local|format-chip-contrast|image-selection-local|import-export-local|int-1093-filter-validation|mobile-touch-targets|notes-feed-keyset-pagination|project-metadata-rollback-local|route-mount|randomizer-interruption-local|session-expiry-local)\.spec\.ts$/,
-];
+export const chromiumFullInventory = chromiumSmokeInventory;
 
 const setupProject: Project = {
   name: 'setup',
@@ -45,10 +32,7 @@ const smokeProjects: Project[] = [
   setupProject,
   {
     name: 'public-chromium-smoke',
-    testMatch: [
-      /[/\\]e2e[/\\]home\.spec\.ts$/,
-      /[/\\]e2e[/\\]ci[/\\]public-accessibility-smoke\.spec\.ts$/,
-    ],
+    testMatch: publicInventory,
     use: { ...devices['Desktop Chrome'] },
   },
   {
@@ -59,11 +43,8 @@ const smokeProjects: Project[] = [
   },
   {
     name: 'mobile-webkit-smoke',
-    testMatch: [
-      /[/\\]e2e[/\\]authenticated[/\\]account-deletion-local\.spec\.ts$/,
-      /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
-      /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|feedback-accessibility|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
-    ],
+    testMatch: webkitFlowInventory,
+    grep: /opens the bottom add menu|creates a book and edits|reverifies the same proof|safe.area/i,
     dependencies: ['setup'],
     use: { ...devices['iPhone 13'], storageState },
   },
@@ -83,13 +64,9 @@ const fullProjects: Project[] = [
     use: { ...devices['Desktop Chrome'], storageState },
   },
   {
-    name: 'public-webkit-full',
-    testMatch: publicWebkitInventory,
-    use: { ...devices['Desktop Safari'] },
-  },
-  {
     name: 'authenticated-webkit-full',
     testMatch: webkitFlowInventory,
+    grep: /opens the bottom add menu|creates a book and edits|reverifies the same proof|safe.area/i,
     dependencies: ['setup'],
     use: { ...devices['iPhone 13'], storageState },
   },

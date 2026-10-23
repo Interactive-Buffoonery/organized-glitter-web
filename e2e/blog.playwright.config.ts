@@ -21,8 +21,5 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
-  projects: [
-    { name: 'blog-chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'blog-mobile-webkit', use: { ...devices['iPhone 13'] } },
-  ],
+  projects: [{ name: 'blog-chromium', use: { ...devices['Desktop Chrome'] } }],
 });

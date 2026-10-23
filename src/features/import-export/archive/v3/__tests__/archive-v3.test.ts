@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import {
   calculateInventoryDigest,
@@ -5,6 +6,7 @@ import {
   calculateParentDescriptorDigest,
 } from '../canonical';
 import {
+  buildArchivePart,
   buildArchiveParts,
   prepareArchivePlan,
   type ArchiveAssetSource,

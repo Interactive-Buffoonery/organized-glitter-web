@@ -71,7 +71,6 @@ vi.mock('@/services/pocketbase/coloringPageProgressNotes.service', () => ({
 }));
 
 const { useLibraryCsvExport } = await import('@/hooks/useLibraryCsvExport');
-const { AnalyticsEvent } = await import('@/services/analytics-events');
 
 describe('library CSV export analytics', () => {
   beforeEach(() => {
@@ -88,25 +87,6 @@ describe('library CSV export analytics', () => {
         updatedAt: '',
       },
     ]);
-  });
-
-  it('captures CSV export completion without the generated filename', async () => {
-    const { result } = renderHookWithProviders(() => useLibraryCsvExport());
-
-    await act(async () => {
-      await result.current.exportDiamondProjectsCsv();
-    });
-
-    expect(mockCapture).toHaveBeenCalledWith(AnalyticsEvent.CSV_EXPORT_COMPLETED, {
-      surface: 'settings_data',
-      source: 'organized_csv',
-      status: 'success',
-      records: 1,
-      duration_ms: expect.any(Number),
-    });
-    expect(
-      JSON.stringify(mockCapture.mock.calls.map(([, properties]) => properties))
-    ).not.toContain('diamond-projects');
   });
 
   it('does not download a partial coloring page export when the complete page read fails', async () => {

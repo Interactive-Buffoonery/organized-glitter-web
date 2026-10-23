@@ -22,6 +22,11 @@ export const safeSwatch = (swatch: string) => (/^#[0-9a-f]{6}$/i.test(swatch) ? 
 export const requestFor = (symbol: string, requests: Record<string, SymbolRequestPreview> = {}) =>
   symbol.startsWith('r:') ? requests[symbol.slice(2)] : undefined;
 
+export const colorKeyLabel = (row: ColorKey, request?: SymbolRequestPreview) =>
+  [symbolName(row.symbol, request), row.code.trim() || 'no code yet', row.color_name]
+    .filter(Boolean)
+    .join(', ');
+
 /** Plain text for Copy: one `<symbol> <code>` line per row, in strip order. */
 export function colorKeyCopyText(
   rows: ColorKey[],

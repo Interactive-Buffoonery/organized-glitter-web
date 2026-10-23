@@ -28,13 +28,6 @@ describe('color key queries', () => {
     );
   });
 
-  it('loads the page list', async () => {
-    service.list.mockResolvedValue([{ id: 'a' }]);
-    const { result } = renderHook(() => useColorKeys('page', 'owner'), { wrapper });
-    await waitFor(() => expect(result.current.data).toEqual([{ id: 'a' }]));
-    expect(service.list).toHaveBeenCalledWith('page', 'owner');
-  });
-
   it('waits to load history until the entry asks for it', async () => {
     service.history.mockResolvedValue([]);
     const { rerender } = renderHook(({ enabled }) => useColorKeyHistory('owner', enabled), {

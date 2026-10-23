@@ -13,7 +13,7 @@ import { createLogger } from '@/utils/logger';
 import { ColorKeyEntry, type EntryTarget } from './ColorKeyEntry';
 import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
-import { colorKeyCopyText, requestFor, safeSwatch, symbolName } from './symbolName';
+import { colorKeyCopyText, colorKeyLabel, requestFor, safeSwatch, symbolName } from './symbolName';
 
 const logger = createLogger('ColorKeySection');
 
@@ -210,14 +210,11 @@ function ColorKeyEditor({
             <ul className="divide-border/60 -mx-2 divide-y">
               {rows.map(row => {
                 const request = requestFor(row.symbol, requests);
-                const name = symbolName(row.symbol, request);
                 return (
                   <li key={row.id}>
                     <button
                       type="button"
-                      aria-label={[name, row.code.trim() || 'no code yet', row.color_name]
-                        .filter(Boolean)
-                        .join(', ')}
+                      aria-label={colorKeyLabel(row, request)}
                       onClick={() => setEntry({ row, symbol: row.symbol, position: row.position })}
                       className="hover:bg-muted/60 flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left"
                     >

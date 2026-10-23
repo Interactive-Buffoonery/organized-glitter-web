@@ -14,6 +14,7 @@ export type SymbolRequestPreview = { description: string; thumbnail: string };
 
 // ponytail: bounded history scan; move to a server endpoint if users outgrow 500 recent keys.
 const HISTORY_LIMIT = 500;
+const REQUEST_BATCH_SIZE = 50;
 
 function requireOwner(userId: string) {
   if (!userId || getCurrentUserId() !== userId)
@@ -88,25 +89,29 @@ export const ColorKeysService = {
     requestIds: string[]
   ): Promise<Record<string, SymbolRequestPreview>> {
     requireOwner(userId);
-    if (!requestIds.length) return {};
-    const params = Object.fromEntries(requestIds.map((id, index) => [`r${index}`, id]));
-    const records = await pb
-      .collection(Collections.ColoringSymbolRequests)
-      .getFullList<ColoringSymbolRequestsResponse>({
-        filter: pb.filter(
-          `user = {:user} && (${requestIds.map((_, index) => `id = {:r${index}}`).join(' || ')})`,
-          { user: userId, ...params }
-        ),
-        fields: 'id,collectionId,collectionName,photo,description',
-      });
-    return Object.fromEntries(
-      records.map(record => [
-        record.id,
-        {
+    const ids = [...new Set(requestIds)];
+    const previews: Record<string, SymbolRequestPreview> = {};
+    for (let offset = 0; offset < ids.length; offset += REQUEST_BATCH_SIZE) {
+      requireOwner(userId);
+      const batch = ids.slice(offset, offset + REQUEST_BATCH_SIZE);
+      const params = Object.fromEntries(batch.map((id, index) => [`r${index}`, id]));
+      const records = await pb
+        .collection(Collections.ColoringSymbolRequests)
+        .getFullList<ColoringSymbolRequestsResponse>({
+          filter: pb.filter(
+            `user = {:user} && (${batch.map((_, index) => `id = {:r${index}}`).join(' || ')})`,
+            { user: userId, ...params }
+          ),
+          fields: 'id,collectionId,collectionName,photo,description',
+        });
+      requireOwner(userId);
+      for (const record of records) {
+        previews[record.id] = {
           description: record.description ?? '',
           thumbnail: record.photo ? pb.files.getURL(record, record.photo, { thumb: '96x96f' }) : '',
-        },
-      ])
-    );
+        };
+      }
+    }
+    return previews;
   },
 };

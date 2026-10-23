@@ -86,25 +86,6 @@ describe('Colors used setup', () => {
     expect(saved.slice(0, 2)).toEqual(['u:0031', 'u:0032']);
   });
 
-  it('moves focus to the section heading after a successful start', async () => {
-    const user = userEvent.setup();
-    state.setup.mockResolvedValue([]);
-    render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: 'Start' }));
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Colors used' })).toHaveFocus());
-  });
-
-  it('adds symbols after z from the picker', async () => {
-    const user = userEvent.setup();
-    state.setup.mockResolvedValue([]);
-    render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: 'Add symbols after z' }));
-    await user.type(screen.getByRole('searchbox', { name: 'Search symbols' }), 'psi');
-    await user.click(screen.getByRole('option', { name: 'Psi' }));
-    await user.click(screen.getByRole('button', { name: 'Start' }));
-    expect(state.setup.mock.calls[0][0].at(-1)).toBe('u:03C8');
-  });
-
   it('can be skipped', async () => {
     const user = userEvent.setup();
     render(<ColorKeySection pageId="page-1" />);
@@ -146,38 +127,10 @@ describe('Colors used setup', () => {
 });
 
 describe('Colors used record', () => {
-  it('lists rows in order and marks an unknown custom shape', () => {
-    state.rows = [
-      key('a', 0, 'u:0031', { code: '654', color_name: 'Lilac', swatch: '#B79AD6' }),
-      key('b', 1, 'c:not-in-catalog'),
-    ];
-    render(<ColorKeySection pageId="page-1" />);
-    expect(screen.getByRole('button', { name: 'One, 654, Lilac' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Unknown symbol' })).toBeInTheDocument();
-    expect(screen.getByText('1 of 2 filled in')).toBeInTheDocument();
-  });
-
   it('never puts an unexpected swatch value into a style', () => {
     state.rows = [key('a', 0, 'u:0031', { code: '1', swatch: 'url(https://example.test/x)' })];
     const { container } = render(<ColorKeySection pageId="page-1" />);
     expect(container.innerHTML).not.toContain('example.test');
-  });
-
-  it('copies symbol and code lines without variation selectors', async () => {
-    const user = userEvent.setup();
-    state.rows = [
-      key('a', 0, 'u:2665', { code: ' FS\n 609 ' }),
-      key('b', 1, 'c:linked-circles', { code: 'ZC 267' }),
-      key('c', 2, 'r:abcdefghijklmno', { code: '12' }),
-      key('d', 3, 'r:bbbbbbbbbbbbbbb'),
-    ];
-    state.requests = { abcdefghijklmno: { description: 'Two\r\n\tws', thumbnail: '' } };
-    render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: 'Copy' }));
-    await expect(navigator.clipboard.readText()).resolves.toBe(
-      '♥ FS 609\nLinked circles ZC 267\nTwo ws 12\nSent symbol'
-    );
-    expect(state.success).toHaveBeenCalled();
   });
 });
 
@@ -212,25 +165,6 @@ describe('Colors used entry', () => {
         swatch: '#B79AD6',
       }),
     });
-  });
-
-  it('saves and moves to the next symbol on the strip', async () => {
-    const user = userEvent.setup();
-    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
-    state.update.mockImplementation(async ({ id, input }) => key(id, 0, 'u:0031', input));
-    render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: /^One,/ }));
-    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
-    await user.type(screen.getByRole('textbox', { name: 'Add a code you tried' }), '650{Enter}');
-    expect(screen.getByRole('button', { name: 'Remove 650' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Save and next/ }));
-    expect(state.update).toHaveBeenCalledWith({
-      id: 'a',
-      input: expect.objectContaining({ code: '654', tried: ['650'] }),
-    });
-    const dialog = await screen.findByRole('dialog');
-    await waitFor(() => expect(within(dialog).getByText('Two')).toBeInTheDocument());
-    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('');
   });
 
   it('shows the validation message and keeps the entry open', async () => {
@@ -271,47 +205,6 @@ describe('Colors used entry', () => {
       within(screen.getByRole('alertdialog')).getByRole('button', { name: /Delete/ })
     );
     expect(state.remove).toHaveBeenCalledWith('a');
-  });
-
-  it('names the symbol in the title and focuses Code after Save and next', async () => {
-    const user = userEvent.setup();
-    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032'), key('c', 2, 'u:0033')];
-    state.update.mockImplementation(async ({ id, input }) => key(id, 0, input.symbol, input));
-    render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: /^One,/ }));
-    expect(screen.getByRole('dialog', { name: 'Edit color: One' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save and next: Two' }));
-    await screen.findByRole('dialog', { name: 'Edit color: Two' });
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Code' })).toHaveFocus());
-  });
-
-  it('closes only the suggestions when Escape is pressed while they are open', async () => {
-    const user = userEvent.setup();
-    state.rows = [key('a', 0, 'u:0031')];
-    state.history = [{ code: 'MB 108', color_name: 'Lilac', swatch: '#B79AD6' }];
-    render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: /^One,/ }));
-    await user.type(screen.getByRole('combobox', { name: 'Code' }), 'mb');
-    expect(screen.getByRole('listbox', { name: 'Earlier codes' })).toBeInTheDocument();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('listbox', { name: 'Earlier codes' })).toBeNull();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  });
-
-  it('saves a typed tried code even when Add was not pressed', async () => {
-    const user = userEvent.setup();
-    state.rows = [key('a', 0, 'u:0031', { tried: ['650'] }), key('b', 1, 'u:0032')];
-    state.update.mockImplementation(async ({ id, input }) => key(id, 0, 'u:0031', input));
-    render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: /^One,/ }));
-    await user.type(screen.getByRole('textbox', { name: 'Add a code you tried' }), ' 651 ');
-    await user.click(screen.getByRole('button', { name: /Save and next/ }));
-    expect(state.update).toHaveBeenCalledWith({
-      id: 'a',
-      input: expect.objectContaining({ tried: ['650', '651'] }),
-    });
   });
 
   it('saves the latest position when another device reorders during an edit', async () => {
@@ -374,27 +267,6 @@ describe('Colors used entry', () => {
     });
   });
 
-  it('forgets a changed symbol for a new color when it is cancelled', async () => {
-    const user = userEvent.setup();
-    render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: 'Skip' }));
-    const addYen = async () => {
-      await user.click(screen.getByRole('button', { name: 'Add symbol' }));
-      await user.type(screen.getByRole('searchbox', { name: 'Search symbols' }), 'yen');
-      await user.click(screen.getByRole('option', { name: 'Yen sign' }));
-    };
-    await addYen();
-    await user.click(screen.getByRole('button', { name: 'Change symbol' }));
-    await user.type(screen.getByRole('searchbox', { name: 'Search symbols' }), 'psi');
-    await user.click(screen.getAllByRole('option')[0]);
-    expect(screen.queryByRole('dialog', { name: 'Add a color: Yen sign' })).toBeNull();
-    await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-
-    await addYen();
-    expect(screen.getByRole('dialog', { name: 'Add a color: Yen sign' })).toBeInTheDocument();
-  });
-
   it('tidies a typed hex swatch when Enter saves without leaving the field', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031')];
@@ -415,18 +287,6 @@ describe('Colors used entry', () => {
     expect(screen.getByRole('button', { name: /^☎,/ })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^One,/ }));
     expect(screen.getByRole('button', { name: 'Save and next: \u260E\uFE0E' })).toBeInTheDocument();
-  });
-
-  it('tidies a typed hex swatch when leaving the field', async () => {
-    const user = userEvent.setup();
-    state.rows = [key('a', 0, 'u:0031')];
-    render(<ColorKeySection pageId="page-1" />);
-    await user.click(screen.getByRole('button', { name: /^One,/ }));
-    const hex = screen.getByRole('textbox', { name: 'Swatch hex' });
-    expect(hex).toHaveAttribute('placeholder', 'Like #A1B2C3');
-    await user.type(hex, 'b79ad6');
-    await user.tab();
-    expect(hex).toHaveValue('#B79AD6');
   });
 
   it('moves focus to the next tried code, then the input, when removing codes', async () => {

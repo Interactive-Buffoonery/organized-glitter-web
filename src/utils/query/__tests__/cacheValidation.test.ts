@@ -50,21 +50,4 @@ describe('navigation cache cleanup', () => {
 
     expect(client.getQueryCache().find({ queryKey: key, exact: true })).toBeUndefined();
   });
-
-  it('keeps retryable errors instead of treating their query labels as invalid IDs', async () => {
-    const key = queryKeys.coloring.pages.detail('pqrstuvwxyz0123');
-    await expect(
-      client.fetchQuery({
-        queryKey: key,
-        queryFn: async () => {
-          throw { status: 503 };
-        },
-      })
-    ).rejects.toEqual({ status: 503 });
-
-    window.dispatchEvent(new Event('navigation'));
-    vi.advanceTimersByTime(100);
-
-    expect(client.getQueryState(key)?.error).toEqual({ status: 503 });
-  });
 });

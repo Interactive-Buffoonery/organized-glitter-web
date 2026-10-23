@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AccountDeletionService } from '../accountDeletion.service';
 
 const mocks = vi.hoisted(() => ({
   store: {
@@ -41,7 +42,6 @@ vi.mock('@/services/accountDeletion/analytics', () => ({
 }));
 vi.mock('@/services/analytics-preference', () => ({ syncAnalyticsConsent: vi.fn() }));
 vi.mock('@/lib/queryClient', () => ({ queryClient: { cancelQueries: mocks.cancel } }));
-import { AccountDeletionService } from '../accountDeletion.service';
 
 const proof = () => ({
   action: 'delete_account' as const,

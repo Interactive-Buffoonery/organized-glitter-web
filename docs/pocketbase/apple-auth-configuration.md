@@ -69,6 +69,6 @@ PocketBase process or sufficient host/SFTP privileges can read the file. Grant
 encryption protects a database-only leak, not a full server compromise.
 
 The runtime test `node scripts/test-native-apple-auth.mjs` uses disposable keys
-and a real PocketBase 0.40.4 server. It checks invalid configuration, permissions,
+and a real PocketBase 0.40.5 server. It checks invalid configuration, permissions,
 symlinks, HTTP exposure, backup exclusion, restore preservation, and the existing
 authentication and grant flows. Its output directory contains `result.json`.

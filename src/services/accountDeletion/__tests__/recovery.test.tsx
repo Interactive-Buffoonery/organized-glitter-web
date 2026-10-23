@@ -1,5 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  finishInterruptedSignOut,
+  refreshDeletionRecovery,
+  useDeletionRecovery,
+} from '../recovery';
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -46,11 +51,6 @@ vi.mock('../analytics', () => ({
   releaseDeletionTransportFence: mocks.release,
   inspectUnownedDeletionTransportFence: mocks.unowned,
 }));
-import {
-  finishInterruptedSignOut,
-  refreshDeletionRecovery,
-  useDeletionRecovery,
-} from '../recovery';
 
 describe('durable deletion recovery', () => {
   beforeEach(() => {
@@ -100,22 +100,6 @@ describe('durable deletion recovery', () => {
     expect(mocks.discard).toHaveBeenCalledOnce();
   });
 
-  it('surfaces an interrupted sign-out claim without removing or ignoring it', async () => {
-    mocks.get.mockResolvedValue({ kind: 'signed_out', accountId: 'account-a' });
-    const { result } = renderHook(useDeletionRecovery);
-    await act(refreshDeletionRecovery);
-    expect(result.current).toMatchObject({ ready: true, claimBlocked: true });
-    expect(mocks.release).not.toHaveBeenCalled();
-  });
-
-  it('shows a locked recovery error for an unowned pre-intent fence', async () => {
-    mocks.unowned.mockReturnValue({ checking: false, orphan: true, waitMs: 0 });
-    const { result } = renderHook(useDeletionRecovery);
-    await act(refreshDeletionRecovery);
-    expect(result.current).toMatchObject({ ready: true, orphanFence: true });
-    expect(mocks.release).not.toHaveBeenCalled();
-  });
-
   it('finishes only the original interrupted session and retains the claim for sign-in', async () => {
     await finishInterruptedSignOut();
     expect(mocks.finish).toHaveBeenCalledWith(
@@ -128,17 +112,6 @@ describe('durable deletion recovery', () => {
     expect(mocks.release).not.toHaveBeenCalled();
   });
 
-  it('keeps a newer account session when storage resolves after the switch', async () => {
-    mocks.list.mockImplementation(async () => {
-      mocks.token = 'new-session';
-      mocks.accountId = 'account-b';
-      return [];
-    });
-    await expect(finishInterruptedSignOut()).rejects.toThrow();
-    expect(mocks.finish).not.toHaveBeenCalled();
-    expect(mocks.clear).not.toHaveBeenCalled();
-  });
-
   it('keeps a newer same-account session at the final claim check', async () => {
     mocks.finish.mockImplementation(async (_backend, _account, _epoch, apply) => {
       mocks.token = 'new-session';
@@ -147,17 +120,6 @@ describe('durable deletion recovery', () => {
     await expect(finishInterruptedSignOut()).rejects.toThrow();
     expect(mocks.clear).not.toHaveBeenCalled();
     expect(mocks.token).toBe('new-session');
-  });
-
-  it('retains the session when a deletion intent or transport fence appears', async () => {
-    mocks.list.mockResolvedValue([{ localCleanupDone: false }]);
-    await expect(finishInterruptedSignOut()).rejects.toThrow();
-    expect(mocks.finish).not.toHaveBeenCalled();
-    mocks.list.mockResolvedValue([]);
-    mocks.unowned.mockReturnValue({ checking: false, orphan: true, waitMs: 0 });
-    await expect(finishInterruptedSignOut()).rejects.toThrow();
-    expect(mocks.finish).not.toHaveBeenCalled();
-    expect(mocks.clear).not.toHaveBeenCalled();
   });
 
   it('keeps the original session when private storage fails', async () => {

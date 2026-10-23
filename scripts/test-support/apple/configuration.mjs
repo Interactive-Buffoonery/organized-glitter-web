@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   readFileSync,
   renameSync,
   symlinkSync,
@@ -123,6 +124,10 @@ export async function testAppleConfiguration(fixture, request, adminHeaders) {
   ]) {
     assert.ok(!diagnosticText.includes(secret), 'stored diagnostics contain no secret values');
   }
+  const hookSettingsDir = path.join(dataDir, 'hook-settings-private');
+  mkdirSync(hookSettingsDir, { mode: 0o700 });
+  const hookSettingsPath = path.join(hookSettingsDir, 'config.json');
+  writeFileSync(hookSettingsPath, '{"FEEDBACK_TO_EMAIL":"kept@example.test"}', { mode: 0o600 });
   const backupName = 'apple-config-test.zip';
   const backupPath = path.join(dataDir, 'backups', backupName);
   const backup = await request(`${baseUrl}/api/backups`, {
@@ -142,6 +147,10 @@ export async function testAppleConfiguration(fixture, request, adminHeaders) {
   assert.ok(
     !archive.stdout.includes('apple-auth-private'),
     'backup excludes the entire private directory'
+  );
+  assert.ok(
+    !archive.stdout.includes('hook-settings-private'),
+    'backup excludes the private hook settings directory'
   );
   const marker = path.join(dataDir, 'after-backup-marker');
   writeFileSync(marker, 'restore must remove this');
@@ -165,6 +174,11 @@ export async function testAppleConfiguration(fixture, request, adminHeaders) {
     readFileSync(configPath),
     original,
     'restore does not replace the encryption key'
+  );
+  assert.equal(
+    readFileSync(hookSettingsPath, 'utf8'),
+    '{"FEEDBACK_TO_EMAIL":"kept@example.test"}',
+    'restore preserves the private hook settings'
   );
   const logs = readFileSync(logPath, 'utf8');
   for (const secret of [

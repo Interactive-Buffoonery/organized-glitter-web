@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
@@ -8,7 +16,12 @@ import { installPocketBase } from './install-pocketbase.mjs';
 
 // Exercise the actual HTTP route: a mock cannot catch static-route precedence,
 // an authentication requirement, a redirect, or the wrong response content type.
-const configured = !process.argv.includes('--unconfigured');
+// --file supplies the app ID through the private hook settings file, as on hosts
+// without custom environment variables. --unsafe-file must be ignored.
+const mode = ['--unconfigured', '--file', '--unsafe-file'].find(flag =>
+  process.argv.includes(flag)
+);
+const configured = mode === undefined || mode === '--file';
 const directory = mkdtempSync(path.join(tmpdir(), 'og-native-association-'));
 let socket;
 let server;
@@ -17,8 +30,17 @@ try {
   const migrations = path.join(directory, 'migrations');
   mkdirSync(hooks);
   mkdirSync(migrations);
-  const source = path.resolve('pb_hooks/native_association.pb.js');
-  if (existsSync(source)) copyFileSync(source, path.join(hooks, 'native_association.pb.js'));
+  for (const file of ['native_association.pb.js', 'hook_settings.js', 'private_json.js']) {
+    const source = path.resolve('pb_hooks', file);
+    if (existsSync(source)) copyFileSync(source, path.join(hooks, file));
+  }
+  if (mode === '--file' || mode === '--unsafe-file') {
+    const settingsDir = path.join(directory, 'data', 'hook-settings-private');
+    mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
+    const settingsPath = path.join(settingsDir, 'config.json');
+    writeFileSync(settingsPath, JSON.stringify({ APPLE_APP_IDS: 'AAAAAAAAAA.test.example.app' }));
+    chmodSync(settingsPath, mode === '--file' ? 0o600 : 0o644);
+  }
   const binary = await installPocketBase({
     destination: path.resolve('.tmp/test-tools/pocketbase'),
   });
@@ -43,7 +65,7 @@ try {
       stdio: 'ignore',
       env: {
         ...process.env,
-        APPLE_APP_IDS: configured ? 'AAAAAAAAAA.test.example.app,invalid' : '',
+        APPLE_APP_IDS: mode === undefined ? 'AAAAAAAAAA.test.example.app,invalid' : '',
       },
     }
   );
@@ -78,7 +100,7 @@ try {
   const callback = await fetch(`${baseURL}/api/oauth2-redirect`, { redirect: 'manual' });
   assert.equal(callback.status, 307);
   assert.match(callback.headers.get('location'), /oauth2-redirect-failure$/);
-  console.log(`Native association HTTP checks passed (${configured ? 'configured' : 'disabled'})`);
+  console.log(`Native association HTTP checks passed (${mode ?? 'environment'})`);
 } finally {
   if (socket?.listening) await new Promise(resolve => socket.close(resolve));
   if (server?.pid && server.exitCode === null && server.signalCode === null) {

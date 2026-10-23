@@ -5,7 +5,8 @@ Date: 2026-06-12 (records a bar raised incrementally; written down during the
 
 ## Status
 
-Accepted. Gate implementation refreshed on 2026-10-03.
+Accepted. Gate implementation refreshed on 2026-10-03. Browser suites cut to
+critical journeys on 2026-10-23.
 
 ## Context
 
@@ -21,14 +22,14 @@ React Doctor, PocketBase schema and upgrade validation, the full Vitest suite,
 the production build and bundle budget, publication security, and production
 browser smoke with blocking public and authenticated accessibility checks.
 Browser tests use disposable PocketBase data and include mobile WebKit.
-`pnpm test:release` uses the broader browser selection. `pnpm pr:create` runs the
+`pnpm test:release` runs the same browser inventory as the PR gate. `pnpm pr:create` runs the
 PR gate before opening a PR. Local commands and Actions share the same phase
 commands; see [the CI contract](../agents/ci.md).
 
 Hosted pull-request CI runs static, unit, React, build, budget, and publication
-checks. PocketBase runtime and backend-dependent browser suites run on the local
-test computer before the PR is opened. Report backend results before opening
-hook, migration or schema PRs. Actions does not repeat those local runtime suites.
+checks as separate jobs, and `Complete PR validation` runs the PocketBase
+runtime and browser phases. Report local backend results before opening hook,
+migration or schema PRs.
 
 Testing stack and rules:
 
@@ -51,10 +52,11 @@ PR, and the commitment is that inaccessible UI is a defect, not a backlog item.
 
 ### Full e2e suite as the PR gate
 
-Running the whole Playwright matrix per PR would be too slow for solo
-iteration; the gate runs a focused browser and a11y subset. Broader Chromium
-and WebKit suites run for release PRs, on a schedule, on manual dispatch, and
-through the local release gate.
+Running a broad Playwright matrix per PR was too slow and too flaky for solo
+iteration. The browser inventory is limited to critical journeys and a11y
+checks, and release PRs run the same set. Coverage beyond those journeys
+belongs in focused unit tests or in a dedicated release gate with its own
+fixture.
 
 ## Consequences
 

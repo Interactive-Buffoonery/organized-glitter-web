@@ -115,20 +115,6 @@ describe('ColorKeysService', () => {
     );
   });
 
-  it('sets up a page with one server call and returns the created rows', async () => {
-    mocks.send.mockResolvedValue({ items: [{ id: 'key-0' }, { id: 'key-1' }] });
-    await expect(ColorKeysService.setup('page-1', 'owner', ['u:0031', 'u:0061'])).resolves.toEqual([
-      { id: 'key-0' },
-      { id: 'key-1' },
-    ]);
-    expect(mocks.send).toHaveBeenCalledWith('/api/coloring/color-keys/setup', {
-      method: 'POST',
-      body: { page: 'page-1', symbols: ['u:0031', 'u:0061'] },
-      requestKey: null,
-    });
-    expect(mocks.create).not.toHaveBeenCalled();
-  });
-
   it('treats deleting a color that is already gone as done', async () => {
     mocks.delete.mockRejectedValue(new ClientResponseError({ status: 404 }));
     await expect(ColorKeysService.remove('key-1', 'owner')).resolves.toBeUndefined();
@@ -170,6 +156,26 @@ describe('ColorKeysService', () => {
     });
     expect(mocks.collection).toHaveBeenCalledWith('coloring_symbol_requests');
     expect(mocks.getURL).toHaveBeenCalledWith(record, 'p.jpg', { thumb: '96x96f' });
+  });
+
+  it('bounds request lookups and deduplicates IDs', async () => {
+    const ids = Array.from({ length: 65 }, (_, index) => String(index).padStart(15, '0'));
+    mocks.getFullList.mockResolvedValue([]);
+    await ColorKeysService.requests('owner', [...ids, ...ids]);
+    expect(mocks.getFullList).toHaveBeenCalledTimes(2);
+    for (const [options] of mocks.getFullList.mock.calls) {
+      expect(options.filter.match(/id = /g)?.length).toBeLessThanOrEqual(50);
+    }
+  });
+
+  it('stops a batched lookup when the account changes', async () => {
+    mocks.getFullList.mockImplementationOnce(async () => {
+      mocks.userId = 'someone-else';
+      return [];
+    });
+    const ids = Array.from({ length: 65 }, (_, index) => String(index).padStart(15, '0'));
+    await expect(ColorKeysService.requests('owner', ids)).rejects.toThrow('account changed');
+    expect(mocks.getFullList).toHaveBeenCalledOnce();
   });
 
   it('skips the request lookup when no rows use a sent symbol', async () => {

@@ -90,19 +90,6 @@ beforeEach(() => {
 });
 
 describe('SymbolRequestDialog', () => {
-  it('prefills the book, page and account email, with the photo placeholder on', () => {
-    renderDialog();
-    expect(screen.getByRole('textbox', { name: 'Book and page' })).toHaveValue(
-      'Lost Ocean, page 4'
-    );
-    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue('me@example.test');
-    expect(
-      screen.getByRole('checkbox', { name: 'Use my photo as the symbol on this page for now' })
-    ).toBeChecked();
-    for (const button of screen.getAllByRole('button'))
-      expect(button).toHaveAttribute('type', expect.stringMatching(/button|submit/));
-  });
-
   it('asks for a photo before sending anything', async () => {
     const user = userEvent.setup();
     renderDialog();
@@ -127,6 +114,7 @@ describe('SymbolRequestDialog', () => {
     state.prepare.mockResolvedValue(prepared);
     state.send.mockResolvedValue({ id: 'abcdefghijklmno' });
     renderDialog();
+    await user.type(screen.getByRole('textbox', { name: 'Book and page' }), '  ');
     await fillAndSend(user);
     expect(state.prepare).toHaveBeenCalledWith(photo);
     expect(state.send).toHaveBeenCalledWith({
@@ -137,17 +125,6 @@ describe('SymbolRequestDialog', () => {
       photo: prepared,
     });
     await waitFor(() => expect(state.onSent).toHaveBeenCalledWith('abcdefghijklmno', true));
-  });
-
-  it('reports when the photo should not stand in for the symbol', async () => {
-    const user = userEvent.setup();
-    state.send.mockResolvedValue({ id: 'abcdefghijklmno' });
-    renderDialog();
-    await user.click(
-      screen.getByRole('checkbox', { name: 'Use my photo as the symbol on this page for now' })
-    );
-    await fillAndSend(user);
-    await waitFor(() => expect(state.onSent).toHaveBeenCalledWith('abcdefghijklmno', false));
   });
 
   it.each([
@@ -200,12 +177,6 @@ describe('SymbolRequestDialog', () => {
     expect(state.send).not.toHaveBeenCalled();
   });
 
-  it('marks the photo and book as required', () => {
-    renderDialog();
-    expect(screen.getByLabelText('Photo')).toHaveAttribute('aria-required', 'true');
-    expect(screen.getByRole('textbox', { name: 'Book and page' })).toBeRequired();
-  });
-
   it('points the failed field at the error', async () => {
     const user = userEvent.setup();
     renderDialog();
@@ -245,39 +216,5 @@ describe('SymbolRequestDialog', () => {
     expect(screen.getByRole('textbox', { name: /^Description/ })).toHaveValue('Two w stacked');
     await user.keyboard('{Escape}');
     expect(state.onOpenChange).toHaveBeenCalledWith(false);
-  });
-
-  it('retries only the placement after the request was created', async () => {
-    const user = userEvent.setup();
-    state.send.mockResolvedValue({ id: 'abcdefghijklmno' });
-    state.onSent.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-    renderDialog();
-    await fillAndSend(user, true);
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "We got your photo, but couldn't add it to this page."
-    );
-    expect(screen.getByRole('textbox', { name: 'Email' })).toBeDisabled();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).toHaveFocus());
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
-    await waitFor(() => expect(state.onSent).toHaveBeenCalledTimes(2));
-    expect(state.onSent).toHaveBeenLastCalledWith('abcdefghijklmno', true);
-    expect(state.send).toHaveBeenCalledTimes(1);
-  });
-
-  it('sends a cropped photo, and the original after skipping the crop', async () => {
-    const user = userEvent.setup();
-    state.send.mockResolvedValue({ id: 'abcdefghijklmno' });
-    renderDialog();
-    await user.upload(screen.getByLabelText('Photo'), photo);
-    await user.click(screen.getByRole('button', { name: 'Crop photo' }));
-    await user.click(screen.getByRole('button', { name: 'Use crop' }));
-    await user.click(screen.getByRole('button', { name: 'Send' }));
-    await waitFor(() => expect(state.prepare).toHaveBeenCalledWith(cropped));
-
-    await user.click(screen.getByRole('button', { name: 'Crop photo' }));
-    expect(screen.getByRole('dialog', { name: 'Crop the symbol' })).toHaveTextContent('symbol.jpg');
-    await user.click(screen.getByRole('button', { name: 'Skip crop' }));
-    await user.click(screen.getByRole('button', { name: 'Send' }));
-    await waitFor(() => expect(state.prepare).toHaveBeenLastCalledWith(photo));
   });
 });

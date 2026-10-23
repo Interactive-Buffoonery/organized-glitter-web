@@ -22,7 +22,6 @@ export const safeSwatch = (swatch: string) => (/^#[0-9a-f]{6}$/i.test(swatch) ? 
 export const requestFor = (symbol: string, requests: Record<string, SymbolRequestPreview> = {}) =>
   symbol.startsWith('r:') ? requests[symbol.slice(2)] : undefined;
 
-/** Accessible name for a row: symbol, code and color name. */
 export const colorKeyLabel = (row: ColorKey, request?: SymbolRequestPreview) =>
   [symbolName(row.symbol, request), row.code.trim() || 'no code yet', row.color_name]
     .filter(Boolean)

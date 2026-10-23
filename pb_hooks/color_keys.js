@@ -1,3 +1,6 @@
+const SYMBOL_PATTERN =
+  /^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$/;
+
 function validateKey(record, app) {
   let tried;
   try {
@@ -17,10 +20,7 @@ function validateKey(record, app) {
     );
   }
   record.set('tried', tried);
-  const position = record.get('position');
-  if (!Number.isInteger(position) || position < 0) {
-    throw new BadRequestError('Position must be a non-negative integer.');
-  }
+  prepareKeyCreate({ position: record.get('position') });
   const symbol = record.getString('symbol');
   if (symbol.startsWith('r:')) {
     const requests = app.findRecordsByFilter(
@@ -40,9 +40,6 @@ function validateKey(record, app) {
     throw new BadRequestError('Swatch must be empty or #RRGGBB.');
   }
 }
-
-const SYMBOL_PATTERN =
-  /^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$/;
 
 function setupKeys(app, auth, body) {
   if (!auth.getBool('verified')) throw new ForbiddenError('Email verification is required.');
@@ -139,9 +136,8 @@ function validateResolution(record) {
   if (!symbol && !resolving) return false;
   if (
     symbol.length > 64 ||
-    !/^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48})$/.test(
-      symbol
-    )
+    symbol.startsWith('r:') ||
+    symbol.match(SYMBOL_PATTERN)?.[0] !== symbol
   ) {
     throw new BadRequestError('Resolution requires a valid Unicode or custom symbol ID.');
   }

@@ -30,7 +30,7 @@ See [`PRODUCT.md`](PRODUCT.md), [`DESIGN.md`](DESIGN.md), and [`docs/README.md`]
 
 - Node.js 24.x
 - pnpm 11.1.2 or newer
-- PocketBase 0.40.4 for local database work
+- PocketBase 0.40.5 for local database work
 
 The repo includes an `.nvmrc` set to Node 24.
 

@@ -43,6 +43,29 @@ describe('TimelineDateEditor', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
+  it.each([
+    { value: null, isSet: false, formattedDisplay: '', visibleText: 'Not set' },
+    {
+      value: '2026-09-20',
+      isSet: true,
+      formattedDisplay: 'Sep 20, 2026',
+      visibleText: 'Sep 20, 2026',
+    },
+  ])('includes the visible date in the trigger name: $visibleText', props => {
+    render(
+      <TimelineDateEditorHarness
+        dateKey="dateCompleted"
+        label="Completed"
+        projectId="project-123"
+        {...props}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: `Edit Completed date: ${props.visibleText}` })
+    ).toHaveTextContent(props.visibleText);
+  });
+
   it('keeps the date draft open when the save fails', async () => {
     const user = userEvent.setup();
     updateDatesMutationState.mutate.mockImplementationOnce((_input, options) => {
@@ -60,7 +83,7 @@ describe('TimelineDateEditor', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Edit Completed date' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Completed date: Not set' }));
     await user.type(screen.getByRole('textbox', { name: 'Completed date' }), '9/20/2026');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -95,7 +118,7 @@ describe('TimelineDateEditor', () => {
         formattedDisplay=""
       />
     );
-    await user.click(screen.getByRole('button', { name: 'Edit Completed date' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Completed date: Not set' }));
     await user.type(screen.getByRole('textbox', { name: 'Completed date' }), '9/20/2026');
 
     act(() => {
@@ -128,7 +151,7 @@ describe('TimelineDateEditor', () => {
       formattedDisplay: '',
     };
     const { rerender } = render(<TimelineDateEditorHarness {...props} projectId="project-a" />);
-    await user.click(screen.getByRole('button', { name: 'Edit Completed date' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Completed date: Not set' }));
     await user.type(screen.getByRole('textbox', { name: 'Completed date' }), '9/20/2026');
 
     rerender(<TimelineDateEditorHarness {...props} projectId="project-b" />);

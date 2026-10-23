@@ -91,7 +91,12 @@ function ColorKeyEditor({
           position: rows[editingIndex].position,
         }
       : entry;
-  const next = editingIndex >= 0 ? rows[editingIndex + 1] : undefined;
+  const next =
+    editingIndex >= 0
+      ? rows[editingIndex + 1]
+      : entry?.row
+        ? rows.find(row => row.position > entry.position)
+        : undefined;
   const filled = rows.filter(row => row.code.trim()).length;
   const showSetup = !query.isPending && !query.isError && rows.length === 0 && !skipped;
 
@@ -362,6 +367,7 @@ function ColorKeyEditor({
         pageId={pageId}
         userId={userId}
         target={liveEntry}
+        positionForNew={nextPosition}
         next={next}
         requests={requests}
         onClose={() => setEntry(null)}

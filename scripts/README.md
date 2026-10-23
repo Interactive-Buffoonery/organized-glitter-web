@@ -47,7 +47,7 @@ pnpm setup
   identity validation, and account quota against disposable PocketBase.
 - `pnpm pb:test:archive-restore-v3` runs canonical digest, multipart inventory,
   ownership, conflict, gallery order, metrics, retry, file rollback, and empty
-  versus populated migration rollback checks against disposable PocketBase 0.40.4.
+  versus populated migration rollback checks against disposable PocketBase 0.40.5.
 - `ci-result.mjs` rejects failed, cancelled, skipped, or missing required jobs.
 
 See [CI](../docs/agents/ci.md) for exact commands and failure behavior.

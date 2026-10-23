@@ -41,7 +41,7 @@ Native Apple authentication is in `native_apple_auth.pb.js`; encrypted Apple
 grant capture for the existing web OAuth flow is in `apple_grants.pb.js`. The
 native route evaluates the same fail-closed condition as its public readiness
 response and uses PocketBase's signed Apple token validation. Test the route
-against disposable PocketBase 0.40.4 data with
+against disposable PocketBase 0.40.5 data with
 `node scripts/test-native-apple-auth.mjs`. The test copies the production hook
 and replaces only its provider fetch seam with disposable claims; no test
 endpoint override exists in the production hook. Web grant capture is tested by

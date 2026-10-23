@@ -127,11 +127,11 @@ describe('PocketBase installer', () => {
   });
   it('pins checksum-verified macOS and Linux archives', () => {
     expect(resolveArchive('darwin', 'arm64')).toMatchObject({
-      archive: 'pocketbase_0.40.4_darwin_arm64.zip',
+      archive: 'pocketbase_0.40.5_darwin_arm64.zip',
       sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     expect(resolveArchive('linux', 'x64')).toMatchObject({
-      archive: 'pocketbase_0.40.4_linux_amd64.zip',
+      archive: 'pocketbase_0.40.5_linux_amd64.zip',
       sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
   });

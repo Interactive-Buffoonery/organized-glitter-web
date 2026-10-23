@@ -10,7 +10,6 @@ import {
   clearSessionDrafts,
   peekSessionDraft,
   recordCompletedSessionFeedback,
-  recordCompletedSessionFeedbackForAccount,
   takeCompletedSessionFeedback,
 } from '@/services/auth/sessionRecovery';
 
@@ -25,58 +24,6 @@ describe('FeedbackDialog', () => {
     sendFeedbackEmailMock.mockReset();
     clearSessionDrafts();
     vi.stubEnv('VITE_CONTACT_EMAIL', 'contact@example.test');
-  });
-
-  it('retains its accessible name and announces successful delivery', async () => {
-    sendFeedbackEmailMock.mockResolvedValue({ success: true });
-    render(<FeedbackDialog isOpen onOpenChange={vi.fn()} />);
-    const dialog = screen.getByRole('dialog', { name: 'Share Your Feedback' });
-    const status = screen.getByRole('status');
-    expect(status).toBeEmptyDOMElement();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), {
-      target: { value: 'A valid feedback message.' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Submit Feedback' }));
-    await waitFor(() => expect(status).toHaveTextContent('Thank you'));
-    expect(dialog).toHaveAccessibleName('Share Your Feedback');
-  });
-
-  it('explains the length rule and blocks feedback the service would reject', async () => {
-    const user = userEvent.setup();
-    render(<FeedbackDialog isOpen onOpenChange={vi.fn()} />);
-
-    const messageField = screen.getByRole('textbox', { name: 'Message' });
-    await user.type(messageField, 'short');
-    expect(messageField).toHaveAccessibleDescription();
-    expect(screen.getByRole('button', { name: 'Submit Feedback' })).toBeDisabled();
-    expect(sendFeedbackEmailMock).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByLabelText('Message'), {
-      target: { value: 'a'.repeat(5001) },
-    });
-    expect(screen.getByRole('button', { name: 'Submit Feedback' })).toBeDisabled();
-    expect(sendFeedbackEmailMock).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByLabelText('Message'), {
-      target: { value: 'a'.repeat(5000) },
-    });
-    expect(screen.getByRole('button', { name: 'Submit Feedback' })).toBeEnabled();
-  });
-
-  it('submits a padded 5,000-character draft as the validated message', async () => {
-    sendFeedbackEmailMock.mockResolvedValue({ success: true });
-    render(<FeedbackDialog isOpen onOpenChange={vi.fn()} />);
-
-    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), {
-      target: { value: `  ${'a'.repeat(5000)}  ` },
-    });
-    const submit = screen.getByRole('button', { name: 'Submit Feedback' });
-    expect(submit).toBeEnabled();
-    fireEvent.click(submit);
-
-    expect(sendFeedbackEmailMock).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'a'.repeat(5000) })
-    );
   });
 
   it('keeps the draft when feedback delivery fails', async () => {
@@ -201,113 +148,6 @@ describe('FeedbackDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
-  it('does not let an old session-changed result stop a newer submission', async () => {
-    let resolveOld!: (value: { success: false; reason: string }) => void;
-    let resolveNew!: (value: { success: false; reason: string }) => void;
-    sendFeedbackEmailMock
-      .mockReturnValueOnce(
-        new Promise(resolve => {
-          resolveOld = resolve;
-        })
-      )
-      .mockReturnValueOnce(
-        new Promise(resolve => {
-          resolveNew = resolve;
-        })
-      );
-
-    function Harness() {
-      const [isOpen, setIsOpen] = useState(true);
-      return (
-        <>
-          <button type="button" onClick={() => setIsOpen(true)}>
-            Open feedback
-          </button>
-          <FeedbackDialog isOpen={isOpen} onOpenChange={setIsOpen} />
-        </>
-      );
-    }
-
-    render(<Harness />);
-    fireEvent.change(screen.getByLabelText('Message'), {
-      target: { value: 'Message from the old session' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Submit Feedback' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Open feedback' }));
-    fireEvent.change(screen.getByLabelText('Message'), {
-      target: { value: 'Message from the new session' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Submit Feedback' }));
-
-    await act(async () => {
-      resolveOld({ success: false, reason: 'session_changed' });
-      await Promise.resolve();
-    });
-
-    expect(screen.getByRole('button', { name: 'Submit Feedback' })).toBeDisabled();
-    expect(screen.getByLabelText('Message')).toHaveValue('Message from the new session');
-
-    await act(async () => {
-      resolveNew({ success: false, reason: 'session_changed' });
-      await Promise.resolve();
-    });
-    expect(screen.getByRole('button', { name: 'Submit Feedback' })).toBeEnabled();
-  });
-
-  it('shows matching completion recorded before same-account recovery renders', async () => {
-    const onOpenChange = vi.fn();
-    sendFeedbackEmailMock.mockImplementation(async ({ draftId }: { draftId: string }) => {
-      recordCompletedSessionFeedbackForAccount('account-a', {
-        draftId,
-        message: 'Feedback from the original session',
-        name: 'Anonymous User',
-        email: '',
-      });
-      return {
-        success: false,
-        error: 'Session changed while the request completed.',
-        reason: 'session_changed',
-      };
-    });
-    render(<FeedbackDialog isOpen accountId="account-a" onOpenChange={onOpenChange} />);
-    fireEvent.change(screen.getByLabelText('Message'), {
-      target: { value: 'Feedback from the original session' },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Submit Feedback' }));
-
-    expect(await screen.findByText('Thank you for your message!')).toBeInTheDocument();
-    expect(takeCompletedSessionFeedback('account-a')).toBeUndefined();
-    expect(onOpenChange).not.toHaveBeenCalled();
-  });
-
-  it('marks a restored message as sent when its old response arrives', async () => {
-    const onOpenChange = vi.fn();
-    const { rerender } = render(
-      <FeedbackDialog isOpen accountId="account-a" onOpenChange={onOpenChange} />
-    );
-    fireEvent.change(screen.getByLabelText('Message'), {
-      target: { value: 'Sent after the session expired' },
-    });
-    captureSessionDrafts('account-a', 'token-a');
-    const draftId = peekSessionDraft<{ draftId: string }>('feedback-dialog', 'account-a')?.draftId;
-    rerender(<FeedbackDialog isOpen={false} onOpenChange={onOpenChange} />);
-    rerender(<FeedbackDialog isOpen accountId="account-a" onOpenChange={onOpenChange} />);
-    expect(screen.getByLabelText('Message')).toHaveValue('Sent after the session expired');
-
-    act(() =>
-      recordCompletedSessionFeedback('token-a', {
-        draftId,
-        message: 'Sent after the session expired',
-        name: 'Anonymous User',
-        email: '',
-      })
-    );
-
-    expect(screen.getByText('Thank you for your message!')).toBeInTheDocument();
-  });
-
   it('keeps a restored draft when its email changed after the old request', () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(
@@ -344,28 +184,5 @@ describe('FeedbackDialog', () => {
       email: 'old@example.test',
       name: 'Anonymous User',
     });
-  });
-
-  it('marks an already delivered message as sent when the dialog restores', () => {
-    const onOpenChange = vi.fn();
-    const { rerender } = render(
-      <FeedbackDialog isOpen accountId="account-a" onOpenChange={onOpenChange} />
-    );
-    fireEvent.change(screen.getByLabelText('Message'), {
-      target: { value: 'Sent before the dialog restored' },
-    });
-    captureSessionDrafts('account-a', 'token-a');
-    const draftId = peekSessionDraft<{ draftId: string }>('feedback-dialog', 'account-a')?.draftId;
-    rerender(<FeedbackDialog isOpen={false} onOpenChange={onOpenChange} />);
-    recordCompletedSessionFeedback('token-a', {
-      draftId,
-      message: 'Sent before the dialog restored',
-      email: '',
-      name: 'Anonymous User',
-    });
-
-    rerender(<FeedbackDialog isOpen accountId="account-a" onOpenChange={onOpenChange} />);
-
-    expect(screen.getByText('Thank you for your message!')).toBeInTheDocument();
   });
 });

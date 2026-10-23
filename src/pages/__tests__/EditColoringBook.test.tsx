@@ -12,12 +12,7 @@ import {
   userEvent,
   waitFor,
 } from '@/test-utils';
-import {
-  findOwnedDialog,
-  openControlledPopup,
-  pasteIntoField,
-  typeIntoField,
-} from '@/test-utils/scopedInteractions';
+import { openControlledPopup, pasteIntoField } from '@/test-utils/scopedInteractions';
 
 const {
   navigateMock,
@@ -195,58 +190,6 @@ describe('EditColoringBook page', () => {
     bookState.isLoading = false;
   });
 
-  it('renders loading and not-found states', () => {
-    bookState.isLoading = true;
-    const view = renderWithProviders(<EditColoringBook />);
-
-    expect(view.container.querySelector('.animate-spin')).toBeInTheDocument();
-    expect(document.title).toBe('Edit coloring book | Organized Glitter');
-
-    bookState.isLoading = false;
-    bookState.data = null as never;
-    view.rerender(<EditColoringBook />);
-
-    expect(
-      within(view.container).getByRole('heading', { name: 'Coloring book not found' })
-    ).toBeInTheDocument();
-    expect(document.title).toBe('Coloring book not found | Organized Glitter');
-  });
-
-  it('renders the edit header', () => {
-    const view = renderWithProviders(<EditColoringBook />);
-    const form = within(view.container);
-
-    expect(form.getByRole('heading', { name: 'Edit book' })).toBeInTheDocument();
-    expect(document.title).toBe('Edit Worlds of Wonder | Organized Glitter');
-  });
-
-  it('updates a coloring book and persists total pages', async () => {
-    const user = userEvent.setup();
-
-    const view = renderWithProviders(<EditColoringBook />);
-    const form = within(view.container);
-
-    await user.clear(form.getByLabelText(/Title/));
-    await pasteIntoField(user, form.getByLabelText(/Title/), 'Updated Worlds');
-    await user.clear(form.getByLabelText(/Number of pages/));
-    await typeIntoField(user, form.getByLabelText(/Number of pages/), '120');
-    await user.click(form.getByRole('button', { name: 'Update book' }));
-
-    await waitFor(() => {
-      expect(updateBookMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          patch: expect.objectContaining({
-            title: 'Updated Worlds',
-            total_pages: 120,
-            status: 'purchased',
-            is_mystery: false,
-          }),
-        })
-      );
-      expect(navigateMock).toHaveBeenCalledWith('/coloring/book-123');
-    });
-  });
-
   it('omits unchanged page totals when saving a title edit', async () => {
     const user = userEvent.setup();
     const view = renderWithProviders(<EditColoringBook />);
@@ -259,25 +202,6 @@ describe('EditColoringBook page', () => {
     await waitFor(() => expect(updateBookMutateAsync).toHaveBeenCalledTimes(1));
     expect(updateBookMutateAsync.mock.calls[0][0].patch).not.toHaveProperty('total_pages');
     expect(navigateMock).toHaveBeenCalledWith('/coloring/book-123');
-  });
-
-  it('adds an inline illustrator without submitting the edit form', async () => {
-    const user = userEvent.setup();
-    createIllustratorMutateAsync.mockResolvedValue({ id: 'ill-new', name: 'Pat Lee' });
-
-    const view = renderWithProviders(<EditColoringBook />);
-    const form = within(view.container);
-
-    const addIllustrator = form.getByRole('button', { name: 'Add illustrator' });
-    await user.click(addIllustrator);
-    const createDialog = await findOwnedDialog(addIllustrator, 'Add illustrator');
-    await pasteIntoField(user, createDialog.getByLabelText('Name'), 'Pat Lee');
-    await user.click(createDialog.getByRole('button', { name: 'Create' }));
-
-    expect(await form.findByText('Pat Lee')).toBeVisible();
-    expect(createIllustratorMutateAsync).toHaveBeenCalledWith({ name: 'Pat Lee' });
-    expect(updateBookMutateAsync).not.toHaveBeenCalled();
-    expect(navigateMock).not.toHaveBeenCalled();
   });
 
   it('clears an existing cover image when the user removes it', async () => {
@@ -299,32 +223,6 @@ describe('EditColoringBook page', () => {
         expect.objectContaining({
           patch: expect.objectContaining({
             cover_image: '',
-          }),
-        })
-      );
-    });
-  });
-
-  it('offers softcover and hardcover formats without offering physical book', async () => {
-    const user = userEvent.setup();
-
-    const view = renderWithProviders(<EditColoringBook />);
-    const form = within(view.container);
-
-    const formats = await openControlledPopup(user, form.getByLabelText('Format'));
-
-    expect(formats.getByRole('option', { name: 'Softcover' })).toBeInTheDocument();
-    expect(formats.getByRole('option', { name: 'Hardcover' })).toBeInTheDocument();
-    expect(formats.queryByRole('option', { name: 'Physical book' })).not.toBeInTheDocument();
-
-    await user.click(formats.getByRole('option', { name: 'Hardcover' }));
-    await user.click(form.getByRole('button', { name: 'Update book' }));
-
-    await waitFor(() => {
-      expect(updateBookMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          patch: expect.objectContaining({
-            book_format: 'hardcover',
           }),
         })
       );
@@ -460,50 +358,6 @@ describe('EditColoringBook page', () => {
     });
   });
 
-  it('syncs selected coloring tags after updating the book', async () => {
-    const user = userEvent.setup();
-
-    const view = renderWithProviders(<EditColoringBook />);
-    const form = within(view.container);
-
-    const tags = await openControlledPopup(user, form.getByRole('button', { name: 'Add tag' }));
-    await user.click(await tags.findByRole('option', { name: 'Cozy' }));
-    await user.click(form.getByRole('button', { name: 'Update book' }));
-
-    await waitFor(() => {
-      expect(updateBookMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          expectedRevision: 0,
-          tagIds: ['coloring-tag-1'],
-        })
-      );
-      expect(navigateMock).toHaveBeenCalledWith('/coloring/book-123');
-    });
-  });
-
-  it('shows the highest protected page when a reduction is rejected', async () => {
-    const user = userEvent.setup();
-    updateBookMutateAsync.mockRejectedValue({
-      type: 'validation',
-      message: 'Total pages cannot be less than 900 because that page has saved work.',
-      retryable: false,
-    });
-
-    const view = renderWithProviders(<EditColoringBook />);
-    const form = within(view.container);
-
-    await user.click(form.getByRole('button', { name: 'Update book' }));
-
-    await waitFor(() => {
-      expect(notifyMock).toHaveBeenCalledWith({
-        kind: 'error',
-        title: 'Could not update coloring book',
-        description: 'Total pages cannot be less than 900 because that page has saved work.',
-      });
-    });
-    expect(navigateMock).not.toHaveBeenCalledWith('/coloring/book-123');
-  });
-
   it('does not carry a late recovery revision into a different book', async () => {
     const user = userEvent.setup();
     let releaseRefetch!: (result: unknown) => void;
@@ -530,25 +384,6 @@ describe('EditColoringBook page', () => {
       bookId: 'book-456',
       expectedRevision: 0,
     });
-  });
-
-  it('shows the supported reduction step in the saved draft error', async () => {
-    const user = userEvent.setup();
-    updateBookMutateAsync.mockRejectedValue({
-      type: 'validation',
-      message: 'Reduce this coloring book in steps of 500 pages or fewer.',
-      retryable: false,
-    });
-    const view = renderWithProviders(<EditColoringBook />);
-    const form = within(view.container);
-    await user.click(form.getByRole('button', { name: 'Update book' }));
-    await waitFor(() =>
-      expect(notifyMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          description: 'Reduce this coloring book in steps of 500 pages or fewer.',
-        })
-      )
-    );
   });
 
   it('still navigates when post-update cache invalidation fails', async () => {

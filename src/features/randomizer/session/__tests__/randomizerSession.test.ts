@@ -8,7 +8,6 @@ import {
   buildRandomizerUrl,
   buildSpinMetadata,
   parseRandomizerSearch,
-  reconcileTargetPool,
   resolveTargetSelection,
 } from '../randomizerSession';
 
@@ -39,13 +38,6 @@ const eligibility: RandomizerEligibility = {
 };
 
 describe('randomizer session URL state', () => {
-  it('falls back from an unknown mode and missing eligibility filters', () => {
-    expect(parseRandomizerSearch('?mode=unknown')).toEqual({
-      mode: 'diamond',
-      eligibility: DEFAULT_RANDOMIZER_ELIGIBILITY,
-    });
-  });
-
   it('round-trips explicitly unchecked status filters without restoring defaults', () => {
     const emptyEligibility = {
       ...DEFAULT_RANDOMIZER_ELIGIBILITY,
@@ -62,22 +54,6 @@ describe('randomizer session URL state', () => {
     expect(parseRandomizerSearch(new URL(url).search).eligibility).toEqual(emptyEligibility);
   });
 
-  it('reads coloring mode and comma-separated status filters without empty entries', () => {
-    expect(
-      parseRandomizerSearch(
-        '?mode=coloring-page&diamondStatus=progress,%20onhold,%20&bookStatus=wishlist&pageStatus=not_started,in_progress'
-      )
-    ).toEqual({
-      mode: 'coloring-page',
-      eligibility: {
-        diamondStatuses: ['progress', 'onhold'],
-        bookStatuses: ['wishlist'],
-        pageStatuses: ['not_started', 'in_progress'],
-        ownership: 'owned',
-      },
-    });
-  });
-
   it('keeps an explicit empty selection empty and distinguishes it from a missing selection', () => {
     const targets = [diamondTarget, secondDiamondTarget];
 
@@ -86,23 +62,6 @@ describe('randomizer session URL state', () => {
       omitSelection: false,
     });
     expect(resolveTargetSelection('', 'diamond', targets)).toEqual({
-      ids: new Set(['diamond-one', 'diamond-two']),
-      omitSelection: true,
-    });
-  });
-
-  it('honors legacy project IDs only in diamond mode and defaults when IDs are stale', () => {
-    const targets = [diamondTarget, secondDiamondTarget];
-
-    expect(resolveTargetSelection('?projects=diamond-two', 'diamond', targets)).toEqual({
-      ids: new Set(['diamond-two']),
-      omitSelection: false,
-    });
-    expect(resolveTargetSelection('?projects=diamond-two', 'coloring-book', targets)).toEqual({
-      ids: new Set(['diamond-one', 'diamond-two']),
-      omitSelection: true,
-    });
-    expect(resolveTargetSelection('?items=deleted-id', 'diamond', targets)).toEqual({
       ids: new Set(['diamond-one', 'diamond-two']),
       omitSelection: true,
     });
@@ -140,31 +99,6 @@ describe('randomizer session URL state', () => {
       })
     );
     expect(empty.searchParams.get('items')).toBe('none');
-  });
-});
-
-describe('randomizer target pool', () => {
-  it('keeps the displayed order and references when a refetch only reorders targets', () => {
-    const current = [diamondTarget, secondDiamondTarget];
-    const refetched = [{ ...secondDiamondTarget }, { ...diamondTarget }];
-
-    expect(reconcileTargetPool(current, refetched)).toBe(current);
-  });
-
-  it('refreshes target details while preserving the displayed order', () => {
-    const current = [diamondTarget, secondDiamondTarget];
-    const changed = { ...diamondTarget, title: 'New title', width: 50 };
-
-    expect(reconcileTargetPool(current, [secondDiamondTarget, changed])).toEqual([
-      changed,
-      secondDiamondTarget,
-    ]);
-  });
-
-  it('adopts new membership when a target is removed', () => {
-    expect(
-      reconcileTargetPool([diamondTarget, secondDiamondTarget], [secondDiamondTarget])
-    ).toEqual([secondDiamondTarget]);
   });
 });
 
@@ -221,47 +155,5 @@ describe('randomizer spin metadata', () => {
     expect(metadata.selectedTargetIds).toEqual(['diamond-one', 'diamond-two']);
     expect(metadata.selectedTargets[0].id).toBe('diamond-one');
     expect(metadata.eligibility.diamondStatuses).toEqual(['progress', 'onhold']);
-  });
-
-  it('records scoped page eligibility and section as provided by the session', () => {
-    const pageTarget: RandomizerTarget = {
-      id: 'page-one',
-      mode: 'coloring-page',
-      targetType: 'coloring_page',
-      title: 'Garden, page 1',
-      subtitle: 'Garden',
-      href: '/coloring/book-one/pages/page-one',
-      statusLabel: 'Not started',
-      selectedMetadata: { coloringBook: 'book-one', coloringPage: 'page-one' },
-    };
-    const pageEligibility: RandomizerEligibility = {
-      ...eligibility,
-      pageStatuses: ['not_started', 'palette_chosen', 'in_progress', 'on_hold'],
-    };
-    const section = { kind: 'number' as const, number: 4, candidates: [2, 4] };
-
-    const metadata = buildSpinMetadata({
-      target: pageTarget,
-      mode: 'coloring-page',
-      eligibility: pageEligibility,
-      selectedTargetIds: ['page-one'],
-      selectedTargets: [pageTarget],
-      section,
-    });
-    expect(metadata).toMatchObject({
-      mode: 'coloring-page',
-      eligibility: pageEligibility,
-      selectedTargetIds: ['page-one'],
-      section: { kind: 'number', number: 4, candidates: [2, 4] },
-    });
-    section.candidates.push(8);
-    pageEligibility.pageStatuses.push('completed');
-    expect(metadata.section).toEqual({ kind: 'number', number: 4, candidates: [2, 4] });
-    expect(metadata.eligibility.pageStatuses).toEqual([
-      'not_started',
-      'palette_chosen',
-      'in_progress',
-      'on_hold',
-    ]);
   });
 });

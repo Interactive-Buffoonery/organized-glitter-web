@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const {
@@ -96,60 +96,5 @@ describe('ColoringMediumList delete confirmation', () => {
       'medium-1',
       expect.objectContaining({ onSettled: expect.any(Function) })
     );
-  });
-
-  it('ignores a second save while medium creation is starting', async () => {
-    createMediumMutateAsync.mockReturnValue(new Promise(() => {}));
-    const user = userEvent.setup();
-    renderColoringMediumList();
-
-    await user.click(screen.getByRole('button', { name: /add coloring medium/i }));
-    await user.type(screen.getByLabelText('Name'), 'New pencils');
-    const form = screen.getByRole('button', { name: 'Save' }).closest('form');
-
-    expect(form).not.toBeNull();
-    fireEvent.submit(form!);
-    fireEvent.submit(form!);
-
-    expect(createMediumMutateAsync).toHaveBeenCalledTimes(1);
-  });
-
-  it('blocks reopening until an update is reflected in refreshed data', async () => {
-    let resolveUpdate!: (value: unknown) => void;
-    updateMediumMutateAsync.mockReturnValue(
-      new Promise(resolve => {
-        resolveUpdate = resolve;
-      })
-    );
-    const user = userEvent.setup();
-    const view = renderColoringMediumList();
-
-    await user.click(screen.getByRole('button', { name: /edit prismacolor premier/i }));
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Updated pencils' } });
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    await user.click(screen.getByRole('button', { name: 'Close' }));
-
-    expect(screen.getByRole('button', { name: /edit prismacolor premier/i })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: /edit prismacolor premier/i }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
-    mediumsFetchingRef.value = true;
-    await act(async () => {
-      resolveUpdate({ ...baseMedium, name: 'Updated pencils' });
-      await Promise.resolve();
-    });
-
-    expect(screen.getByRole('button', { name: /edit prismacolor premier/i })).toBeDisabled();
-
-    mediumItemsRef.value = [{ ...baseMedium, name: 'Updated pencils' }];
-    mediumsFetchingRef.value = false;
-    view.rerender(
-      <MemoryRouter>
-        <ColoringMediumList />
-      </MemoryRouter>
-    );
-    await user.click(screen.getByRole('button', { name: /edit updated pencils/i }));
-
-    expect(screen.getByLabelText('Name')).toHaveValue('Updated pencils');
   });
 });

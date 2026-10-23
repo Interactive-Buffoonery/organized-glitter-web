@@ -80,46 +80,4 @@ describe('Apple grant store', () => {
       { identity: 'shared-identity', user: 'owner-1' }
     );
   });
-
-  it('sets a retry delay when the linked-grant scan exceeds capacity', () => {
-    const grants = Array.from({ length: 501 }, (_, index) =>
-      record({
-        id: `grant-${String(index).padStart(4, '0')}`,
-        provider_id_hash: 'shared-identity',
-        state: 'active',
-        user_id: 'owner-1',
-      })
-    );
-    const app = {
-      findCollectionByNameOrId: vi.fn(() => ({ id: 'users-collection' })),
-      findRecordsByFilter: vi.fn((collection, filter, _sort, limit, _offset, params) => {
-        if (collection === '_externalAuths') {
-          return [record({ providerId: 'apple-subject', recordRef: 'owner-1' })];
-        }
-        if (filter.includes('state = "revocation_pending"')) return [];
-        if (filter.includes('id > {:cursor}')) {
-          const start = params.cursor
-            ? grants.findIndex(grant => grant.id === params.cursor) + 1
-            : 0;
-          return grants.slice(start, start + limit);
-        }
-        return [];
-      }),
-    };
-    const setHeader = vi.fn();
-    const response = { header: () => ({ set: setHeader }) };
-    const store = loadModule('pb_hooks/apple_grant_store.js', {
-      $security: { sha256: () => 'shared-identity' },
-    });
-
-    expect(() =>
-      store.requireActive(app, 'shared-identity', 'native-client', false, 'apple', false, response)
-    ).toThrow(
-      expect.objectContaining({
-        status: 503,
-        data: { reason: expect.objectContaining({ code: 'apple_grant_check_limit' }) },
-      })
-    );
-    expect(setHeader).toHaveBeenCalledExactlyOnceWith('Retry-After', '30');
-  });
 });

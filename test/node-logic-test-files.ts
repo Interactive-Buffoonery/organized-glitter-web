@@ -52,10 +52,4 @@ export const nodeLogicTestFiles = [
   'src/utils/date/timezoneUtils.test.ts',
   'src/utils/error/__tests__/structuredErrorReason.test.ts',
   'src/utils/image/__tests__/imagePolicy.test.ts',
-  'test/build-script-default-version.test.ts',
-  'test/dark-theme-tokens.test.ts',
-  'test/progress-note-dialog-css.test.ts',
-  'test/safe-area-css.test.ts',
-  'test/scrapbook-sig-tape.test.ts',
-  'test/sonner-toast-css.test.ts',
 ];

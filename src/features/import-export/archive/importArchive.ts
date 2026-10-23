@@ -253,26 +253,21 @@ function appendIfPresent(formData: FormData, key: string, value: unknown): void 
   formData.append(key, String(value));
 }
 
-async function resolveCompanyId(
-  name: string | undefined,
-  assertSession: () => void
-): Promise<string | undefined> {
-  if (!name?.trim()) return undefined;
-  const existing = await CompaniesService.findByName(name);
-  if (existing) return existing.id;
-  assertSession();
-  return (await CompaniesService.create({ name })).id;
+interface ProjectTaxonomyService {
+  findByName(name: string): Promise<{ id: string } | null>;
+  create(data: { name: string }): Promise<{ id: string }>;
 }
 
-async function resolveArtistId(
+async function resolveProjectTaxonomyId(
+  service: ProjectTaxonomyService,
   name: string | undefined,
   assertSession: () => void
 ): Promise<string | undefined> {
   if (!name?.trim()) return undefined;
-  const existing = await ArtistsService.findByName(name);
+  const existing = await service.findByName(name);
   if (existing) return existing.id;
   assertSession();
-  return (await ArtistsService.create({ name })).id;
+  return (await service.create({ name })).id;
 }
 
 async function createDiamondProjectRecord(
@@ -282,8 +277,8 @@ async function createDiamondProjectRecord(
   assertSession: () => void
 ): Promise<{ id: string }> {
   const [companyId, artistId] = await Promise.all([
-    resolveCompanyId(project.company, assertSession),
-    resolveArtistId(project.artist, assertSession),
+    resolveProjectTaxonomyId(CompaniesService, project.company, assertSession),
+    resolveProjectTaxonomyId(ArtistsService, project.artist, assertSession),
   ]);
 
   const formData = new FormData();
@@ -584,7 +579,7 @@ function createDefaultArchiveImportAdapter(
     async listColoringMediums() {
       return (await ColoringMediumsService.listColoringMediums(userId)).items;
     },
-    async createColoringMedium(medium) {
+    createColoringMedium(medium) {
       assertSession();
       return ColoringMediumsService.createColoringMedium({
         name: medium.name,
@@ -597,11 +592,11 @@ function createDefaultArchiveImportAdapter(
     async listColoringPages(bookId) {
       return ColoringService.listAllPages({ bookId });
     },
-    async restoreColoringPageMetadata(input) {
+    restoreColoringPageMetadata(input) {
       assertSession();
       return ArchiveFilesService.restoreColoringPageMetadata(input);
     },
-    async reconcileColoringBookMetrics(bookId) {
+    reconcileColoringBookMetrics(bookId) {
       assertSession();
       return ArchiveFilesService.reconcileColoringBookMetrics(bookId);
     },
@@ -616,7 +611,7 @@ function createDefaultArchiveImportAdapter(
         assertSession
       );
     },
-    async appendColoringPagePhotos(pageId, photoFiles) {
+    appendColoringPagePhotos(pageId, photoFiles) {
       assertSession();
       return ColoringService.updatePage(pageId, {
         'photos+': photoFiles,
@@ -1436,19 +1431,18 @@ export async function importOrganizedGlitterArchive(
     userId: user.id,
     getCurrentUserId: () => getCurrentUser()?.id ?? null,
   };
-  assertArchiveImportSession(importSession);
+  const assertSession = () => assertArchiveImportSession(importSession);
+  assertSession();
 
   const bundle = await readOrganizedGlitterArchive(file);
   const archiveFingerprint =
     bundle.archiveFingerprint ??
     (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
-  assertArchiveImportSession(importSession);
+  assertSession();
   const { userId } = importSession;
   return withArchiveImportLock(`organized-glitter:archive-import:${userId}`, async () => {
-    assertArchiveImportSession(importSession);
-    const adapter = createDefaultArchiveImportAdapter(userId, () =>
-      assertArchiveImportSession(importSession)
-    );
+    assertSession();
+    const adapter = createDefaultArchiveImportAdapter(userId, assertSession);
     const recoveryStore = createArchiveImportRecoveryStore(userId, archiveFingerprint);
     return importArchiveBundle(bundle, adapter, recoveryStore);
   });

@@ -97,7 +97,6 @@ describe('archive import dispatcher', () => {
     expect(mocks.importV3).not.toHaveBeenCalled();
   });
 
-
   it('reports malformed manifest JSON without exposing parser details', async () => {
     const file = await manifestFile('{');
 

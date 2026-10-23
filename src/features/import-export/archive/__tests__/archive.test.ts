@@ -147,6 +147,7 @@ import {
 } from '@/features/import-export/archive/exportArchive';
 import {
   importArchiveBundle,
+  importOrganizedGlitterArchive,
   type ArchiveImportAdapter,
 } from '@/features/import-export/archive/importArchive';
 import type {
@@ -252,6 +253,9 @@ beforeEach(() => {
   mockCaptureException.mockClear();
   serviceMocks.auth.isAuthenticated.mockReturnValue(true);
   serviceMocks.auth.getCurrentUser.mockReturnValue({ id: 'user-1' });
+  serviceMocks.auth.getCurrentUserId.mockReturnValue('user-1');
+  serviceMocks.companiesService.findByName.mockReset();
+  serviceMocks.companiesService.create.mockReset();
   serviceMocks.archiveFilesService.getPrivateFileToken.mockResolvedValue('private-file-token');
   serviceMocks.pocketbase.resolveFileUrl.mockImplementation(
     (collectionName: string, recordId: string, filename: string) =>
@@ -784,9 +788,18 @@ describe('archive import', () => {
     ]);
   });
 
+  async function sessionArchiveZip(
+    overrides: Partial<OrganizedGlitterArchiveManifestV1>,
+    photoPaths: string[] = []
+  ): Promise<File> {
+    const zip = new JSZip();
+    for (const path of photoPaths) zip.file(path, new Blob([path]));
+    zip.file('manifest.json', JSON.stringify(validManifest({ schemaVersion: 2, ...overrides })));
+    return new File([await zip.generateAsync({ type: 'blob' })], 'session.zip');
+  }
+
   async function sessionArchiveFile(): Promise<File> {
-    const manifest = validManifest({
-      schemaVersion: 2,
+    return sessionArchiveZip({
       coloringMediums: [
         {
           ref: 'coloring-medium:session-medium',
@@ -808,9 +821,6 @@ describe('archive import', () => {
         },
       ],
     });
-    const zip = new JSZip();
-    zip.file('manifest.json', JSON.stringify(manifest));
-    return new File([await zip.generateAsync({ type: 'blob' })], 'session.zip');
   }
 
   it('stops a legacy import when the signed-in account changes mid-import', async () => {
@@ -875,30 +885,6 @@ describe('archive import', () => {
     totalPages: number,
     page: Partial<ArchiveColoringPage> = {}
   ): Promise<File> {
-    const zip = new JSZip();
-    for (const path of [...(page.photoPaths ?? []), ...(page.colorReference?.photoPaths ?? [])]) {
-      zip.file(path, new Blob([path]));
-    }
-    zip.file(
-      'manifest.json',
-      JSON.stringify(
-        validManifest({
-          schemaVersion: 2,
-          coloringBooks: [
-            {
-              ref: 'coloring-book:session-batches',
-              oldId: 'session-batches',
-              title: 'Session Batches',
-              isMystery: false,
-              status: 'in_stash',
-              totalPages,
-              tags: [],
-              pages: [{ ...archiveColoringPage(1), ...page }],
-            },
-          ],
-        })
-      )
-    );
     serviceMocks.archiveFilesService.restoreColoringBookBatch.mockImplementation(
       async (formData: FormData) => {
         const firstPage = Number(formData.get('firstPage'));
@@ -916,7 +902,23 @@ describe('archive import', () => {
       }
     );
     serviceMocks.archiveFilesService.restoreColoringPageMetadata.mockResolvedValue(undefined);
-    return new File([await zip.generateAsync({ type: 'blob' })], 'session-batches.zip');
+    return sessionArchiveZip(
+      {
+        coloringBooks: [
+          {
+            ref: 'coloring-book:session-batches',
+            oldId: 'session-batches',
+            title: 'Session Batches',
+            isMystery: false,
+            status: 'in_stash',
+            totalPages,
+            tags: [],
+            pages: [{ ...archiveColoringPage(1), ...page }],
+          },
+        ],
+      },
+      [...(page.photoPaths ?? []), ...(page.colorReference?.photoPaths ?? [])]
+    );
   }
 
   it.each(['publisher', 'illustrator'] as const)(
@@ -946,29 +948,22 @@ describe('archive import', () => {
         }),
         create,
       });
-      const zip = new JSZip();
-      zip.file(
-        'manifest.json',
-        JSON.stringify(
-          validManifest({
-            schemaVersion: 2,
-            coloringBooks: [
-              {
-                ref: 'coloring-book:session-taxonomy',
-                oldId: 'session-taxonomy',
-                title: 'Session Taxonomy',
-                isMystery: false,
-                status: 'in_stash',
-                totalPages: 1,
-                [field]: 'Session Name',
-                tags: [],
-                pages: [],
-              },
-            ],
-          })
-        )
-      );
-      const file = new File([await zip.generateAsync({ type: 'blob' })], 'session-taxonomy.zip');
+      const file = await sessionArchiveZip({
+        schemaVersion: 2,
+        coloringBooks: [
+          {
+            ref: 'coloring-book:session-taxonomy',
+            oldId: 'session-taxonomy',
+            title: 'Session Taxonomy',
+            isMystery: false,
+            status: 'in_stash',
+            totalPages: 1,
+            [field]: 'Session Name',
+            tags: [],
+            pages: [],
+          },
+        ],
+      });
 
       await expect(
         importOrganizedGlitterArchive(file, {
@@ -984,27 +979,21 @@ describe('archive import', () => {
   );
 
   it('does not create a diamond project when the account changes during taxonomy lookup', async () => {
-    const zip = new JSZip();
-    zip.file(
-      'manifest.json',
-      JSON.stringify(
-        validManifest({
-          schemaVersion: 2,
-          diamondProjects: [
-            {
-              ref: 'project:session-project',
-              oldId: 'session-project',
-              title: 'Session project',
-              status: 'progress',
-              company: 'Session Company',
-              tags: [],
-              progressNotes: [],
-            },
-          ],
-        })
-      )
-    );
-    const file = new File([await zip.generateAsync({ type: 'blob' })], 'session-project.zip');
+    const file = await sessionArchiveZip({
+      schemaVersion: 2,
+      diamondProjects: [
+        {
+          ref: 'project:session-project',
+          oldId: 'session-project',
+          title: 'Session project',
+          status: 'progress',
+          company: 'Session Company',
+          tags: [],
+          progressNotes: [],
+        },
+      ],
+    });
+
     let currentUserId = 'user-1';
     serviceMocks.companiesService.findByName.mockImplementation(async () => {
       currentUserId = 'user-2';
@@ -1085,7 +1074,6 @@ describe('archive import', () => {
 
     expect(serviceMocks.colorReferencesService.restore).toHaveBeenCalledTimes(1);
   });
-
 
   it('reconciles coloring book metrics from final stored page states after conflicts', async () => {
     const manifest = validManifest({

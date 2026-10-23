@@ -232,6 +232,97 @@ describe('useAuth Integration Tests', () => {
       expect(pocketBaseMock.authStore.clear).not.toHaveBeenCalled();
     });
 
+    describe('Session renewal', () => {
+      afterEach(() => vi.restoreAllMocks());
+
+      const focusSession = () =>
+        act(() => {
+          window.dispatchEvent(new Event('focus'));
+        });
+
+      const tokenExpiringIn = (seconds: number) =>
+        `header.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + seconds }))}.sig`;
+
+      it.each([
+        ['renews a session that is more than a day old', 3 * 86400, true],
+        ['leaves a session from the last day alone', 6.9 * 86400, false],
+      ])('%s', async (_name, secondsLeft, shouldRefresh) => {
+        const refresh = vi
+          .spyOn(UsersService, 'refreshDetachedSession')
+          .mockReturnValue(new Promise(() => {}));
+        setupMockAuthState(true, createMockUser({ id: 'sliding-account' }));
+        pocketBaseMock.authStore.token = tokenExpiringIn(secondsLeft);
+
+        const { result } = renderUseAuthHook();
+        await waitFor(() => expect(result.current.initialCheckComplete).toBe(true));
+
+        expect(refresh).toHaveBeenCalledTimes(shouldRefresh ? 1 : 0);
+      });
+
+      it('waits before retrying a session renewal that failed', async () => {
+        const refresh = vi
+          .spyOn(UsersService, 'refreshDetachedSession')
+          .mockRejectedValue(new Error('network down'));
+        setupMockAuthState(true, createMockUser({ id: 'backoff-account' }));
+        pocketBaseMock.authStore.token = tokenExpiringIn(3 * 86400);
+
+        renderUseAuthHook();
+        await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+        await act(async () => Promise.resolve());
+
+        focusSession();
+        expect(refresh).toHaveBeenCalledTimes(1);
+
+        const now = Date.now();
+        vi.spyOn(Date, 'now').mockReturnValue(now + 11 * 60 * 1000);
+        focusSession();
+        expect(refresh).toHaveBeenCalledTimes(2);
+      });
+
+      it.each([
+        ['retries right away when the session is about to expire', 5 * 60, 'same'],
+        ['does not hold a failed renewal against a replacement session', 3 * 86400, 'replaced'],
+      ])('%s', async (_name, secondsLeft, session) => {
+        const refresh = vi
+          .spyOn(UsersService, 'refreshDetachedSession')
+          .mockRejectedValue(new Error('network down'));
+        setupMockAuthState(true, createMockUser({ id: 'retry-account' }));
+        const authStore = pocketBaseMock.authStore;
+        authStore.token = tokenExpiringIn(secondsLeft);
+
+        renderUseAuthHook();
+        await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+        await act(async () => Promise.resolve());
+
+        if (session === 'replaced') authStore.token = tokenExpiringIn(secondsLeft - 60);
+        focusSession();
+        expect(refresh).toHaveBeenCalledTimes(2);
+      });
+
+      it('leaves the renewed session alone after a successful renewal', async () => {
+        const account = createMockUser({ id: 'renewed-account' });
+        const renewedToken = tokenExpiringIn(7 * 86400);
+        const refresh = vi
+          .spyOn(UsersService, 'refreshDetachedSession')
+          .mockResolvedValue({ token: renewedToken, record: account } as Awaited<
+            ReturnType<typeof UsersService.refreshDetachedSession>
+          >);
+        setupMockAuthState(true, account);
+        const authStore = pocketBaseMock.authStore;
+        authStore.token = tokenExpiringIn(3 * 86400);
+        pocketBaseMock.authStore.save.mockImplementation((token: string) => {
+          authStore.token = token;
+        });
+
+        renderUseAuthHook();
+        await waitFor(() =>
+          expect(pocketBaseMock.authStore.save).toHaveBeenCalledWith(renewedToken, account)
+        );
+        focusSession();
+        expect(refresh).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('does not capture the previous account form when a new session expires before React commits', async () => {
       let onChange: ((token: string | null, record: unknown) => void) | undefined;
       const first = createMockUser({ id: 'draft-first-account' });

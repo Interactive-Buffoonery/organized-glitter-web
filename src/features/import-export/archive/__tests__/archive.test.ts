@@ -1,5 +1,6 @@
 import { ArchiveRestoreSignInError } from '@/services/pocketbase/archiveColorKeys.service';
 import JSZip from 'jszip';
+import { ClientResponseError } from 'pocketbase';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('browser-image-compression', () => ({
@@ -12,6 +13,7 @@ const { serviceMocks, mockCaptureException } = vi.hoisted(() => ({
     auth: {
       isAuthenticated: vi.fn(),
       getCurrentUser: vi.fn(),
+      getCurrentUserId: vi.fn(),
     },
     archiveFilesService: {
       getPrivateFileToken: vi.fn(),
@@ -21,6 +23,7 @@ const { serviceMocks, mockCaptureException } = vi.hoisted(() => ({
       reconcileColoringBookMetrics: vi.fn(),
     },
     pocketbase: {
+      collection: vi.fn(),
       resolveFileUrl: vi.fn(
         (collectionName: string, recordId: string, filename: string) =>
           `https://pb.example/api/files/${collectionName}/${recordId}/${filename}`
@@ -70,6 +73,10 @@ const { serviceMocks, mockCaptureException } = vi.hoisted(() => ({
       list: vi.fn().mockResolvedValue([]),
       restore: vi.fn(),
     },
+    companiesService: {
+      findByName: vi.fn(),
+      create: vi.fn(),
+    },
   },
 }));
 
@@ -79,7 +86,11 @@ vi.mock('@/services/analytics-escape-hatch', () => ({
 }));
 
 vi.mock('@/lib/pocketbase', () => ({
-  pb: { authStore: { token: '', record: null, onChange: vi.fn(() => vi.fn()) } },
+  pb: {
+    authStore: { token: '', record: null, onChange: vi.fn(() => vi.fn()) },
+    collection: serviceMocks.pocketbase.collection,
+    filter: (expr: string) => expr,
+  },
   resolveFileUrl: serviceMocks.pocketbase.resolveFileUrl,
 }));
 
@@ -93,6 +104,10 @@ vi.mock('@/services/pocketbase/colorReferences.service', () => ({
 }));
 
 vi.mock('@/services/auth', () => serviceMocks.auth);
+
+vi.mock('@/services/pocketbase/companies.service', () => ({
+  CompaniesService: serviceMocks.companiesService,
+}));
 
 vi.mock('@/services/pocketbase/archiveFiles.service', () => ({
   ArchiveFilesService: serviceMocks.archiveFilesService,
@@ -139,6 +154,7 @@ import {
 } from '@/features/import-export/archive/exportArchive';
 import {
   importArchiveBundle,
+  importOrganizedGlitterArchive,
   type ArchiveImportAdapter,
 } from '@/features/import-export/archive/importArchive';
 import type {
@@ -244,6 +260,9 @@ beforeEach(() => {
   mockCaptureException.mockClear();
   serviceMocks.auth.isAuthenticated.mockReturnValue(true);
   serviceMocks.auth.getCurrentUser.mockReturnValue({ id: 'user-1' });
+  serviceMocks.auth.getCurrentUserId.mockReturnValue('user-1');
+  serviceMocks.companiesService.findByName.mockReset();
+  serviceMocks.companiesService.create.mockReset();
   serviceMocks.archiveFilesService.getPrivateFileToken.mockResolvedValue('private-file-token');
   serviceMocks.pocketbase.resolveFileUrl.mockImplementation(
     (collectionName: string, recordId: string, filename: string) =>
@@ -774,6 +793,293 @@ describe('archive import', () => {
     expect(appendColoringPagePhotos).toHaveBeenCalledWith('current-page', [
       expect.objectContaining({ name: '2.jpg' }),
     ]);
+  });
+
+  async function sessionArchiveZip(
+    overrides: Partial<OrganizedGlitterArchiveManifestV1>,
+    photoPaths: string[] = []
+  ): Promise<File> {
+    const zip = new JSZip();
+    for (const path of photoPaths) zip.file(path, new Blob([path]));
+    zip.file('manifest.json', JSON.stringify(validManifest({ schemaVersion: 2, ...overrides })));
+    return new File([await zip.generateAsync({ type: 'blob' })], 'session.zip');
+  }
+
+  async function sessionArchiveFile(): Promise<File> {
+    return sessionArchiveZip({
+      coloringMediums: [
+        {
+          ref: 'coloring-medium:session-medium',
+          oldId: 'session-medium',
+          name: 'Session medium',
+          type: 'colored_pencil',
+        },
+      ],
+      coloringBooks: [
+        {
+          ref: 'coloring-book:session-book',
+          oldId: 'session-book',
+          title: 'Session Book',
+          isMystery: false,
+          status: 'in_stash',
+          totalPages: 1,
+          tags: [],
+          pages: [],
+        },
+      ],
+    });
+  }
+
+  it('stops a legacy import when the signed-in account changes mid-import', async () => {
+    const file = await sessionArchiveFile();
+    let currentUserId = 'user-1';
+    serviceMocks.coloringMediumsService.listColoringMediums.mockImplementation(async () => {
+      currentUserId = 'user-2';
+      return { items: [], totalItems: 0, totalPages: 0 };
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        getCurrentUserId: () => currentUserId,
+      })
+    ).rejects.toThrow('The signed-in account changed during archive import');
+
+    expect(serviceMocks.coloringMediumsService.createColoringMedium).not.toHaveBeenCalled();
+    expect(serviceMocks.archiveFilesService.restoreColoringBookBatch).not.toHaveBeenCalled();
+    expect(serviceMocks.coloringService.createBook).not.toHaveBeenCalled();
+  });
+
+  it('stops a legacy import once its signal is aborted', async () => {
+    const file = await sessionArchiveFile();
+    const controller = new AbortController();
+    serviceMocks.coloringMediumsService.listColoringMediums.mockImplementation(async () => {
+      controller.abort();
+      return { items: [], totalItems: 0, totalPages: 0 };
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        signal: controller.signal,
+        getCurrentUserId: () => 'user-1',
+      })
+    ).rejects.toThrow('Archive import was cancelled');
+
+    expect(serviceMocks.coloringMediumsService.createColoringMedium).not.toHaveBeenCalled();
+    expect(serviceMocks.archiveFilesService.restoreColoringBookBatch).not.toHaveBeenCalled();
+    expect(serviceMocks.coloringService.createBook).not.toHaveBeenCalled();
+  });
+
+  it('does not start a legacy import with an already aborted signal', async () => {
+    const file = await sessionArchiveFile();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        signal: controller.signal,
+        getCurrentUserId: () => 'user-1',
+      })
+    ).rejects.toThrow('Archive import was cancelled');
+
+    expect(navigator.locks.request).not.toHaveBeenCalled();
+    expect(serviceMocks.projectsService.getAllForUser).not.toHaveBeenCalled();
+  });
+
+  async function sessionBookArchiveFile(
+    totalPages: number,
+    page: Partial<ArchiveColoringPage> = {}
+  ): Promise<File> {
+    serviceMocks.archiveFilesService.restoreColoringBookBatch.mockImplementation(
+      async (formData: FormData) => {
+        const firstPage = Number(formData.get('firstPage'));
+        return {
+          bookId: 'session-book',
+          created: firstPage === 1,
+          pages: Array.from({ length: Number(formData.get('pageCount')) }, (_, index) =>
+            makeColoringPage({
+              id: `session-page-${firstPage + index}`,
+              bookId: 'session-book',
+              pageNumber: firstPage + index,
+            })
+          ),
+        };
+      }
+    );
+    serviceMocks.archiveFilesService.restoreColoringPageMetadata.mockResolvedValue(undefined);
+    return sessionArchiveZip(
+      {
+        coloringBooks: [
+          {
+            ref: 'coloring-book:session-batches',
+            oldId: 'session-batches',
+            title: 'Session Batches',
+            isMystery: false,
+            status: 'in_stash',
+            totalPages,
+            tags: [],
+            pages: [{ ...archiveColoringPage(1), ...page }],
+          },
+        ],
+      },
+      [...(page.photoPaths ?? []), ...(page.colorReference?.photoPaths ?? [])]
+    );
+  }
+
+  it.each(['publisher', 'illustrator'] as const)(
+    'does not create a %s under a new account after its lookup',
+    async field => {
+      const [{ BookPublishersService }, { BookIllustratorsService }] = await Promise.all([
+        vi.importActual<typeof import('@/services/pocketbase/bookPublishers.service')>(
+          '@/services/pocketbase/bookPublishers.service'
+        ),
+        vi.importActual<typeof import('@/services/pocketbase/bookIllustrators.service')>(
+          '@/services/pocketbase/bookIllustrators.service'
+        ),
+      ]);
+      serviceMocks.bookPublishersService.createIfNotExists.mockImplementation(
+        BookPublishersService.createIfNotExists.bind(BookPublishersService)
+      );
+      serviceMocks.bookIllustratorsService.createIfNotExists.mockImplementation(
+        BookIllustratorsService.createIfNotExists.bind(BookIllustratorsService)
+      );
+      let currentUserId = 'user-1';
+      serviceMocks.auth.getCurrentUserId.mockImplementation(() => currentUserId);
+      const create = vi.fn();
+      serviceMocks.pocketbase.collection.mockReturnValue({
+        getFirstListItem: vi.fn(async () => {
+          currentUserId = 'user-2';
+          throw new ClientResponseError({ status: 404 });
+        }),
+        create,
+      });
+      const file = await sessionArchiveZip({
+        schemaVersion: 2,
+        coloringBooks: [
+          {
+            ref: 'coloring-book:session-taxonomy',
+            oldId: 'session-taxonomy',
+            title: 'Session Taxonomy',
+            isMystery: false,
+            status: 'in_stash',
+            totalPages: 1,
+            [field]: 'Session Name',
+            tags: [],
+            pages: [],
+          },
+        ],
+      });
+
+      await expect(
+        importOrganizedGlitterArchive(file, {
+          userId: 'user-1',
+          getCurrentUserId: () => currentUserId,
+        })
+      ).rejects.toThrow('The signed-in account changed during archive import');
+
+      expect(create).not.toHaveBeenCalled();
+      expect(serviceMocks.archiveFilesService.restoreColoringBookBatch).not.toHaveBeenCalled();
+      expect(serviceMocks.coloringService.createBook).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not create a diamond project when the account changes during taxonomy lookup', async () => {
+    const file = await sessionArchiveZip({
+      schemaVersion: 2,
+      diamondProjects: [
+        {
+          ref: 'project:session-project',
+          oldId: 'session-project',
+          title: 'Session project',
+          status: 'progress',
+          company: 'Session Company',
+          tags: [],
+          progressNotes: [],
+        },
+      ],
+    });
+
+    let currentUserId = 'user-1';
+    serviceMocks.companiesService.findByName.mockImplementation(async () => {
+      currentUserId = 'user-2';
+      return { id: 'company-1' };
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        getCurrentUserId: () => currentUserId,
+      })
+    ).rejects.toThrow('The signed-in account changed during archive import');
+
+    expect(serviceMocks.archiveFilesService.restoreDiamondProject).not.toHaveBeenCalled();
+  });
+
+  it('stops coloring book page batches once the import is cancelled', async () => {
+    const file = await sessionBookArchiveFile(200);
+    const controller = new AbortController();
+    const restoreBatch = serviceMocks.archiveFilesService.restoreColoringBookBatch;
+    const respond = restoreBatch.getMockImplementation()!;
+    restoreBatch.mockImplementation(async (formData: FormData) => {
+      controller.abort();
+      return respond(formData);
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        signal: controller.signal,
+        getCurrentUserId: () => 'user-1',
+      })
+    ).rejects.toThrow('Archive import was cancelled');
+
+    expect(restoreBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops page photo batches once the import is cancelled', async () => {
+    const photoPaths = Array.from({ length: 5 }, (_, index) => `photos/session/${index}.jpg`);
+    const file = await sessionBookArchiveFile(1, { status: 'completed', photoPaths });
+    const controller = new AbortController();
+    serviceMocks.coloringService.updatePage.mockImplementation(async () => {
+      controller.abort();
+      return makeColoringPage({ id: 'session-page-1' });
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        signal: controller.signal,
+        getCurrentUserId: () => 'user-1',
+      })
+    ).rejects.toThrow('Archive import was cancelled');
+
+    expect(serviceMocks.coloringService.updatePage).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops color reference photo restores when the account changes', async () => {
+    const file = await sessionBookArchiveFile(1, {
+      colorReference: {
+        ref: 'coloring-color-reference:session',
+        notes: '001',
+        photoPaths: ['swatches/one.png', 'swatches/two.png'],
+      },
+    });
+    let currentUserId = 'user-1';
+    serviceMocks.colorReferencesService.restore.mockImplementation(async () => {
+      currentUserId = 'user-2';
+      return { referenceId: 'reference-1', addedPhotoCount: 1 };
+    });
+
+    await expect(
+      importOrganizedGlitterArchive(file, {
+        userId: 'user-1',
+        getCurrentUserId: () => currentUserId,
+      })
+    ).rejects.toThrow('The signed-in account changed during archive import');
+
+    expect(serviceMocks.colorReferencesService.restore).toHaveBeenCalledTimes(1);
   });
 
   it('reconciles coloring book metrics from final stored page states after conflicts', async () => {

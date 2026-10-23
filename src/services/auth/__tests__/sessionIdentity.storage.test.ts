@@ -92,20 +92,26 @@ describe('session identity across queued storage events', () => {
     otherTabStore.save('token-a', account);
     resolveResponse(new Response(null, { status: 401 }));
 
-    await expect(request).resolves.toHaveProperty('status', 401);
+    await expect(request).resolves.toMatchObject({
+      response: { status: 401 },
+      sessionBlocked: false,
+    });
     unsubscribe();
     expect(pb.authStore.token).toBe('token-a');
     expect(pb.authStore.record?.id).toBe('account-a');
     expect(onInvalidSession).not.toHaveBeenCalled();
   });
-  it('blocks raw feedback before and after a cross-tab deletion intent', async () => {
+  it('blocks dispatch and fences an accepted response after a cross-tab deletion intent', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
     deletionFence.get.mockResolvedValue({ phase: 'pending' });
     await expect(sendFeedbackRequest({ feedback: 'draft' }, 'token-a')).rejects.toThrow();
     expect(fetcher).not.toHaveBeenCalled();
     deletionFence.get.mockResolvedValueOnce(undefined).mockResolvedValue({ phase: 'pending' });
-    await expect(sendFeedbackRequest({ feedback: 'draft' }, 'token-a')).rejects.toThrow();
+    await expect(sendFeedbackRequest({ feedback: 'draft' }, 'token-a')).resolves.toMatchObject({
+      response: { status: 200 },
+      sessionBlocked: true,
+    });
     expect(fetcher).toHaveBeenCalledOnce();
   });
 

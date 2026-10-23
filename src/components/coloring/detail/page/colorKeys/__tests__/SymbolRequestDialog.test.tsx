@@ -1,0 +1,220 @@
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { ClientResponseError } from 'pocketbase';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SymbolRequestDialog } from '../SymbolRequestDialog';
+
+const state = vi.hoisted(() => ({
+  send: vi.fn(),
+  prepare: vi.fn(),
+  onSent: vi.fn(),
+  onOpenChange: vi.fn(),
+}));
+vi.mock('@/hooks/mutations/coloring/useColorKeyMutations', () => ({
+  useCreateSymbolRequest: () => ({ mutateAsync: state.send }),
+}));
+vi.mock('@/utils/image/symbolRequestPhoto', () => ({ prepareSymbolRequestPhoto: state.prepare }));
+
+const photo = new File(['photo'], 'symbol.jpg', { type: 'image/jpeg' });
+const cropped = new File(['cropped'], 'symbol-cropped.jpg', { type: 'image/jpeg' });
+
+// react-easy-crop needs real image layout; the stub drives the dialog's two ways out.
+vi.mock('@/components/image/ImageCropDialog', () => ({
+  ImageCropDialog: ({
+    open,
+    file,
+    onCropComplete,
+    onUseOriginal,
+    onOpenChange,
+  }: {
+    open: boolean;
+    file: File | null;
+    onCropComplete: (file: File) => void;
+    onUseOriginal: (file: File) => void;
+    onOpenChange: (open: boolean) => void;
+  }) =>
+    open ? (
+      <div role="dialog" aria-label="Crop the symbol">
+        <span>{file?.name}</span>
+        <button
+          type="button"
+          onClick={() => {
+            onCropComplete(cropped);
+            onOpenChange(false);
+          }}
+        >
+          Use crop
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (file) onUseOriginal(file);
+            onOpenChange(false);
+          }}
+        >
+          Skip crop
+        </button>
+      </div>
+    ) : null,
+}));
+
+function renderDialog() {
+  render(
+    <SymbolRequestDialog
+      open
+      onOpenChange={state.onOpenChange}
+      userId="owner"
+      pageId="page-1"
+      bookLabel="Lost Ocean, page 4"
+      email="me@example.test"
+      onSent={state.onSent}
+    />
+  );
+  return screen.getByRole('dialog', { name: 'Send us a symbol' });
+}
+
+async function fillAndSend(user: ReturnType<typeof userEvent.setup>, submitWithEnter = false) {
+  await user.upload(screen.getByLabelText('Photo'), photo);
+  await user.type(screen.getByRole('textbox', { name: /^Description/ }), 'Two w stacked');
+  // Enter leaves focus in a field, as the phone keyboard's Go key does.
+  if (submitWithEnter) await user.keyboard('{Enter}');
+  else await user.click(screen.getByRole('button', { name: 'Send' }));
+}
+
+beforeEach(() => {
+  for (const mock of Object.values(state)) mock.mockReset();
+  state.prepare.mockImplementation(async (file: File) => file);
+  state.onSent.mockResolvedValue(true);
+  URL.createObjectURL = vi.fn(() => 'blob:preview');
+  URL.revokeObjectURL = vi.fn();
+});
+
+describe('SymbolRequestDialog', () => {
+  it('asks for a photo before sending anything', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose a photo.');
+    expect(state.send).not.toHaveBeenCalled();
+  });
+
+  it('requires a valid email', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.clear(screen.getByRole('textbox', { name: 'Email' }));
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'nope');
+    await fillAndSend(user);
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a valid email address.');
+    expect(state.send).not.toHaveBeenCalled();
+  });
+
+  it('sends the prepared photo with the typed fields and reports the new request', async () => {
+    const user = userEvent.setup();
+    const prepared = new File(['small'], 'symbol.jpg', { type: 'image/jpeg' });
+    state.prepare.mockResolvedValue(prepared);
+    state.send.mockResolvedValue({ id: 'abcdefghijklmno' });
+    renderDialog();
+    await user.type(screen.getByRole('textbox', { name: 'Book and page' }), '  ');
+    await fillAndSend(user);
+    expect(state.prepare).toHaveBeenCalledWith(photo);
+    expect(state.send).toHaveBeenCalledWith({
+      page: 'page-1',
+      book_label: 'Lost Ocean, page 4',
+      description: 'Two w stacked',
+      email: 'me@example.test',
+      photo: prepared,
+    });
+    await waitFor(() => expect(state.onSent).toHaveBeenCalledWith('abcdefghijklmno', true));
+  });
+
+  it.each([
+    [429, "You've sent a few requests. Try again in a little while."],
+    [503, "We're getting a lot of requests right now. Try again in a few minutes."],
+    [500, 'Could not send your photo. Try again.'],
+  ])('shows a friendly message for HTTP %i and keeps everything typed', async (status, message) => {
+    const user = userEvent.setup();
+    state.send.mockRejectedValueOnce(new ClientResponseError({ status }));
+    renderDialog();
+    await fillAndSend(user, true);
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toHaveFocus());
+    expect(state.onSent).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: /^Description/ })).toHaveValue('Two w stacked');
+    expect(screen.getByRole('img', { name: 'Chosen symbol' })).toBeInTheDocument();
+
+    state.send.mockResolvedValueOnce({ id: 'abcdefghijklmno' });
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(state.send).toHaveBeenLastCalledWith(expect.objectContaining({ photo }));
+    await waitFor(() => expect(state.onSent).toHaveBeenCalled());
+  });
+
+  it.each([
+    ['email', 'Enter a valid email address.'],
+    ['photo', 'Choose a JPG, PNG, or WebP photo under 10 MB.'],
+    ['book_label', 'Check the book and page.'],
+  ])('explains a rejected %s field', async (field, message) => {
+    const user = userEvent.setup();
+    state.send.mockRejectedValue(
+      new ClientResponseError({
+        status: 400,
+        response: { data: { [field]: { code: 'validation_invalid', message: 'Invalid' } } },
+      })
+    );
+    renderDialog();
+    await fillAndSend(user);
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+  });
+
+  it('shows a photo that could not be prepared and keeps it chosen', async () => {
+    const user = userEvent.setup();
+    state.prepare.mockRejectedValue(new Error('Choose a JPG, PNG, or WebP photo under 10 MB.'));
+    renderDialog();
+    await fillAndSend(user);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Choose a JPG, PNG, or WebP photo under 10 MB.'
+    );
+    expect(screen.getByRole('img', { name: 'Chosen symbol' })).toBeInTheDocument();
+    expect(state.send).not.toHaveBeenCalled();
+  });
+
+  it('points the failed field at the error', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    const alert = screen.getByRole('alert');
+    const input = screen.getByLabelText('Photo');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input.getAttribute('aria-describedby')).toContain(alert.id);
+
+    await user.upload(input, photo);
+    const email = screen.getByRole('textbox', { name: 'Email' });
+    await user.clear(email);
+    await user.type(email, 'nope');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(input).not.toHaveAttribute('aria-invalid');
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(email).toHaveAccessibleDescription(
+      "We'll email you when it's added. Enter a valid email address."
+    );
+  });
+
+  it('cannot be dismissed while sending, and shows the error after', async () => {
+    const user = userEvent.setup();
+    let reject: (error: unknown) => void = () => {};
+    state.send.mockReturnValue(new Promise((_, fail) => (reject = fail)));
+    renderDialog();
+    await fillAndSend(user);
+    expect(screen.getByRole('button', { name: 'Sending…' })).toBeDisabled();
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(state.onOpenChange).not.toHaveBeenCalledWith(false);
+
+    reject(new ClientResponseError({ status: 429 }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "You've sent a few requests. Try again in a little while."
+    );
+    expect(screen.getByRole('textbox', { name: /^Description/ })).toHaveValue('Two w stacked');
+    await user.keyboard('{Escape}');
+    expect(state.onOpenChange).toHaveBeenCalledWith(false);
+  });
+});

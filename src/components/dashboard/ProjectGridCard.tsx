@@ -53,8 +53,8 @@ const ProjectGridCardComponent = ({
           ? 'border-accent bg-accent/10 ring-accent ring-opacity-50 ring-2'
           : 'border-border bg-card hover:border-primary/20'
       )}
-      aria-label={`Open project ${project.title}`}
     >
+      <span className="sr-only">Open project </span>
       <div className="bg-muted relative h-48 w-full sm:h-52">
         <ProjectThumbnail
           imageUrl={project.imageUrl}

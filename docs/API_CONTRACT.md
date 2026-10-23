@@ -231,6 +231,13 @@ reject actual changes. Omitted, empty, or null `tried` defaults to `[]` on
 API and internal saves; other supplied values must be arrays of up to 20
 strings of 100 characters.
 
+`POST /api/coloring/color-keys/setup` creates a page's starting keys in one
+transaction. The body is `{ page, symbols }` with 1 to 100 different valid
+symbol IDs; rows get positions `0` to `n-1` and the response is `{ items }`. It
+requires a verified user who owns the page's book (401, 403, or 404 otherwise)
+and returns 409 without creating anything when the caller already has a key on
+that page.
+
 Requests allow owner create/list/view only; update/delete require a superuser.
 Any optional page must be owned. Status and resolution are server-controlled on
 create. The photo is protected, including thumbnails; use an owner file token.

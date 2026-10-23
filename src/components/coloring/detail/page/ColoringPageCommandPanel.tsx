@@ -1,4 +1,5 @@
 import { ColorReferenceSection } from './ColorReferenceSection';
+import { ColorKeySection } from './colorKeys/ColorKeySection';
 import type { UseColoringPageLifecycleDatesResult } from '@/hooks/coloring/useColoringPageLifecycleDates';
 import type { UseColoringPageMediumSelectionResult } from '@/hooks/coloring/useColoringPageMediumSelection';
 import type { UseColoringPageMysteryRevealResult } from '@/hooks/coloring/useColoringPageMysteryReveal';
@@ -64,6 +65,7 @@ export function ColoringPageCommandPanel({
         disabled={mediumSelection.isPending}
       />
 
+      <ColorKeySection pageId={page.id} bookLabel={`${book.title}, page ${page.pageNumber}`} />
       <ColorReferenceSection pageId={page.id} />
 
       {book.isMystery ? (

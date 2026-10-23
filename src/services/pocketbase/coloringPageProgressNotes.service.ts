@@ -4,9 +4,9 @@
  */
 
 import { getFileUrl, pb } from '@/lib/pocketbase';
-import { getCurrentUserId, isAuthenticated } from '@/services/auth';
 import { Collections } from '@/types/pocketbase.types';
 import { ErrorHandler } from './base/ErrorHandler';
+import { requireUserId } from './base/requireUserId';
 import { createLogger } from '@/utils/logger';
 import { deleteBatch } from './base/batchDelete';
 import type { MarkdownString } from '@/types/markdown';
@@ -18,13 +18,6 @@ import type { NoteListCursor } from './base/noteListCursor';
 
 const logger = createLogger('ColoringPageProgressNotesService');
 const LATEST_NOTE_QUERY_CONCURRENCY = 6;
-
-function requireUserId(): string {
-  if (!isAuthenticated()) throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  const userId = getCurrentUserId();
-  if (!userId) throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  return userId;
-}
 
 export interface ColoringPageProgressNoteDTO {
   id: string;

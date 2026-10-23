@@ -130,6 +130,29 @@ describe('archive import dispatcher', () => {
     ]);
     expect(result.schemaVersion).toBe(4);
     expect(result.result.success).toBe(true);
+  });
+
+  it('preserves the legacy v2 route without requiring a v3-capable server', async () => {
+    const file = await schemaFile(2);
+    mocks.importLegacy.mockResolvedValue({
+      archiveSchemaVersion: 2,
+      success: true,
+    });
+
+    const controller = new AbortController();
+
+    const result = await importOrganizedGlitterArchives([file], { signal: controller.signal });
+
+    expect(result.schemaVersion).toBe(2);
+    expect(mocks.importLegacy).toHaveBeenCalledWith(file, {
+      userId: 'user-1',
+      signal: controller.signal,
+      getCurrentUserId: expect.any(Function),
+    });
+    const session = mocks.importLegacy.mock.calls[0][1] as { getCurrentUserId(): string | null };
+    mocks.getCurrentUser.mockReturnValueOnce({ id: 'user-2' });
+    expect(session.getCurrentUserId()).toBe('user-2');
+    expect(mocks.getCapabilities).not.toHaveBeenCalled();
     expect(mocks.importV3).not.toHaveBeenCalled();
   });
 

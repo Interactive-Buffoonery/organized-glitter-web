@@ -19,7 +19,7 @@ export async function sendFeedbackRequest(
   payload: FeedbackRequest,
   token: string,
   sessionIdentity: SessionIdentity = captureSessionIdentity()
-): Promise<Response> {
+): Promise<{ response: Response; sessionBlocked: boolean }> {
   const checkFence = async (beforeDispatch: boolean) => {
     if (
       !sessionIdentity.accountId ||
@@ -37,7 +37,14 @@ export async function sendFeedbackRequest(
     },
     body: JSON.stringify(payload),
   });
-  await checkFence(false);
+  let sessionBlocked = false;
+  try {
+    await checkFence(false);
+  } catch (error) {
+    if (!response.ok) throw error;
+    // Preserve an accepted response for completion tracking while keeping the session fenced.
+    sessionBlocked = true;
+  }
   if (
     response.status === 401 &&
     pb.authStore.token === token &&
@@ -45,5 +52,5 @@ export async function sendFeedbackRequest(
   ) {
     reportInvalidSession(token);
   }
-  return response;
+  return { response, sessionBlocked };
 }

@@ -517,6 +517,67 @@ try {
   await flushOutput();
   assert.equal(mails('contact@example.test').length, 1);
   // A fresh account proves the quota exactly, independent of invalid submissions above.
+  const setupPath = '/api/coloring/color-keys/setup';
+  const runSetup = (client, body) => client.send(setupPath, { method: 'POST', body });
+  const setupPage = async who => {
+    const book = await admin
+      .collection('coloring_books')
+      .create({ user: who.user.id, title: 'Setup', total_pages: 1, status: 'in_progress' });
+    return admin.collection('coloring_pages').getFirstListItem(`book = '${book.id}'`);
+  };
+  const pageKeys = pageId => admin.collection(keys).getFullList({ filter: `page = '${pageId}'` });
+  const freshPage = await setupPage(a);
+  const setupSymbols = ['u:0031', 'u:0032', 'c:linked-circles'];
+  const setupResult = await runSetup(a.client, { page: freshPage.id, symbols: setupSymbols });
+  assert.deepEqual(
+    setupResult.items.map(row => [row.position, row.symbol, row.user, row.page]),
+    setupSymbols.map((symbol, position) => [position, symbol, a.user.id, freshPage.id])
+  );
+  await assert.rejects(
+    runSetup(a.client, { page: freshPage.id, symbols: ['u:0033'] }),
+    error => error.status === 409 && error.response.message === 'This page already has symbols.'
+  );
+  assert.equal((await pageKeys(freshPage.id)).length, 3);
+  const racePage = await setupPage(a);
+  const race = await Promise.allSettled([
+    runSetup(a.client, { page: racePage.id, symbols: ['u:0031'] }),
+    runSetup(a.client, { page: racePage.id, symbols: ['u:0032'] }),
+  ]);
+  assert.deepEqual(
+    race.map(result => (result.status === 'fulfilled' ? 200 : result.reason.status)).sort(),
+    [200, 409]
+  );
+  assert.equal((await pageKeys(racePage.id)).length, 1);
+  const untouched = await setupPage(a);
+  for (const [client, body, status] of [
+    [b.client, { page: untouched.id, symbols: ['u:0031'] }, 403],
+    [unverified.client, { page: unverified.page.id, symbols: ['u:0031'] }, 403],
+    [new PocketBase(url), { page: untouched.id, symbols: ['u:0031'] }, 401],
+    [a.client, { page: 'missingpage0000', symbols: ['u:0031'] }, 404],
+    [a.client, { page: untouched.id, symbols: [] }, 400],
+    [a.client, { page: untouched.id, symbols: 'u:0031' }, 400],
+    [a.client, { page: untouched.id, symbols: ['u:abcd'] }, 400],
+    [a.client, { page: untouched.id, symbols: [1] }, 400],
+    [a.client, { page: untouched.id, symbols: ['u:0031', 'u:0031'] }, 400],
+    [
+      a.client,
+      {
+        page: untouched.id,
+        symbols: Array.from({ length: 101 }, (_, i) => `c:s${i}`),
+      },
+      400,
+    ],
+  ]) {
+    await reject(runSetup(client, body), status);
+  }
+  assert.equal((await pageKeys(untouched.id)).length, 0);
+  assert.equal((await pageKeys(unverified.page.id)).length, 0);
+  const hundred = await setupPage(a);
+  const full = await runSetup(a.client, {
+    page: hundred.id,
+    symbols: Array.from({ length: 100 }, (_, i) => `c:s${i}`),
+  });
+  assert.equal(full.items.length, 100);
   const quota = await account('quota');
   const results = await Promise.all(
     Array.from({ length: 8 }, async () => {
@@ -538,7 +599,7 @@ try {
   await admin.collection('users').delete(b.user.id);
   await reject(admin.collection(keys).getOne(foreign.id), 404);
   console.log(
-    'Color keys: ownership, verification, validation, immutability, protected files, status forcing, quota, nonfatal mail, resolution, idempotence and cascades passed'
+    'Color keys: ownership, verification, validation, immutability, protected files, setup, status forcing, quota, nonfatal mail, resolution, idempotence and cascades passed'
   );
   if (process.argv.includes('--generate-types')) {
     const result = spawnSync('pnpm', ['pb:types'], {

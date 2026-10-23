@@ -74,11 +74,35 @@ import {
   type ColoringBookRecoveryCheckpoint,
   type ColoringPageMetadataSnapshot,
 } from '@/features/import-export/archive/archiveImportRecovery';
+import type { ArchiveV3ImportSession } from '@/features/import-export/archive/v3/import';
 
 const DEFAULT_TAG_COLOR_HEX = TAG_COLOR_PALETTE[0].hex;
 const ARCHIVE_PAGE_PHOTO_BATCH_SIZE = 4;
 const archiveImportQueues = new Map<string, Promise<unknown>>();
 const AMBIGUOUS_PROJECT_MATCH = Symbol('ambiguous-project-match');
+
+class ArchiveImportStoppedError extends Error {
+  override name = 'ArchiveImportStoppedError';
+}
+
+function assertArchiveImportSession(session: ArchiveV3ImportSession): void {
+  if (session.signal?.aborted) {
+    throw new ArchiveImportStoppedError('Archive import was cancelled');
+  }
+  if (session.getCurrentUserId() !== session.userId) {
+    throw new ArchiveImportStoppedError(
+      'The signed-in account changed during archive import. Import was stopped.'
+    );
+  }
+}
+
+function captureRecoverableImportError(
+  error: unknown,
+  properties: Parameters<typeof captureImportExportException>[1]
+): void {
+  if (error instanceof ArchiveImportStoppedError) throw error;
+  captureImportExportException(error, properties);
+}
 
 export function withArchiveImportLock<T>(
   name: string,
@@ -121,7 +145,8 @@ export async function restoreArchivedColorReference(
   notes: string,
   photoPaths: string[],
   loadPhoto: (path: string) => Promise<File>,
-  restoreKey: string
+  restoreKey: string,
+  assertSession: () => void = () => {}
 ): Promise<ColorReferenceRestoreResult> {
   let referenceId = '';
   let addedPhotoCount = 0;
@@ -129,6 +154,7 @@ export async function restoreArchivedColorReference(
     for (let offset = 0; offset < Math.max(photoPaths.length, 1); offset++) {
       const path = photoPaths[offset];
       const files = path ? [await loadPhoto(path)] : [];
+      assertSession();
       const restored = await ColorReferencesService.restore(pageId, userId, {
         action: 'restore',
         notes,
@@ -141,6 +167,7 @@ export async function restoreArchivedColorReference(
     }
     return { referenceId, addedPhotoCount };
   } catch (error) {
+    if (error instanceof ArchiveImportStoppedError) throw error;
     throw new PartialColorReferenceRestoreError(
       error instanceof Error ? error.message : 'Color reference restore failed',
       { addedPhotoCount, referenceId, cause: error }
@@ -241,26 +268,32 @@ function appendIfPresent(formData: FormData, key: string, value: unknown): void 
   formData.append(key, String(value));
 }
 
-async function resolveCompanyId(name: string | undefined): Promise<string | undefined> {
-  if (!name?.trim()) return undefined;
-  const existing = await CompaniesService.findByName(name);
-  return existing?.id ?? (await CompaniesService.create({ name })).id;
+interface ProjectTaxonomyService {
+  findByName(name: string): Promise<{ id: string } | null>;
+  create(data: { name: string }): Promise<{ id: string }>;
 }
 
-async function resolveArtistId(name: string | undefined): Promise<string | undefined> {
+async function resolveProjectTaxonomyId(
+  service: ProjectTaxonomyService,
+  name: string | undefined,
+  assertSession: () => void
+): Promise<string | undefined> {
   if (!name?.trim()) return undefined;
-  const existing = await ArtistsService.findByName(name);
-  return existing?.id ?? (await ArtistsService.create({ name })).id;
+  const existing = await service.findByName(name);
+  if (existing) return existing.id;
+  assertSession();
+  return (await service.create({ name })).id;
 }
 
 async function createDiamondProjectRecord(
   project: ArchiveDiamondProject,
-  coverFile?: File,
-  archiveProjectId?: string
+  coverFile: File | undefined,
+  archiveProjectId: string | undefined,
+  assertSession: () => void
 ): Promise<{ id: string }> {
   const [companyId, artistId] = await Promise.all([
-    resolveCompanyId(project.company),
-    resolveArtistId(project.artist),
+    resolveProjectTaxonomyId(CompaniesService, project.company, assertSession),
+    resolveProjectTaxonomyId(ArtistsService, project.artist, assertSession),
   ]);
 
   const formData = new FormData();
@@ -283,6 +316,7 @@ async function createDiamondProjectRecord(
   appendIfPresent(formData, 'artist', artistId);
   if (coverFile) formData.append('image', coverFile);
 
+  assertSession();
   const restored = await ArchiveFilesService.restoreDiamondProject(formData);
   if (restored.status !== project.status) {
     throw new Error('Archive diamond project status changed during restore.');
@@ -295,7 +329,11 @@ interface TagResolver {
   createTag: (tagData: TagFormValues) => Promise<ServiceResponse<Tag>>;
 }
 
-async function getOrCreateTagIds(tagNames: string[], resolver: TagResolver): Promise<string[]> {
+async function getOrCreateTagIds(
+  tagNames: string[],
+  resolver: TagResolver,
+  assertSession: () => void
+): Promise<string[]> {
   const existingResponse = await resolver.listTags();
   if (isServiceResponseError(existingResponse)) {
     throw existingResponse.error;
@@ -313,6 +351,7 @@ async function getOrCreateTagIds(tagNames: string[], resolver: TagResolver): Pro
       continue;
     }
 
+    assertSession();
     const created = await resolver.createTag({
       name: trimmed,
       color: DEFAULT_TAG_COLOR_HEX,
@@ -325,28 +364,51 @@ async function getOrCreateTagIds(tagNames: string[], resolver: TagResolver): Pro
   return ids;
 }
 
-function getOrCreateDiamondTagIds(tagNames: string[]): Promise<string[]> {
-  return getOrCreateTagIds(tagNames, {
-    listTags: () => TagService.getUserTags(),
-    createTag: tagData => TagService.createTag(tagData),
-  });
+function getOrCreateDiamondTagIds(
+  tagNames: string[],
+  assertSession: () => void
+): Promise<string[]> {
+  return getOrCreateTagIds(
+    tagNames,
+    {
+      listTags: () => TagService.getUserTags(),
+      createTag: tagData => TagService.createTag(tagData),
+    },
+    assertSession
+  );
 }
 
-function getOrCreateColoringTagIds(tagNames: string[]): Promise<string[]> {
-  return getOrCreateTagIds(tagNames, {
-    listTags: () => ColoringTagService.listColoringTags(),
-    createTag: tagData => ColoringTagService.createColoringTag(tagData),
-  });
+function getOrCreateColoringTagIds(
+  tagNames: string[],
+  assertSession: () => void
+): Promise<string[]> {
+  return getOrCreateTagIds(
+    tagNames,
+    {
+      listTags: () => ColoringTagService.listColoringTags(),
+      createTag: tagData => ColoringTagService.createColoringTag(tagData),
+    },
+    assertSession
+  );
 }
 
-async function resolvePublisherId(name: string | undefined): Promise<string | undefined> {
+interface BookTaxonomyService {
+  createIfNotExists(data: { name: string }, expectedUserId: string): Promise<{ id: string }>;
+}
+
+async function resolveBookTaxonomyId(
+  service: BookTaxonomyService,
+  name: string | undefined,
+  userId: string,
+  assertSession: () => void
+): Promise<string | undefined> {
   if (!name?.trim()) return undefined;
-  return (await BookPublishersService.createIfNotExists({ name })).id;
-}
-
-async function resolveIllustratorId(name: string | undefined): Promise<string | undefined> {
-  if (!name?.trim()) return undefined;
-  return (await BookIllustratorsService.createIfNotExists({ name })).id;
+  try {
+    return (await service.createIfNotExists({ name }, userId)).id;
+  } catch (error) {
+    assertSession();
+    throw error;
+  }
 }
 
 function appendArchiveColoringBookIdentityFields(
@@ -392,11 +454,13 @@ async function restoreArchiveColoringBookRecord(
   book: ArchiveColoringBook,
   archiveFingerprint: string,
   coverFile: File | undefined,
-  options: { allowCreate: boolean }
+  options: { allowCreate: boolean },
+  userId: string,
+  assertSession: () => void
 ): Promise<{ bookId: string; created: boolean; pages: ColoringPageDTO[] }> {
   const [publisher, illustrator] = await Promise.all([
-    resolvePublisherId(book.publisher),
-    resolveIllustratorId(book.illustrator),
+    resolveBookTaxonomyId(BookPublishersService, book.publisher, userId, assertSession),
+    resolveBookTaxonomyId(BookIllustratorsService, book.illustrator, userId, assertSession),
   ]);
   let bookId = '';
   let created = false;
@@ -413,6 +477,7 @@ async function restoreArchiveColoringBookRecord(
     appendIfPresent(formData, 'allowCreate', options.allowCreate && firstPage === 1);
     if (firstPage === 1 && coverFile) formData.append('cover_image', coverFile);
 
+    assertSession();
     const batch = await ArchiveFilesService.restoreColoringBookBatch(formData);
     if (bookId && bookId !== batch.bookId) {
       throw new Error('Archive coloring book restore returned inconsistent record IDs.');
@@ -425,7 +490,10 @@ async function restoreArchiveColoringBookRecord(
   return { bookId, created, pages };
 }
 
-function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter {
+function createDefaultArchiveImportAdapter(
+  userId: string,
+  assertSession: () => void
+): ArchiveImportAdapter {
   return {
     async listExistingProjects() {
       return (await projectsService.getAllForUser(userId)).map(project => ({
@@ -435,10 +503,11 @@ function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter
       }));
     },
     createDiamondProject(project, coverFile, archiveProjectId) {
-      return createDiamondProjectRecord(project, coverFile, archiveProjectId);
+      return createDiamondProjectRecord(project, coverFile, archiveProjectId, assertSession);
     },
     async addDiamondTags(projectId, tagNames) {
-      const tagIds = await getOrCreateDiamondTagIds(tagNames);
+      const tagIds = await getOrCreateDiamondTagIds(tagNames, assertSession);
+      assertSession();
       await Promise.all(
         tagIds.map(async tagId => {
           const response = await TagService.addTagToProject(projectId, tagId);
@@ -450,6 +519,7 @@ function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter
       return ProgressNotesService.listByProject(projectId);
     },
     async createDiamondProgressNote(projectId, note, imageFile) {
+      assertSession();
       return ProgressNotesService.create({
         project: projectId,
         content: note.content as MarkdownString,
@@ -472,9 +542,10 @@ function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter
     },
     async createColoringBook(book, coverFile) {
       const [publisher, illustrator] = await Promise.all([
-        resolvePublisherId(book.publisher),
-        resolveIllustratorId(book.illustrator),
+        resolveBookTaxonomyId(BookPublishersService, book.publisher, userId, assertSession),
+        resolveBookTaxonomyId(BookIllustratorsService, book.illustrator, userId, assertSession),
       ]);
+      assertSession();
       return ColoringService.createBook({
         title: book.title,
         publisher,
@@ -505,10 +576,18 @@ function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter
       return deriveArchiveColoringBookId(userId, archiveFingerprint, archiveBookRef);
     },
     restoreArchiveColoringBook(book, archiveFingerprint, coverFile, options) {
-      return restoreArchiveColoringBookRecord(book, archiveFingerprint, coverFile, options);
+      return restoreArchiveColoringBookRecord(
+        book,
+        archiveFingerprint,
+        coverFile,
+        options,
+        userId,
+        assertSession
+      );
     },
     async addColoringBookTags(bookId, tagNames) {
-      const tagIds = await getOrCreateColoringTagIds(tagNames);
+      const tagIds = await getOrCreateColoringTagIds(tagNames, assertSession);
+      assertSession();
       const response = await ColoringTagService.syncBookTags(bookId, tagIds);
       if (isServiceResponseError(response)) throw response.error;
     },
@@ -516,6 +595,7 @@ function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter
       return (await ColoringMediumsService.listColoringMediums(userId)).items;
     },
     createColoringMedium(medium) {
+      assertSession();
       return ColoringMediumsService.createColoringMedium({
         name: medium.name,
         type: medium.type,
@@ -528,12 +608,15 @@ function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter
       return ColoringService.listAllPages({ bookId });
     },
     restoreColoringPageMetadata(input) {
+      assertSession();
       return ArchiveFilesService.restoreColoringPageMetadata(input);
     },
     reconcileColoringBookMetrics(bookId) {
+      assertSession();
       return ArchiveFilesService.reconcileColoringBookMetrics(bookId);
     },
     restoreColorKeys(pageId, pageRef, keys, archiveFingerprint) {
+      assertSession();
       return ArchiveColorKeysService.restore(pageId, userId, pageRef, keys, archiveFingerprint);
     },
     async restoreColorReference(pageId, notes, photoPaths, loadPhoto, restoreKey) {
@@ -543,10 +626,12 @@ function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter
         notes,
         photoPaths,
         loadPhoto,
-        restoreKey
+        restoreKey,
+        assertSession
       );
     },
     appendColoringPagePhotos(pageId, photoFiles) {
+      assertSession();
       return ColoringService.updatePage(pageId, {
         'photos+': photoFiles,
       });
@@ -555,6 +640,7 @@ function createDefaultArchiveImportAdapter(userId: string): ArchiveImportAdapter
       return ColoringPageProgressNotesService.listByPage(pageId);
     },
     async createColoringPageProgressNote(pageId, note, imageFile) {
+      assertSession();
       return ColoringPageProgressNotesService.create({
         page: pageId,
         content: note.content as MarkdownString,
@@ -626,7 +712,7 @@ async function resolveArchiveColoringMediums(
       mappedIds.set(medium.ref, currentMedium.id);
       refMap[medium.ref] = currentMedium.id;
     } catch (error) {
-      captureImportExportException(error, {
+      captureRecoverableImportError(error, {
         source: 'archive_import',
         operation: 'map_coloring_medium',
         archive_schema_version: archiveSchemaVersion,
@@ -951,7 +1037,7 @@ export async function importArchiveBundle(
         }
       }
     } catch (error) {
-      captureImportExportException(error, {
+      captureRecoverableImportError(error, {
         source: 'archive_import',
         operation: 'import_diamond_project',
         archive_schema_version: result.archiveSchemaVersion,
@@ -1137,7 +1223,7 @@ export async function importArchiveBundle(
               });
               recoveryStore?.completePage(book.ref, page.ref);
             } catch (error) {
-              captureImportExportException(error, {
+              captureRecoverableImportError(error, {
                 source: 'archive_import',
                 operation: 'restore_coloring_page_metadata',
                 archive_schema_version: result.archiveSchemaVersion,
@@ -1216,7 +1302,7 @@ export async function importArchiveBundle(
               result.importedPhotoCount += photoFiles.length;
             }
           } catch (error) {
-            captureImportExportException(error, {
+            captureRecoverableImportError(error, {
               source: 'archive_import',
               operation: 'append_coloring_page_photos',
               archive_schema_version: result.archiveSchemaVersion,
@@ -1277,10 +1363,7 @@ export async function importArchiveBundle(
             );
             applyColorReferenceRestoreProgress(result, reference.ref, restored);
           } catch (error) {
-            if (error instanceof PartialColorReferenceRestoreError && page.colorReference) {
-              applyColorReferenceRestoreProgress(result, page.colorReference.ref, error);
-            }
-            captureImportExportException(error, {
+            captureRecoverableImportError(error, {
               source: 'archive_import',
               operation: 'restore_coloring_color_reference',
               archive_schema_version: result.archiveSchemaVersion,
@@ -1288,6 +1371,9 @@ export async function importArchiveBundle(
               failed_count: result.errors.length + 1,
               warning_count: warnings.length,
             });
+            if (error instanceof PartialColorReferenceRestoreError && page.colorReference) {
+              applyColorReferenceRestoreProgress(result, page.colorReference.ref, error);
+            }
             result.errors.push(
               error instanceof Error
                 ? `Page ${page.pageNumber} in ${book.title}: ${error.message}`
@@ -1378,7 +1464,7 @@ export async function importArchiveBundle(
         recoveryStore?.completeBook(book.ref);
       }
     } catch (error) {
-      captureImportExportException(error, {
+      captureRecoverableImportError(error, {
         source: 'archive_import',
         operation: 'import_coloring_book',
         archive_schema_version: result.archiveSchemaVersion,
@@ -1394,7 +1480,10 @@ export async function importArchiveBundle(
   return result;
 }
 
-export async function importOrganizedGlitterArchive(file: File): Promise<ArchiveImportResult> {
+export async function importOrganizedGlitterArchive(
+  file: File,
+  session?: ArchiveV3ImportSession
+): Promise<ArchiveImportResult> {
   if (!isAuthenticated()) {
     throw new Error('You must be logged in to import an archive');
   }
@@ -1402,14 +1491,23 @@ export async function importOrganizedGlitterArchive(file: File): Promise<Archive
   if (!user?.id) {
     throw new Error('You must be logged in to import an archive');
   }
+  const importSession = session ?? {
+    userId: user.id,
+    getCurrentUserId: () => getCurrentUser()?.id ?? null,
+  };
+  const assertSession = () => assertArchiveImportSession(importSession);
+  assertSession();
 
   const bundle = await readOrganizedGlitterArchive(file);
   const archiveFingerprint =
     bundle.archiveFingerprint ??
     (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
-  return withArchiveImportLock(`organized-glitter:archive-import:${user.id}`, () => {
-    const adapter = createDefaultArchiveImportAdapter(user.id);
-    const recoveryStore = createArchiveImportRecoveryStore(user.id, archiveFingerprint);
+  assertSession();
+  const { userId } = importSession;
+  return withArchiveImportLock(`organized-glitter:archive-import:${userId}`, async () => {
+    assertSession();
+    const adapter = createDefaultArchiveImportAdapter(userId, assertSession);
+    const recoveryStore = createArchiveImportRecoveryStore(userId, archiveFingerprint);
     return importArchiveBundle({ ...bundle, archiveFingerprint }, adapter, recoveryStore);
   });
 }

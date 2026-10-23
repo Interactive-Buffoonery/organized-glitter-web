@@ -57,13 +57,18 @@ export async function importOrganizedGlitterArchives(
   const user = getCurrentUser();
   if (!user?.id) throw new Error('You must be logged in to import an archive');
   if (files.length === 0) throw new Error('Select at least one archive file');
+  const session = {
+    userId: user.id,
+    signal: options.signal,
+    getCurrentUserId: () => getCurrentUser()?.id ?? null,
+  };
 
   if (files.length === 1) {
     const schemaVersion = await readSchemaVersion(files[0]);
     if (schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 4) {
       return {
         schemaVersion,
-        result: await importOrganizedGlitterArchive(files[0]),
+        result: await importOrganizedGlitterArchive(files[0], session),
       };
     }
     if (schemaVersion !== 3) throw new Error(INVALID_ARCHIVE_SCHEMA_ERROR);
@@ -76,11 +81,7 @@ export async function importOrganizedGlitterArchives(
     result: await importArchiveV3Parts(files, {
       capabilities,
       adapter: ArchiveRestoreV3Service,
-      session: {
-        userId: user.id,
-        signal: options.signal,
-        getCurrentUserId: () => getCurrentUser()?.id ?? null,
-      },
+      session,
       onProgress: options.onV3Progress,
     }),
   }));

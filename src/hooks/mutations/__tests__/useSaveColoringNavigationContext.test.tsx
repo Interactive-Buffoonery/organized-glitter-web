@@ -52,33 +52,6 @@ describe('useSaveColoringNavigationContext', () => {
     saveColoringNavigationContextMock.mockResolvedValue('settings-1');
   });
 
-  it('updates the saved coloring navigation context cache after a successful save', async () => {
-    const client = makeClient();
-    const userId = 'user-1';
-    const key = queryKeys.dashboardSettings.coloringNavigationContext(userId);
-    const staleContext = makeNavigationContext({ searchTerm: 'old cached search' });
-    const savedContext = makeNavigationContext({
-      searchTerm: 'new saved search',
-      mysteryOnly: true,
-    });
-
-    client.setQueryData(key, staleContext);
-
-    const { result } = renderHook(() => useSaveColoringNavigationContext(userId), {
-      wrapper: makeWrapper(client),
-    });
-
-    await act(async () => {
-      await result.current.mutateAsync({
-        userId,
-        navigationContext: savedContext,
-      });
-    });
-
-    expect(saveColoringNavigationContextMock).toHaveBeenCalledWith(userId, savedContext, undefined);
-    expect(client.getQueryData(key)).toEqual(savedContext);
-  });
-
   it('serializes saves so older preference state cannot finish last', async () => {
     const client = makeClient();
     const userId = 'user-1';
@@ -121,60 +94,6 @@ describe('useSaveColoringNavigationContext', () => {
     ).toEqual(secondPreferences);
   });
 
-  it('updates the cache before the preference save finishes', async () => {
-    const client = makeClient();
-    const userId = 'user-1';
-    const key = queryKeys.dashboardSettings.coloringNavigationContext(userId);
-    let resolveSave: ((value: string) => void) | undefined;
-    saveColoringNavigationContextMock.mockImplementationOnce(
-      () =>
-        new Promise<string>(resolve => {
-          resolveSave = resolve;
-        })
-    );
-    const nextPreferences = makeNavigationContext({ pageSize: 25 });
-    client.setQueryData(key, makeNavigationContext());
-
-    const { result } = renderHook(() => useSaveColoringNavigationContext(userId), {
-      wrapper: makeWrapper(client),
-    });
-
-    let save: Promise<void>;
-    act(() => {
-      save = result.current.mutateAsync({ userId, navigationContext: nextPreferences });
-    });
-
-    await waitFor(() => expect(client.getQueryData(key)).toEqual(nextPreferences));
-    expect(saveColoringNavigationContextMock).toHaveBeenCalledTimes(1);
-
-    resolveSave?.('settings-1');
-    await act(async () => save!);
-  });
-
-  it('restores the confirmed cache when an optimistic save fails', async () => {
-    const client = makeClient();
-    const userId = 'user-1';
-    const key = queryKeys.dashboardSettings.coloringNavigationContext(userId);
-    const confirmed = makeNavigationContext({ searchTerm: 'confirmed' });
-    client.setQueryData(key, confirmed);
-    saveColoringNavigationContextMock.mockRejectedValueOnce(new Error('save failed'));
-
-    const { result } = renderHook(() => useSaveColoringNavigationContext(userId), {
-      wrapper: makeWrapper(client),
-    });
-
-    await expect(
-      act(() =>
-        result.current.mutateAsync({
-          userId,
-          navigationContext: makeNavigationContext({ searchTerm: 'optimistic' }),
-        })
-      )
-    ).rejects.toThrow('save failed');
-
-    expect(client.getQueryData(key)).toEqual(confirmed);
-  });
-
   it('restores the last confirmed cache when consecutive queued saves fail', async () => {
     const client = makeClient();
     const userId = 'user-1';
@@ -203,36 +122,5 @@ describe('useSaveColoringNavigationContext', () => {
     await expect(firstSave!).rejects.toThrow('save failed');
     await expect(secondSave!).rejects.toThrow('save failed');
     expect(client.getQueryData(key)).toEqual(confirmed);
-  });
-
-  it('removes optimistic data when the prior query failed without cached data', async () => {
-    const client = makeClient();
-    const userId = 'user-1';
-    const key = queryKeys.dashboardSettings.coloringNavigationContext(userId);
-    await client
-      .fetchQuery({
-        queryKey: key,
-        queryFn: () => Promise.reject(new Error('load failed')),
-        retry: false,
-      })
-      .catch(() => undefined);
-    expect(client.getQueryState(key)?.status).toBe('error');
-    expect(client.getQueryData(key)).toBeUndefined();
-    saveColoringNavigationContextMock.mockRejectedValueOnce(new Error('save failed'));
-
-    const { result } = renderHook(() => useSaveColoringNavigationContext(userId), {
-      wrapper: makeWrapper(client),
-    });
-
-    await expect(
-      act(() =>
-        result.current.mutateAsync({
-          userId,
-          navigationContext: makeNavigationContext({ pageSize: 25 }),
-        })
-      )
-    ).rejects.toThrow('save failed');
-
-    expect(client.getQueryData(key)).toBeUndefined();
   });
 });

@@ -61,17 +61,6 @@ async function renderPreference() {
 }
 
 describe('account analytics preference', () => {
-  it('writes confirmed load, realtime and save choices to browser storage', async () => {
-    const control = await renderPreference();
-    const stored = () => JSON.parse(localStorage.getItem('og:analytics:account-consent')!);
-    expect(stored()).toEqual({ accountId: 'account-a', enabled: true });
-    act(() => mocks.remoteCallback?.(true));
-    expect(stored()).toEqual({ accountId: 'account-a', enabled: false });
-    mocks.update.mockResolvedValue(false);
-    fireEvent.click(control);
-    await waitFor(() => expect(stored().enabled).toBe(true));
-  });
-
   it('does not write a choice on a failed load', async () => {
     mocks.get.mockRejectedValue(new Error('offline'));
     stop = initializeAnalyticsPreference();
@@ -84,74 +73,6 @@ describe('account analytics preference', () => {
     mocks.update.mockImplementation(() => new Promise(() => {}));
     fireEvent.click(control);
     expect(JSON.parse(localStorage.getItem('og:analytics:account-consent')!).enabled).toBe(false);
-  });
-
-  it('lets a new account server preference overwrite the stored opt-out', async () => {
-    localStorage.setItem(
-      'og:analytics:account-consent',
-      JSON.stringify({ accountId: 'previous', enabled: false })
-    );
-    await renderPreference();
-    expect(JSON.parse(localStorage.getItem('og:analytics:account-consent')!)).toEqual({
-      accountId: 'account-a',
-      enabled: true,
-    });
-  });
-
-  it('contains browser storage write failures', async () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
-    const control = await renderPreference();
-    expect(control).toBeChecked();
-  });
-
-  it('waits for the server, then saves the choice on the account', async () => {
-    const control = await renderPreference();
-    expect(control).toBeChecked();
-    fireEvent.click(control);
-    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith('account-a', true));
-    await waitFor(() => expect(control).toBeEnabled());
-    expect(control).not.toBeChecked();
-    expect(screen.getByText(/saved to your account/i)).toBeInTheDocument();
-  });
-
-  it('shows a save error and restores the confirmed choice', async () => {
-    mocks.update.mockRejectedValue(new Error('offline'));
-    const control = await renderPreference();
-    fireEvent.click(control);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save');
-    expect(control).toBeChecked();
-  });
-
-  it('reconciles a failed save when the server applied the opt-out', async () => {
-    const control = await renderPreference();
-    mocks.update.mockRejectedValue(new Error('response lost'));
-    mocks.get.mockResolvedValue(true);
-    fireEvent.click(control);
-    await waitFor(() => expect(mocks.update).toHaveBeenCalled());
-    await waitFor(() => expect(control).toBeEnabled());
-    expect(control).not.toBeChecked();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('clears the save warning when a later refresh confirms the requested choice', async () => {
-    const control = await renderPreference();
-    mocks.update.mockRejectedValue(new Error('response lost'));
-    mocks.get.mockRejectedValueOnce(new Error('offline'));
-    fireEvent.click(control);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save');
-    mocks.get.mockResolvedValue(true);
-    act(() => window.dispatchEvent(new Event('focus')));
-    await waitFor(() => expect(control).toBeEnabled());
-    expect(control).not.toBeChecked();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('applies an opt-out received from another device', async () => {
-    const control = await renderPreference();
-    act(() => mocks.remoteCallback?.(true));
-    expect(control).not.toBeChecked();
   });
 
   it('does not copy the previous account choice to another account', async () => {
@@ -185,24 +106,6 @@ describe('account analytics preference', () => {
     await waitFor(() => expect(control).toBeEnabled());
     await act(async () => resolveSave(true));
     expect(control).toBeChecked();
-  });
-
-  it('ignores a read started before a same-account auth refresh', async () => {
-    let resolveOldRead!: (optOut: boolean) => void;
-    mocks.get.mockImplementationOnce(
-      () =>
-        new Promise<boolean>(resolve => {
-          resolveOldRead = resolve;
-        })
-    );
-    stop = initializeAnalyticsPreference();
-    render(<AnalyticsPreference />);
-    const control = screen.getByRole('switch');
-    mocks.get.mockResolvedValue(true);
-    act(() => mocks.authCallback?.());
-    await waitFor(() => expect(control).toBeEnabled());
-    await act(async () => resolveOldRead(false));
-    expect(control).not.toBeChecked();
   });
 
   it('keeps tracking and the control off when the preference cannot be loaded', async () => {

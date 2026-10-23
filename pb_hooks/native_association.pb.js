@@ -5,7 +5,8 @@ routerAdd('GET', '/.well-known/apple-app-site-association', e => {
     webcredentials: {
       apps: [
         ...new Set(
-          ($os.getenv('APPLE_APP_IDS') || '')
+          require(`${__hooks}/hook_settings.js`)
+            .get(e.app, 'APPLE_APP_IDS')
             .split(',')
             .map(value => value.trim())
             .filter(value => /^[A-Z0-9]{10}\.[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)+$/.test(value))

@@ -71,7 +71,7 @@ describe('color key mutations', () => {
     service.remove.mockReturnValue(new Promise((_, fail) => (reject = fail)));
     const { result } = renderHook(() => useDeleteColorKey('page', 'owner'), { wrapper });
     let pending: Promise<unknown> = Promise.resolve();
-    act(() => {
+    await act(async () => {
       pending = result.current.mutateAsync('a').catch(() => {});
     });
     await vi.waitFor(() =>

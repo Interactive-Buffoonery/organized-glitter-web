@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/hooks/queries/queryKeys';
-import { useColorKeyHistory, useColorKeys, useSymbolRequests } from '../useColorKeys';
+import { useColorKeyHistory, useSymbolRequests } from '../useColorKeys';
 
 const service = vi.hoisted(() => ({ list: vi.fn(), history: vi.fn(), requests: vi.fn() }));
 vi.mock('@/services/pocketbase/colorKeys.service', () => ({ ColorKeysService: service }));

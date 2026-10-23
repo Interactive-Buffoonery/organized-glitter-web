@@ -83,6 +83,55 @@ export function useDeleteColorKey(pageId: string, userId: string) {
   });
 }
 
+/**
+ * Saves `ordered` as positions 0 to n-1, one PATCH per row that moved.
+ * Restores moved rows on failure where possible, then refetches the server order.
+ */
+export function useReorderColorKeys(pageId: string, userId: string) {
+  const client = useQueryClient();
+  const key = colorKeysKey(userId, pageId);
+  return useMutation({
+    mutationFn: async (ordered: ColorKey[]) => {
+      const saved: ColorKey[] = [];
+      try {
+        for (const [position, row] of ordered.entries())
+          if (row.position !== position)
+            saved.push(await ColorKeysService.update(row.id, userId, { position }));
+      } catch (error) {
+        const before = new Map(ordered.map(row => [row.id, row.position]));
+        // ponytail: best effort; onError refetches, so a failed revert still shows the server order.
+        await Promise.allSettled(
+          saved.map(row =>
+            ColorKeysService.update(row.id, userId, { position: before.get(row.id)! })
+          )
+        );
+        throw error;
+      }
+      return saved;
+    },
+    onMutate: async ordered => {
+      await client.cancelQueries({ queryKey: key });
+      const previous = client.getQueryData<ColorKey[]>(key);
+      client.setQueryData<ColorKey[]>(
+        key,
+        ordered.map((row, position) => ({ ...row, position }))
+      );
+      return { previous };
+    },
+    onSuccess: saved => {
+      const savedById = new Map(saved.map(row => [row.id, row]));
+      settle(client, userId, pageId, {
+        update: rows => rows.map(row => savedById.get(row.id) ?? row),
+      });
+    },
+    onError: (_error, _ordered, context) => {
+      if (context?.previous) client.setQueryData(key, context.previous);
+      settle(client, userId, pageId);
+    },
+    retry: false,
+  });
+}
+
 export function useSetupColorKeys(pageId: string, userId: string) {
   const client = useQueryClient();
   return useMutation({

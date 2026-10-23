@@ -8,6 +8,7 @@ import {
   useCreateColorKey,
   useCreateSymbolRequest,
   useDeleteColorKey,
+  useReorderColorKeys,
   useSetupColorKeys,
   useUpdateColorKey,
 } from '../useColorKeyMutations';
@@ -86,6 +87,74 @@ describe('color key mutations', () => {
     });
     expect(client.getQueryData<{ id: string }[]>(listKey)?.map(key => key.id)).toEqual(['a', 'b']);
   });
+
+  it('writes positions 0 to n-1 only for the rows that moved', async () => {
+    const a = row('a', 0);
+    const b = row('b', 1);
+    const c = row('c', 2);
+    const d = row('d', 5);
+    client.setQueryData(listKey, [a, b, c, d]);
+    service.update.mockImplementation((id: string, _user: string, input: { position: number }) =>
+      Promise.resolve(row(id, input.position))
+    );
+    const { result } = renderHook(() => useReorderColorKeys('page', 'owner'), { wrapper });
+    await act(() => result.current.mutateAsync([c, b, a, d]));
+    expect(service.update.mock.calls).toEqual([
+      ['c', 'owner', { position: 0 }],
+      ['a', 'owner', { position: 2 }],
+      ['d', 'owner', { position: 3 }],
+    ]);
+    expect(
+      client
+        .getQueryData<{ id: string; position: number }[]>(listKey)
+        ?.map(key => [key.id, key.position])
+    ).toEqual([
+      ['c', 0],
+      ['b', 1],
+      ['a', 2],
+      ['d', 3],
+    ]);
+  });
+
+  it('writes nothing when the order already matches the positions', async () => {
+    const rows = [row('a', 0), row('b', 1)];
+    client.setQueryData(listKey, rows);
+    const { result } = renderHook(() => useReorderColorKeys('page', 'owner'), { wrapper });
+    await act(() => result.current.mutateAsync(rows));
+    expect(service.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['succeeds', () => Promise.resolve(row('c', 2))],
+    ['fails', () => Promise.reject(new Error('offline'))],
+  ])(
+    'reverts saved rows, restores the order and reloads when a write fails and the revert %s',
+    async (_, revert) => {
+      const rows = [row('a', 0), row('b', 1), row('c', 2)];
+      client.setQueryData(listKey, rows);
+      service.update
+        .mockImplementationOnce((id: string, _user: string, input: { position: number }) =>
+          Promise.resolve(row(id, input.position))
+        )
+        .mockRejectedValueOnce(new Error('busy'))
+        .mockImplementationOnce(revert);
+      const { result } = renderHook(() => useReorderColorKeys('page', 'owner'), { wrapper });
+      let failure: unknown;
+      await act(() =>
+        result.current.mutateAsync([rows[2], rows[1], rows[0]]).catch(error => {
+          failure = error;
+        })
+      );
+      expect(failure).toEqual(new Error('busy'));
+      expect(service.update.mock.calls).toEqual([
+        ['c', 'owner', { position: 0 }],
+        ['a', 'owner', { position: 2 }],
+        ['c', 'owner', { position: 2 }],
+      ]);
+      expect(client.getQueryData(listKey)).toEqual(rows);
+      expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
+    }
+  );
 
   it('fills an empty page with the setup rows', async () => {
     client.setQueryData(listKey, []);

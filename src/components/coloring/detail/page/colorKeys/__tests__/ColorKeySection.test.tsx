@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ClientResponseError } from 'pocketbase';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ColorKey } from '@/services/pocketbase/colorKeys.service';
 import { ColorKeySection } from '../ColorKeySection';
 
@@ -13,6 +13,9 @@ const state = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   remove: vi.fn(),
+  reorder: vi.fn(),
+  loadSortPanel: vi.fn(),
+  reorderPending: false,
   refetch: vi.fn(),
   sendRequest: vi.fn(),
   error: vi.fn(),
@@ -36,11 +39,35 @@ vi.mock('@/hooks/mutations/coloring/useColorKeyMutations', () => ({
   useCreateColorKey: () => ({ mutateAsync: state.create, isPending: false }),
   useUpdateColorKey: () => ({ mutateAsync: state.update, isPending: false }),
   useDeleteColorKey: () => ({ mutateAsync: state.remove, isPending: false }),
+  useReorderColorKeys: () => ({ mutateAsync: state.reorder, isPending: state.reorderPending }),
   useCreateSymbolRequest: () => ({ mutateAsync: state.sendRequest }),
 }));
 vi.mock('@/utils/image/symbolRequestPhoto', () => ({
   prepareSymbolRequestPhoto: async (file: File) => file,
 }));
+// jsdom has no layout for dnd-kit; this stand-in reverses the order instead of dragging.
+vi.mock('../loadSortPanel', () => ({ loadSortPanel: state.loadSortPanel }));
+function SortPanelStandIn({
+  order,
+  onOrderChange,
+  onDone,
+}: {
+  order: { id: string }[] | null;
+  onOrderChange: (order: unknown[]) => void;
+  onDone: () => void;
+}) {
+  return order ? (
+    <div role="dialog" aria-label="Sort Color Order">
+      <span>{order.map(row => row.id).join(',')}</span>
+      <button type="button" onClick={() => onOrderChange([...order].reverse())}>
+        Reverse
+      </button>
+      <button type="button" onClick={onDone}>
+        Done
+      </button>
+    </div>
+  ) : null;
+}
 vi.mock('@/lib/notifications', () => ({ notifyError: state.error, notifySuccess: state.success }));
 vi.mock('@/components/image/PrivateFileImage', () => ({
   PrivateFileImage: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
@@ -70,6 +97,7 @@ beforeEach(() => {
     state.create,
     state.update,
     state.remove,
+    state.reorder,
     state.refetch,
     state.sendRequest,
   ])
@@ -78,6 +106,8 @@ beforeEach(() => {
   URL.revokeObjectURL = vi.fn();
   state.error.mockReset();
   state.success.mockReset();
+  state.reorderPending = false;
+  state.loadSortPanel.mockReset().mockResolvedValue({ ColorKeySortPanel: SortPanelStandIn });
 });
 
 describe('Colors used setup', () => {
@@ -147,6 +177,114 @@ describe('Colors used record', () => {
     state.rows = [key('a', 0, 'u:0031', { code: '1', swatch: 'url(https://example.test/x)' })];
     const { container } = render(<ColorKeySection pageId="page-1" />);
     expect(container.innerHTML).not.toContain('example.test');
+  });
+});
+
+describe('Colors used sort', () => {
+  const three = () => [key('a', 0, 'u:0031'), key('b', 1, 'u:0032'), key('c', 2, 'u:0033')];
+  const openSort = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: 'Sort' }));
+    return screen.findByRole('dialog', { name: 'Sort Color Order' });
+  };
+
+  it('offers Sort only once there are two colors', () => {
+    state.rows = [key('a', 0, 'u:0031')];
+    const { rerender } = render(<ColorKeySection pageId="page-1" />);
+    expect(screen.queryByRole('button', { name: 'Sort' })).not.toBeInTheDocument();
+    state.rows = three();
+    rerender(<ColorKeySection pageId="page-1" />);
+    expect(screen.getByRole('button', { name: 'Sort' })).toBeEnabled();
+  });
+
+  it('saves nothing when the order did not change', async () => {
+    const user = userEvent.setup();
+    state.rows = three();
+    render(<ColorKeySection pageId="page-1" />);
+    await openSort(user);
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(state.reorder).not.toHaveBeenCalled();
+  });
+
+  it('keeps the panel closed and asks to try again when it cannot load', async () => {
+    const user = userEvent.setup();
+    state.rows = three();
+    state.loadSortPanel.mockRejectedValue(
+      new TypeError('Failed to fetch dynamically imported module')
+    );
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: 'Sort' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Couldn’t open Sort Color Order. Please try again.'
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add symbol' })).toBeEnabled();
+  });
+
+  it('disables Sort, the rows and Add symbol while an order is saving', () => {
+    state.rows = three();
+    state.reorderPending = true;
+    render(<ColorKeySection pageId="page-1" />);
+    expect(screen.getByRole('button', { name: 'Sort' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add symbol' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Two,/ })).toBeDisabled();
+  });
+
+  it('asks to try again when saving the order fails', async () => {
+    const user = userEvent.setup();
+    state.rows = three();
+    state.reorder.mockRejectedValue(new Error('busy'));
+    render(<ColorKeySection pageId="page-1" />);
+    await openSort(user);
+    await user.click(screen.getByRole('button', { name: 'Reverse' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Couldn’t save the updated order. Please try again.'
+    );
+  });
+
+  it('does not save when a color arrived while the panel was open', async () => {
+    const user = userEvent.setup();
+    state.rows = three();
+    const { rerender } = render(<ColorKeySection pageId="page-1" />);
+    await openSort(user);
+    await user.click(screen.getByRole('button', { name: 'Reverse' }));
+    state.rows = [...three(), key('d', 3, 'u:0034')];
+    rerender(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(state.reorder).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t save the updated order.');
+  });
+
+  describe('offline', () => {
+    const setOnline = (value: boolean) => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => value });
+      window.dispatchEvent(new Event(value ? 'online' : 'offline'));
+    };
+    afterEach(() => setOnline(true));
+
+    it('disables Sort', () => {
+      setOnline(false);
+      state.rows = three();
+      render(<ColorKeySection pageId="page-1" />);
+      expect(screen.getByRole('button', { name: 'Sort' })).toBeDisabled();
+    });
+
+    it('says sorting needs a connection when the save fails offline', async () => {
+      const user = userEvent.setup();
+      state.rows = three();
+      state.reorder.mockImplementation(async () => {
+        setOnline(false);
+        throw new Error('Failed to fetch');
+      });
+      render(<ColorKeySection pageId="page-1" />);
+      await openSort(user);
+      await user.click(screen.getByRole('button', { name: 'Reverse' }));
+      await user.click(screen.getByRole('button', { name: 'Done' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Sorting colors needs a connection. Reconnect and try again.'
+      );
+    });
   });
 });
 

@@ -92,7 +92,7 @@ test.describe('diamond pagination shared URL', () => {
     expect(destination.searchParams.get('includeArchived')).toBe('true');
     expect(destination.searchParams.get('page')).toBe('3');
 
-    // ponytail: open the shared link directly. On CI, Playwright sometimes never reports a
+    // Open the shared link directly. On CI, Playwright sometimes never reports a
     // Ctrl+click tab that Chromium opened and loaded. LibraryPagination.test.tsx covers the
     // app leaving modified clicks to the browser.
     const newTab = await context.newPage();

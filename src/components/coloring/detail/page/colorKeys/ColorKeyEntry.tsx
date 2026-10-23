@@ -49,6 +49,7 @@ interface ColorKeyEntryProps {
   pageId: string;
   userId: string;
   target: EntryTarget | null;
+  positionForNew: number;
   next?: ColorKey;
   requests?: Record<string, SymbolRequestPreview>;
   onClose: () => void;
@@ -106,6 +107,7 @@ function EntryForm({
   pageId,
   userId,
   target,
+  positionForNew,
   next,
   requests,
   onClose,
@@ -207,7 +209,7 @@ function EntryForm({
     };
     try {
       if (row && !gone) await update.mutateAsync({ id: row.id, input });
-      else await create.mutateAsync(input);
+      else await create.mutateAsync({ ...input, position: positionForNew });
     } catch (saveError) {
       if (row && !gone && saveError instanceof ClientResponseError && saveError.status === 404) {
         onGone();

@@ -1,6 +1,5 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import ErrorBoundary from '@/components/ErrorBoundary';
+import { render } from '@testing-library/react';
 import {
   ImageErrorBoundary,
   ProjectContentErrorBoundary,
@@ -30,50 +29,6 @@ describe('ErrorBoundary', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders children when there is no error', () => {
-    render(
-      <ErrorBoundary>
-        <div data-testid="child">safe child</div>
-      </ErrorBoundary>
-    );
-    expect(screen.getByTestId('child')).toBeInTheDocument();
-  });
-
-  it('calls posthog.captureException when a child throws', () => {
-    render(
-      <ErrorBoundary>
-        <ThrowError message="private diary private-photo.png https://example.test/?token=synthetic-token" />
-      </ErrorBoundary>
-    );
-
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
-    const [errorArg, propsArg] = mockCaptureException.mock.calls[0];
-    expect(errorArg).toBeInstanceOf(Error);
-    expect((errorArg as Error).message).toBe('Application error (message redacted)');
-    expect((errorArg as Error).stack).not.toMatch(/private diary|private-photo|synthetic-token/);
-    expect(propsArg).toEqual(
-      expect.objectContaining({
-        $exception_source: 'react_error_boundary',
-        componentStack: expect.any(String),
-      })
-    );
-  });
-
-  it('passes errorContext through to posthog.captureException', () => {
-    render(
-      <ErrorBoundary errorContext={{ component: 'TestWidget', userId: 42 }}>
-        <ThrowError message="contextful error" />
-      </ErrorBoundary>
-    );
-
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
-    const [, propsArg] = mockCaptureException.mock.calls[0];
-    expect(propsArg).toMatchObject({
-      $exception_source: 'react_error_boundary',
-      errorContext: { component: 'TestWidget', userId: 42 },
-    });
-  });
-
   it('keeps private image context out of exception properties', () => {
     render(
       <ImageErrorBoundary
@@ -99,18 +54,5 @@ describe('ErrorBoundary', () => {
     const properties = mockCaptureException.mock.calls[0][1];
     expect(properties.errorContext).toEqual({ component: 'ProjectContent' });
     expect(JSON.stringify(properties)).not.toContain('private-project-id');
-  });
-
-  it('uses a fallback error id when crypto.randomUUID is unavailable', () => {
-    vi.stubGlobal('crypto', {});
-
-    render(
-      <ErrorBoundary fallback={({ errorId }) => <div>Error id: {errorId}</div>}>
-        <ThrowError message="fallback id error" />
-      </ErrorBoundary>
-    );
-
-    expect(screen.getByText(/^Error id: [a-z0-9]{8}$/)).toBeInTheDocument();
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
 });

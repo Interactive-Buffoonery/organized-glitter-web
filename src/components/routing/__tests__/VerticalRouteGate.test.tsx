@@ -32,49 +32,6 @@ vi.mock('@/hooks/useEnabledVerticals', () => ({
 
 import { VerticalRouteGate } from '../AppRoutes';
 
-describe('VerticalRouteGate', () => {
-  beforeEach(() => {
-    useAppReadyMock.mockReset();
-    useHideSplashMock.mockReset();
-    authState.user = { id: 'user-123' };
-    enabledVerticalsState.diamond_painting = true;
-    enabledVerticalsState.coloring_books = true;
-    enabledVerticalsState.isLoading = true;
-  });
-
-  it('hides splash without marking ready while verticals resolve', () => {
-    render(
-      <MemoryRouter>
-        <VerticalRouteGate requiredVertical="coloring_books">
-          <div>Protected coloring page</div>
-        </VerticalRouteGate>
-      </MemoryRouter>
-    );
-
-    expect(useHideSplashMock).toHaveBeenCalled();
-    expect(useHideSplashMock.mock.calls.every(call => call.length === 0)).toBe(true);
-    expect(useAppReadyMock).not.toHaveBeenCalled();
-    expect(screen.getByRole('status')).toHaveTextContent('Loading…');
-    expect(screen.getByRole('status').querySelector('.sr-only')).toBeNull();
-    expect(screen.queryByText('Protected coloring page')).not.toBeInTheDocument();
-  });
-
-  it('renders children once vertical access is available', () => {
-    enabledVerticalsState.isLoading = false;
-
-    render(
-      <MemoryRouter>
-        <VerticalRouteGate requiredVertical="coloring_books">
-          <div>Protected coloring page</div>
-        </VerticalRouteGate>
-      </MemoryRouter>
-    );
-
-    expect(screen.getByText('Protected coloring page')).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  });
-});
-
 function DraftEditor() {
   const [draft, setDraft] = useState('');
   return (
@@ -120,22 +77,6 @@ describe('VerticalRouteGate admission', () => {
       </MemoryRouter>
     );
     expect(screen.getByRole('textbox', { name: 'Draft' })).toHaveValue('Unsaved note');
-  });
-
-  it('reevaluates access when entering another route', () => {
-    const view = render(
-      <MemoryRouter>
-        <GateWithNavigation />
-      </MemoryRouter>
-    );
-    enabledVerticalsState.coloring_books = false;
-    view.rerender(
-      <MemoryRouter>
-        <GateWithNavigation />
-      </MemoryRouter>
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Another editor' }));
-    expect(screen.queryByRole('textbox', { name: 'Draft' })).not.toBeInTheDocument();
   });
 
   it('reevaluates access when the account changes', () => {

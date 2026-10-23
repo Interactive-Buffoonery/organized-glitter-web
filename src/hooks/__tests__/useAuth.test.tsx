@@ -445,6 +445,81 @@ describe('useAuth Integration Tests', () => {
       refresh.mockRestore();
     });
 
+    it('waits before retrying a session renewal that failed', async () => {
+      const refresh = vi
+        .spyOn(UsersService, 'refreshDetachedSession')
+        .mockRejectedValue(new Error('network down'));
+      setupMockAuthState(true, createMockUser({ id: 'backoff-account' }));
+      (pb.authStore as { token: string }).token = tokenExpiringIn(3 * 86400);
+
+      renderUseAuthHook();
+      await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+      await act(async () => Promise.resolve());
+
+      act(() => {
+        window.dispatchEvent(new Event('focus'));
+      });
+      expect(refresh).toHaveBeenCalledTimes(1);
+
+      const now = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 11 * 60 * 1000);
+      act(() => {
+        window.dispatchEvent(new Event('focus'));
+      });
+      expect(refresh).toHaveBeenCalledTimes(2);
+      clock.mockRestore();
+      refresh.mockRestore();
+    });
+
+    it.each([
+      ['retries right away when the session is about to expire', 5 * 60, 'same'],
+      ['does not hold a failed renewal against a replacement session', 3 * 86400, 'replaced'],
+    ])('%s', async (_name, secondsLeft, session) => {
+      const refresh = vi
+        .spyOn(UsersService, 'refreshDetachedSession')
+        .mockRejectedValue(new Error('network down'));
+      setupMockAuthState(true, createMockUser({ id: 'retry-account' }));
+      const authStore = pb.authStore as { token: string };
+      authStore.token = tokenExpiringIn(secondsLeft);
+
+      renderUseAuthHook();
+      await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+      await act(async () => Promise.resolve());
+
+      if (session === 'replaced') authStore.token = tokenExpiringIn(secondsLeft - 60);
+      act(() => {
+        window.dispatchEvent(new Event('focus'));
+      });
+      expect(refresh).toHaveBeenCalledTimes(2);
+      refresh.mockRestore();
+    });
+
+    it('stops checking once a renewal succeeds', async () => {
+      const account = createMockUser({ id: 'renewed-account' });
+      const renewedToken = tokenExpiringIn(7 * 86400);
+      const refresh = vi
+        .spyOn(UsersService, 'refreshDetachedSession')
+        .mockResolvedValue({ token: renewedToken, record: account } as Awaited<
+          ReturnType<typeof UsersService.refreshDetachedSession>
+        >);
+      setupMockAuthState(true, account);
+      const authStore = pb.authStore as { token: string };
+      authStore.token = tokenExpiringIn(3 * 86400);
+      pocketBaseMock.authStore.save.mockImplementation((token: string) => {
+        authStore.token = token;
+      });
+
+      renderUseAuthHook();
+      await waitFor(() =>
+        expect(pocketBaseMock.authStore.save).toHaveBeenCalledWith(renewedToken, account)
+      );
+      act(() => {
+        window.dispatchEvent(new Event('focus'));
+      });
+      expect(refresh).toHaveBeenCalledTimes(1);
+      refresh.mockRestore();
+    });
+
     it('guards every refreshed token when the session ends', async () => {
       let onChange: ((token: string | null, record: unknown) => void) | undefined;
       const account = createMockUser({ id: 'refreshed-account' });

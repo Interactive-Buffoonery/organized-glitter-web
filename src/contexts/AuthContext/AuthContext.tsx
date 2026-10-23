@@ -49,6 +49,7 @@ import { getSessionIdentityTracker } from '@/services/auth/sessionEpoch';
 import { deletionIntents } from '@/services/accountDeletion/intentStore';
 
 const SESSION_RENEW_WINDOW_SECONDS = 6 * 24 * 60 * 60;
+const SESSION_RENEW_RETRY_MS = 10 * 60 * 1000;
 
 const authLogger = createLogger('AuthProvider');
 
@@ -304,6 +305,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const sessionIdentityTracker = getSessionIdentityTracker(pb.authStore);
 
     let refreshPromise: Promise<void> | null = null;
+    let failedRefresh = { token: '', at: 0 };
     const checkSession = () => {
       const token = pb.authStore.token;
       if (!token || !pb.authStore.record || refreshPromise) return;
@@ -313,6 +315,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       // Renews about once a day while in use; tuned for the 7-day users token.
       if (!isTokenExpired(token, SESSION_RENEW_WINDOW_SECONDS)) return;
+      if (
+        token === failedRefresh.token &&
+        Date.now() - failedRefresh.at < SESSION_RENEW_RETRY_MS &&
+        !isTokenExpired(token, SESSION_RENEW_RETRY_MS / 1000)
+      ) {
+        return;
+      }
       const generation = sessionGenerationRef.current;
       const sessionIdentity = sessionIdentityTracker.capture();
       refreshPromise = UsersService.refreshDetachedSession(token, pb.authStore.record)
@@ -335,6 +344,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           ) {
             reportInvalidSession(token);
           } else {
+            failedRefresh = { token, at: Date.now() };
             authLogger.warn('Session refresh failed; keeping the current session', error);
           }
         })

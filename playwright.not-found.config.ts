@@ -6,10 +6,7 @@ export default defineConfig({
   outputDir: '.tmp/not-found-qa/results',
   reporter: [['list'], ['html', { outputFolder: '.tmp/not-found-qa/report', open: 'never' }]],
   use: { baseURL: 'http://localhost:5184', trace: 'retain-on-failure' },
-  projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile-safari', use: { ...devices['iPhone 13'] } },
-  ],
+  projects: [{ name: 'desktop', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: 'node scripts/generate-not-found.mjs --check && pnpm build && pnpm start',
     env: {

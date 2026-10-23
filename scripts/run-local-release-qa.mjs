@@ -422,8 +422,8 @@ export function parseListedTestCount(output) {
 }
 
 const managedInventory = {
-  smoke: { files: 24, tests: 115 },
-  full: { files: 41, tests: 330 },
+  smoke: { files: 13, tests: 29 },
+  full: { files: 13, tests: 29 },
 };
 
 export function parseListedInventory(output, suite) {

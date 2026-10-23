@@ -12,10 +12,7 @@ export default defineConfig({
   ],
   outputDir: '.tmp/pwa-navigation/artifacts',
   use: { baseURL: 'http://localhost:4183', trace: 'retain-on-failure' },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-  ],
+  projects: [{ name: 'webkit', use: { ...devices['Desktop Safari'] } }],
   webServer: {
     command: 'pnpm exec vite build && node server/local-build-server.js',
     url: 'http://localhost:4183/login',

@@ -52,6 +52,10 @@ backend/browser coverage. The complete job checks out the exact event PR head
 SHA and uses the event base SHA for comparisons. Record both SHAs in the PR.
 No branch protection or repository permissions are changed by this work.
 
+The `dev` merge queue runs the same workflow on `merge_group` events. Each queue
+run compares the queued commit with the queue base SHA, so it checks a PR
+together with `dev` and every PR ahead of it.
+
 Actions uses ordinary `pull_request` semantics, read-only contents permission,
 no persisted checkout credentials, bounded timeouts and cancellation of
 superseded PR runs. No privileged PR-code trigger or production service is

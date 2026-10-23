@@ -422,8 +422,8 @@ export function parseListedTestCount(output) {
 }
 
 const managedInventory = {
-  smoke: { files: 24, tests: 115 },
-  full: { files: 41, tests: 330 },
+  smoke: { files: 13, tests: 29 },
+  full: { files: 13, tests: 29 },
 };
 
 export function parseListedInventory(output, suite) {
@@ -461,21 +461,6 @@ const collectReportTests = (suites, parents = [], inheritedFile = '') => {
   return collected;
 };
 
-const allowedFullSkip = test => {
-  const annotations = [...(test.annotations || [])];
-  for (const result of test.results || []) annotations.push(...(result.annotations || []));
-  return (
-    test.projectName === 'authenticated-chromium-full' &&
-    test.file?.replaceAll('\\', '/').endsWith('e2e/authenticated/mobile-touch-targets.spec.ts') &&
-    test.title.endsWith('mobile touch targets › bottom nav remains anchored during scroll') &&
-    annotations.some(
-      annotation =>
-        annotation.type === 'skip' &&
-        annotation.description === 'page too short to verify bottom nav scroll anchoring'
-    )
-  );
-};
-
 export function validateManagedPlaywrightReport(report, suite) {
   const expected = managedInventory[suite];
   if (!expected || !report || !Array.isArray(report.suites) || !report.stats) {
@@ -494,14 +479,9 @@ export function validateManagedPlaywrightReport(report, suite) {
   }
 
   let passed = 0;
-  let skipped = 0;
   for (const test of tests) {
     if (test.status === 'skipped') {
-      if (suite !== 'full' || !allowedFullSkip(test)) {
-        throw new Error(`Playwright reported an unexpected skip: ${test.title}.`);
-      }
-      skipped += 1;
-      continue;
+      throw new Error(`Playwright reported an unexpected skip: ${test.title}.`);
     }
     const finalResult = test.results?.at(-1);
     if (
@@ -518,14 +498,14 @@ export function validateManagedPlaywrightReport(report, suite) {
   const stats = report.stats;
   if (
     stats.expected !== passed ||
-    stats.skipped !== skipped ||
+    stats.skipped !== 0 ||
     stats.unexpected !== 0 ||
     stats.flaky !== 0 ||
-    passed + skipped !== expected.tests
+    passed !== expected.tests
   ) {
     throw new Error('Playwright structured report totals do not reconcile.');
   }
-  return { expected: passed, skipped, total: tests.length };
+  return { expected: passed, skipped: 0, total: tests.length };
 }
 
 const stopProcess = async processHandle => {

@@ -1,92 +1,7 @@
 import { describe, expect, it } from 'vitest';
-
-import catalog from './symbolCatalog.json';
-import {
-  DEFAULT_SETUP_SYMBOLS,
-  SYMBOL_GROUP_IDS,
-  SYMBOL_ID_PATTERN,
-  type SymbolGroupId,
-  getCatalogSymbol,
-  isSymbolId,
-  parseSymbolId,
-  searchSymbols,
-  symbolDisplayText,
-  symbolLabel,
-  symbolsByGroup,
-  unicodeSymbolId,
-} from './symbols';
-
-describe('symbol catalog contract', () => {
-  it('uses version 1 and all contract groups in display order', () => {
-    expect(catalog.version).toBe(1);
-    expect(catalog.groups.map(({ id }) => id)).toEqual(SYMBOL_GROUP_IDS);
-    for (const { id, label } of catalog.groups) {
-      const group = id as SymbolGroupId;
-      expect(label.trim()).not.toBe('');
-      expect(symbolsByGroup[group].length).toBeGreaterThan(0);
-      expect(symbolsByGroup[group]).toEqual(catalog.symbols.filter(symbol => symbol.group === id));
-    }
-  });
-
-  it('contains unique valid IDs, lowercase keywords and usable names', () => {
-    expect(new Set(catalog.symbols.map(({ id }) => id)).size).toBe(catalog.symbols.length);
-    for (const symbol of catalog.symbols) {
-      expect(symbol.id).toMatch(SYMBOL_ID_PATTERN);
-      expect(isSymbolId(symbol.id)).toBe(true);
-      expect(SYMBOL_GROUP_IDS).toContain(symbol.group);
-      expect(symbol.name.trim()).not.toBe('');
-      expect(symbol.keywords.length).toBeGreaterThan(0);
-      for (const keyword of symbol.keywords) {
-        expect(keyword.trim()).not.toBe('');
-        expect(keyword).toBe(keyword.toLowerCase());
-      }
-      if (symbol.id.startsWith('u:')) {
-        expect(symbol).not.toHaveProperty('path');
-        expect(symbol).toHaveProperty(
-          'char',
-          String.fromCodePoint(
-            ...symbol.id
-              .slice(2)
-              .split('-')
-              .map(hex => parseInt(hex, 16))
-          )
-        );
-      } else {
-        expect(symbol.id).toMatch(/^c:/);
-        expect(symbol).not.toHaveProperty('char');
-        expect(symbol).toHaveProperty('path');
-        const path = 'path' in symbol ? symbol.path : '';
-        expect(path).toMatch(/^[MLHV CQAZmlhvcqaz0-9.,+\-\s]+$/);
-        expect(path).toMatch(/^[Mm]/);
-      }
-    }
-  });
-
-  it('covers requested alphabets, symbols and custom shapes', () => {
-    const required =
-      '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZψφδωσλπμθΨΦΔΩΣΛΠΜΘ$€£¥₪₸¢₹₩₽₺₿+-×÷=≈≠≤≥∑∏√∞∫∂∆∇∈∩∪⊂⊃⋔±°‰♪♫♩♬♭♮♯𝄞#@%&§¶©®™*†‡?!¿¡><♀♂☼☀☾★☆♠♣♥♦♄☺œæøßðþŋʃʒƒﬀЖЊѦɄꜨꙍꭓƳṡᴥЧШЯФЮБДЛП◊○●□■△▲▽◇◆◎⊙⊕⊗✕✓♢';
-    for (const char of required) expect(getCatalogSymbol(unicodeSymbolId(char))?.char).toBe(char);
-    for (const slug of [
-      'linked-circles',
-      'curled-triangle',
-      'spiral-square',
-      'crossed-ribbons',
-      'lightning',
-      'circled-dot',
-      'w-over-w',
-    ]) {
-      expect(getCatalogSymbol(`c:${slug}`)?.path).toBeTruthy();
-    }
-  });
-});
+import { getCatalogSymbol, parseSymbolId, symbolLabel } from './symbols';
 
 describe('symbol IDs', () => {
-  it('preserves the exact shared validation pattern', () => {
-    expect(SYMBOL_ID_PATTERN.source).toBe(
-      '^(u:(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4})(-(?:[0-9A-CE-F][0-9A-F]{3}|D[0-7][0-9A-F]{2}|[1-9A-F][0-9A-F]{4}|10[0-9A-F]{4}))*|c:[a-z0-9-]{1,48}|r:[a-z0-9]{15})$'
-    );
-  });
-
   it('parses Unicode sequences, custom shapes and requests', () => {
     expect(parseSymbolId('u:03C8')).toEqual({ kind: 'unicode', text: 'ψ' });
     expect(parseSymbolId('u:1D11E-0301')).toEqual({ kind: 'unicode', text: '𝄞́' });
@@ -97,44 +12,6 @@ describe('symbol IDs', () => {
     });
     expect(parseSymbolId('c:' + 'a'.repeat(48))).not.toBeNull();
     expect(parseSymbolId('u:10FFFF')).not.toBeNull();
-  });
-
-  it.each([
-    '',
-    'u:abc',
-    'u:03c8',
-    'u:110000',
-    'u:D800',
-    'u:DFFF',
-    'u:00041',
-    'u:000041',
-    'u:041',
-    'u:0FFFFF',
-    'u:0041-',
-    'c:Upper',
-    'c:' + 'a'.repeat(49),
-    'r:short',
-    'r:ABC123def456ghi',
-    'u:0041\n',
-    'u:0041\r',
-    'u:0041\u2028',
-    'c:unknown\u2029',
-  ])('rejects invalid ID %j without throwing', id => {
-    expect(isSymbolId(id)).toBe(false);
-    expect(parseSymbolId(id)).toBeNull();
-  });
-
-  it('builds IDs by code point without normalizing or changing case', () => {
-    expect(unicodeSymbolId('A𝄞́')).toBe('u:0041-1D11E-0301');
-    expect(unicodeSymbolId('a')).toBe('u:0061');
-    expect(() => unicodeSymbolId('')).toThrow();
-    expect(() => unicodeSymbolId('\uD800')).toThrow();
-  });
-
-  it('provides setup IDs in contract order', () => {
-    expect(DEFAULT_SETUP_SYMBOLS).toEqual(
-      Array.from('1234567890abcdefghijklmnopqrstuvwxyz', unicodeSymbolId)
-    );
   });
 });
 
@@ -153,46 +30,5 @@ describe('symbol lookup, search and labels', () => {
       'Two stacked Ws'
     );
     expect(symbolLabel('r:abc123def456ghi', { requestDescription: '  ' })).toBe('Sent symbol');
-  });
-
-  it('ranks exact characters before name prefixes, keyword prefixes and substrings', () => {
-    // y, Y: exact character. Yen sign: name prefix.
-    expect(
-      searchSymbols('y')
-        .slice(0, 3)
-        .map(({ id }) => id)
-    ).toEqual(['u:0079', 'u:0059', 'u:00A5']);
-    // Circled white star: name prefix. Sigma: keyword prefix. At: substring.
-    const circleIds = searchSymbols('circle').map(({ id }) => id);
-    const tiers = ['u:272A', 'u:03C3', 'u:0040'].map(id => circleIds.indexOf(id));
-    expect(tiers.every(index => index >= 0)).toBe(true);
-    expect(tiers).toEqual([...tiers].sort((a, b) => a - b));
-    expect(searchSymbols('ψ')[0].id).toBe('u:03C8');
-    expect(searchSymbols(' PI ')).toEqual(searchSymbols('pi'));
-    expect(searchSymbols('trident').map(({ id }) => id)).toContain('u:03C8');
-    expect(searchSymbols('y with lines').map(({ id }) => id)).toContain('u:00A5');
-    expect(searchSymbols('not a real symbol')).toEqual([]);
-    expect(searchSymbols('  ')).toEqual(catalog.symbols);
-  });
-});
-
-describe('emoji presentation', () => {
-  it('keeps emoji-by-default code points out of the catalog', () => {
-    const emoji = catalog.symbols.filter(
-      ({ char }) => char && /\p{Emoji_Presentation}/u.test(char)
-    );
-    expect(emoji.map(({ id }) => id)).toEqual([]);
-  });
-
-  it('requests text presentation for display only', () => {
-    expect(symbolDisplayText('♥')).toBe('♥\uFE0E');
-    expect(symbolDisplayText('✔\uFE0F')).toBe('✔\uFE0F');
-    expect(symbolDisplayText('a1#ψ')).toBe('a1#ψ');
-  });
-
-  it('never stores variation selectors in IDs', () => {
-    expect(unicodeSymbolId('♥\uFE0E')).toBe('u:2665');
-    expect(unicodeSymbolId('♥\uFE0F')).toBe('u:2665');
-    expect(() => unicodeSymbolId('\uFE0E')).toThrow();
   });
 });

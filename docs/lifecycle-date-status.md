@@ -25,6 +25,3 @@ Legacy archive project restore uses an authenticated PocketBase route with a
 restore context, so a saved completion date does not replace the archived
 status. The route assigns the signed-in user and checks ownership of related
 companies and artists.
-
-The local PocketBase smoke test is `node test/local-completion-status.mjs`
-after `pnpm pb:bootstrap:local -- --seed` or `pnpm pb:local` is running.

@@ -27,8 +27,8 @@ pnpm setup
 - `node scripts/generate-not-found.mjs` generates `public/404.html` from the
   shared recovery content and HTML template. `--check` rejects stale output.
   `pnpm build` generates the page; static CI checks its committed version.
-- `pnpm test:not-found` checks standalone HTTP 404 recovery and client-side
-  recovery, matching copy, and keyboard navigation in Chromium and WebKit.
+- `pnpm test:built-app` serves one production build for the cold-load,
+  standalone 404, and PWA navigation suites.
 - `pnpm test:pr` runs the complete local merge gate.
 - `pnpm build:budget` measures the generated eager shell and service-worker
   precache after `pnpm build`, writes `.tmp/bundle-budget/report.{md,json}`,
@@ -298,13 +298,6 @@ and logs under the same run directory, and stops the background services.
 
 ```bash
 pnpm qa:release:local
-```
-
-Pass Playwright filters after the package script when debugging a narrower
-release check:
-
-```bash
-pnpm qa:release:local -- --project=authenticated e2e/authenticated/route-mount.spec.ts
 ```
 
 The runner refuses non-local app and PocketBase URLs, and the direct-mutating

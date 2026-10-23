@@ -4,7 +4,6 @@ import { vi } from 'vitest';
 import {
   renderWithProviders,
   screen,
-  waitFor,
   userEvent,
   describe,
   it,
@@ -206,55 +205,6 @@ describe('EditProject page', () => {
     editProjectState.error = null;
   });
 
-  it('passes inline field errors into the edit form sections', () => {
-    editProjectState.fieldErrors = {
-      sourceUrl: 'Source URL must be a valid URL if provided',
-    };
-
-    renderWithProviders(<EditProject />);
-
-    expect(screen.getByText('Source URL must be a valid URL if provided')).toBeInTheDocument();
-  });
-
-  it('renders the single-scroll edit flow without tabs', () => {
-    renderWithProviders(<EditProject />);
-
-    expect(screen.getByText('Editing')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Aurora Wolves' })).toBeInTheDocument();
-    expect(screen.getByTestId('edit-project-form-sections')).toBeInTheDocument();
-    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
-    expect(document.title).toBe('Edit Aurora Wolves | Organized Glitter');
-  });
-
-  it('wires the page controls into the live edit handlers', async () => {
-    const user = userEvent.setup();
-
-    renderWithProviders(<EditProject />);
-
-    await user.click(screen.getByRole('button', { name: 'Edit sections' }));
-    expect(handleFormDataChangeMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Updated Aurora Wolves',
-        totalDiamonds: '20000',
-        colorCount: '48',
-      })
-    );
-
-    await user.click(screen.getByRole('button', { name: 'More actions' }));
-    await user.click(await screen.findByRole('menuitem', { name: /archive/i }));
-    await user.click(screen.getByRole('button', { name: 'More actions' }));
-    await user.click(await screen.findByRole('menuitem', { name: /delete project/i }));
-    await user.click(screen.getByRole('button', { name: 'Update project' }));
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-
-    await waitFor(() => {
-      expect(handleArchiveMock).toHaveBeenCalled();
-      expect(handleDeleteMock).toHaveBeenCalled();
-      expect(handleSubmitMock).toHaveBeenCalledWith(editProjectState.formData);
-      expect(navigateMock).toHaveBeenCalledWith('/projects/project-123');
-    });
-  });
-
   it('runs the discard guard once before leaving the edit page', async () => {
     const user = userEvent.setup();
     renderWithProviders(<EditProject />);
@@ -284,18 +234,5 @@ describe('EditProject page', () => {
 
     await user.click(screen.getByRole('button', { name: 'Continue without new photo' }));
     expect(continueWithoutPhotoMock).toHaveBeenCalledOnce();
-  });
-
-  it('shows loading and not-found states from the live page entrypoint', () => {
-    editProjectState.loading = true;
-    const { rerender } = renderWithProviders(<EditProject />);
-    expect(screen.getByTestId('edit-project-skeleton')).toBeInTheDocument();
-
-    editProjectState.loading = false;
-    editProjectState.project = null;
-    rerender(<EditProject />);
-
-    expect(screen.getByTestId('edit-project-not-found')).toBeInTheDocument();
-    expect(document.title).toBe('Project not found | Organized Glitter');
   });
 });

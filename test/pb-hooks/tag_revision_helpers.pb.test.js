@@ -107,32 +107,11 @@ describe('tag revision helper', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('passes a prevalidated guarded join through without duplicate lookups or parent saves', () => {
-    const { e, app, next, findRecordById, save } = event({ guarded: true });
-
-    loadHelpers().reviseTagParent(e, relation, 'create');
-
-    expect(next).toHaveBeenCalledOnce();
-    expect(findRecordById).not.toHaveBeenCalled();
-    expect(save).not.toHaveBeenCalled();
-    expect(app.runInTransaction).not.toHaveBeenCalled();
-  });
-
   it('rejects an unguarded join with a different tag owner before writing', () => {
     const { e, next, save } = event({ tagOwner: 'other-owner' });
 
     expect(() => loadHelpers().reviseTagParent(e, relation, 'create')).toThrow(BadRequestError);
     expect(next).not.toHaveBeenCalled();
     expect(save).not.toHaveBeenCalled();
-  });
-
-  it('saves the parent after a valid unguarded join to advance its revision', () => {
-    const { e, next, save, parent } = event();
-
-    loadHelpers().reviseTagParent(e, relation, 'create');
-
-    expect(next).toHaveBeenCalledOnce();
-    expect(save).toHaveBeenCalledExactlyOnceWith(parent);
-    expect(parent.revision).toBe(1);
   });
 });

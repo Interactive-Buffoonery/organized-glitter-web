@@ -145,6 +145,18 @@ describe('account deletion state machine', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Verify password for retry' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect password');
   });
+  it('clears a failed verification message after a successful retry', async () => {
+    mocks.verify.mockResolvedValueOnce({ success: false, error: 'Incorrect password. Try again.' });
+    render(<DeleteAccount />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Current password'), 'wrong');
+    await user.click(screen.getByRole('button', { name: 'Verify password' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect password');
+    await user.type(screen.getByLabelText('Current password'), 'test-password');
+    await user.click(screen.getByRole('button', { name: 'Verify password' }));
+    expect(await screen.findByText('Identity verified for five minutes.')).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
   it('keeps an expired original session locked with support guidance', async () => {
     mocks.intents = [intent()];
     mocks.expired = true;

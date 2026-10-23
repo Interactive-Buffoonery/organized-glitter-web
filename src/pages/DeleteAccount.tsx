@@ -71,7 +71,7 @@ function reducer(state: State, action: Action): State {
         : state;
     case 'verified':
       return state.phase === 'verifying'
-        ? { ...state, phase: 'ready', proof: action.proof }
+        ? { ...state, phase: 'ready', proof: action.proof, error: undefined }
         : state;
     case 'verification_failed':
       return state.intent

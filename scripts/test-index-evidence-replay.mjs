@@ -57,23 +57,27 @@ const withWorkDir = async run => {
   }
 };
 
+// Shared by the synthetic cases and the real schema: throws for any schema
+// index that is neither in production nor created by a newer migration.
+const checkSchemaIndexes = async ({ schema, inventory, migrations }) => {
+  const replayedIndexes = await withWorkDir(workDir =>
+    replayIndexEvidence({ schema, inventory, migrations, binary, workDir })
+  );
+  return applyIndexInventory(schema, inventory, { replayedIndexes });
+};
+
 const evidenceFor = ({ source, schema = [notes], name = '1800000000_case.js' }) =>
-  withWorkDir(async workDir => {
-    const inventory = { $inventoryThroughMigration: boundary, notes: [] };
-    const replayedIndexes = await replayIndexEvidence({
-      schema,
-      inventory,
-      migrations: [
-        { name: boundary, source: 'migrate(() => {}, () => {});\n' },
-        { name, source },
-      ],
-      binary,
-      workDir,
-    });
-    return applyIndexInventory(schema, inventory, { replayedIndexes });
+  checkSchemaIndexes({
+    schema,
+    inventory: { $inventoryThroughMigration: boundary, notes: [] },
+    migrations: [
+      { name: boundary, source: 'migrate(() => {}, () => {});\n' },
+      { name, source },
+    ],
   });
 
 const rejected = {
+  'no migration creates it': migration(''),
   'only a comment names it': migration(`    // ${addStatusIndex(statusIndex)}`),
   'an unused const holds it': migration(`    const sql = ${JSON.stringify(statusIndex)};`),
   'an uncalled function creates it': migration(
@@ -125,7 +129,11 @@ await assert.rejects(
   'an inventoried migration creates it'
 );
 
-assert.deepEqual(await evidenceFor({ source: migration(addStatusIndex(statusIndex)) }), [notes]);
+assert.deepEqual(
+  await evidenceFor({ source: migration(addStatusIndex(statusIndex)) }),
+  [notes],
+  'a newer migration creates an index production lacks'
+);
 assert.deepEqual(
   await evidenceFor({
     source: migration(
@@ -159,17 +167,11 @@ const inventory = JSON.parse(
 const schema = JSON.parse(
   readFileSync(path.join(root, 'docs/pocketbase/collections.schema.json'), 'utf8')
 );
-const replayedIndexes = await withWorkDir(workDir =>
-  replayIndexEvidence({
-    schema,
-    inventory,
-    migrations: readBaseMigrations({ baseCommit: 'HEAD' }),
-    binary,
-    workDir,
-  })
-);
-assert.deepEqual(replayedIndexes, {}, 'The production inventory covers every schema index');
-applyIndexInventory(schema, inventory, { replayedIndexes });
+await checkSchemaIndexes({
+  schema,
+  inventory,
+  migrations: readBaseMigrations({ baseCommit: 'HEAD' }),
+});
 
 console.log(
   'Index inventory evidence: replay rejects dead, dropped, rollback-only and mismatched creates and accepts real forward creates.'

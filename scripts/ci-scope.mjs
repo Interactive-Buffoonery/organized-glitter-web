@@ -23,6 +23,7 @@ const requireValue = (value, label) => {
 export function resolveComparison({
   eventName,
   pullRequestBaseSha,
+  mergeGroupBaseSha,
   pushBeforeSha,
   explicitBase,
   branchCreationBase,
@@ -32,6 +33,10 @@ export function resolveComparison({
   if (eventName === 'pull_request') {
     const base = requireValue(pullRequestBaseSha, 'Pull request base SHA');
     return { base, head, range: `${base}...${head}` };
+  }
+  if (eventName === 'merge_group') {
+    const base = requireValue(mergeGroupBaseSha, 'Merge group base SHA');
+    return { base, head, range: `${base}..${head}` };
   }
   if (eventName === 'push') {
     const before = requireValue(pushBeforeSha, 'Push before SHA');
@@ -164,6 +169,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const rawComparison = resolveComparison({
       eventName: process.env.CI_EVENT_NAME,
       pullRequestBaseSha: process.env.CI_PULL_REQUEST_BASE_SHA,
+      mergeGroupBaseSha: process.env.CI_MERGE_GROUP_BASE_SHA,
       pushBeforeSha: process.env.CI_PUSH_BEFORE_SHA,
       explicitBase: process.env.CI_EXPLICIT_BASE,
       branchCreationBase: process.env.CI_BRANCH_CREATION_BASE,
@@ -183,7 +189,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const scope = classifyCiScope(undefined, {
       comparison,
       eventName: process.env.CI_EVENT_NAME,
-      targetBranch: process.env.CI_TARGET_BRANCH,
+      targetBranch: process.env.CI_TARGET_BRANCH?.replace(/^refs\/heads\//, ''),
     });
     const plan = JSON.stringify({ backend: scope.backend, browser: scope.browser });
     const outputs = [

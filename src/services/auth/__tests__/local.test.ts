@@ -1,4 +1,6 @@
 import { loginWithPassword } from '@/services/auth';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
+import { AccountDeletionError } from '@/services/accountDeletion/types';
 import { ClientResponseError } from 'pocketbase';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -90,6 +92,26 @@ describe('local auth service', () => {
       })
     );
   });
+
+  // These admission failures must remain actionable without installing the new session.
+  it.each(['pending', 'storage'] as const)(
+    'preserves the %s deletion admission error during password login',
+    async reason => {
+      authWithPasswordMock.mockResolvedValue({
+        token: 'new-session-token',
+        record: { id: 'user-1', verified: true },
+      });
+      const error = new AccountDeletionError(reason);
+      vi.mocked(deletionIntents.applyAuthIfClear).mockRejectedValueOnce(error);
+
+      await expect(
+        loginWithPassword({ email: 'sarah@example.test', password: 'password-123' })
+      ).resolves.toEqual({ success: false, error: error.message });
+      expect(authStore.save).not.toHaveBeenCalled();
+      expect(authStore.clear).not.toHaveBeenCalled();
+      expect(authStore.token).toBe('');
+    }
+  );
 
   it('clears auth and rejects login for an unverified user', async () => {
     authWithPasswordMock.mockImplementation(() => {

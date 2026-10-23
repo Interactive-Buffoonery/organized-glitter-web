@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
+import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
+import type { DeletionIntent } from '@/services/accountDeletion/types';
 
 const authState = vi.hoisted(() => ({
   accountId: 'account-a',
@@ -48,6 +51,7 @@ describe('sendFeedbackEmail', () => {
     authState.token = 'session-token';
     clearSessionDrafts();
     vi.restoreAllMocks();
+    vi.mocked(deletionIntents.get).mockReset().mockResolvedValue(undefined);
     vi.stubEnv('VITE_CONTACT_EMAIL', 'contact@example.test');
   });
 
@@ -86,6 +90,95 @@ describe('sendFeedbackEmail', () => {
         }),
       })
     );
+  });
+
+  // A late acceptance must survive deletion fences, storage loss, and account changes.
+  it.each(['same session', 'another account', 'storage unavailable'])(
+    'records accepted feedback for its original account with %s after dispatch',
+    async boundary => {
+      const fetchMock = vi.fn().mockImplementation(async () => {
+        if (boundary === 'another account') {
+          authState.accountId = 'account-b';
+          authState.isCurrentSession = false;
+        }
+        if (boundary === 'storage unavailable') {
+          vi.mocked(deletionIntents.get).mockRejectedValue(new Error('Storage unavailable'));
+        } else {
+          vi.mocked(deletionIntents.get).mockResolvedValue({ phase: 'pending' } as DeletionIntent);
+        }
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      });
+      const openMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      vi.stubGlobal('window', {
+        ...window,
+        location: { ...window.location, hostname: 'app.example.test' },
+        open: openMock,
+      });
+      const feedback = {
+        draftId: 'feedback-draft-a',
+        message: 'Accepted feedback from the original account.',
+        name: 'Sarah',
+        email: 'contact@example.test',
+      };
+
+      await expect(sendFeedbackEmail(feedback)).resolves.toMatchObject({
+        success: false,
+        reason: 'session_changed',
+      });
+      expect(takeCompletedSessionFeedback('account-b')).toBeUndefined();
+      expect(takeCompletedSessionFeedback('account-a')).toEqual(feedback);
+      expect(takeCompletedSessionFeedback('account-a')).toBeUndefined();
+      expect(deletionIntents.get).toHaveBeenLastCalledWith(POCKETBASE_URL, 'account-a');
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(openMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('blocks feedback before dispatch when deletion is pending without opening a mail app', async () => {
+    vi.mocked(deletionIntents.get).mockResolvedValue({ phase: 'pending' } as DeletionIntent);
+    const fetchMock = vi.fn();
+    const openMock = vi.fn();
+    vi.stubGlobal('window', {
+      ...window,
+      location: { ...window.location, hostname: 'app.example.test' },
+      open: openMock,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      sendFeedbackEmail({ message: 'A valid feedback message.' })
+    ).resolves.toMatchObject({
+      success: false,
+      reason: 'session_changed',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(openMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps a rejected feedback response fenced without recording completion or opening mail', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => {
+        vi.mocked(deletionIntents.get).mockResolvedValue({ phase: 'pending' } as DeletionIntent);
+        return new Response(JSON.stringify({ error: 'Rejected' }), { status: 403 });
+      })
+    );
+    const openMock = vi.fn();
+    vi.stubGlobal('window', {
+      ...window,
+      location: { ...window.location, hostname: 'app.example.test' },
+      open: openMock,
+    });
+
+    await expect(
+      sendFeedbackEmail({ message: 'A valid feedback message.' })
+    ).resolves.toMatchObject({
+      success: false,
+      reason: 'session_changed',
+    });
+    expect(takeCompletedSessionFeedback('account-a')).toBeUndefined();
+    expect(openMock).not.toHaveBeenCalled();
   });
 
   it('requires a session without sending or opening a mail app', async () => {

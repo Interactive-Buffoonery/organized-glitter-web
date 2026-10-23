@@ -255,7 +255,7 @@ describe('Colors used entry', () => {
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('654');
     await user.click(screen.getByRole('button', { name: /^Save$/ }));
     expect(state.create).toHaveBeenCalledWith(
-      expect.objectContaining({ symbol: 'u:0031', position: 3, code: '654' })
+      expect.objectContaining({ symbol: 'u:0031', position: 4, code: '654' })
     );
     expect(state.update).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());

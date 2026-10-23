@@ -109,9 +109,22 @@ app vendors a copy. Shape:
 | `note`               | text, max 2000                                      | Optional.                                                            |
 | `created`, `updated` | autodate                                            |                                                                      |
 
-Index on `page`. API rules mirror `coloring_pages`: the caller must be verified,
+Indexes on `page` and `(user, symbol)`. API rules mirror `coloring_pages`: the caller must be verified,
 own the record (`user`), and own the page's book. `user` and `page` cannot be
-changed after create. A server hook validates `tried`.
+changed after create. A server hook validates `tried` and `swatch`; omitted
+`tried`, null, and empty values default to `[]` on all saves, including internal
+saves. Position presence is enforced by the API create hook rather than PocketBase's numeric `required` flag, which rejects zero.
+Update payloads may include unchanged `user` and `page` values. Only actual
+changes are rejected, using PocketBase's `:changed` rule modifier.
+
+When a key is created or updated with an `r:` ID for the same user's already
+`added` or `matched` request, the hook stores that request's resolved symbol
+instead. Unknown, unresolved, and other users' request IDs remain placeholders.
+Known limit: syntactically valid `r:` IDs do not require an existing or owned
+request.
+
+Known concurrency limit: a key saved concurrently with a resolution may keep
+`r:<id>` until either the key or the request is saved again.
 
 ### `coloring_symbol_requests`
 
@@ -129,12 +142,32 @@ changed after create. A server hook validates `tried`.
 
 - Users can create and read their own requests. Only superusers update or
   delete them. Clients cannot set `status` or `resolved_symbol`.
-- Creating a request is rate limited per user and emails the maintainer
-  (`FEEDBACK_TO_EMAIL`). A mail failure does not fail the request.
+- Creating a request is limited to five attempts per user per 15 minutes
+  (in-memory, reset on restart; superuser creates bypass the quota) and emails the maintainer
+  through the same `FEEDBACK_TO_EMAIL` inbox as in-app feedback
+  (`contact@organizedglitter.app` in production). No separate recipient setting
+  is used. The maintainer message includes the account ID, account email, and
+  separately labeled typed contact email. Book labels and descriptions have
+  line breaks replaced with spaces and appear last. A mail failure does not
+  fail the request. Missing configuration skips mail
+  and logs the reason. Notifications run after commit without a retry queue.
 - When a superuser sets `status` to `added` or `matched` with a
   `resolved_symbol`, the server replaces `r:<request id>` with that symbol on
   every one of the requester's color keys, then emails the requester. Clients
   pick up the change on their next fetch.
+- Every nonempty `resolved_symbol` must be a canonical Unicode or custom ID,
+  including while open or declined. It can be changed or cleared until the
+  previous status is `added` or `matched`, when it becomes immutable and the
+  status can only move between `added` and `matched`. A superuser attempt
+  returns 400. Only matching `r:<request id>` rows are
+  rewritten, so previously resolved choices are not silently reassigned.
+- Resolution and key replacements commit atomically. A failed key save rolls
+  back the transaction and returns an error containing the key ID. Resolution
+  mail goes to the typed contact address only when at least one key was
+  rewritten or the status entered `added` or `matched` from an unresolved
+  state. Repeat saves and changes between `added` and `matched` with the same
+  symbol send nothing unless keys were actually rewritten. Declining leaves
+  keys unchanged.
 - Adding a brand new custom shape also needs a catalog update in both apps.
   New Unicode symbols render everywhere immediately.
 

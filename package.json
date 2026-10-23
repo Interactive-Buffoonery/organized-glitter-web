@@ -97,7 +97,7 @@
     "lint:workflows": "node scripts/lint-workflows.mjs",
     "test:ci:static": "node scripts/generate-not-found.mjs --check && pnpm typecheck && pnpm format:check && pnpm lint && node scripts/check-query-lint-placement.mjs && pnpm lint:pb-boundary && pnpm lint:workflows && node --test e2e/ci/browser-inventory.test.mjs && node scripts/check-browser-discovery.mjs",
     "test:ci:unit": "pnpm test",
-    "test:ci:backend": "pnpm pb:test:examples && pnpm pb:validate:schema && pnpm pb:validate:migrations && pnpm pb:validate:upgrade && pnpm pb:test:index-evidence && pnpm pb:test:protected-file-upgrade && pnpm pb:test:auth-verification && pnpm pb:test:feedback && pnpm pb:test:native-oauth-association && pnpm pb:test:auth-step-up && pnpm pb:test:native-apple && pnpm pb:test:archive-restore-v3 && pnpm pb:test:mobile-sync && pnpm pb:test:stats && pnpm pb:test:account-deletion && pnpm pb:test:restore-verified-rules && pnpm pb:test:legacy-migration-guard",
+    "test:ci:backend": "pnpm pb:test:examples && pnpm pb:validate:schema && pnpm pb:validate:migrations && pnpm pb:validate:upgrade && pnpm pb:test:index-evidence && pnpm pb:test:protected-file-upgrade && pnpm pb:test:auth-verification && pnpm pb:test:feedback && pnpm pb:test:native-oauth-association && pnpm pb:test:auth-step-up && pnpm pb:test:native-apple && pnpm pb:test:archive-restore-v3 && pnpm pb:test:mobile-sync && pnpm pb:test:stats && pnpm pb:test:account-deletion && pnpm pb:test:restore-verified-rules && pnpm pb:test:legacy-migration-guard && pnpm pb:test:color-keys",
     "test:ci:build": "pnpm build && pnpm build:budget",
     "test:publication": "node scripts/run-publication-validation.mjs",
     "qa:browser": "node scripts/run-local-release-qa.mjs --suite=smoke",
@@ -116,7 +116,8 @@
     "qa:blog": "node scripts/run-blog-qa.mjs",
     "pb:test:account-deletion": "node scripts/test-account-deletion.mjs && node scripts/test-account-deletion-worker.mjs",
     "pb:test:restore-verified-rules": "node scripts/test-restore-verified-rules.mjs",
-    "pb:test:legacy-migration-guard": "node scripts/test-legacy-migration-guard.mjs"
+    "pb:test:legacy-migration-guard": "node scripts/test-legacy-migration-guard.mjs",
+    "pb:test:color-keys": "node scripts/test-color-keys-pocketbase.mjs"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.2.8",

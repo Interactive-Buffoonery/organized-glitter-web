@@ -125,3 +125,9 @@ receipts would make retries unsafe.
 Run `pnpm pb:test:mobile-sync` for the disposable server
 test, then `pnpm pb:validate:schema`, `pnpm pb:validate:migrations`, and
 `pnpm pb:validate:upgrade -- --base-ref=origin/dev`.
+
+The additive `coloring_page_color_keys` and `coloring_symbol_requests`
+collections use the standard online collection APIs. They are not part of the
+v1 snapshot or apply allowlist. Fetch keys again after a request is resolved;
+server propagation appears on the next online fetch. See
+[Coloring Color Keys](../coloring-color-keys.md).

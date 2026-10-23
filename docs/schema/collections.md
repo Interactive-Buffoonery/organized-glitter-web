@@ -369,3 +369,37 @@ create/update/delete rules are locked; the authenticated transactional route
 validates and derives immutable relations. Empty content removes the record.
 Hidden `restore_key` and JSON `upload_receipts` are internal retry state, not
 user-authored content. See [Color Codes & Swatches](../color-codes-and-swatches.md).
+
+### `coloring_page_color_keys` (base)
+
+Per-page symbol/color rows. Required `user` and `page` relations cascade on
+account/page deletion. `position` is a non-negative integer; create requires
+its presence in the request hook because PocketBase's numeric `required` flag
+rejects zero. `symbol` is required text (64 characters) with the pattern in
+[color keys](../coloring-color-keys.md). Optional `code` and `color_name` have
+100-character limits, `note` 2000, and `swatch` is empty or `#RRGGBB`.
+`tried` is an array of at most 20 strings of at most 100 characters, defaulting
+to `[]` when omitted, null, or empty on API and internal saves. Both timestamps
+are autodates. Indexes: `page` and `(user, symbol)`.
+
+All client operations require a verified owner who also owns the page's book.
+Create explicitly requires the submitted `user` to be self. Update permits
+unchanged `user` and `page` values and rejects changes using `:changed`.
+Placeholders for the same user's already resolved requests are replaced on
+save. Unknown, unresolved, or other users' request IDs remain placeholders.
+
+### `coloring_symbol_requests` (base)
+
+Required `user` relation cascades on account deletion. Optional `page` relation
+is cleared when its page is deleted. Required `book_label` text (200 characters),
+optional `description` (500), required `email`, and required single protected
+`photo` (10 MiB, JPEG/PNG/WebP; thumbnails `96x96f`, `320x320f`). `status` is
+`open`, `added`, `matched`, or `declined`; `resolved_symbol` has a 64-character
+limit. Both timestamps are autodates. Index: `user`.
+
+Verified users create/read their own requests; an attached page must be theirs.
+Only superusers update/delete. Creation forces `open` and an empty resolution.
+Resolution validates a Unicode/custom symbol, freezes it after resolution, and
+atomically replaces the request placeholder only on that requester's keys.
+Notifications run after commit and never fail a saved request. See the feature
+contract for rate limiting, notification behavior, and known limits.

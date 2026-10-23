@@ -110,7 +110,6 @@ const DashboardStatusSegments = ({
                 'hover:bg-muted/50 active:bg-muted transition-colors',
                 'focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
               )}
-              aria-label={`Filter by status. Current: ${getAccessibleLabel(activeSegment.label, activeCount)}`}
               data-testid="status-picker-trigger"
             >
               <span className="flex items-center gap-2">
@@ -215,7 +214,7 @@ const DashboardStatusSegments = ({
               onClick={() => handleStatusChange(status, count)}
               onKeyDown={event => handleKeyDown(event, index)}
             >
-              <span className="truncate">{label}</span>
+              <span className="truncate">{label}</span>{' '}
               {isLoadingCounts ? (
                 <span
                   aria-hidden="true"

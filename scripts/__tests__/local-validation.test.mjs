@@ -36,9 +36,7 @@ describe('local validation orchestrator', () => {
     expect(ci).toEqual(pr.filter(([name]) => !ciJobForPhase(name)));
     expect(ci.map(([name]) => name)).toEqual([
       'backend',
-      'not-found',
-      'pwa-navigation',
-      'cold-load',
+      'built-app',
       'browser-smoke',
       'protected-file-browser',
       'blog-browser',

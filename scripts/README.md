@@ -27,8 +27,8 @@ pnpm setup
 - `node scripts/generate-not-found.mjs` generates `public/404.html` from the
   shared recovery content and HTML template. `--check` rejects stale output.
   `pnpm build` generates the page; static CI checks its committed version.
-- `pnpm test:not-found` checks standalone HTTP 404 recovery and client-side
-  recovery, matching copy, and keyboard navigation in Chromium and WebKit.
+- `pnpm test:built-app` serves one production build for the cold-load,
+  standalone 404, and PWA navigation suites.
 - `pnpm test:pr` runs the complete local merge gate.
 - `pnpm build:budget` measures the generated eager shell and service-worker
   precache after `pnpm build`, writes `.tmp/bundle-budget/report.{md,json}`,

@@ -28,10 +28,10 @@ This local server does not run Spacefast Functions. Use
 For built-artifact cold-load recovery without accounts or a backend process:
 
 ```bash
-pnpm exec playwright test --config playwright.cold-load.config.ts
+pnpm exec playwright test --config playwright.built-app.config.ts --project=cold-load
 ```
 
-This dedicated Chromium and mobile WebKit suite injects resource 429s and 404s
+This dedicated Chromium suite injects resource 429s and 404s
 in fresh contexts with service workers and HTTP caching disabled. It checks
 bounded recovery, Retry-After, static public content, and protected-route
 delivery. See [Cold-load regression tests](./testing-cold-load.md) for its

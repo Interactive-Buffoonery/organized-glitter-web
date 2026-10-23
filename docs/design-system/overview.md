@@ -268,11 +268,8 @@ from `src/content/not-found.json`. The build generates `public/404.html` from
 the shared content or template, run `node scripts/generate-not-found.mjs` and
 commit the generated page. The server version must remain usable without React, JavaScript, or PocketBase.
 
-Run `pnpm exec playwright test --config playwright.not-found.config.ts` for
-recovery links, narrow layouts, saved appearance, no-JavaScript support, and
-keyboard focus on both surfaces. The suite checks a built server response for
+Run `pnpm exec playwright test --config playwright.built-app.config.ts --project=not-found`
+to check both recovery surfaces. The suite checks a built server response for
 HTTP 404, then reaches the client fallback through browser history without a
-document reload. Assertions use accessible heading and link roles. The suite
-also verifies generated HTML is current and both pages expose the heading and
-recovery actions from the shared content.
-Results are written to `.tmp/not-found-qa/report/`.
+document reload, and follows the shared recovery links. Static checks verify
+the generated HTML is current. Results are written to `.tmp/built-app-qa/report/`.

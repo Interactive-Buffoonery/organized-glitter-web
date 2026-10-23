@@ -26,9 +26,7 @@ const sharedPhases = [
   ['react', 'test:ci:react'],
   ['build', 'test:ci:build'],
   ['publication', 'test:publication'],
-  ['not-found', 'test:not-found'],
-  ['pwa-navigation', 'test:pwa:navigation'],
-  ['cold-load', 'test:cold-load'],
+  ['built-app', 'test:built-app'],
 ];
 
 const trailingBrowserPhases = [

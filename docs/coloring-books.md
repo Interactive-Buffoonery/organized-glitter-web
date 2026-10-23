@@ -142,11 +142,3 @@ then drops it once the parent `options` prop includes the same ID.
   normalized by `ColoringService`.
 - The list queries have a five-minute stale time, so mutation invalidation and the
   select's pending option bridge both matter for perceived consistency.
-
-## Regression tests
-
-- `src/components/coloring/__tests__/ColoringTaxonomySelect.test.tsx` verifies
-  that an inline-created option appears immediately and can match the selected
-  value.
-- `src/services/pocketbase/__tests__/bookTaxonomy.service.test.ts` verifies that
-  `Other` and `Unknown` are treated as real taxonomy names.

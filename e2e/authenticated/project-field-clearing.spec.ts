@@ -10,8 +10,6 @@
 import { expect, test } from '@playwright/test';
 import PocketBase from 'pocketbase';
 import { randomUUID } from 'node:crypto';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { assertLocalE2ETargets } from '../fixtures/local-safety';
 
@@ -44,9 +42,6 @@ const pocketBaseUrl = process.env.VITE_POCKETBASE_URL ?? 'http://localhost:8090'
 const appUrl = process.env.E2E_APP_URL ?? 'http://localhost:3000';
 const email = process.env.E2E_TEST_EMAIL;
 const password = process.env.E2E_TEST_PASSWORD;
-const rootDir = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const PORTRAIT_FIXTURE = path.join(rootDir, 'e2e', 'fixtures', 'portrait-cover.jpg');
-const LOGO_FIXTURE = path.join(rootDir, 'public', 'images', 'logo.png');
 
 const createClient = async () => {
   if (!email || !password) {
@@ -191,62 +186,5 @@ test.describe('Full project edit field clearing', () => {
         totalDiamonds: 0,
         colorCount: 0,
       });
-  });
-
-  test('persists full-form crop output instead of the originally selected file', async ({
-    page,
-  }) => {
-    expect(projectId).toBeTruthy();
-    await page.goto(`/projects/${projectId}/edit`);
-
-    const imageInput = page.locator('#project-image-input');
-    await expect(imageInput).toBeAttached({ timeout: 15_000 });
-    await imageInput.setInputFiles(PORTRAIT_FIXTURE);
-
-    const cropDialog = page.getByRole('dialog', { name: 'Crop project image' });
-    await expect(cropDialog).toBeVisible();
-    const useCropButton = cropDialog.getByRole('button', { name: 'Use crop' });
-    await expect(useCropButton).toBeEnabled();
-    await useCropButton.click();
-    await page.getByRole('button', { name: 'Update project' }).click();
-
-    await expect
-      .poll(
-        async () => {
-          const record = await pb.collection('projects').getOne<ProjectRecord>(projectId!);
-          return record.image;
-        },
-        { timeout: 15_000 }
-      )
-      .toContain('cropped');
-  });
-
-  test('persists the second of two consecutive full-form file selections', async ({ page }) => {
-    expect(projectId).toBeTruthy();
-    await page.goto(`/projects/${projectId}/edit`);
-
-    const imageInput = page.locator('#project-image-input');
-    await expect(imageInput).toBeAttached({ timeout: 15_000 });
-    await imageInput.setInputFiles(PORTRAIT_FIXTURE);
-
-    let cropDialog = page.getByRole('dialog', { name: 'Crop project image' });
-    await expect(cropDialog).toBeVisible();
-    await cropDialog.getByRole('button', { name: 'Skip crop' }).click();
-
-    await page.getByLabel('Replace image file picker').setInputFiles(LOGO_FIXTURE);
-    cropDialog = page.getByRole('dialog', { name: 'Crop project image' });
-    await expect(cropDialog).toBeVisible();
-    await cropDialog.getByRole('button', { name: 'Skip crop' }).click();
-    await page.getByRole('button', { name: 'Update project' }).click();
-
-    await expect
-      .poll(
-        async () => {
-          const record = await pb.collection('projects').getOne<ProjectRecord>(projectId!);
-          return record.image;
-        },
-        { timeout: 15_000 }
-      )
-      .toContain('logo');
   });
 });

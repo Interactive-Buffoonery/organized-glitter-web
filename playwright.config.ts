@@ -98,48 +98,17 @@ export default defineConfig({
       // Public (unauthenticated) tests. Run in parallel with nothing that
       // depends on login state.
       name: 'public',
-      testMatch:
-        /[/\\]e2e[/\\](?:(?:home|pwa-safe-area|public-accessibility|links-accessibility|page-titles)\.spec\.ts|a11y[/\\]public-a11y\.spec\.ts)$/,
+      testMatch: /[/\\]e2e[/\\](?:(?:pwa-safe-area)\.spec\.ts|a11y[/\\]public-a11y\.spec\.ts)$/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       // Authenticated route-mount sweep. Depends on the setup project so
       // storageState is ready before these tests run.
       name: 'authenticated',
-      testMatch:
-        /[/\\]e2e[/\\](?:authenticated[/\\].*|a11y[/\\](?:authenticated-a11y|mobile-state-a11y))\.spec\.ts$/,
+      testMatch: /[/\\]e2e[/\\](?:authenticated[/\\].*|a11y[/\\]authenticated-a11y)\.spec\.ts$/,
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],
-        storageState: STORAGE_STATE,
-      },
-    },
-    {
-      // Local visual review atlas. Uses authenticated state so one inventory
-      // can include both public and signed-in screens.
-      name: 'screen-review-desktop',
-      testMatch: /screen-review\/screen-review\.spec\.ts$/,
-      dependencies: ['setup'],
-      use: {
-        ...devices['Desktop Chrome'],
-        storageState: STORAGE_STATE,
-      },
-    },
-    {
-      name: 'screen-review-mobile-chrome',
-      testMatch: /screen-review\/screen-review\.spec\.ts$/,
-      dependencies: ['setup'],
-      use: {
-        ...devices['Pixel 5'],
-        storageState: STORAGE_STATE,
-      },
-    },
-    {
-      name: 'screen-review-mobile-safari',
-      testMatch: /screen-review\/screen-review\.spec\.ts$/,
-      dependencies: ['setup'],
-      use: {
-        ...devices['iPhone 13'],
         storageState: STORAGE_STATE,
       },
     },

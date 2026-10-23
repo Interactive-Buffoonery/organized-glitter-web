@@ -38,8 +38,7 @@ existing session to `/overview`. `pnpm dev` still serves the SPA at `/`,
 
 Run `pnpm spacefast:stage` after building. It copies the Function and shared
 route policy into `dist` and embeds the built app shell, landing, 404 page, and HTML
-security headers in the Function bundle. `server/app-route-policy.test.js`
-checks that the server policy stays aligned with the React route definitions.
+security headers in the Function bundle.
 The app's HTML responses declare `frame-ancestors 'none'` and
 `X-Frame-Options: DENY` to prevent other sites from embedding the app.
 Unknown public paths receive the dedicated HTML 404 page. Missing static

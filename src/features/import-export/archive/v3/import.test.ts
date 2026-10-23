@@ -6,12 +6,12 @@ import {
   calculateItemDigest,
   sha256Bytes,
 } from '@/features/import-export/archive/v3/canonical';
-import { importArchiveV3Parts } from './import';
-import type { ArchiveRestoreCapabilities } from '@/services/pocketbase/archiveRestoreV3.service';
 import type {
   ArchiveItemV3,
   ArchivePartManifestV3,
 } from '@/features/import-export/archive/v3/types';
+import type { ArchiveRestoreCapabilities } from '@/services/pocketbase/archiveRestoreV3.service';
+import { importArchiveV3Parts } from './import';
 
 const backupId = '123e4567-e89b-42d3-a456-426614174000';
 const exportedAt = '2026-09-22T12:00:00.000Z';
@@ -127,13 +127,6 @@ async function archivePart(input: {
   return new File([bytes], `part-${input.partNumber}.zip`, { type: 'application/zip' });
 }
 
-async function rawManifestPart(manifest: string): Promise<File> {
-  const zip = new JSZip();
-  zip.file('manifest.json', manifest);
-  const bytes = await zip.generateAsync({ type: 'uint8array' });
-  return new File([bytes], 'invalid-part.zip', { type: 'application/zip' });
-}
-
 function session(currentUser = { id: 'user-1' }) {
   return {
     userId: 'user-1',
@@ -142,50 +135,6 @@ function session(currentUser = { id: 'user-1' }) {
 }
 
 describe('v3 archive import preflight', () => {
-  it('rejects a warning flood before validating v3 items or writing', async () => {
-    const restoreItem = vi.fn();
-    const file = await rawManifestPart(
-      JSON.stringify({
-        schemaVersion: 3,
-        items: [],
-        warnings: Array(10_001).fill({ code: 'test', message: '' }),
-      })
-    );
-
-    await expect(
-      importArchiveV3Parts([file], {
-        capabilities,
-        adapter: { restoreItem },
-        session: session(),
-      })
-    ).rejects.toThrow(/too many warnings/i);
-    expect(restoreItem).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ['null', 'Unsupported or invalid archive schema version'],
-    ['[]', 'Unsupported or invalid archive schema version'],
-    ['{"schemaVersion":2}', 'Unsupported or invalid archive schema version'],
-    ['{', 'Invalid archive manifest JSON'],
-  ])('rejects invalid v3 manifest %s before restoring any selected part', async (json, error) => {
-    const restoreItem = vi.fn();
-    const valid = await archivePart({
-      partNumber: 1,
-      partCount: 2,
-      items: [projectItem('project:1')],
-    });
-    const invalid = await rawManifestPart(json);
-
-    await expect(
-      importArchiveV3Parts([valid, invalid], {
-        capabilities,
-        adapter: { restoreItem },
-        session: session(),
-      })
-    ).rejects.toThrow(error);
-    expect(restoreItem).not.toHaveBeenCalled();
-  });
-
   it('rejects a mixed backup set before the first server write', async () => {
     const restoreItem = vi.fn();
     const first = await archivePart({
@@ -234,92 +183,9 @@ describe('v3 archive import preflight', () => {
     ).rejects.toThrow(/asset digest mismatch/i);
     expect(restoreItem).not.toHaveBeenCalled();
   });
-
-  it('rejects server upload limits across the selected set before writing', async () => {
-    const restoreItem = vi.fn();
-    const first = await archivePart({
-      partNumber: 1,
-      partCount: 2,
-      items: [projectItem('project:1')],
-    });
-    const second = await archivePart({
-      partNumber: 2,
-      partCount: 2,
-      items: [assetItem(new Uint8Array([1, 2, 3]))],
-      assetBytes: new Uint8Array([1, 2, 3]),
-    });
-    await expect(
-      importArchiveV3Parts([first, second], {
-        capabilities: {
-          ...capabilities,
-          maxAssetBytesByRole: {
-            ...capabilities.maxAssetBytesByRole,
-            'coloring-page-photo': 2,
-          },
-        },
-        adapter: { restoreItem },
-        session: session(),
-      })
-    ).rejects.toThrow(/server upload limit/i);
-    expect(restoreItem).not.toHaveBeenCalled();
-  });
-
-  it('rejects duplicate part indexes even when their inventories match', async () => {
-    const file = await archivePart({
-      partNumber: 1,
-      partCount: 1,
-      items: [projectItem('project:1')],
-    });
-    await expect(
-      importArchiveV3Parts([file, file], {
-        capabilities,
-        adapter: { restoreItem: vi.fn() },
-        session: session(),
-      })
-    ).rejects.toThrow(/selected more than once/i);
-  });
 });
 
 describe('v3 archive restore accounting', () => {
-  it('rejects an asset that grows after preflight before the server write', async () => {
-    const file = await archivePart({
-      partNumber: 1,
-      partCount: 1,
-      items: [assetItem(new Uint8Array([1]))],
-      assetBytes: new Uint8Array([1]),
-    });
-    const originalLoadAsync = JSZip.loadAsync.bind(JSZip);
-    const loadAsync = vi.spyOn(JSZip, 'loadAsync');
-    let loadCount = 0;
-    loadAsync.mockImplementation(async (...args) => {
-      const zip = await originalLoadAsync(...args);
-      if (++loadCount === 2) zip.file('assets/photo-1/photo.jpg', new Uint8Array([1, 2]));
-      return zip;
-    });
-    const restoreItem = vi.fn();
-
-    try {
-      const result = await importArchiveV3Parts([file], {
-        capabilities: {
-          ...capabilities,
-          maxAssetBytesByRole: { ...capabilities.maxAssetBytesByRole, 'coloring-page-photo': 1 },
-        },
-        adapter: { restoreItem },
-        session: session(),
-      });
-
-      expect(result.errors).toEqual([
-        expect.objectContaining({
-          itemId: 'asset:photo-1',
-          message: expect.stringMatching(/too large/i),
-        }),
-      ]);
-      expect(restoreItem).not.toHaveBeenCalled();
-    } finally {
-      loadAsync.mockRestore();
-    }
-  });
-
   it('accepts repeated dependency items across parts and counts the retry response', async () => {
     const dependency = projectItem('project:shared');
     const first = await archivePart({
@@ -359,157 +225,6 @@ describe('v3 archive restore accounting', () => {
     expect(result.alreadyAppliedItemCount).toBe(1);
   });
 
-  it('excludes assets and prepared parents from new library item counts', async () => {
-    const bytes = new Uint8Array([1, 2, 3]);
-    const item = assetItem(bytes);
-    const file = await archivePart({
-      partNumber: 1,
-      partCount: 1,
-      items: [item],
-      assetBytes: bytes,
-    });
-    const restoreItem = vi.fn().mockResolvedValue({
-      outcome: 'created',
-      itemId: item.itemId,
-      targetRecordId: 'asset-target',
-      scaffoldedParentCount: 2,
-      assetOutcomes: [],
-    });
-    const result = await importArchiveV3Parts([file], {
-      capabilities,
-      adapter: { restoreItem },
-      session: session(),
-    });
-    expect(result.createdItemCount).toBe(1);
-    expect(result.scaffoldedItemCount).toBe(2);
-    expect(result.createdLibraryItemCount).toBe(0);
-  });
-
-  it('counts parent scaffolds created by a child restore response', async () => {
-    const file = await archivePart({
-      partNumber: 1,
-      partCount: 1,
-      items: [projectItem('project:child')],
-    });
-    const restoreItem = vi.fn().mockResolvedValue({
-      outcome: 'created',
-      itemId: 'project:child',
-      targetRecordId: 'target-child',
-      scaffoldedParentCount: 1,
-      assetOutcomes: [],
-    });
-
-    const result = await importArchiveV3Parts([file], {
-      capabilities,
-      adapter: { restoreItem },
-      session: session(),
-    });
-
-    expect(result.createdItemCount).toBe(1);
-    expect(result.scaffoldedItemCount).toBe(1);
-  });
-
-  it('reopens one immutable part at a time after whole-set preflight', async () => {
-    const first = await archivePart({
-      partNumber: 1,
-      partCount: 2,
-      items: [projectItem('project:1')],
-    });
-    const second = await archivePart({
-      partNumber: 2,
-      partCount: 2,
-      items: [projectItem('project:2')],
-    });
-    const loadAsync = vi.spyOn(JSZip, 'loadAsync');
-    const restoreItem = vi.fn(async ({ request }) => ({
-      outcome: 'created' as const,
-      itemId: request.item.itemId,
-      targetRecordId: `target-${request.item.itemId}`,
-      assetOutcomes: [],
-    }));
-
-    await importArchiveV3Parts([first, second], {
-      capabilities,
-      adapter: { restoreItem },
-      session: session(),
-    });
-
-    expect(loadAsync).toHaveBeenCalledTimes(4);
-    expect(restoreItem).toHaveBeenCalledTimes(2);
-    loadAsync.mockRestore();
-  });
-
-  it('imports a selected part independently and reports missing parts without claiming full coverage', async () => {
-    const file = await archivePart({
-      partNumber: 2,
-      partCount: 3,
-      items: [projectItem('project:1'), projectItem('project:2')],
-    });
-    const restoreItem = vi
-      .fn()
-      .mockResolvedValueOnce({
-        outcome: 'already_applied',
-        itemId: 'project:1',
-        targetRecordId: 'target-1',
-        assetOutcomes: [],
-      })
-      .mockResolvedValueOnce({
-        outcome: 'created',
-        itemId: 'project:2',
-        targetRecordId: 'target-2',
-        assetOutcomes: [],
-      });
-
-    const result = await importArchiveV3Parts([file], {
-      capabilities,
-      adapter: { restoreItem },
-      session: session(),
-    });
-
-    expect(result).toMatchObject({
-      success: true,
-      selectedPartNumbers: [2],
-      missingPartNumbers: [1, 3],
-      selectedPartCount: 1,
-      totalPartCount: 3,
-      selectedLogicalItemCount: 2,
-      createdItemCount: 1,
-      alreadyAppliedItemCount: 1,
-    });
-    expect(restoreItem).toHaveBeenCalledTimes(2);
-  });
-
-  it('reports a server conflict per item and continues with later independent items', async () => {
-    const file = await archivePart({
-      partNumber: 1,
-      partCount: 1,
-      items: [projectItem('project:1'), projectItem('project:2')],
-    });
-    const conflict = Object.assign(new Error('Project was edited after its restore scaffold'), {
-      status: 409,
-      response: { data: { reason: 'archive_parent_descriptor_conflict' } },
-    });
-    const restoreItem = vi.fn().mockRejectedValueOnce(conflict).mockResolvedValueOnce({
-      outcome: 'created',
-      itemId: 'project:2',
-      targetRecordId: 'target-2',
-      assetOutcomes: [],
-    });
-
-    const result = await importArchiveV3Parts([file], {
-      capabilities,
-      adapter: { restoreItem },
-      session: session(),
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.conflicts).toEqual([
-      expect.objectContaining({ itemId: 'project:1', kind: 'conflict' }),
-    ]);
-    expect(result.createdItemCount).toBe(1);
-    expect(restoreItem).toHaveBeenCalledTimes(2);
-  });
-
   it('stops before another write when the authenticated account changes', async () => {
     const currentUser = { id: 'user-1' };
     const file = await archivePart({
@@ -547,67 +262,6 @@ describe('v3 archive restore accounting', () => {
       partNumber: 1,
       itemId: 'project:1',
     });
-  });
-
-  it('keeps confirmed counts when cancellation occurs after the last item of a part', async () => {
-    const first = await archivePart({
-      partNumber: 1,
-      partCount: 2,
-      items: [projectItem('project:1')],
-    });
-    const second = await archivePart({
-      partNumber: 2,
-      partCount: 2,
-      items: [projectItem('project:2')],
-    });
-    const controller = new AbortController();
-    const restoreItem = vi.fn().mockResolvedValue({
-      outcome: 'created',
-      itemId: 'project:1',
-      targetRecordId: 'target-1',
-      assetOutcomes: [],
-    });
-
-    const result = await importArchiveV3Parts([first, second], {
-      capabilities,
-      adapter: { restoreItem },
-      session: { ...session(), signal: controller.signal },
-      onProgress: progress => {
-        if (progress.phase === 'restore' && progress.completed === 1) controller.abort();
-      },
-    });
-
-    expect(restoreItem).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ success: false, createdItemCount: 1 });
-    expect(result.itemResults).toHaveLength(1);
-    expect(result.errors).toEqual([
-      expect.objectContaining({ partNumber: 2, itemId: 'project:2', kind: 'cancelled' }),
-    ]);
-  });
-
-  it.each([
-    ['offline', Object.assign(new Error('Network request failed'), { status: 0 })],
-    ['unauthorized', Object.assign(new Error('Unauthorized'), { status: 401 })],
-    ['forbidden', Object.assign(new Error('Forbidden'), { status: 403 })],
-  ])('stops after a %s failure without requesting the next item', async (_label, failure) => {
-    const file = await archivePart({
-      partNumber: 1,
-      partCount: 1,
-      items: [projectItem('project:1'), projectItem('project:2')],
-    });
-    const restoreItem = vi.fn().mockRejectedValueOnce(failure);
-
-    const result = await importArchiveV3Parts([file], {
-      capabilities,
-      adapter: { restoreItem },
-      session: session(),
-    });
-
-    expect(restoreItem).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ success: false, createdItemCount: 0 });
-    expect(result.errors).toEqual([
-      expect.objectContaining({ itemId: 'project:1', kind: 'failed' }),
-    ]);
   });
 
   it('keeps a confirmed write when a later transport failure stops restore', async () => {

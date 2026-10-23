@@ -170,7 +170,6 @@ Use the narrowest test seam for the behavior being changed.
   - `src/pages/__tests__/EditColoringBook.test.tsx`
 - Detail drawer behavior:
   - `src/components/coloring/__tests__/ColoringBookEditDrawer.test.tsx`
-  - `src/pages/__tests__/ColoringBookDetail.test.tsx`
 - Service relation and metric behavior:
   - `src/services/pocketbase/__tests__/coloring.service.relations.test.ts`
 

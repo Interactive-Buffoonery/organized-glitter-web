@@ -4,42 +4,36 @@ Run this suite when changing public HTML, the app bootstrap, startup recovery,
 or eager module imports:
 
 ```bash
-pnpm test:cold-load
+pnpm test:built-app
 ```
 
-The config builds the current checkout with Vite and serves `dist/` through
-`server/local-build-server.js`. It uses Chromium and iPhone WebKit, one worker,
+`playwright.built-app.config.ts` builds the current checkout with Vite and serves `dist/` through
+`server/local-build-server.js`. The `cold-load` project uses Chromium, one worker,
 zero runner retries, empty storage state, and blocked service workers. Routing
 disables the browser HTTP cache. Every test receives a fresh browser context.
 There is no login setup, real account, PocketBase process, or deployment.
 The app's configured backend URL points at the local test server, whose API
 routes return 404. The public login form must still become usable.
 
-Port 5184 is reserved for this run. An occupied port fails instead of reusing
-another worktree's server. Choose a different local port when needed:
-
-```bash
-COLD_LOAD_PORT=5185 pnpm exec playwright test --config playwright.cold-load.config.ts
-```
+Port 4183 is reserved for this run. An occupied port fails instead of reusing
+another worktree's server. The same build also serves the `not-found` and
+`pwa-navigation` projects.
 
 Focused runs and discovery:
 
 ```bash
-pnpm exec playwright test --config playwright.cold-load.config.ts --list
-pnpm exec playwright test --config playwright.cold-load.config.ts --project=chromium
-pnpm exec playwright test --config playwright.cold-load.config.ts --grep 'dependency'
+pnpm exec playwright test --config playwright.built-app.config.ts --list
+pnpm exec playwright test --config playwright.built-app.config.ts --project=cold-load
+pnpm exec playwright test --config playwright.built-app.config.ts --grep 'dependency'
 node --test e2e/ci/browser-inventory.test.mjs
 ```
 
-Artifacts stay under `.tmp/cold-load-qa/`: `report/` contains the HTML report,
+Artifacts stay under `.tmp/built-app-qa/`: `report/` contains the HTML report,
 `results.json` contains machine-readable outcomes, and `results/` contains
 failure screenshots and traces. Each test attaches `cold-load-requests`, a JSON
 record of resource paths, query strings, request types, timestamps, and injected
 and actual response statuses. Fault injection matches pathnames so adding a cache-busting query
 cannot bypass a persistent failure.
-
-Set `COLD_LOAD_ARTIFACT_DIR` to keep another run's report and traces separate,
-for example `.tmp/cold-load-integration`.
 
 ## Coverage and integration contract
 
@@ -107,8 +101,8 @@ entry/dependency 404 recovery, and the four protected-route redirects passed in
 both browsers. Entry/dependency automatic 429 recovery, persistent 429 automatic
 attempts, HTTP-date recovery, stylesheet recovery, raw public HTML, blocked-SPA
 landing, landing graph isolation, and both no-JavaScript appearances failed at
-their intended seams. The report is `.tmp/cold-load-qa/report/index.html` and
-machine-readable results are `.tmp/cold-load-qa/results.json` in the test
+their intended seams. The report is `.tmp/built-app-qa/report/index.html` and
+machine-readable results are `.tmp/built-app-qa/results.json` in the test
 worktree. These failures were not skipped or changed into baseline assertions.
 
 The final inventory also includes a separate manual-Retry accessibility control
@@ -140,8 +134,8 @@ cache-isolation guarantees.
 
 ## Validation gate
 
-`pnpm test:cold-load` runs the dedicated production-artifact config. Both
-`pnpm test:pr` and `pnpm test:release` include this phase after PWA navigation.
+`pnpm test:built-app` runs the dedicated production-artifact config. Both
+`pnpm test:pr` and `pnpm test:release` include it as the `built-app` phase.
 Public HTML, bootstrap, and initial graph changes therefore receive this
 coverage independently of the ordinary authenticated/public project filters.
 The full browser inventory retains its separate smoke and release purposes.

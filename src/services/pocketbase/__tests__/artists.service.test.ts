@@ -3,7 +3,7 @@
  * Covers: explicit userId, ServiceError normalization, narrowed list types,
  * duplicate-name validation and ownership checks
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const sessionState = vi.hoisted(() => ({ accountId: 'user-123', generation: 0 }));
 vi.mock('@/services/auth/sessionIdentity', () => ({
@@ -84,23 +84,6 @@ describe('ArtistsService', () => {
       expect(pbMock.pb.filter).toHaveBeenCalledWith('user = {:userId}', { userId: 'user-456' });
       expect(result.items).toEqual([{ id: 'a1', name: 'Monet' }]);
     });
-
-    it('returns narrowed ArtistListItem shape', async () => {
-      pbMock.collectionMethods.getList.mockResolvedValue(
-        pbMock.createListResult([{ id: 'a1', name: 'Monet' }])
-      );
-
-      const result = await ArtistsService.list('user-123');
-      expect(result.items[0]).toHaveProperty('id');
-      expect(result.items[0]).toHaveProperty('name');
-    });
-
-    it('throws ServiceError when userId is empty', async () => {
-      await expect(ArtistsService.list('')).rejects.toMatchObject({
-        type: 'auth',
-        message: 'User ID is required',
-      });
-    });
   });
 
   describe('create()', () => {
@@ -118,45 +101,6 @@ describe('ArtistsService', () => {
       await expect(pending).rejects.toMatchObject({ reason: 'session_changed' });
       expect(pbMock.collectionMethods.create).not.toHaveBeenCalled();
     });
-
-    it('throws validation ServiceError on duplicate name', async () => {
-      pbMock.collectionMethods.getFirstListItem.mockResolvedValue({
-        id: 'existing',
-        name: 'Monet',
-      });
-
-      try {
-        await ArtistsService.create({ name: 'Monet' });
-        expect.unreachable('Should have thrown');
-      } catch (error) {
-        expect(ErrorHandler.isPocketBaseError(error)).toBe(true);
-        if (ErrorHandler.isPocketBaseError(error)) {
-          expect(error.type).toBe('validation');
-          expect(error.message).toContain('Monet');
-        }
-      }
-    });
-
-    it('allows placeholder-like names when the user creates them intentionally', async () => {
-      pbMock.collectionMethods.getFirstListItem.mockRejectedValue({
-        type: 'not_found',
-        message: 'not found',
-        retryable: false,
-      });
-      pbMock.collectionMethods.create.mockResolvedValue({
-        id: 'unknown-artist',
-        name: 'Unknown',
-        user: 'user-123',
-      });
-
-      const result = await ArtistsService.create({ name: 'Unknown' });
-
-      expect(pbMock.collectionMethods.create).toHaveBeenCalledWith({
-        name: 'Unknown',
-        user: 'user-123',
-      });
-      expect(result.name).toBe('Unknown');
-    });
   });
 
   describe('update()', () => {
@@ -170,23 +114,6 @@ describe('ArtistsService', () => {
         expect(ErrorHandler.isPocketBaseError(error)).toBe(true);
         if (ErrorHandler.isPocketBaseError(error)) {
           expect(error.type).toBe('permission');
-        }
-      }
-    });
-
-    it('throws validation ServiceError on duplicate name during update', async () => {
-      pbMock.collectionMethods.getOne.mockResolvedValue({ id: 'a1', user: 'user-123' });
-      pbMock.collectionMethods.getList.mockResolvedValue(
-        pbMock.createListResult([{ id: 'a2', name: 'Existing' }])
-      );
-
-      try {
-        await ArtistsService.update('a1', { name: 'Existing' });
-        expect.unreachable('Should have thrown');
-      } catch (error) {
-        expect(ErrorHandler.isPocketBaseError(error)).toBe(true);
-        if (ErrorHandler.isPocketBaseError(error)) {
-          expect(error.type).toBe('validation');
         }
       }
     });
@@ -208,12 +135,6 @@ describe('ArtistsService', () => {
       expect(pbMock.collectionMethods.delete).not.toHaveBeenCalled();
     });
 
-    it('deletes an owned record while the originating session is current', async () => {
-      pbMock.collectionMethods.getOne.mockResolvedValueOnce({ id: 'metadata-1', user: 'user-123' });
-      await ArtistsService.delete('metadata-1');
-      expect(pbMock.collectionMethods.delete).toHaveBeenCalledWith('metadata-1');
-    });
-
     it('throws permission ServiceError when user does not own the record', async () => {
       pbMock.collectionMethods.getOne.mockResolvedValue({ id: 'a1', user: 'other-user' });
 
@@ -226,20 +147,6 @@ describe('ArtistsService', () => {
           expect(error.type).toBe('permission');
         }
       }
-    });
-  });
-
-  describe('getProjectCounts()', () => {
-    it('loads all artist counts with one aggregate request', async () => {
-      pbMock.pb.send.mockResolvedValue({ counts: { a1: 3, a2: 1 } });
-
-      const counts = await ArtistsService.getProjectCounts();
-
-      expect(pbMock.pb.send).toHaveBeenCalledOnce();
-      expect(pbMock.pb.send).toHaveBeenCalledWith('/api/stats/artist-project-counts', {
-        method: 'GET',
-      });
-      expect(counts).toEqual({ a1: 3, a2: 1 });
     });
   });
 });

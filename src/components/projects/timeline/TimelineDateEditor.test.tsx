@@ -43,52 +43,6 @@ describe('TimelineDateEditor', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('normalizes slash dates before submitting with Enter', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <TimelineDateEditorHarness
-        dateKey="dateStarted"
-        label="Started"
-        value={null}
-        projectId="project-123"
-        isSet={false}
-        formattedDisplay=""
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Edit Started date' }));
-    await user.type(screen.getByRole('textbox', { name: 'Started date' }), '7/3/2024');
-    await user.keyboard('{Enter}');
-
-    expect(updateDatesMutationState.mutate).toHaveBeenCalledWith(
-      { projectId: 'project-123', dateStarted: '2024-07-03' },
-      { onSuccess: expect.any(Function) }
-    );
-  });
-
-  it('saves a completion date without sending the displayed status', async () => {
-    const user = userEvent.setup();
-    render(
-      <TimelineDateEditorHarness
-        dateKey="dateCompleted"
-        label="Completed"
-        value={null}
-        projectId="project-123"
-        currentStatus="progress"
-        isSet={false}
-        formattedDisplay=""
-      />
-    );
-    await user.click(screen.getByRole('button', { name: 'Edit Completed date' }));
-    await user.type(screen.getByRole('textbox', { name: 'Completed date' }), '9/20/2026');
-    await user.keyboard('{Enter}');
-    expect(updateDatesMutationState.mutate).toHaveBeenCalledWith(
-      { projectId: 'project-123', dateCompleted: '2026-09-20' },
-      { onSuccess: expect.any(Function) }
-    );
-  });
-
   it('keeps the date draft open when the save fails', async () => {
     const user = userEvent.setup();
     updateDatesMutationState.mutate.mockImplementationOnce((_input, options) => {

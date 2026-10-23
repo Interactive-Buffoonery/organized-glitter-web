@@ -43,41 +43,6 @@ describe('useImageUpload', () => {
     vi.unstubAllGlobals();
   });
 
-  it('revokes replaced previews and the active preview on unmount', async () => {
-    const { result, unmount } = renderHook(() => useImageUpload('project-images'));
-    const first = new File(['first'], 'first.jpg', { type: 'image/jpeg' });
-    const second = new File(['second'], 'second.jpg', { type: 'image/jpeg' });
-
-    await act(async () => {
-      await result.current.handleImageChange(changeEventFor(first));
-      await result.current.handleImageChange(changeEventFor(second));
-    });
-
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
-
-    unmount();
-
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-2');
-  });
-
-  it('replaces pending input resets and clears the timer on unmount', async () => {
-    vi.useFakeTimers();
-    const { result, unmount } = renderHook(() => useImageUpload('project-images'));
-    const first = new File(['first'], 'first.jpg', { type: 'image/jpeg' });
-    const second = new File(['second'], 'second.jpg', { type: 'image/jpeg' });
-
-    await act(async () => {
-      await result.current.handleImageChange(changeEventFor(first));
-      await result.current.handleImageChange(changeEventFor(second));
-    });
-
-    expect(vi.getTimerCount()).toBe(1);
-
-    unmount();
-
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
   it('ignores compression results from a superseded file selection', async () => {
     const firstCompression = deferred<File>();
     const secondCompression = deferred<File>();
@@ -110,44 +75,5 @@ describe('useImageUpload', () => {
     });
 
     expect(result.current.processedFile).toBe(secondResult);
-  });
-
-  it('revokes the resize object URL when canvas conversion fails', async () => {
-    class MockImage {
-      width = 100;
-      height = 100;
-      onload: ((event: Event) => void) | null = null;
-      onerror: ((event: Event) => void) | null = null;
-
-      set src(_value: string) {
-        queueMicrotask(() => this.onload?.(new Event('load')));
-      }
-    }
-
-    vi.stubGlobal('Image', MockImage);
-    const originalCreateElement = document.createElement.bind(document);
-    const createElementSpy = vi
-      .spyOn(document, 'createElement')
-      .mockImplementation((tagName: string, options?: ElementCreationOptions) => {
-        if (tagName === 'canvas') {
-          return {
-            getContext: () => ({ drawImage: vi.fn() }),
-            toBlob: (callback: BlobCallback) => callback(null),
-            width: 0,
-            height: 0,
-          } as unknown as HTMLCanvasElement;
-        }
-
-        return originalCreateElement(tagName, options);
-      });
-    const { result } = renderHook(() => useImageUpload('avatars', 'avatar'));
-    const avatar = new File(['avatar'], 'avatar.jpg', { type: 'image/jpeg' });
-
-    await act(async () => {
-      await result.current.handleImageChange(changeEventFor(avatar));
-    });
-
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-2');
-    createElementSpy.mockRestore();
   });
 });

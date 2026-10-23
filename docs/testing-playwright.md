@@ -139,12 +139,7 @@ Default artifacts:
 - `.tmp/pocketbase-release-qa/<run-id>/artifacts/test-results/`
 
 The harness and direct-mutating E2E specs refuse non-local app or PocketBase
-URLs. Use them only with fake local records. The older focused interface remains
-available through `qa:release:local`; pass normal Playwright filters after `--`:
-
-```bash
-pnpm qa:release:local -- --project=authenticated e2e/authenticated/route-mount.spec.ts
-```
+URLs. Use them only with fake local records.
 
 Run the focused accessibility subset with:
 
@@ -208,13 +203,6 @@ reach full opacity, and fonts to settle before scanning. A visible main element
 can still be fading in or covered by the splash, which changes the contrast
 measured by Linux WebKit.
 
-`e2e/authenticated/mobile-touch-targets.spec.ts` reuses that settle path, then
-waits for coarse-pointer media and the bottom nav (so `useMobileDevice` has
-left its desktop initial state) before size asserts. Touch-target checks poll
-until the box is frame-stable at >= 44px rather than reading `boundingBox()`
-once after `toBeVisible`. That keeps the WCAG/HIG sizing contract while
-avoiding the INT-1057 flake under full-suite contention.
-
 Install browser engines locally before running the full browser matrix:
 
 ```bash
@@ -239,48 +227,6 @@ mobile presentation: photo-import review uses cards, and Manage Lists is inside
 the account menu. Opening that menu must preserve its accessible dialog name and
 description without Radix title warnings. Let the drawer primitives generate and
 connect their title and description IDs.
-
-## Randomizer interruption regression
-
-`e2e/authenticated/randomizer-interruption-local.spec.ts` covers three
-interruption scenarios on the `/randomizer` route against local PocketBase:
-
-1. **Clear/restore cancellation**: deselecting all items during an active spin
-   cancels the session and allows a fresh spin after restoring the selection.
-2. **Wheel click activation**: clicking the wheel element starts a spin the same
-   way the button does.
-3. **Keyboard page pick**: after a coloring-book spin result, the page-pick
-   action is reachable via keyboard (Enter) and announces the picked page.
-
-The spec runs in both Chromium and iPhone WebKit inventories within the
-disposable QA harness. It requires `reducedMotion: 'no-preference'` so the wheel
-animation fires completion events.
-
-## Local image-selection regression
-
-The avatar crop regression saves a 1:1 avatar through both compression passes
-and checks the 200px preview before upload. It then reloads the page and checks
-that the saved avatar loads from PocketBase. The local build server permits the
-configured loopback PocketBase origin in `connect-src` and `img-src` only when
-`APP_TEST_ENV=test`; production response headers keep their existing policy.
-Run it with disposable local fixtures:
-
-```bash
-pnpm qa:release:local -- --project=authenticated e2e/authenticated/avatar-crop-local.spec.ts --retries=0
-```
-
-The focused legacy project uses Chromium. Run `pnpm qa:browser:full` when the
-avatar regression also needs its managed iPhone WebKit coverage. Managed smoke
-and full inventories do not accept project or file filters.
-
-The local image-selection regression replaces a large image while compression is
-pending, crops the replacement, and checks the pixels saved to PocketBase. Run it
-against disposable local fixtures in both engines:
-
-```bash
-pnpm qa:release:local -- --project=authenticated e2e/authenticated/image-selection-local.spec.ts --retries=0
-E2E_IMAGE_BROWSER=webkit pnpm qa:release:local -- --project=authenticated e2e/authenticated/image-selection-local.spec.ts --retries=0
-```
 
 ## Hosted preview runs
 

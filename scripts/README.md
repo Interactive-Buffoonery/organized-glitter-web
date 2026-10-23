@@ -300,13 +300,6 @@ and logs under the same run directory, and stops the background services.
 pnpm qa:release:local
 ```
 
-Pass Playwright filters after the package script when debugging a narrower
-release check:
-
-```bash
-pnpm qa:release:local -- --project=authenticated e2e/authenticated/route-mount.spec.ts
-```
-
 The runner refuses non-local app and PocketBase URLs, and the direct-mutating
 E2E specs also assert localhost targets before creating or deleting records.
 The default fake login is local only and uses `.test` email addresses. Do not

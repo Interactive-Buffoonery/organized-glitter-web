@@ -150,13 +150,11 @@ The global toaster is intentionally a solid overlay surface, not a glass panel:
 Sonner's default close control is restyled in `src/index.css` with
 `[data-sonner-*]` selectors so it sits on the **right** inside toast padding:
 transparent background, no border or shadow, bare X glyph (not Sonner's
-floating chrome). The CSS contract is asserted in `test/sonner-toast-css.test.ts`
-together with `src/components/ui/sonner.test.tsx`. If you change the close control,
-keep those checks and this section aligned.
+floating chrome).
 
 When adding a notification kind, update `NotificationKind`, `DEFAULT_DURATION_MS`,
 the `notify()` switch, `toastClassNames` and icons in `sonner.tsx`, the
-notification and toaster tests, and this section.
+this section.
 
 ## Glass system
 

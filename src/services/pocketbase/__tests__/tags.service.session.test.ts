@@ -29,8 +29,8 @@ vi.mock('@/services/auth', () => ({
   getCurrentUserId: () => store.record?.id ?? null,
 }));
 
-import { TagService } from '../tags.service';
 import { captureSessionIdentity, isCurrentSessionIdentity } from '@/services/auth/sessionIdentity';
+import { TagService } from '../tags.service';
 
 // Uses the actual service across its lookup suspension points: no transport or hook replacement.
 describe('tag linking originating session', () => {

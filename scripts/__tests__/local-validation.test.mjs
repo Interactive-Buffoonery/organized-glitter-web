@@ -10,21 +10,37 @@ import {
 } from '../run-local-validation.mjs';
 
 describe('local validation orchestrator', () => {
+  it('delegates built-app browser suites from cloud to complete PR validation', () => {
+    const builtApp = ['built-app', 'test:built-app'];
+    expect(buildPhasePlan('pr')).toContainEqual(builtApp);
+    expect(buildPhasePlan('release')).toContainEqual(builtApp);
+    expect(buildPhasePlan('ci')).toContainEqual(builtApp);
+    expect(buildPhasePlan('cloud')).not.toContainEqual(builtApp);
+    const config = readFileSync(
+      new URL('../../playwright.built-app.config.ts', import.meta.url),
+      'utf8'
+    );
+    for (const spec of ['cold-load', 'not-found', 'pwa-navigation']) {
+      expect(config).toContain(`testMatch: '${spec}.spec.ts'`);
+    }
+  });
+
   it('cloud checks retain every non-browser PR phase and delegate every browser phase', () => {
     const pr = buildPhasePlan('pr');
     const cloud = buildPhasePlan('cloud');
-    expect(cloud).toEqual(pr.slice(0, 6));
+    const browserPhases = ['built-app', 'browser-smoke', 'protected-file-browser', 'blog-browser'];
+    expect(cloud).toEqual(pr.filter(([name]) => !browserPhases.includes(name)));
     const report = formatValidationReport({
       profile: 'cloud',
       outcome: 'cloud-checks-passed',
       platform: { operatingSystem: 'linux', architecture: 'x64' },
       repository: { base: { sha: 'abc' }, head: { commit: 'def' } },
-      phases: pr.map(([name], index) => ({
+      phases: pr.map(([name]) => ({
         name,
-        outcome: index < 6 ? 'passed' : 'delegated-to-ci',
+        outcome: browserPhases.includes(name) ? 'delegated-to-ci' : 'passed',
       })),
     });
-    for (const [name] of pr.slice(6)) expect(report).toContain(`| ${name} | delegated-to-ci |`);
+    for (const name of browserPhases) expect(report).toContain(`| ${name} | delegated-to-ci |`);
     expect(report).toContain('Browser coverage: delegated to CI, not passed locally.');
     expect(report).toContain('Complete PR validation: not established by this cloud profile.');
     expect(parseArgs(['--profile=cloud', '--base=origin/dev']).profile).toBe('cloud');

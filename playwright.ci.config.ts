@@ -11,6 +11,7 @@ const isFullSuite = process.env.E2E_QA_SUITE === 'full';
 if (!process.env.E2E_STORAGE_STATE) process.env.E2E_STORAGE_STATE = storageState;
 
 const publicInventory = /[/\\]e2e[/\\]a11y[/\\]public-a11y\.spec\.ts$/;
+const publicWebkitInventory = /[/\\]e2e[/\\]pwa-safe-area\.spec\.ts$/;
 export const chromiumSmokeInventory = [
   /[/\\]e2e[/\\]authenticated[/\\](?:account-deletion-local|archive-v3-restore-local|import-export-local|project-create-cover-local|project-delete-atomic-local|project-field-clearing|session-expiry-local)\.spec\.ts$/,
   /[/\\]e2e[/\\]ci[/\\]coloring-book-create-flow\.spec\.ts$/,
@@ -18,7 +19,7 @@ export const chromiumSmokeInventory = [
 ];
 export const webkitFlowInventory = [
   /[/\\]e2e[/\\]ci[/\\](?:mobile-webkit-smoke|coloring-book-create-flow)\.spec\.ts$/,
-  /[/\\]e2e[/\\](?:pwa-safe-area|authenticated[/\\]account-deletion-local)\.spec\.ts$/,
+  /[/\\]e2e[/\\]authenticated[/\\]account-deletion-local\.spec\.ts$/,
 ];
 export const chromiumFullInventory = chromiumSmokeInventory;
 
@@ -36,6 +37,11 @@ const smokeProjects: Project[] = [
     use: { ...devices['Desktop Chrome'] },
   },
   {
+    name: 'public-webkit-smoke',
+    testMatch: publicWebkitInventory,
+    use: { ...devices['iPhone 13'] },
+  },
+  {
     name: 'authenticated-chromium-smoke',
     testMatch: chromiumSmokeInventory,
     dependencies: ['setup'],
@@ -44,7 +50,7 @@ const smokeProjects: Project[] = [
   {
     name: 'mobile-webkit-smoke',
     testMatch: webkitFlowInventory,
-    grep: /opens the bottom add menu|creates a book and edits|reverifies the same proof|safe.area/i,
+    grep: /opens the bottom add menu|creates a book and edits|reverifies the same proof/i,
     dependencies: ['setup'],
     use: { ...devices['iPhone 13'], storageState },
   },
@@ -58,6 +64,11 @@ const fullProjects: Project[] = [
     use: { ...devices['Desktop Chrome'] },
   },
   {
+    name: 'public-webkit-full',
+    testMatch: publicWebkitInventory,
+    use: { ...devices['iPhone 13'] },
+  },
+  {
     name: 'authenticated-chromium-full',
     testMatch: chromiumFullInventory,
     dependencies: ['setup'],
@@ -66,7 +77,7 @@ const fullProjects: Project[] = [
   {
     name: 'authenticated-webkit-full',
     testMatch: webkitFlowInventory,
-    grep: /opens the bottom add menu|creates a book and edits|reverifies the same proof|safe.area/i,
+    grep: /opens the bottom add menu|creates a book and edits|reverifies the same proof/i,
     dependencies: ['setup'],
     use: { ...devices['iPhone 13'], storageState },
   },

@@ -11,7 +11,9 @@ export const MAX_ARCHIVE_TOP_LEVEL_RECORDS = 10_000;
 const MAX_ARCHIVE_PAGES = 100_000;
 const MAX_ARCHIVE_PAGE_PHOTOS = 99;
 const MAX_ARCHIVE_NESTED_RECORDS = 10_000;
-const MAX_ARCHIVE_TOTAL_RECORDS = 100_000;
+const MAX_ARCHIVE_TOTAL_RECORDS = 200_000;
+const MAX_ARCHIVE_COLOR_KEYS = 100_000;
+export const MAX_ARCHIVE_COLOR_KEYS_PER_PAGE = 500;
 
 type CompressedEntry = JSZip.JSZipObject & {
   _data?: { compressedSize?: number; uncompressedSize?: number };
@@ -206,6 +208,7 @@ export function assertArchiveManifestRecordLimits(manifest: {
 
   let nestedRecordCount = 0;
   let pageCount = 0;
+  let colorKeyCount = 0;
   const addNested = (value: unknown, name: string) => {
     if (!Array.isArray(value)) return;
     nestedRecordCount += value.length;
@@ -235,6 +238,17 @@ export function assertArchiveManifestRecordLimits(manifest: {
         addNested(page.photoPaths, 'photo paths');
       }
       if ('progressNotes' in page) addNested(page.progressNotes, 'progress notes');
+      if ('colorKeys' in page && Array.isArray(page.colorKeys)) {
+        const pageName = 'pageNumber' in page ? String(page.pageNumber) : 'unknown';
+        const bookName = 'title' in book ? String(book.title) : 'an untitled book';
+        if (page.colorKeys.length > MAX_ARCHIVE_COLOR_KEYS_PER_PAGE)
+          throw new Error(`Page ${pageName} in ${bookName} has more than 500 color keys.`);
+        colorKeyCount += page.colorKeys.length;
+        if (colorKeyCount > MAX_ARCHIVE_COLOR_KEYS)
+          throw new Error(
+            `The archive exceeds 100,000 color keys at page ${pageName} in ${bookName}.`
+          );
+      }
       if ('mediumRefs' in page) addNested(page.mediumRefs, 'medium references');
       if (
         'colorReference' in page &&
@@ -250,7 +264,7 @@ export function assertArchiveManifestRecordLimits(manifest: {
     (Array.isArray(manifest.diamondProjects) ? manifest.diamondProjects.length : 0) +
     (Array.isArray(manifest.coloringBooks) ? manifest.coloringBooks.length : 0) +
     (Array.isArray(manifest.coloringMediums) ? manifest.coloringMediums.length : 0);
-  if (topLevelRecords + pageCount + nestedRecordCount > MAX_ARCHIVE_TOTAL_RECORDS) {
+  if (topLevelRecords + pageCount + nestedRecordCount + colorKeyCount > MAX_ARCHIVE_TOTAL_RECORDS) {
     throw new Error('Archive manifest contains too many records');
   }
 }

@@ -1,3 +1,4 @@
+import { ArchiveRestoreSignInError } from '@/services/pocketbase/archiveColorKeys.service';
 import JSZip from 'jszip';
 import { ClientResponseError } from 'pocketbase';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -67,6 +68,7 @@ const { serviceMocks, mockCaptureException } = vi.hoisted(() => ({
       createColoringTag: vi.fn(),
       syncBookTags: vi.fn(),
     },
+    archiveColorKeysService: { list: vi.fn().mockResolvedValue([]), restore: vi.fn() },
     colorReferencesService: {
       list: vi.fn().mockResolvedValue([]),
       restore: vi.fn(),
@@ -90,6 +92,11 @@ vi.mock('@/lib/pocketbase', () => ({
     filter: (expr: string) => expr,
   },
   resolveFileUrl: serviceMocks.pocketbase.resolveFileUrl,
+}));
+
+vi.mock('@/services/pocketbase/archiveColorKeys.service', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/services/pocketbase/archiveColorKeys.service')>()),
+  ArchiveColorKeysService: serviceMocks.archiveColorKeysService,
 }));
 
 vi.mock('@/services/pocketbase/colorReferences.service', () => ({
@@ -1276,4 +1283,201 @@ describe('color reference archive round trips', () => {
       expect(adapter.createColoringPageProgressNote).not.toHaveBeenCalled();
     }
   );
+});
+describe('color key archives', () => {
+  const key = {
+    id: 'key000000000001',
+    page: 'page-1',
+    user: 'source-user',
+    position: 0,
+    symbol: 'r:abc123def456ghi',
+    code: '001',
+    color_name: 'Rose',
+    swatch: '#ff00aa',
+    tried: ['002'],
+    note: '  keep spacing  ',
+    created: '2026-01-01 00:00:00.000Z',
+    updated: '2026-02-01 00:00:00.000Z',
+  };
+
+  const source = (pages = [makeColoringPage()]): ArchiveExportSourceData => {
+    return {
+      projects: [],
+      projectProgressNotes: [],
+      coloringMediums: [],
+      coloringPageProgressNotes: [],
+      coloringBooks: [
+        {
+          id: 'book-1',
+          userId: 'user-1',
+          title: 'Swatch fixture',
+          publisherId: '',
+          illustratorId: '',
+          series: '',
+          theme: '',
+          isbn: '',
+          edition: '',
+          language: '',
+          sourceUrl: '',
+          datePurchased: '',
+          dateReceived: '',
+          dateStarted: '',
+          dateCompleted: '',
+          bookFormat: '',
+          notes: '',
+          coverImage: '',
+          isMystery: false,
+          status: 'in_stash',
+          totalPages: pages.length,
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+      coloringPagesByBookId: { 'book-1': pages },
+      colorKeys: pages.map((page, index) => ({ ...key, id: `key${index}`, page: page.id })),
+    };
+  };
+  it('exports page keys, skips orphan keys, preserves placeholders and remaps restores', async () => {
+    const data = source();
+    data.colorKeys = [key, { ...key, id: 'orphan', page: 'absent-page' }];
+
+    const { blob, manifest } = await createArchiveZipFromData(data);
+    expect(manifest.schemaVersion).toBe(4);
+    const { id, page: _page, user: _user, ...metadata } = key;
+    expect(manifest.coloringBooks[0].pages[0].colorKeys).toEqual([
+      { ref: `coloring-color-key:${id}`, ...metadata },
+    ]);
+    expect(JSON.stringify(manifest)).not.toContain('source-user');
+    expect(JSON.stringify(manifest)).not.toContain('coloring_symbol_requests');
+    const zip = await JSZip.loadAsync(blob);
+    const parsed = validateArchiveManifest(
+      JSON.parse(await zip.file('manifest.json')!.async('string'))
+    );
+    const restore = vi.fn().mockResolvedValue({
+      outcome: 'created',
+      refMap: { 'coloring-color-key:key000000000001': 'restored-key' },
+    });
+    const adapter = makeImportAdapter({
+      createColoringBook: vi.fn().mockResolvedValue({ id: 'new-book' }),
+      listColoringPages: vi
+        .fn()
+        .mockResolvedValue([makeColoringPage({ id: 'new-page', bookId: 'new-book' })]),
+      restoreColorKeys: restore,
+    });
+    const bundle = { zip, manifest: parsed, warnings: [], archiveFingerprint: 'keys-fixture' };
+    const result = await importArchiveBundle(bundle, adapter);
+    expect(result.errors).toEqual([]);
+    expect(restore).toHaveBeenCalledWith(
+      'new-page',
+      parsed.coloringBooks[0].pages[0].ref,
+      parsed.coloringBooks[0].pages[0].colorKeys,
+      'keys-fixture'
+    );
+    expect(result.refMap[`coloring-color-key:${id}`]).toBe('restored-key');
+    await importArchiveBundle(bundle, adapter);
+    expect(restore.mock.calls[1]).toEqual(restore.mock.calls[0]);
+    parsed.coloringBooks[0].pages[0].colorKeys!.push({
+      ...parsed.coloringBooks[0].pages[0].colorKeys![0],
+      ref: 'coloring-color-key:second',
+    });
+    restore.mockClear();
+    restore.mockResolvedValue({ outcome: 'skipped', refMap: {} });
+    vi.mocked(adapter.listExistingColoringBooks).mockResolvedValue([
+      { id: 'new-book', title: 'Swatch fixture', publisher: '', illustrator: '' },
+    ]);
+    const skipped = await importArchiveBundle(bundle, adapter);
+    expect(skipped.errors).toEqual([]);
+    expect(restore).toHaveBeenCalledOnce();
+    expect(
+      skipped.warnings.filter(warning => warning.code === 'skipped-existing-coloring-color-keys')
+    ).toHaveLength(1);
+    restore.mockRejectedValueOnce(new Error('Invalid or duplicate archive color key.'));
+    const failed = await importArchiveBundle(bundle, adapter);
+    expect(failed.errors).toEqual([
+      'Color keys for page 1 in Swatch fixture could not be restored. Export again and retry.',
+    ]);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Import/export operation failed' }),
+      expect.objectContaining({ operation: 'restore_coloring_color_key' })
+    );
+    restore.mockRejectedValueOnce(new ArchiveRestoreSignInError());
+    const signedOut = await importArchiveBundle(bundle, adapter);
+    expect(signedOut.errors).toEqual(['Sign in again to continue the restore.']);
+    vi.mocked(adapter.listExistingColoringBooks).mockResolvedValue([]);
+    const secondPage = {
+      ...parsed.coloringBooks[0].pages[0],
+      ref: 'coloring-page:second' as const,
+      oldId: 'second',
+      pageNumber: 2,
+    };
+    expect(() =>
+      validateArchiveManifest({
+        ...parsed,
+        coloringBooks: [
+          {
+            ...parsed.coloringBooks[0],
+            totalPages: 2,
+            pages: [parsed.coloringBooks[0].pages[0], secondPage],
+          },
+        ],
+      })
+    ).toThrow('duplicate color key');
+    await expect(
+      createArchiveZipFromData({
+        ...data,
+        colorKeys: Array.from({ length: 501 }, (_, i) => ({ ...key, id: `limit${i}` })),
+      })
+    ).rejects.toThrow('Page 1 in Swatch fixture has more than 500 color keys.');
+    delete parsed.coloringBooks[0].pages[0].colorKeys;
+    parsed.schemaVersion = 2;
+    restore.mockClear();
+    vi.mocked(adapter.createColoringBook).mockClear();
+    const oldResult = await importArchiveBundle(bundle, adapter);
+    expect(oldResult.errors).toEqual([]);
+    expect(oldResult.createdColoringBookCount).toBe(1);
+    expect(adapter.createColoringBook).toHaveBeenCalledOnce();
+    expect(oldResult.refMap[parsed.coloringBooks[0].pages[0].ref]).toBe('new-page');
+    expect(restore).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['a changed archive', Object.assign(new Error('conflict'), { status: 409 })],
+    ['an expired session', new ArchiveRestoreSignInError()],
+  ])('stops the restore after %s', async (_, failure) => {
+    const pages = [makeColoringPage(), makeColoringPage({ id: 'page-2', pageNumber: 2 })];
+    const data = source(pages);
+    data.coloringPageProgressNotes = [
+      {
+        id: 'coloring-note-1',
+        pageId: 'page-1',
+        content: 'after keys',
+        date: '2026-05-02',
+        createdAt: '',
+        updatedAt: '',
+      },
+    ];
+    const { blob } = await createArchiveZipFromData(data);
+    const zip = await JSZip.loadAsync(blob);
+    const manifest = validateArchiveManifest(
+      JSON.parse(await zip.file('manifest.json')!.async('string'))
+    );
+    const restore = vi.fn().mockRejectedValue(failure);
+    const adapter = makeImportAdapter({
+      createColoringBook: vi.fn().mockResolvedValue({ id: 'new-book' }),
+      listColoringPages: vi
+        .fn()
+        .mockResolvedValue([
+          makeColoringPage({ id: 'new-page', bookId: 'new-book' }),
+          makeColoringPage({ id: 'new-page-2', bookId: 'new-book', pageNumber: 2 }),
+        ]),
+      restoreColorKeys: restore,
+    });
+    const result = await importArchiveBundle(
+      { zip, manifest, warnings: [], archiveFingerprint: 'keys-fixture' },
+      adapter
+    );
+    expect(restore).toHaveBeenCalledOnce();
+    expect(adapter.createColoringPageProgressNote).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.errors).toHaveLength(1);
+  });
 });

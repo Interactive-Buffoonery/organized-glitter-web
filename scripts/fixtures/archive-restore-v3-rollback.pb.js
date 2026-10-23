@@ -3,7 +3,12 @@
 onRecordCreate(e => {
   e.next();
   const itemId = e.record.getString('item_id');
-  if (itemId === 'asset:rollback-new-file' || itemId === 'asset:rollback-gallery') {
+  if (
+    itemId === 'asset:rollback-new-file' ||
+    itemId === 'asset:rollback-gallery' ||
+    itemId === 'coloring-color-key:rollback' ||
+    itemId === 'coloring-color-key:page:coloring-page:rollback'
+  ) {
     throw new Error('forced rollback after archive target and receipt save');
   }
 }, 'archive_restore_items');

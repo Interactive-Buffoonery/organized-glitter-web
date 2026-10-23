@@ -299,9 +299,9 @@ describe('archive restore PocketBase routes', () => {
   it('requires users authentication for every archive route', () => {
     const { requireAuth, routes } = loadHook();
 
-    expect(routes).toHaveLength(4);
-    expect(requireAuth).toHaveBeenCalledTimes(4);
-    expect(requireAuth.mock.calls).toEqual([['users'], ['users'], ['users'], ['users']]);
+    expect(routes).toHaveLength(5);
+    expect(requireAuth).toHaveBeenCalledTimes(5);
+    expect(requireAuth.mock.calls).toEqual([['users'], ['users'], ['users'], ['users'], ['users']]);
     expect(routes.every(route => route.middleware.collections[0] === 'users')).toBe(true);
   });
 

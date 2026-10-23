@@ -1,3 +1,4 @@
+import { archiveColorKeyMetadataSchema } from '../colorKeySchema';
 import { z } from 'zod';
 import {
   calculateInventoryDigest,
@@ -125,6 +126,7 @@ const metadata = {
   'coloring-page': page,
   'coloring-page-note': note,
   'coloring-color-reference': reference,
+  'coloring-color-key': archiveColorKeyMetadataSchema,
   asset: assetMetadata,
 } as const;
 function safeAssetPath(path: string): boolean {
@@ -247,6 +249,7 @@ export function validateArchiveManifestV3(
       'coloring-page': 'coloring-book',
       'coloring-page-note': 'coloring-page',
       'coloring-color-reference': 'coloring-page',
+      'coloring-color-key': 'coloring-page',
       asset: 'coloring-page',
     };
     if (parsed.parent && expectedParent[shell.kind] !== parsed.parent.kind)
@@ -263,6 +266,7 @@ export function validateArchiveManifestV3(
       'coloring-page': [],
       'coloring-page-note': ['coloring-page-progress-note'],
       'coloring-color-reference': [],
+      'coloring-color-key': [],
       asset: ['coloring-page-photo', 'coloring-swatch-photo'],
     };
     if (shell.assets.some(a => !allowedRoles[shell.kind].includes(a.role)))

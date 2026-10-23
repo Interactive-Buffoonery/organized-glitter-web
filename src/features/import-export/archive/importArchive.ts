@@ -1,3 +1,10 @@
+import { createLogger } from '@/utils/logger';
+import {
+  ArchiveColorKeysService,
+  ArchiveRestoreSignInError,
+  type ArchiveColorKeysRestoreResult,
+} from '@/services/pocketbase/archiveColorKeys.service';
+import type { ArchiveColorKey } from './types';
 import {
   ColorReferencesService,
   type ColorReferenceRestoreResult,
@@ -179,6 +186,8 @@ function applyColorReferenceRestoreProgress(
   result.importedPhotoCount += restored.addedPhotoCount;
 }
 
+const logger = createLogger('ArchiveImport');
+
 export interface ArchiveBundle {
   zip: JSZip;
   manifest: OrganizedGlitterArchiveManifestV1;
@@ -187,6 +196,12 @@ export interface ArchiveBundle {
 }
 
 export interface ArchiveImportAdapter {
+  restoreColorKeys?(
+    pageId: string,
+    pageRef: string,
+    keys: ArchiveColorKey[],
+    archiveFingerprint: string
+  ): Promise<ArchiveColorKeysRestoreResult>;
   restoreColorReference?(
     pageId: string,
     notes: string,
@@ -599,6 +614,10 @@ function createDefaultArchiveImportAdapter(
     reconcileColoringBookMetrics(bookId) {
       assertSession();
       return ArchiveFilesService.reconcileColoringBookMetrics(bookId);
+    },
+    restoreColorKeys(pageId, pageRef, keys, archiveFingerprint) {
+      assertSession();
+      return ArchiveColorKeysService.restore(pageId, userId, pageRef, keys, archiveFingerprint);
     },
     async restoreColorReference(pageId, notes, photoPaths, loadPhoto, restoreKey) {
       return restoreArchivedColorReference(
@@ -1032,7 +1051,12 @@ export async function importArchiveBundle(
     }
   }
 
+  const fingerprint =
+    bundle.archiveFingerprint ??
+    (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
+  let restoreStopped = false;
   for (const book of bundle.manifest.coloringBooks) {
+    if (restoreStopped) break;
     const errorCountBeforeBook = result.errors.length;
     try {
       const archiveBookId =
@@ -1320,9 +1344,6 @@ export async function importArchiveBundle(
             if (!adapter.restoreColorReference)
               throw new Error('Color reference restore is unavailable.');
             const reference = page.colorReference;
-            const fingerprint =
-              bundle.archiveFingerprint ??
-              (await fingerprintArchiveManifest(JSON.stringify(bundle.manifest)));
             const restored = await adapter.restoreColorReference(
               createdPage.id,
               reference.notes,
@@ -1358,6 +1379,49 @@ export async function importArchiveBundle(
                 ? `Page ${page.pageNumber} in ${book.title}: ${error.message}`
                 : `Could not restore color reference for page ${page.pageNumber} in ${book.title}`
             );
+          }
+        }
+
+        if (page.colorKeys?.length) {
+          try {
+            if (!adapter.restoreColorKeys) throw new Error('Color key restore is unavailable.');
+            const restored = await adapter.restoreColorKeys(
+              createdPage.id,
+              page.ref,
+              page.colorKeys,
+              fingerprint
+            );
+            Object.assign(result.refMap, restored.refMap);
+            if (restored.outcome === 'skipped') {
+              warnings.push({
+                code: 'skipped-existing-coloring-color-keys',
+                recordRef: page.ref,
+                message: `Page ${page.pageNumber} in ${book.title} already has color keys. Saved keys were kept.`,
+              });
+            }
+          } catch (error) {
+            logger.error(
+              'Color key restore failed',
+              error instanceof Error ? error.message : 'Unknown restore error'
+            );
+            captureImportExportException(error, {
+              source: 'archive_import',
+              operation: 'restore_coloring_color_key',
+              archive_schema_version: result.archiveSchemaVersion,
+              status: 'partial',
+              failed_count: result.errors.length + 1,
+              warning_count: warnings.length,
+            });
+            result.errors.push(
+              error instanceof ArchiveRestoreSignInError
+                ? error.message
+                : `Color keys for page ${page.pageNumber} in ${book.title} could not be restored. Export again and retry.`
+            );
+            // A changed archive or lost session makes every later write unsafe.
+            if (error instanceof ArchiveRestoreSignInError || isArchiveMetadataConflict(error)) {
+              restoreStopped = true;
+              break;
+            }
           }
         }
 
@@ -1444,6 +1508,6 @@ export async function importOrganizedGlitterArchive(
     assertSession();
     const adapter = createDefaultArchiveImportAdapter(userId, assertSession);
     const recoveryStore = createArchiveImportRecoveryStore(userId, archiveFingerprint);
-    return importArchiveBundle(bundle, adapter, recoveryStore);
+    return importArchiveBundle({ ...bundle, archiveFingerprint }, adapter, recoveryStore);
   });
 }

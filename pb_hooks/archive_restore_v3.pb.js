@@ -21,7 +21,7 @@ routerAdd(
         .fields.getByName(field).maxSize;
     }
     return e.json(200, {
-      restoreSchemaVersions: [1, 2, 3],
+      restoreSchemaVersions: [1, 2, 3, 4],
       multipartRestore: true,
       maxPartBytes: 536870912,
       maxAssetBytesByRole,
@@ -62,6 +62,7 @@ routerAdd(
       'coloring-page',
       'coloring-page-note',
       'coloring-color-reference',
+      'coloring-color-key',
       'asset',
     ];
     const roles = [
@@ -163,6 +164,17 @@ routerAdd(
       },
       'coloring-page-note': { content: 's', date: 's' },
       'coloring-color-reference': { notes: 's' },
+      'coloring-color-key': {
+        position: 'i',
+        symbol: 's',
+        code: 's',
+        color_name: 's',
+        swatch: 's',
+        tried: 'a',
+        note: 's',
+        created: 's',
+        updated: 's',
+      },
       asset: { position: 'i', ownerItemId: 's?' },
     };
     const validateMetadata = (kind, metadata) => {
@@ -561,7 +573,8 @@ routerAdd(
         }
         if (
           collection === 'coloring_page_progress_notes' ||
-          collection === 'coloring_page_color_references'
+          collection === 'coloring_page_color_references' ||
+          collection === 'coloring_page_color_keys'
         ) {
           return record.getString('user') === authId;
         }
@@ -995,6 +1008,25 @@ routerAdd(
           target.set('content', m.content);
           target.set('date', m.date);
           txApp.saveWithContext(context, target);
+        }
+      } else if (item.kind === 'coloring-color-key') {
+        if (!item.parent || item.parent.kind !== 'coloring-page')
+          throw new BadRequestError('Color key is missing its page parent.');
+        const parent = ensureParent(item.parent);
+        collection = 'coloring_page_color_keys';
+        const id = deterministicId(item.itemId);
+        target = findOwned(collection, id);
+        if (!target) {
+          target = new Record(txApp.findCollectionByNameOrId(collection));
+          target.set('id', id);
+          target.set('user', authId);
+          target.set('page', parent.id);
+          require(`${__hooks}/archive_color_keys.js`).saveKey(
+            txApp,
+            target,
+            item.metadata,
+            context
+          );
         }
       } else if (item.kind === 'coloring-color-reference') {
         if (!item.parent || item.parent.kind !== 'coloring-page') {

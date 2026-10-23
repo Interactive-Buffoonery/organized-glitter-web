@@ -148,7 +148,7 @@ function RequestForm({
         return fail(prepError instanceof Error ? prepError.message : FIELD_ERRORS.photo, 'photo');
       }
       try {
-        requestId = (await send.mutateAsync({ ...input, photo: prepared })).id;
+        requestId = (await send.mutateAsync({ ...parsed.data, photo: prepared })).id;
       } catch (requestError) {
         logger.warn('Could not send a symbol request', requestError);
         settle();

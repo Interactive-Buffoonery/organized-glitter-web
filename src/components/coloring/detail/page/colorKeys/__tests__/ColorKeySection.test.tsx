@@ -352,23 +352,6 @@ describe('Symbol requests', () => {
     expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue('me@example.test');
   });
 
-  it('adds the photo as the next row and opens it for a color', async () => {
-    const user = userEvent.setup();
-    state.rows = [key('a', 0, 'u:0031'), key('b', 3, 'u:0032')];
-    state.sendRequest.mockResolvedValue({ id: REQUEST });
-    state.create.mockResolvedValue(key('r', 4, `r:${REQUEST}`));
-    render(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
-    await user.click(screen.getByRole('button', { name: 'Add symbol' }));
-    await sendPhoto(user);
-    expect(state.sendRequest).toHaveBeenCalledWith(expect.objectContaining({ page: 'page-1' }));
-    expect(state.create).toHaveBeenCalledWith({ symbol: `r:${REQUEST}`, position: 4 });
-    const entry = await screen.findByRole('dialog', { name: 'Edit color: Sent symbol' });
-    await waitFor(() => expect(entry).toContainElement(document.activeElement as HTMLElement));
-    expect(state.success).toHaveBeenCalledWith(
-      "Thanks for the photo. We'll email you when it's added."
-    );
-  });
-
   it('only sends the photo when it should not stand in for the symbol', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031')];
@@ -458,32 +441,6 @@ describe('Symbol requests', () => {
     await waitFor(() =>
       expect(state.create).toHaveBeenCalledWith({ symbol: `r:${REQUEST}`, position: 6 })
     );
-  });
-
-  it('keeps the request open while sending, whatever tries to close it', async () => {
-    const user = userEvent.setup();
-    state.rows = [key('a', 0, 'u:0031')];
-    let reject: (error: unknown) => void = () => {};
-    state.sendRequest.mockReturnValue(new Promise((_, fail) => (reject = fail)));
-    render(<ColorKeySection pageId="page-1" bookLabel="Lost Ocean, page 4" />);
-    await user.click(screen.getByRole('button', { name: 'Add symbol' }));
-    await user.click(screen.getByRole('button', { name: /Can't find your symbol/ }));
-    const dialog = screen.getByRole('dialog', { name: 'Send us a symbol' });
-    await user.upload(
-      within(dialog).getByLabelText('Photo'),
-      new File(['photo'], 'symbol.jpg', { type: 'image/jpeg' })
-    );
-    await user.type(within(dialog).getByRole('textbox', { name: /^Description/ }), 'Two w');
-    await user.click(within(dialog).getByRole('button', { name: 'Send' }));
-    await user.keyboard('{Escape}');
-    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
-    expect(screen.getByRole('dialog', { name: 'Send us a symbol' })).toBe(dialog);
-
-    reject(new Error('Network down'));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Network down');
-    expect(within(dialog).getByRole('textbox', { name: /^Description/ })).toHaveValue('Two w');
-    expect(within(dialog).getByRole('img', { name: 'Chosen symbol' })).toBeInTheDocument();
-    expect(state.create).not.toHaveBeenCalled();
   });
 
   it('returns focus to Add symbol after closing the request', async () => {

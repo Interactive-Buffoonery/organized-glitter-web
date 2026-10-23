@@ -979,23 +979,23 @@ describe('color reference archive round trips', () => {
   );
 });
 describe('color key archives', () => {
-  it('exports page keys, skips orphan keys, preserves placeholders and remaps restores', async () => {
-    const page = makeColoringPage();
-    const key = {
-      id: 'key000000000001',
-      page: page.id,
-      user: 'source-user',
-      position: 0,
-      symbol: 'r:abc123def456ghi',
-      code: '001',
-      color_name: 'Rose',
-      swatch: '#ff00aa',
-      tried: ['002'],
-      note: '  keep spacing  ',
-      created: '2026-01-01 00:00:00.000Z',
-      updated: '2026-02-01 00:00:00.000Z',
-    };
-    const data: ArchiveExportSourceData = {
+  const key = {
+    id: 'key000000000001',
+    page: 'page-1',
+    user: 'source-user',
+    position: 0,
+    symbol: 'r:abc123def456ghi',
+    code: '001',
+    color_name: 'Rose',
+    swatch: '#ff00aa',
+    tried: ['002'],
+    note: '  keep spacing  ',
+    created: '2026-01-01 00:00:00.000Z',
+    updated: '2026-02-01 00:00:00.000Z',
+  };
+
+  const source = (pages = [makeColoringPage()]): ArchiveExportSourceData => {
+    return {
       projects: [],
       projectProgressNotes: [],
       coloringMediums: [],
@@ -1022,14 +1022,18 @@ describe('color key archives', () => {
           coverImage: '',
           isMystery: false,
           status: 'in_stash',
-          totalPages: 1,
+          totalPages: pages.length,
           createdAt: '',
           updatedAt: '',
         },
       ],
-      coloringPagesByBookId: { 'book-1': [page] },
-      colorKeys: [key, { ...key, id: 'orphan', page: 'absent-page' }],
+      coloringPagesByBookId: { 'book-1': pages },
+      colorKeys: pages.map((page, index) => ({ ...key, id: `key${index}`, page: page.id })),
     };
+  };
+  it('exports page keys, skips orphan keys, preserves placeholders and remaps restores', async () => {
+    const data = source();
+    data.colorKeys = [key, { ...key, id: 'orphan', page: 'absent-page' }];
 
     const { blob, manifest } = await createArchiveZipFromData(data);
     expect(manifest.schemaVersion).toBe(4);
@@ -1112,27 +1116,6 @@ describe('color key archives', () => {
         ],
       })
     ).toThrow('duplicate color key');
-    const largeData = {
-      ...data,
-      coloringBooks: [{ ...data.coloringBooks[0], totalPages: 2500 }],
-      coloringPagesByBookId: {
-        'book-1': Array.from({ length: 2500 }, (_, i) =>
-          makeColoringPage({ id: `page-${i}`, pageNumber: i + 1 })
-        ),
-      },
-      colorKeys: Array.from({ length: 100000 }, (_, i) => ({
-        ...key,
-        id: `key${i}`,
-        page: `page-${Math.floor(i / 40)}`,
-        position: i % 40,
-      })),
-    };
-    const largeArchive = await createArchiveZipFromData(largeData);
-    expect(() => validateArchiveManifest(largeArchive.manifest)).not.toThrow();
-    largeData.colorKeys.push({ ...key, id: 'over-budget', page: 'page-0' });
-    await expect(createArchiveZipFromData(largeData)).rejects.toThrow(
-      'The archive exceeds 100,000 color keys at page 2500 in Swatch fixture.'
-    );
     await expect(
       createArchiveZipFromData({
         ...data,
@@ -1155,64 +1138,17 @@ describe('color key archives', () => {
     ['an expired session', new ArchiveRestoreSignInError()],
   ])('stops the restore after %s', async (_, failure) => {
     const pages = [makeColoringPage(), makeColoringPage({ id: 'page-2', pageNumber: 2 })];
-    const key = {
-      id: 'key000000000001',
-      page: 'page-1',
-      user: 'source-user',
-      position: 0,
-      symbol: 'r:abc123def456ghi',
-      code: '001',
-      color_name: 'Rose',
-      swatch: '#ff00aa',
-      tried: [],
-      note: '',
-      created: '2026-01-01 00:00:00.000Z',
-      updated: '2026-02-01 00:00:00.000Z',
-    };
-    const data: ArchiveExportSourceData = {
-      projects: [],
-      projectProgressNotes: [],
-      coloringMediums: [],
-      coloringPageProgressNotes: [
-        {
-          id: 'coloring-note-1',
-          pageId: 'page-1',
-          content: 'after keys',
-          date: '2026-05-02',
-          createdAt: '',
-          updatedAt: '',
-        },
-      ],
-      coloringBooks: [
-        {
-          id: 'book-1',
-          userId: 'user-1',
-          title: 'Swatch fixture',
-          publisherId: '',
-          illustratorId: '',
-          series: '',
-          theme: '',
-          isbn: '',
-          edition: '',
-          language: '',
-          sourceUrl: '',
-          datePurchased: '',
-          dateReceived: '',
-          dateStarted: '',
-          dateCompleted: '',
-          bookFormat: '',
-          notes: '',
-          coverImage: '',
-          isMystery: false,
-          status: 'in_stash',
-          totalPages: 2,
-          createdAt: '',
-          updatedAt: '',
-        },
-      ],
-      coloringPagesByBookId: { 'book-1': pages },
-      colorKeys: [key, { ...key, id: 'key000000000002', page: 'page-2' }],
-    };
+    const data = source(pages);
+    data.coloringPageProgressNotes = [
+      {
+        id: 'coloring-note-1',
+        pageId: 'page-1',
+        content: 'after keys',
+        date: '2026-05-02',
+        createdAt: '',
+        updatedAt: '',
+      },
+    ];
     const { blob } = await createArchiveZipFromData(data);
     const zip = await JSZip.loadAsync(blob);
     const manifest = validateArchiveManifest(

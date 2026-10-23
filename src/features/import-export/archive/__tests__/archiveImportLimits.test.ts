@@ -40,6 +40,11 @@ it('counts keys separately but retains a combined record cap and page cap', () =
   ).not.toThrow();
   expect(() =>
     assertArchiveManifestRecordLimits({
+      coloringBooks: [{ pages: [...keyedPages, { colorKeys: [{}] }] }],
+    })
+  ).toThrow('100,000 color keys');
+  expect(() =>
+    assertArchiveManifestRecordLimits({
       coloringBooks: [{ pages: [...keyedPages, ...Array(97500).fill({})] }],
     })
   ).toThrow('too many records');

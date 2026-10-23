@@ -399,6 +399,44 @@ describe('Colors used entry', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
+  it('recreates a vanished row after the latest live position', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    state.update.mockRejectedValue(new ClientResponseError({ status: 404 }));
+    state.create.mockResolvedValue(key('c', 8, 'u:0031'));
+    const { rerender } = render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    state.rows = [key('b', 0, 'u:0032')];
+    rerender(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^Save$/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Save again to add it back');
+    state.rows = [key('b', 0, 'u:0032'), key('d', 7, 'u:0034')];
+    rerender(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^Save$/ }));
+    expect(state.create).toHaveBeenCalledWith(
+      expect.objectContaining({ position: 8, code: '654', symbol: 'u:0031' })
+    );
+  });
+
+  it('keeps Save and next available after the edited row vanishes', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 2, 'u:0031'), key('b', 5, 'u:0032')];
+    state.update.mockRejectedValue(new ClientResponseError({ status: 404 }));
+    state.create.mockResolvedValue(key('c', 6, 'u:0031'));
+    const { rerender } = render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    state.rows = [key('d', 0, 'u:0034'), key('b', 5, 'u:0032')];
+    rerender(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: 'Save and next: Two' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Save again to add it back');
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('654');
+    await user.click(screen.getByRole('button', { name: 'Save and next: Two' }));
+    expect(await screen.findByRole('dialog', { name: 'Edit color: Two' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveFocus();
+  });
+
   it('forgets a changed symbol when the entry is cancelled', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031')];

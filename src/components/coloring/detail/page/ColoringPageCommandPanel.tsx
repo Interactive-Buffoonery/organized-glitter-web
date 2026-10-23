@@ -65,7 +65,7 @@ export function ColoringPageCommandPanel({
         disabled={mediumSelection.isPending}
       />
 
-      <ColorKeySection pageId={page.id} />
+      <ColorKeySection pageId={page.id} bookLabel={`${book.title}, page ${page.pageNumber}`} />
       <ColorReferenceSection pageId={page.id} />
 
       {book.isMystery ? (

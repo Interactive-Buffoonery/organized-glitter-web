@@ -182,4 +182,62 @@ describe('ColorKeysService', () => {
     await expect(ColorKeysService.requests('owner', [])).resolves.toEqual({});
     expect(mocks.getFullList).not.toHaveBeenCalled();
   });
+
+  it('sends a symbol request owned by the user with trimmed fields and the photo', async () => {
+    const photo = new File(['x'], 'symbol.jpg', { type: 'image/jpeg' });
+    mocks.create.mockResolvedValue({ id: 'abcdefghijklmno' });
+    const saved = await ColorKeysService.createRequest('owner', {
+      page: 'page-1',
+      book_label: '  Lost Ocean, page 4 ',
+      description: ' Two w stacked ',
+      email: ' me@example.test ',
+      photo,
+    });
+    expect(saved.id).toBe('abcdefghijklmno');
+    expect(mocks.collection).toHaveBeenCalledWith('coloring_symbol_requests');
+    const [data, options] = mocks.create.mock.calls[0];
+    expect(data).toEqual({
+      user: 'owner',
+      page: 'page-1',
+      book_label: 'Lost Ocean, page 4',
+      description: 'Two w stacked',
+      email: 'me@example.test',
+      photo,
+    });
+    expect(options).toEqual({ requestKey: null });
+  });
+
+  it.each([
+    [{ book_label: ' ' }, 'Enter the book and page.'],
+    [{ book_label: 'x'.repeat(201) }, 'Book and page can be up to 200 characters.'],
+    [{ description: 'x'.repeat(501) }, 'Description can be up to 500 characters.'],
+    [{ email: 'not-an-email' }, 'Enter a valid email address.'],
+    [{ photo: undefined }, 'Choose a photo.'],
+  ])('rejects an invalid symbol request before sending (%o)', async (change, message) => {
+    const input = {
+      book_label: 'Lost Ocean, page 4',
+      email: 'me@example.test',
+      photo: new File(['x'], 'symbol.jpg', { type: 'image/jpeg' }),
+      ...change,
+    };
+    await expect(
+      ColorKeysService.createRequest(
+        'owner',
+        input as Parameters<typeof ColorKeysService.createRequest>[1]
+      )
+    ).rejects.toThrow(message);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses to send a request after the account changes', async () => {
+    mocks.userId = 'someone-else';
+    await expect(
+      ColorKeysService.createRequest('owner', {
+        book_label: 'Lost Ocean',
+        email: 'me@example.test',
+        photo: new File(['x'], 'symbol.jpg', { type: 'image/jpeg' }),
+      })
+    ).rejects.toThrow('Your account changed');
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
 });

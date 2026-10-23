@@ -20,6 +20,8 @@ export function ColorKeySheet({
   children,
   fill = false,
   onEscapeKeyDown,
+  dismissible = true,
+  onCloseAutoFocus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,14 +32,21 @@ export function ColorKeySheet({
   fill?: boolean;
   /** Radix handles Escape on the document first; call preventDefault to keep the sheet open. */
   onEscapeKeyDown?: (event: KeyboardEvent) => void;
+  /** False blocks Escape, the overlay, the close button and swiping down. */
+  dismissible?: boolean;
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
   const { isPhone } = useMobileDevice();
+  const changeOpen = (next: boolean) => {
+    if (next || dismissible) onOpenChange(next);
+  };
   const drawerStyle = useKeyboardSafeViewportStyle(isPhone && open);
   if (isPhone) {
     return (
       <Drawer
         open={open}
-        onOpenChange={onOpenChange}
+        onOpenChange={changeOpen}
+        dismissible={dismissible}
         shouldScaleBackground={false}
         repositionInputs={false}
       >
@@ -45,6 +54,7 @@ export function ColorKeySheet({
           className={fill ? 'h-[92dvh]' : 'max-h-[92dvh]'}
           style={drawerStyle}
           onEscapeKeyDown={onEscapeKeyDown}
+          onCloseAutoFocus={onCloseAutoFocus}
         >
           <div className="space-y-1 px-4 pt-3">
             <DrawerTitle>{title}</DrawerTitle>
@@ -58,13 +68,14 @@ export function ColorKeySheet({
     );
   }
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={changeOpen}>
       <DialogContent
         className={cn(
           'flex max-h-[85dvh] flex-col overflow-hidden [&>button:last-child]:size-11',
           fill && 'h-[min(85dvh,44rem)]'
         )}
         onEscapeKeyDown={onEscapeKeyDown}
+        onCloseAutoFocus={onCloseAutoFocus}
       >
         <DialogHeader className="pr-12">
           <DialogTitle>{title}</DialogTitle>

@@ -62,7 +62,12 @@ function ColorKeyEditor({
   const editingIndex = entry?.row ? rows.findIndex(row => row.id === entry.row?.id) : -1;
   const liveEntry: EntryTarget | null =
     entry?.row && editingIndex >= 0
-      ? { ...entry, row: rows[editingIndex], symbol: rows[editingIndex].symbol }
+      ? {
+          ...entry,
+          row: rows[editingIndex],
+          symbol: rows[editingIndex].symbol,
+          position: rows[editingIndex].position,
+        }
       : entry;
   const next = editingIndex >= 0 ? rows[editingIndex + 1] : undefined;
   const filled = rows.filter(row => row.code.trim()).length;

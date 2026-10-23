@@ -314,6 +314,22 @@ describe('Colors used entry', () => {
     });
   });
 
+  it('saves the latest position when another device reorders during an edit', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    state.update.mockImplementation(async ({ id, input }) => key(id, input.position, 'u:0031'));
+    const { rerender } = render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    state.rows = [key('b', 0, 'u:0032'), key('a', 1, 'u:0031')];
+    rerender(<ColorKeySection pageId="page-1" />);
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    await user.click(screen.getByRole('button', { name: /^Save$/ }));
+    expect(state.update).toHaveBeenCalledWith({
+      id: 'a',
+      input: expect.objectContaining({ position: 1, code: '654' }),
+    });
+  });
+
   it('keeps the draft when the row is gone and adds it back on the next save', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 3, 'u:0031')];

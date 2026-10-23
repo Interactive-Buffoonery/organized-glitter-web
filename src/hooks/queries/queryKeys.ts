@@ -294,6 +294,20 @@ export const queryKeys = {
 
   // Coloring-related keys
   coloring: {
+    colorKeys: {
+      all: ['color-keys'] as const,
+      list: (userId: string, pageId: string) =>
+        [...queryKeys.coloring.colorKeys.all, createUserKeyHash(userId), 'page', pageId] as const,
+      history: (userId: string) =>
+        [...queryKeys.coloring.colorKeys.all, createUserKeyHash(userId), 'history'] as const,
+      requests: (userId: string, requestIds: string[]) =>
+        [
+          ...queryKeys.coloring.colorKeys.all,
+          createUserKeyHash(userId),
+          'requests',
+          createStableIdListKey(requestIds),
+        ] as const,
+    },
     colorReferences: {
       all: ['color-references'] as const,
       detail: (userId: string, pageId: string) =>

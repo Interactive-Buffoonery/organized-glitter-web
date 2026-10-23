@@ -176,6 +176,14 @@ Known concurrency limit: a key saved concurrently with a resolution may keep
 - **Setup.** A page with no keys offers a starting list: `1`-`9`, `0`, then
   `a`-`z`. All 26 letters start on, and the user turns off letters missing from
   the strip. Symbols after `z` are added from the picker. Setup can be skipped.
+  Clients save setup with one call, `POST /api/coloring/color-keys/setup` with
+  `{ "page": "<page id>", "symbols": ["u:0031", ...] }`. It takes 1 to 100
+  different valid symbol IDs and creates rows at positions `0` to `n-1` in one
+  transaction, returning `{ "items": [...] }`. It requires a verified owner of
+  the page's book. If the caller already has any key on the page, it creates
+  nothing and returns HTTP 409 ("This page already has symbols."), so a retry or
+  a second device never duplicates rows. After any error, reload the page's keys
+  and show what the server has.
 - **Picker.** Search by name or keyword, a recently used row, catalog groups,
   then "Can't find your symbol? Send us a photo and we'll add it."
 - **Entry.** Shows the symbol large with its name. Code autocompletes from the

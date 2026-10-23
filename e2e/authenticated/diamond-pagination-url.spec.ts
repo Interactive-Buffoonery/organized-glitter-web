@@ -38,7 +38,7 @@ async function startPopupDiagnostics(page: Page, context: BrowserContext) {
   const startedAt = Date.now();
   const events: unknown[] = [];
   const record = (event: string, detail: object = {}) => {
-    if (events.length === 40) events.shift();
+    if (events.length === 60) events.shift();
     events.push({ ms: Date.now() - startedAt, event, ...detail });
   };
   const observePage = (observed: Page, id: number) => {
@@ -53,6 +53,44 @@ async function startPopupDiagnostics(page: Page, context: BrowserContext) {
     }
     observed.on('popup', () => record('popup', { id }));
   };
+  // Chromium-level tab events tell a tab Chromium never created apart from one
+  // Playwright never surfaced as a page.
+  const browser = context.browser();
+  const targetSession =
+    browser?.browserType().name() === 'chromium' ? await browser.newBrowserCDPSession() : undefined;
+  let pageContextId: string | undefined;
+  if (targetSession) {
+    const pageSession = await context.newCDPSession(page);
+    pageContextId = (await pageSession.send('Target.getTargetInfo')).targetInfo.browserContextId;
+    await pageSession.detach();
+  }
+  const safeTarget = (target: {
+    type: string;
+    attached: boolean;
+    openerId?: string;
+    browserContextId?: string;
+    url: string;
+  }) => ({
+    type: target.type,
+    attached: target.attached,
+    opener: Boolean(target.openerId),
+    sameContext: target.browserContextId === pageContextId,
+    ...paginationRoute(target.url || 'about:blank'),
+  });
+  let discoveringExistingTargets = true;
+  targetSession?.on('Target.targetCreated', ({ targetInfo }) => {
+    if (!discoveringExistingTargets && targetInfo.type === 'page') {
+      record('target-created', safeTarget(targetInfo));
+    }
+  });
+  targetSession?.on('Target.targetInfoChanged', ({ targetInfo }) => {
+    if (targetInfo.type === 'page') record('target-changed', safeTarget(targetInfo));
+  });
+  targetSession?.on('Target.targetCrashed', () => record('target-crashed'));
+  targetSession?.on('Target.targetDestroyed', () => record('target-destroyed'));
+  await targetSession?.send('Target.setDiscoverTargets', { discover: true });
+  discoveringExistingTargets = false;
+
   let pageCount = 1;
   observePage(page, 0);
   context.on('page', newPage => {
@@ -149,7 +187,16 @@ async function startPopupDiagnostics(page: Page, context: BrowserContext) {
       routeSource: paginationRouteValues,
     }
   );
-  const report = (failed: boolean) => {
+  const report = async (failed: boolean) => {
+    const browserTargets = failed
+      ? await targetSession
+          ?.send('Target.getTargets')
+          .then(({ targetInfos }) =>
+            targetInfos.filter(target => target.type === 'page').map(safeTarget)
+          )
+          .catch(() => 'unavailable')
+      : undefined;
+    await targetSession?.detach().catch(() => undefined);
     if (!failed) return;
     console.warn(
       popupDiagnosticPrefix,
@@ -161,6 +208,7 @@ async function startPopupDiagnostics(page: Page, context: BrowserContext) {
           .pages()
           .slice(0, 5)
           .map(openPage => ({ closed: openPage.isClosed(), ...paginationRoute(openPage.url()) })),
+        browserTargets,
         events,
       })
     );
@@ -174,13 +222,13 @@ test.describe('diamond pagination shared URL', () => {
   test.setTimeout(180_000);
 
   let popupDiagnostics: Awaited<ReturnType<typeof startPopupDiagnostics>> | undefined;
-  test.afterEach(({ page }, testInfo) => {
+  test.afterEach(async ({ page }, testInfo) => {
     popupDiagnostics?.record('test-ended', {
       status: testInfo.status,
       closed: page.isClosed(),
       ...paginationRoute(page.url()),
     });
-    popupDiagnostics?.report(testInfo.status !== testInfo.expectedStatus);
+    await popupDiagnostics?.report(testInfo.status !== testInfo.expectedStatus);
     popupDiagnostics = undefined;
   });
 

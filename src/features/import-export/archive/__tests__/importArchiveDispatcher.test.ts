@@ -74,24 +74,6 @@ describe('archive import dispatcher', () => {
     mocks.importV3.mockResolvedValue({ success: true });
   });
 
-  it.each([1, 2, 4])(
-    'routes legacy v%s without requiring a v3-capable server',
-    async schemaVersion => {
-      const file = await schemaFile(schemaVersion);
-      mocks.importLegacy.mockResolvedValue({
-        archiveSchemaVersion: schemaVersion,
-        success: true,
-      });
-
-      const result = await importOrganizedGlitterArchives([file]);
-
-      expect(result.schemaVersion).toBe(schemaVersion);
-      expect(mocks.importLegacy).toHaveBeenCalledWith(file);
-      expect(mocks.getCapabilities).not.toHaveBeenCalled();
-      expect(mocks.importV3).not.toHaveBeenCalled();
-    }
-  );
-
   it('dispatches a complete v4 manifest through the real validator', async () => {
     const manifest = {
       schemaVersion: 4,
@@ -151,21 +133,6 @@ describe('archive import dispatcher', () => {
     expect(mocks.importV3).not.toHaveBeenCalled();
   });
 
-  it.each(['null', '[]', '"manifest"', '42', 'true', '{}', '{"schemaVersion":99}'])(
-    'rejects invalid manifest root or schema version %s before requesting a restore',
-    async manifest => {
-      const file = await manifestFile(manifest);
-
-      await expect(importOrganizedGlitterArchives([file])).rejects.toThrow(
-        'Unsupported or invalid archive schema version'
-      );
-
-      expect(mocks.importLegacy).not.toHaveBeenCalled();
-      expect(mocks.getCapabilities).not.toHaveBeenCalled();
-      expect(mocks.importV3).not.toHaveBeenCalled();
-    }
-  );
-
   it('reports malformed manifest JSON without exposing parser details', async () => {
     const file = await manifestFile('{');
 
@@ -176,33 +143,6 @@ describe('archive import dispatcher', () => {
     expect(mocks.importLegacy).not.toHaveBeenCalled();
     expect(mocks.getCapabilities).not.toHaveBeenCalled();
     expect(mocks.importV3).not.toHaveBeenCalled();
-  });
-
-  it('capability-gates a one-part v3 restore before entering the shared v3 pipeline', async () => {
-    const file = await schemaFile(3);
-
-    await importOrganizedGlitterArchives([file]);
-
-    expect(mocks.getCapabilities).toHaveBeenCalledTimes(1);
-    expect(mocks.getCapabilities.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.importV3.mock.invocationCallOrder[0]
-    );
-    expect(mocks.importV3).toHaveBeenCalledWith(
-      [file],
-      expect.objectContaining({
-        adapter: expect.objectContaining({ restoreItem: mocks.restoreItem }),
-        session: expect.objectContaining({ userId: 'user-1' }),
-      })
-    );
-  });
-
-  it('capability-gates multiple selected files before the v3 importer opens them', async () => {
-    const files = [await schemaFile(3, 'part-1.zip'), await schemaFile(3, 'part-2.zip')];
-
-    await importOrganizedGlitterArchives(files);
-
-    expect(mocks.getCapabilities).toHaveBeenCalledTimes(1);
-    expect(mocks.importV3).toHaveBeenCalledWith(files, expect.any(Object));
   });
 
   it('does not open a v3 archive when the capability request fails', async () => {

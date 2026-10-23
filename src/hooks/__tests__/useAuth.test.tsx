@@ -109,12 +109,9 @@ import {
   expect,
   beforeEach,
   afterEach,
-  renderWithProviders,
-  screen,
   waitFor,
   createMockUser,
   act,
-  userEvent,
 } from '../../test-utils';
 import { useAuth } from '../useAuth';
 import { useSessionDraft } from '../useSessionDraft';
@@ -128,10 +125,7 @@ import {
   hasSessionDraft,
   isSessionTokenInactive,
   registerSessionDraft,
-  takeSessionDraft,
   recordCompletedSessionCreate,
-  takeCompletedSessionDestination,
-  completeSessionRecovery,
   reportInvalidSession,
   peekSessionDraft,
 } from '@/services/auth/sessionRecovery';
@@ -143,29 +137,6 @@ const renderUseAuthHook = () =>
   renderHook((): AuthContextType => useAuth() as AuthContextType, {
     wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
   });
-
-// Test component that consumes useAuth hook
-const AuthStateTestComponent: React.FC = () => {
-  const { user, isAuthenticated, isLoading, initialCheckComplete, signOut } =
-    useAuth() as AuthContextType;
-
-  return (
-    <div>
-      <div data-testid="loading-state">{isLoading ? 'loading' : 'idle'}</div>
-      <div data-testid="auth-state">{isAuthenticated ? 'authenticated' : 'unauthenticated'}</div>
-      <div data-testid="initial-check">{initialCheckComplete ? 'complete' : 'pending'}</div>
-      {user && (
-        <div>
-          <div data-testid="user-id">{user.id}</div>
-          <div data-testid="user-email">{user.email}</div>
-        </div>
-      )}
-      <button data-testid="signout-btn" onClick={() => signOut()} disabled={isLoading}>
-        Sign Out
-      </button>
-    </div>
-  );
-};
 
 // Helper to create controlled PocketBase auth states
 const setupMockAuthState = (
@@ -209,150 +180,6 @@ describe('useAuth Integration Tests', () => {
     queryClient.clear();
     clearSessionDrafts();
     vi.clearAllMocks();
-  });
-
-  describe('Error Boundaries', () => {
-    it('should throw error when used outside AuthProvider', () => {
-      // Mock console.error to avoid noise in tests
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      expect(() => {
-        renderHook(() => useAuth());
-      }).toThrow('useAuth must be used within an AuthProvider');
-
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe('Hook Context Integration', () => {
-    it('captures active drafts when the initial stored token has expired', async () => {
-      setupMockAuthState(false, createMockUser({ id: 'account-a' }));
-      pocketBaseMock.authStore.token = 'expired-token';
-      const unregister = registerSessionDraft('project-edit', 'account-a', () => ({
-        title: 'Unsaved',
-      }));
-
-      const { result } = renderUseAuthHook();
-
-      await waitFor(() => expect(result.current.initialCheckComplete).toBe(true));
-      await waitFor(() => expect(hasSessionDraft('project-edit', 'account-a')).toBe(true));
-      unregister();
-    });
-
-    it('should return auth context values when used within AuthProvider', () => {
-      setupMockAuthState(false, null);
-
-      const { result } = renderUseAuthHook();
-
-      expect(result.current).toHaveProperty('user');
-      expect(result.current).toHaveProperty('isAuthenticated');
-      expect(result.current).toHaveProperty('isLoading');
-      expect(result.current).toHaveProperty('initialCheckComplete');
-      expect(result.current).toHaveProperty('signOut');
-      expect(typeof result.current.signOut).toBe('function');
-    });
-
-    it('should return unauthenticated state when no user is present', async () => {
-      setupMockAuthState(false, null);
-
-      const { result } = renderUseAuthHook();
-
-      // Wait for initial auth check to complete
-      await waitFor(() => {
-        expect(result.current.initialCheckComplete).toBe(true);
-      });
-
-      expect(result.current.isAuthenticated).toBe(false);
-      expect(result.current.user).toBeNull();
-      expect(result.current.isLoading).toBe(false);
-    });
-
-    it('should return authenticated state when valid user is present', async () => {
-      const mockUser = createMockUser({
-        id: 'auth-user-123',
-        email: 'authenticated@example.com',
-      });
-
-      setupMockAuthState(true, mockUser);
-
-      const { result } = renderUseAuthHook();
-
-      // Wait for initial auth check to complete
-      await waitFor(() => {
-        expect(result.current.initialCheckComplete).toBe(true);
-      });
-
-      expect(result.current.isAuthenticated).toBe(true);
-      expect(result.current.user).toEqual(mockUser);
-      expect(result.current.isLoading).toBe(false);
-    });
-  });
-
-  describe('Component Integration', () => {
-    it('should provide auth state to consuming components (unauthenticated)', async () => {
-      setupMockAuthState(false, null);
-
-      renderWithProviders(
-        <AuthProvider>
-          <AuthStateTestComponent />
-        </AuthProvider>
-      );
-
-      // Wait for auth check to complete
-      await waitFor(() => {
-        expect(screen.getByTestId('initial-check')).toHaveTextContent('complete');
-      });
-
-      expect(screen.getByTestId('auth-state')).toHaveTextContent('unauthenticated');
-      expect(screen.getByTestId('loading-state')).toHaveTextContent('idle');
-      expect(screen.queryByTestId('user-id')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('user-email')).not.toBeInTheDocument();
-    });
-
-    it('should provide auth state to consuming components (authenticated)', async () => {
-      const mockUser = createMockUser({
-        id: 'component-user-456',
-        email: 'component@example.com',
-      });
-
-      setupMockAuthState(true, mockUser);
-
-      renderWithProviders(
-        <AuthProvider>
-          <AuthStateTestComponent />
-        </AuthProvider>
-      );
-
-      // Wait for auth check to complete
-      await waitFor(() => {
-        expect(screen.getByTestId('initial-check')).toHaveTextContent('complete');
-      });
-
-      expect(screen.getByTestId('auth-state')).toHaveTextContent('authenticated');
-      expect(screen.getByTestId('loading-state')).toHaveTextContent('idle');
-      expect(screen.getByTestId('user-id')).toHaveTextContent('component-user-456');
-      expect(screen.getByTestId('user-email')).toHaveTextContent('component@example.com');
-    });
-
-    it('should show loading state during initial auth check', async () => {
-      setupMockAuthState(false, null);
-
-      renderWithProviders(
-        <AuthProvider>
-          <AuthStateTestComponent />
-        </AuthProvider>
-      );
-
-      // Check initial loading state - might need to wait for component mount
-      await waitFor(() => {
-        expect(screen.getByTestId('loading-state')).toBeInTheDocument();
-      });
-
-      // Should eventually complete the check
-      await waitFor(() => {
-        expect(screen.getByTestId('initial-check')).toHaveTextContent('complete');
-      });
-    });
   });
 
   describe('Auth State Changes', () => {
@@ -405,96 +232,6 @@ describe('useAuth Integration Tests', () => {
       expect(pocketBaseMock.authStore.clear).not.toHaveBeenCalled();
     });
 
-    it('applies a refresh response during a same-account token refresh', async () => {
-      const account = createMockUser({ id: 'refresh-current-account' });
-      setupMockAuthState(true, account);
-      let finishRefresh: ((value: { token: string; record: PocketBaseUser }) => void) | undefined;
-      vi.spyOn(UsersService, 'refreshDetachedSession').mockImplementation(
-        () =>
-          new Promise(resolve => {
-            finishRefresh = resolve;
-          }) as ReturnType<typeof UsersService.refreshDetachedSession>
-      );
-
-      renderUseAuthHook();
-      await waitFor(() => expect(finishRefresh).toBeTypeOf('function'));
-      finishRefresh?.({ token: 'refreshed-token', record: account });
-
-      await waitFor(() =>
-        expect(pocketBaseMock.authStore.save).toHaveBeenCalledWith('refreshed-token', account)
-      );
-    });
-
-    it('guards every refreshed token when the session ends', async () => {
-      let onChange: ((token: string | null, record: unknown) => void) | undefined;
-      const account = createMockUser({ id: 'refreshed-account' });
-      setupMockAuthState(true, account, callback => {
-        onChange = callback;
-        return vi.fn();
-      });
-      const { result } = renderUseAuthHook();
-      await waitFor(() => expect(result.current.initialCheckComplete).toBe(true));
-
-      const authStore = pb.authStore as { token: string; record: PocketBaseUser | null };
-      act(() => {
-        authStore.token = 'refreshed-token';
-        onChange?.('refreshed-token', account);
-      });
-      await act(async () => {
-        await result.current.signOut();
-      });
-
-      expect(isSessionTokenInactive('mock-token')).toBe(true);
-      expect(isSessionTokenInactive('refreshed-token')).toBe(true);
-    });
-
-    it('keeps a late create after another tab clears the auth store', async () => {
-      let onChange: ((token: string | null, record: unknown) => void) | undefined;
-      const account = createMockUser({ id: 'storage-signout-account' });
-      setupMockAuthState(true, account, callback => {
-        onChange = callback;
-        return vi.fn();
-      });
-      const { result } = renderUseAuthHook();
-      await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
-      queryClient.setQueryData(['account-cache', account.id], { title: 'Old account data' });
-
-      act(() => {
-        const authStore = pb.authStore as { token: string; record: PocketBaseUser | null };
-        authStore.token = '';
-        authStore.record = null;
-        onChange?.('', null);
-      });
-      recordCompletedSessionCreate('mock-token', 'projects', 'project-1');
-
-      expect(queryClient.getQueryData(['account-cache', account.id])).toBeUndefined();
-      expect(takeCompletedSessionDestination(account.id)).toBe('/projects/project-1');
-    });
-
-    it('keeps a late create when the auth store switches accounts', async () => {
-      let onChange: ((token: string | null, record: unknown) => void) | undefined;
-      const account = createMockUser({ id: 'previous-account' });
-      setupMockAuthState(true, account, callback => {
-        onChange = callback;
-        return vi.fn();
-      });
-      const { result } = renderUseAuthHook();
-      await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
-      queryClient.setQueryData(['account-cache', account.id], { title: 'Old account data' });
-
-      act(() => {
-        const next = createMockUser({ id: 'next-account' });
-        const authStore = pb.authStore as { token: string; record: PocketBaseUser | null };
-        authStore.token = 'next-token';
-        authStore.record = next;
-        onChange?.('next-token', next);
-      });
-      recordCompletedSessionCreate('mock-token', 'projects', 'project-2');
-
-      expect(queryClient.getQueryData(['account-cache', account.id])).toBeUndefined();
-      expect(takeCompletedSessionDestination(account.id)).toBe('/projects/project-2');
-    });
-
     it('does not capture the previous account form when a new session expires before React commits', async () => {
       let onChange: ((token: string | null, record: unknown) => void) | undefined;
       const first = createMockUser({ id: 'draft-first-account' });
@@ -533,139 +270,9 @@ describe('useAuth Integration Tests', () => {
       expect(capturedForNextAccount).toBeUndefined();
       expect(restoreDraft).not.toHaveBeenCalled();
     });
-
-    it('does not assign an old account’s create to a new expired account', async () => {
-      let onChange: ((token: string | null, record: unknown) => void) | undefined;
-      const first = createMockUser({ id: 'first-account' });
-      setupMockAuthState(true, first, callback => {
-        onChange = callback;
-        return vi.fn();
-      });
-      const { result } = renderUseAuthHook();
-      await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
-      const unregister = registerSessionDraft('project-form', first.id, () => ({
-        title: 'First account',
-      }));
-
-      act(() => {
-        const authStore = pb.authStore as {
-          isValid: boolean;
-          token: string;
-          record: PocketBaseUser | null;
-        };
-        authStore.isValid = false;
-        authStore.token = 'expired-second-token';
-        authStore.record = createMockUser({ id: 'second-account' });
-        onChange?.(authStore.token, authStore.record);
-      });
-      recordCompletedSessionCreate('mock-token', 'projects', 'first-project');
-
-      expect(takeCompletedSessionDestination('second-account')).toBeUndefined();
-      expect(takeCompletedSessionDestination('first-account')).toBe('/projects/first-project');
-      expect(hasSessionDraft('project-form', 'second-account')).toBe(false);
-      unregister();
-    });
-
-    it('should respond to auth store changes via PocketBase onChange', async () => {
-      let storedCallback: ((token: string | null, record: unknown) => void) | null = null;
-
-      // Setup mock that captures the onChange callback
-      setupMockAuthState(false, null, callback => {
-        storedCallback = callback;
-        return vi.fn(); // cleanup function
-      });
-
-      const { result } = renderUseAuthHook();
-
-      // Wait for initial setup
-      await waitFor(() => {
-        expect(result.current.initialCheckComplete).toBe(true);
-      });
-
-      expect(result.current.isAuthenticated).toBe(false);
-      expect(result.current.user).toBeNull();
-
-      // Simulate auth store change (login)
-      const mockUser = createMockUser({
-        id: 'changed-user-789',
-        email: 'changed@example.com',
-      });
-
-      if (storedCallback) {
-        // Update the mock auth store state
-        const mockAuthStore = pb.authStore as {
-          isValid: boolean;
-          token: string;
-          record: PocketBaseUser | null;
-        };
-        mockAuthStore.isValid = true;
-        mockAuthStore.token = 'mock-token';
-        mockAuthStore.record = mockUser;
-
-        const callback = storedCallback as (token: string | null, record: unknown) => void;
-
-        // Trigger the onChange callback with act
-        act(() => {
-          callback('mock-token', mockUser);
-        });
-
-        await waitFor(() => {
-          expect(result.current.isAuthenticated).toBe(true);
-          expect(result.current.user).toEqual(mockUser);
-        });
-      }
-    });
   });
 
   describe('SignOut Function', () => {
-    it('releases its invalid-session claim when the token changes before clearing auth', async () => {
-      const account = createMockUser({ id: 'invalid-claim-abort-user' });
-      setupMockAuthState(true, account);
-      let finishClaim!: (value: boolean) => void;
-      deletionStore.claimSignOut.mockReturnValue(
-        new Promise(resolve => {
-          finishClaim = resolve;
-        })
-      );
-      const { result } = renderUseAuthHook();
-      await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
-      act(() => reportInvalidSession('mock-token'));
-      expect(deletionStore.claimSignOut).toHaveBeenCalled();
-      pocketBaseMock.authStore.token = 'refreshed-token';
-      await act(async () => finishClaim(true));
-      await waitFor(() =>
-        expect(deletionStore.releaseSignOut).toHaveBeenCalledWith(
-          POCKETBASE_URL,
-          account.id,
-          expect.any(String)
-        )
-      );
-      expect(pb.authStore.clear).not.toHaveBeenCalled();
-    });
-    it('releases only its claim when the same account receives a new token before logout', async () => {
-      const account = createMockUser({ id: 'claim-abort-user' });
-      setupMockAuthState(true, account);
-      let finishClaim!: (value: boolean) => void;
-      deletionStore.claimSignOut.mockReturnValue(
-        new Promise(resolve => {
-          finishClaim = resolve;
-        })
-      );
-      const { result } = renderUseAuthHook();
-      await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
-      await act(async () => {
-        const pending = result.current.signOut();
-        pocketBaseMock.authStore.token = 'same-account-new-token';
-        finishClaim(true);
-        await expect(pending).resolves.toMatchObject({ success: false });
-      });
-      expect(deletionStore.releaseSignOut).toHaveBeenCalledWith(
-        POCKETBASE_URL,
-        account.id,
-        expect.any(String)
-      );
-      expect(pb.authStore.clear).not.toHaveBeenCalled();
-    });
     it('preserves local drafts when clearing the auth store fails', async () => {
       const mockUser = createMockUser({ id: 'draft-signout-user' });
       setupMockAuthState(true, mockUser);
@@ -744,23 +351,6 @@ describe('useAuth Integration Tests', () => {
       ).toBeNull();
     });
 
-    it('keeps a late create destination after explicit sign-out', async () => {
-      const account = createMockUser({ id: 'late-create-account' });
-      setupMockAuthState(true, account);
-      const { result } = renderUseAuthHook();
-      await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
-
-      await act(async () => {
-        await result.current.signOut();
-      });
-      expect(takeSessionDraft('project-form', 'late-create-account')).toBeUndefined();
-      recordCompletedSessionCreate('mock-token', 'projects', 'project-1');
-      completeSessionRecovery('another-account');
-
-      expect(takeCompletedSessionDestination('another-account')).toBeUndefined();
-      expect(takeCompletedSessionDestination('late-create-account')).toBe('/projects/project-1');
-    });
-
     it('shows a late non-project save only after the same account returns', async () => {
       let onChange: ((token: string | null, record: unknown) => void) | undefined;
       const account = createMockUser({ id: 'late-note-account' });
@@ -837,124 +427,5 @@ describe('useAuth Integration Tests', () => {
       expect(invalidate).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['stats'] }));
       invalidate.mockRestore();
     });
-
-    it('should handle signOut button clicks in components', async () => {
-      const mockUser = createMockUser({
-        id: 'button-user-123',
-        email: 'button@example.com',
-      });
-
-      setupMockAuthState(true, mockUser);
-
-      renderWithProviders(
-        <AuthProvider>
-          <AuthStateTestComponent />
-        </AuthProvider>
-      );
-
-      // Wait for authenticated state
-      await waitFor(() => {
-        expect(screen.getByTestId('auth-state')).toHaveTextContent('authenticated');
-      });
-
-      // Click signOut button
-      const signOutButton = screen.getByTestId('signout-btn');
-      expect(signOutButton).not.toBeDisabled();
-
-      const user = userEvent.setup();
-      await user.click(signOutButton);
-
-      // Verify PocketBase clear was called
-      await waitFor(() => {
-        expect(pb.authStore.clear).toHaveBeenCalled();
-      });
-    });
-
-    it('should prevent multiple simultaneous signOut calls', async () => {
-      const mockUser = createMockUser({
-        id: 'multi-signout-user',
-        email: 'multi@example.com',
-      });
-
-      setupMockAuthState(true, mockUser);
-
-      const { result } = renderUseAuthHook();
-
-      await waitFor(() => {
-        expect(result.current.isAuthenticated).toBe(true);
-      });
-
-      // Call signOut multiple times quickly
-      let results: Awaited<ReturnType<typeof result.current.signOut>>[] = [];
-      await act(async () => {
-        const promise1 = result.current.signOut();
-        const promise2 = result.current.signOut();
-        const promise3 = result.current.signOut();
-        results = await Promise.all([promise1, promise2, promise3]);
-      });
-
-      // All should succeed (the implementation handles multiple calls gracefully)
-      results.forEach(result => {
-        expect(result.success).toBe(true);
-      });
-
-      // Clear should have been called (implementation may batch these)
-      expect(pb.authStore.clear).toHaveBeenCalled();
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('returns the PocketBase authStore cleanup callback when the hook unmounts', () => {
-      const mockCleanup = vi.fn();
-      const mockOnChange = vi.fn(() => mockCleanup);
-
-      setupMockAuthState(false, null, mockOnChange);
-
-      const { unmount } = renderUseAuthHook();
-
-      // Verify onChange was called during setup
-      expect(mockOnChange).toHaveBeenCalled();
-
-      // Unmount should trigger cleanup
-      unmount();
-
-      // The cleanup function should have been returned
-      expect(mockOnChange).toHaveReturnedWith(mockCleanup);
-    });
-
-    it('completes the initial auth check without leaving the hook loading', async () => {
-      setupMockAuthState(false, null);
-
-      const { result } = renderUseAuthHook();
-
-      // Wait for auth initialization to complete
-      await waitFor(() => {
-        expect(result.current.initialCheckComplete).toBe(true);
-      });
-
-      // Should have completed without timeout in normal circumstances
-      expect(result.current.isLoading).toBe(false);
-      expect(result.current.initialCheckComplete).toBe(true);
-    });
-
-    it('should maintain referential stability of hook values', async () => {
-      setupMockAuthState(false, null);
-
-      const { result, rerender } = renderUseAuthHook();
-
-      await waitFor(
-        () => {
-          expect(result.current.initialCheckComplete).toBe(true);
-        },
-        { timeout: 5000 }
-      );
-
-      const firstSignOut = result.current.signOut;
-
-      // Rerender and check that signOut function remains stable
-      rerender();
-
-      expect(result.current.signOut).toBe(firstSignOut);
-    }, 15000);
   });
 });

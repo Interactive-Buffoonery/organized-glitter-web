@@ -32,7 +32,11 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const runRoot = path.join(root, '.tmp', 'protected-file-upgrade');
 mkdirSync(runRoot, { recursive: true });
 const runDir = mkdtempSync(path.join(runRoot, 'run-'));
-const report = { fixture: 'PocketBase 0.40.1 prior schema to 0.40.4', runDir, checks: [] };
+const report = {
+  fixture: `PocketBase ${POCKETBASE_BASELINE_VERSION} prior schema to ${POCKETBASE_VERSION}`,
+  runDir,
+  checks: [],
+};
 const recordCheck = (name, detail) => report.checks.push({ name, ...detail });
 const dataDir = path.join(runDir, 'pb_data');
 const migrationDir = path.join(runDir, 'migrations');

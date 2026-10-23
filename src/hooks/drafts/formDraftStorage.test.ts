@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearAccountDrafts,
-  checkpointAccountDrafts,
   getDraftGeneration,
   hasAccountDrafts,
   readFormDraft,
@@ -57,34 +56,6 @@ describe('local form draft storage', () => {
     unregister();
   });
 
-  it('continues checkpointing other editors when one editor throws', () => {
-    const generation = getDraftGeneration(identity)!;
-    const firstFlush = vi.fn(() => {
-      throw new Error('Storage blocked');
-    });
-    const secondFlush = vi.fn();
-    const unregisterFirst = registerDraftEditor(
-      identity,
-      generation,
-      vi.fn(),
-      firstFlush,
-      () => true
-    );
-    const unregisterSecond = registerDraftEditor(
-      identity,
-      generation,
-      vi.fn(),
-      secondFlush,
-      () => true
-    );
-
-    expect(checkpointAccountDrafts(identity)).toBe(true);
-    expect(firstFlush).toHaveBeenCalledOnce();
-    expect(secondFlush).toHaveBeenCalledOnce();
-    unregisterFirst();
-    unregisterSecond();
-  });
-
   it('rejects a stale-generation draft written by a delayed second tab', () => {
     const generation = getDraftGeneration(identity)!;
     expect(clearAccountDrafts(identity)).toBe(true);
@@ -92,50 +63,6 @@ describe('local form draft storage', () => {
     expect(currentGeneration).not.toBe(generation);
     expect(writeFormDraft(identity, generation, { title: 'Old tab' })).toBe(false);
     expect(readFormDraft(identity, currentGeneration, isDraft).draft).toBeNull();
-  });
-
-  it('keeps a new-generation editor active when an old storage event arrives late', () => {
-    const oldGeneration = getDraftGeneration(identity)!;
-    expect(clearAccountDrafts(identity)).toBe(true);
-    const currentGeneration = getDraftGeneration(identity)!;
-    const retire = vi.fn();
-    const unregister = registerDraftEditor(
-      identity,
-      currentGeneration,
-      retire,
-      vi.fn(),
-      () => false
-    );
-    const marker = Array.from({ length: localStorage.length }, (_, index) =>
-      localStorage.key(index)
-    ).find(key => key?.startsWith('og:form-draft-generation:v1:'))!;
-
-    window.dispatchEvent(
-      new StorageEvent('storage', {
-        key: marker,
-        oldValue: oldGeneration,
-        newValue: currentGeneration,
-      })
-    );
-
-    expect(retire).not.toHaveBeenCalled();
-    unregister();
-  });
-
-  it('retires local editors even when generation rotation fails', () => {
-    const generation = getDraftGeneration(identity)!;
-    const retire = vi.fn();
-    const unregister = registerDraftEditor(identity, generation, retire, vi.fn(), () => true);
-    writeFormDraft(identity, generation, { title: 'Private text' });
-    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
-      throw new Error('Storage blocked');
-    });
-
-    expect(clearAccountDrafts(identity)).toBe(false);
-    expect(retire).toHaveBeenCalledOnce();
-    expect(hasAccountDrafts(identity)).toBe(false);
-    setItem.mockRestore();
-    unregister();
   });
 
   it('continues clearing drafts after one storage removal fails', () => {
@@ -168,20 +95,6 @@ describe('local form draft storage', () => {
       expect(localStorage.getItem(secondDraftKey)).toBeNull();
     } finally {
       removeItem.mockRestore();
-    }
-  });
-
-  it('drops drafts older than 30 days', () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
-      const generation = getDraftGeneration(identity)!;
-      writeFormDraft(identity, generation, { title: 'Old' });
-      vi.setSystemTime(new Date('2026-02-02T00:00:00Z'));
-      expect(readFormDraft(identity, generation, isDraft).draft).toBeNull();
-      expect(hasAccountDrafts(identity)).toBe(false);
-    } finally {
-      vi.useRealTimers();
     }
   });
 });

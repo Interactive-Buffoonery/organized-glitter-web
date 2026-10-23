@@ -122,7 +122,7 @@ const migrationRows = dataDir =>
   Object.fromEntries(
     query(dataDir, 'SELECT file, applied FROM _migrations').map(row => [row.file, row.applied])
   );
-// Same order the 0.40.4 runner uses to pick files for `migrate down`.
+// Same order the 0.40.5 runner uses to pick files for `migrate down`.
 const downOrder = dataDir =>
   query(
     dataDir,

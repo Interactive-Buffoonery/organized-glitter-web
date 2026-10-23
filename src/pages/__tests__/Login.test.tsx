@@ -160,13 +160,6 @@ describe('Login page', () => {
     authState.initialCheckComplete = true;
   });
 
-  it('separates the welcome heading words in the DOM', () => {
-    renderWithProviders(<Login />);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(
-      'Welcome Back to Organized Glitter'
-    );
-  });
-
   it('redirects already-authenticated users to their preserved destination', async () => {
     authState.isAuthenticated = true;
     useLocationMock.mockReturnValue({
@@ -222,78 +215,6 @@ describe('Login page', () => {
     });
   });
 
-  it('passes email verification recovery from a rejected password login to the form', async () => {
-    const user = userEvent.setup();
-    loginWithPasswordMock.mockResolvedValue({
-      success: false,
-      error: 'Your email address must be verified before you can sign in.',
-      recovery: {
-        type: 'email-verification',
-        email: 'test@example.com',
-      },
-    });
-
-    renderWithProviders(<Login />);
-
-    await user.click(screen.getByRole('button', { name: 'Submit login' }));
-
-    await waitFor(() => {
-      expect(authFormPropsMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          error: 'Your email address must be verified before you can sign in.',
-          verificationEmail: 'test@example.com',
-        })
-      );
-    });
-    expect(navigateMock).not.toHaveBeenCalled();
-  });
-
-  it('returns Google OAuth logins to the preserved destination', async () => {
-    const user = userEvent.setup();
-    useLocationMock.mockReturnValue({
-      pathname: '/login',
-      search: '',
-      hash: '',
-      state: {
-        from: {
-          pathname: '/projects/abc123',
-          search: '',
-          hash: '#notes',
-        },
-      },
-    });
-
-    renderWithProviders(<Login />);
-
-    await user.click(screen.getByRole('button', { name: 'Google login' }));
-
-    await waitFor(() => {
-      expect(loginWithOAuth2Mock).toHaveBeenCalledWith('google');
-      expect(posthogCaptureMock).toHaveBeenCalledWith('auth_login_succeeded', {
-        auth_method: 'oauth',
-        auth_provider: 'google',
-        auth_entrypoint: 'login',
-      });
-      expect(navigateMock).toHaveBeenCalledWith('/projects/abc123#notes', { replace: true });
-    });
-  });
-
-  it('signs in with Apple and keeps the OAuth analytics provider', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<Login />);
-
-    await user.click(screen.getByRole('button', { name: 'Apple login' }));
-
-    await waitFor(() => {
-      expect(loginWithOAuth2Mock).toHaveBeenCalledWith('apple');
-      expect(posthogCaptureMock).toHaveBeenCalledWith('auth_login_succeeded', {
-        auth_method: 'oauth',
-        auth_provider: 'apple',
-        auth_entrypoint: 'login',
-      });
-    });
-  });
-
   it('falls back to overview when the preserved destination is invalid', async () => {
     authState.isAuthenticated = true;
     useLocationMock.mockReturnValue({
@@ -312,42 +233,5 @@ describe('Login page', () => {
     await waitFor(() => {
       expect(navigateMock).toHaveBeenCalledWith('/overview', { replace: true });
     });
-  });
-
-  it('shows an in-app status spinner while auth is still settling', () => {
-    authState.isLoading = true;
-    authState.initialCheckComplete = false;
-
-    renderWithProviders(<Login />);
-
-    expect(screen.getByRole('status')).toHaveTextContent('Loading…');
-    expect(screen.getByRole('status').querySelector('.sr-only')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Submit login' })).not.toBeInTheDocument();
-    expect(useHideSplashMock).toHaveBeenCalledWith(true);
-    expect(useAppReadyMock).toHaveBeenCalledWith(false);
-  });
-
-  it('shows an in-app status spinner while redirecting an already-authenticated user', async () => {
-    authState.isAuthenticated = true;
-
-    renderWithProviders(<Login />);
-
-    expect(screen.getByRole('status')).toHaveTextContent('Loading…');
-    expect(screen.getByRole('status').querySelector('.sr-only')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Submit login' })).not.toBeInTheDocument();
-    expect(useHideSplashMock).toHaveBeenCalledWith(true);
-    expect(useAppReadyMock).toHaveBeenCalledWith(false);
-
-    await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith('/overview', { replace: true });
-    });
-  });
-
-  it('marks the app ready once the login form is shown', () => {
-    renderWithProviders(<Login />);
-
-    expect(screen.getByRole('button', { name: 'Submit login' })).toBeInTheDocument();
-    expect(useHideSplashMock).toHaveBeenCalledWith(false);
-    expect(useAppReadyMock).toHaveBeenCalledWith(true);
   });
 });

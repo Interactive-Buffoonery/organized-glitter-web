@@ -51,6 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
@@ -63,6 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
@@ -76,6 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
@@ -97,6 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
@@ -127,13 +131,13 @@ jobs:
       - uses: ./.github/actions/setup-project
       - name: Install lockfile-matched browsers and system libraries
         run: pnpm exec playwright install --with-deps chromium webkit
-      - name: Run backend and every strict PR phase
-        run: pnpm test:pr
+      - name: Run backend and browser PR phases
+        run: pnpm test:pr:ci
       - name: Summarize phase outcomes without runtime artifacts
         if: always()
         shell: bash
         run: |
-          for report in .tmp/local-validation/*-pr/report.md; do
+          for report in .tmp/local-validation/*-ci/report.md; do
             if [ -f "$report" ]; then
               cat "$report" >> "$GITHUB_STEP_SUMMARY"
             fi

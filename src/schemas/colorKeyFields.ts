@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isSymbolId } from '@/features/coloring/colorKeys/symbols';
+import { isSymbolId } from '@/features/coloring/colorKeys/symbolId';
 
 export const COLOR_KEY_LIMITS = {
   symbol: 64,

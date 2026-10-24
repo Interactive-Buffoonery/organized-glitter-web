@@ -7,7 +7,7 @@ import {
   waitForAnyVisible,
 } from './axe-test';
 
-const DEFAULT_FIXTURE_PROJECT_ID = 'n5zfnqdq3zzwso0';
+const DEFAULT_FIXTURE_PROJECT_ID = 'i8cbw6fl6vfv3dt';
 const FIXTURE_PROJECT_ID = process.env.E2E_FIXTURE_PROJECT_ID?.trim() || DEFAULT_FIXTURE_PROJECT_ID;
 
 const stableRoutes = [

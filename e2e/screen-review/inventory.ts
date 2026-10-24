@@ -29,8 +29,8 @@ const getFirstHrefMatching = async (page: Page, pattern: RegExp) =>
 // Seeded fixtures (scripts/seed-e2e-coloring-fixture.mjs and the prod demo
 // project). Resolving by id avoids the dashboard href-discovery race that made
 // these screens skip intermittently even when the fixture data existed.
-const FIXTURE_PROJECT_ID = process.env.E2E_FIXTURE_PROJECT_ID?.trim() || 'n5zfnqdq3zzwso0';
-const FIXTURE_COLORING_BOOK_ID = process.env.E2E_COLORING_BOOK_ID?.trim() || 'kgs059794affuba';
+const FIXTURE_PROJECT_ID = process.env.E2E_FIXTURE_PROJECT_ID?.trim() || 'i8cbw6fl6vfv3dt';
+const FIXTURE_COLORING_BOOK_ID = process.env.E2E_COLORING_BOOK_ID?.trim() || 'tb26zj75f5e5alt';
 
 const isReachable = async (page: Page, path: string, ready: Locator) => {
   await page.goto(path);

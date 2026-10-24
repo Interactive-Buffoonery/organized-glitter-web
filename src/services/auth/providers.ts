@@ -88,21 +88,13 @@ function accountStillMatches(proof: FreshSignInMethodProof): boolean {
   return pb.authStore.record?.id === proof.userId && pb.authStore.token === proof.authToken;
 }
 
-export async function listConfiguredOAuthProviders(signal?: AbortSignal): Promise<OAuthProvider[]> {
-  const methods = await pb.collection('users').listAuthMethods({ signal, requestKey: null });
-  return normalizeOAuthProviders(methods);
-}
-
-export async function listAccountSignInMethods(userId: string): Promise<AccountSignInMethod[]> {
+async function withSignInMethodLookupTimeout<T>(
+  lookup: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
   const controller = new AbortController();
   let timeout: ReturnType<typeof setTimeout> | undefined;
-  const [configuredProviders, externalAuths] = await Promise.race([
-    Promise.all([
-      listConfiguredOAuthProviders(controller.signal),
-      pb
-        .collection('users')
-        .listExternalAuths(userId, { signal: controller.signal, requestKey: null }),
-    ]),
+  return Promise.race([
+    lookup(controller.signal),
     new Promise<never>((_resolve, reject) => {
       timeout = setTimeout(() => {
         controller.abort();
@@ -110,6 +102,24 @@ export async function listAccountSignInMethods(userId: string): Promise<AccountS
       }, 15_000);
     }),
   ]).finally(() => clearTimeout(timeout));
+}
+
+async function fetchConfiguredOAuthProviders(signal: AbortSignal): Promise<OAuthProvider[]> {
+  const methods = await pb.collection('users').listAuthMethods({ signal, requestKey: null });
+  return normalizeOAuthProviders(methods);
+}
+
+export function listConfiguredOAuthProviders(): Promise<OAuthProvider[]> {
+  return withSignInMethodLookupTimeout(fetchConfiguredOAuthProviders);
+}
+
+export async function listAccountSignInMethods(userId: string): Promise<AccountSignInMethod[]> {
+  const [configuredProviders, externalAuths] = await withSignInMethodLookupTimeout(signal =>
+    Promise.all([
+      fetchConfiguredOAuthProviders(signal),
+      pb.collection('users').listExternalAuths(userId, { signal, requestKey: null }),
+    ])
+  );
 
   const configured = new Set(configuredProviders);
   const linked = new Set<OAuthProvider>();

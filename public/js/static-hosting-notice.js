@@ -4,7 +4,7 @@
   const template = notice.querySelector('template[data-notice-dismiss]');
   const content = notice.querySelector('[data-notice-content]');
   if (!template?.content.firstElementChild || !content) return;
-  const dismissalKey = 'hosting-notice-spacefast-weekend-dismissed';
+  const dismissalKey = 'hosting-notice-database-move-dismissed';
   try {
     if (sessionStorage.getItem(dismissalKey) === 'true') {
       notice.remove();

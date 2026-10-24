@@ -45,9 +45,9 @@ set -a; . ./.env.e2e; set +a
 
 # 2. point at the preview's backend (prod PocketBase) and its fixtures
 export VITE_POCKETBASE_URL=https://data.organizedglitter.app
-export E2E_FIXTURE_PROJECT_ID=n5zfnqdq3zzwso0
-export E2E_COLORING_BOOK_ID=kgs059794affuba
-export E2E_COLORING_PAGE_ID=m6wzlm2hn2x82g4
+export E2E_FIXTURE_PROJECT_ID=i8cbw6fl6vfv3dt
+export E2E_COLORING_BOOK_ID=tb26zj75f5e5alt
+export E2E_COLORING_PAGE_ID=lodlr3n5a1us1kq
 export E2E_COLORING_MEDIUM_ID=gug3x3ufw5hj7fv
 export E2E_RANDOMIZER_PROJECT_IDS=2s8feo1t3w4cwny,gpi34djxp45vpve,qkirrty89c0u2w9,9y984d1znv4yju2,9xt8wbkrd4s1p4k,voljswe2ngmdaf8,bp0z4t73q8orpt7,51oedioebsc1o4t
 

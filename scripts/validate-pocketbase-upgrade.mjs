@@ -481,6 +481,66 @@ export async function replayIndexEvidence({ schema, inventory, migrations, binar
   }
 }
 
+// Production can run a migration before it reaches the base branch, which is
+// when the inventory boundary is itself one of the added migrations. That
+// migration is already deployed, so it builds the previous schema instead of
+// being tested as an upgrade.
+// ponytail: only the boundary file counts as deployed; record a list in the
+// inventory if production ever runs several migrations ahead of the base.
+export function splitDeployedMigrations(addedMigrations, inventory) {
+  const deployed = addedMigrations.filter(
+    migration => path.basename(migration) === inventory.$inventoryThroughMigration
+  );
+  return {
+    deployed,
+    pending: addedMigrations.filter(migration => !deployed.includes(migration)),
+  };
+}
+
+export async function applyDeployedMigrations({ schema, migrations, binary, workDir }) {
+  if (migrations.length === 0) return schema;
+
+  const migrationDir = path.join(workDir, 'migrations');
+  const dataDir = path.join(workDir, 'data');
+  try {
+    const deployedBinary = await prepareDataDir({
+      sourceBinary: binary,
+      dataDir,
+      schema: schema.map(collection => ({
+        ...collection,
+        indexes: (collection.indexes ?? []).map(stripIndexTerminator),
+      })),
+      logPrefix: path.join(workDir, 'base-import'),
+    });
+    mkdirSync(migrationDir, { recursive: true });
+    for (const migration of migrations) {
+      writeFileSync(path.join(migrationDir, migration.name), migration.source);
+    }
+    const result = spawnSync(
+      deployedBinary,
+      ['migrate', 'up', '--dir', path.join(dataDir, 'pb_data'), '--migrationsDir', migrationDir],
+      { cwd: dataDir, encoding: 'utf8' }
+    );
+    const logPath = path.join(workDir, 'migrate-up.log');
+    writeFileSync(logPath, `${result.stdout || ''}\n${result.stderr || ''}`);
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+      throw new Error(
+        `Applying the already deployed migrations to the base schema failed. See ${logPath}.`
+      );
+    }
+    return await inspectDataDir({
+      binary: deployedBinary,
+      dataDir,
+      logPrefix: path.join(workDir, 'deployed-inspect'),
+    });
+  } finally {
+    for (const directory of [migrationDir, dataDir]) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+}
+
 const inspectDataDir = async ({ binary, dataDir, logPrefix, expectSentinel = false }) => {
   const server = await startPocketBase({ binary, dataDir, logPrefix });
   try {
@@ -540,22 +600,33 @@ export async function validatePocketBaseUpgrade(argv = process.argv.slice(2)) {
     ),
   });
 
+  const inventory = existsSync(path.join(rootDir, indexInventoryPath))
+    ? JSON.parse(readFileSync(path.join(rootDir, indexInventoryPath), 'utf8'))
+    : {};
+  const { deployed, pending } = splitDeployedMigrations(addedMigrations, inventory);
+
   for (const migration of addedMigrations) {
     if (!existsSync(path.join(rootDir, migration))) {
       throw new Error(`Added migration is missing from the worktree: ${migration}`);
     }
+  }
+  for (const migration of pending) {
     copyFileSync(path.join(rootDir, migration), path.join(migrationDir, path.basename(migration)));
   }
-
-  const inventory = existsSync(path.join(rootDir, indexInventoryPath))
-    ? JSON.parse(readFileSync(path.join(rootDir, indexInventoryPath), 'utf8'))
-    : {};
   // PocketBase 0.40.4 rejects legacy `;\n` index metadata on import. Seed the
   // previous schema with the 0.40.1 baseline after applying the production
   // index inventory (semicolon-stripped) so the upgrade matches deployed
   // metadata without asking 0.40.4 to ingest invalid CREATE INDEX strings.
   // Only base-commit migrations can explain indexes that production lacks.
-  const baseSchema = JSON.parse(baseSchemaSource);
+  const baseSchema = await applyDeployedMigrations({
+    schema: JSON.parse(baseSchemaSource),
+    migrations: deployed.map(migration => ({
+      name: path.basename(migration),
+      source: readFileSync(path.join(rootDir, migration), 'utf8'),
+    })),
+    binary: cachedBaselineBinary,
+    workDir: path.join(runDir, 'deployed'),
+  });
   const replayedIndexes = await replayIndexEvidence({
     schema: baseSchema,
     inventory,
@@ -626,7 +697,7 @@ export async function validatePocketBaseUpgrade(argv = process.argv.slice(2)) {
   }
 
   console.log(
-    `Validated ${addedMigrations.length} PocketBase migration(s) from ${baseCommit}; logs: ${logsDir}`
+    `Validated ${pending.length} PocketBase migration(s) from ${baseCommit}${deployed.length ? ` after ${deployed.length} already deployed` : ''}; logs: ${logsDir}`
   );
   return { addedMigrations, logsDir, skipped: false };
 }

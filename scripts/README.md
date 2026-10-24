@@ -124,7 +124,10 @@ The script detects changes in `docs/pocketbase/collections.schema.json` and
 exits early. Otherwise it:
 
 1. Installs PocketBase into a temporary directory under `.tmp/pocketbase-upgrade/`.
-2. Imports the base revision's schema and applies new migrations.
+2. Imports the base revision's schema and applies new migrations. If production
+   already ran the inventory's last migration before it reached the base
+   branch, that migration is applied to the base schema first and is not
+   tested again.
 3. Compares the resulting schema against the current committed export.
 4. Reports mismatches as failures.
 

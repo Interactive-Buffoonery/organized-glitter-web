@@ -69,7 +69,11 @@ vi.mock('@/services/auth/sessionIdentity', () => ({
     identity.epoch === sessionState.current.epoch,
 }));
 
-import { connectOAuthProvider, requestOAuthSignInMethodProof } from '../providers';
+import {
+  connectOAuthProvider,
+  listConfiguredOAuthProviders,
+  requestOAuthSignInMethodProof,
+} from '../providers';
 
 describe('OAuth provider service', () => {
   beforeEach(() => {
@@ -127,5 +131,25 @@ describe('OAuth provider service', () => {
       reason: 'account_changed',
     });
     expect(verificationClearMock).toHaveBeenCalledOnce();
+  });
+
+  it('gives up on a configured provider lookup that never answers', async () => {
+    vi.useFakeTimers();
+    try {
+      let lookupSignal: AbortSignal | undefined;
+      listAuthMethodsMock.mockImplementation(({ signal }: { signal: AbortSignal }) => {
+        lookupSignal = signal;
+        return new Promise(() => {});
+      });
+
+      const lookup = listConfiguredOAuthProviders();
+      const rejection = expect(lookup).rejects.toThrow('Sign-in method lookup timed out');
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      await rejection;
+      expect(lookupSignal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -3,7 +3,7 @@ import { Info, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
-const DISMISSAL_KEY = 'hosting-notice-spacefast-weekend-dismissed';
+const DISMISSAL_KEY = 'hosting-notice-database-move-dismissed';
 let dismissedInMemory = false;
 
 export function HostingNotice() {
@@ -58,15 +58,12 @@ export function HostingNoticeContent({ children }: { children?: ReactNode }) {
         <Info aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
         <div className="min-w-0 flex-1">
           <p id="hosting-notice-title" className="font-semibold">
-            Hosting update this weekend
+            Database move today
           </p>
           <p>
-            We’re moving Organized Glitter to a new hosting provider this weekend. You may notice
-            brief interruptions. Please save your work before refreshing. Your account and saved
-            projects will stay in place.{' '}
-            <strong className="font-bold">
-              If you don't see your projects, sign out and back in.
-            </strong>
+            Our database provider is moving our server to a new facility today, so Organized Glitter
+            may be down for a few hours. Your account and saved projects are safe. Thanks for your
+            patience!
           </p>
         </div>
         {children}

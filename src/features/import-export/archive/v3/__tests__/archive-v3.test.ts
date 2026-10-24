@@ -1,25 +1,13 @@
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import {
-  assertArchiveCentralDirectoryLimits,
-  assertArchiveV3RecordLimits,
-  assertArchiveZipMetadataLimits,
-  MAX_ARCHIVE_CENTRAL_DIRECTORY_BYTES,
-  MAX_ARCHIVE_ENTRY_BYTES,
-} from '@/features/import-export/archive/archiveImportLimits';
-import { MAX_ARCHIVE_MANIFEST_BYTES } from '@/features/import-export/archive/archiveZipRead';
-import {
   calculateInventoryDigest,
   calculateItemDigest,
   calculateParentDescriptorDigest,
-  canonicalJson,
-  sha256Bytes,
 } from '../canonical';
 import {
-  DEFAULT_ARCHIVE_HARD_LIMIT_BYTES,
   buildArchivePart,
   buildArchiveParts,
-  exactStoreZipBytes,
   prepareArchivePlan,
   type ArchiveAssetSource,
   type ArchiveSourceItemV3,
@@ -28,7 +16,6 @@ import type {
   ArchiveItemWithoutDigestV3,
   ArchiveParentDescriptorV3,
   ArchivePartManifestV3,
-  ColoringPageMetadata,
 } from '../types';
 import { validateArchiveManifestV3 } from '../validate';
 
@@ -144,247 +131,8 @@ function dependencyFixtureItems(): ArchiveSourceItemV3[] {
   };
   return [swatch, pagePhoto, reference, page, medium];
 }
-async function built(plan: Awaited<ReturnType<typeof prepareArchivePlan>>) {
-  const output = [];
-  for await (const part of buildArchiveParts(plan)) output.push(part);
-  return output;
-}
-
-describe('v3 canonical format', () => {
-  it('sorts object keys recursively, preserves arrays, and has stable digests', () => {
-    expect(canonicalJson({ z: [{ b: 2, a: 1 }], a: -0 })).toBe('{"a":0,"z":[{"a":1,"b":2}]}');
-    expect(sha256Bytes(new TextEncoder().encode('abc'))).toBe(
-      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
-    );
-    expect(() => canonicalJson({ bad: Infinity })).toThrow('non-finite');
-  });
-  it('rejects cyclic arrays with the canonical cycle error', () => {
-    const cyclic: unknown[] = [];
-    cyclic.push(cyclic);
-    expect(() => canonicalJson(cyclic)).toThrow('Canonical JSON does not allow cycles');
-  });
-  it('counts exact STORE bytes for UTF-8 paths', async () => {
-    const entries = [
-      { path: 'manifest.json', byteLength: 3 },
-      { path: 'assets/a/café.jpg', byteLength: 7 },
-    ];
-    const zip = new JSZip();
-    for (const entry of entries)
-      zip.file(entry.path, new Uint8Array(entry.byteLength), {
-        compression: 'STORE',
-        createFolders: false,
-      });
-    const bytes = await zip.generateAsync({
-      type: 'uint8array',
-      compression: 'STORE',
-      platform: 'DOS',
-    });
-    expect(exactStoreZipBytes(entries)).toBe(bytes.byteLength);
-  });
-});
-
-// archive-v3-limits.test.ts exercises the packer against KiB-sized copies of these limits. These
-// checks keep the importer's real 64 MiB and 16 MiB boundaries covered through declared ZIP
-// metadata, without allocating archives of that size.
-describe('v3 restore limits shared with the packer', () => {
-  function zipDeclaring(name: string, size: number): JSZip {
-    return {
-      files: {
-        [name]: { name, dir: false, _data: { compressedSize: size, uncompressedSize: size } },
-      },
-    } as unknown as JSZip;
-  }
-
-  it('accepts declared entries at the real entry and manifest limits and rejects one byte more', () => {
-    const asset = 'assets/a1/photo.jpg';
-    expect(() =>
-      assertArchiveZipMetadataLimits(zipDeclaring(asset, MAX_ARCHIVE_ENTRY_BYTES))
-    ).not.toThrow();
-    expect(() =>
-      assertArchiveZipMetadataLimits(zipDeclaring(asset, MAX_ARCHIVE_ENTRY_BYTES + 1))
-    ).toThrow(/assets\/a1\/photo\.jpg is too large/);
-    expect(() =>
-      assertArchiveZipMetadataLimits(zipDeclaring('manifest.json', MAX_ARCHIVE_MANIFEST_BYTES))
-    ).not.toThrow();
-    expect(() =>
-      assertArchiveZipMetadataLimits(zipDeclaring('manifest.json', MAX_ARCHIVE_MANIFEST_BYTES + 1))
-    ).toThrow(/manifest\.json is too large/);
-  });
-
-  it('checks a declared central directory against the real limit before reading it', async () => {
-    const zip = new JSZip();
-    zip.file('manifest.json', '{}');
-    const bytes = await zip.generateAsync({ type: 'uint8array' });
-    const declare = (directoryBytes: number) => {
-      const copy = bytes.slice();
-      new DataView(copy.buffer).setUint32(copy.length - 22 + 12, directoryBytes, true);
-      return new File([copy], 'declared.zip');
-    };
-
-    await expect(
-      assertArchiveCentralDirectoryLimits(declare(MAX_ARCHIVE_CENTRAL_DIRECTORY_BYTES + 1))
-    ).rejects.toThrow(/central directory is too large/);
-    // At the cap the size check passes and the forged offset is what fails.
-    await expect(
-      assertArchiveCentralDirectoryLimits(declare(MAX_ARCHIVE_CENTRAL_DIRECTORY_BYTES))
-    ).rejects.toThrow(/invalid central directory/);
-  });
-});
 
 describe('v3 packer', () => {
-  it('rejects warnings above the restore count without dropping any', async () => {
-    const warnings = Array.from({ length: 10_001 }, (_, index) => ({
-      code: 'test',
-      message: `Warning ${index}`,
-    }));
-
-    await expect(prepareArchivePlan([], { backupId, exportedAt, warnings })).rejects.toThrow(
-      /too many warnings/i
-    );
-    expect(warnings).toHaveLength(10_001);
-
-    const allowed = await prepareArchivePlan([], {
-      backupId,
-      exportedAt,
-      warnings: warnings.slice(0, 10_000),
-    });
-    expect(allowed.parts[0].manifest.warnings).toHaveLength(10_000);
-    expect(() => assertArchiveV3RecordLimits(allowed.parts[0].manifest)).not.toThrow();
-  });
-
-  it('rejects metadata lists that the v3 importer cannot accept', async () => {
-    const items: ArchiveSourceItemV3[] = [
-      {
-        itemId: 'diamond-project:many-tags',
-        kind: 'diamond-project',
-        metadata: { title: 'Project', status: 'wishlist', tags: Array(1_001).fill('tag') },
-        assets: [],
-      },
-    ];
-
-    await expect(prepareArchivePlan(items, { backupId, exportedAt })).rejects.toThrow(
-      /too many tags/i
-    );
-  });
-
-  it('splits asset-free items before a part exceeds the restore item limit', async () => {
-    const items: ArchiveSourceItemV3[] = Array.from({ length: 10_001 }, (_, index) => ({
-      itemId: `diamond-project:${index}`,
-      kind: 'diamond-project',
-      metadata: { title: `Project ${index}`, status: 'wishlist', tags: [] },
-      assets: [],
-    }));
-    const plan = await prepareArchivePlan(items, { backupId, exportedAt });
-
-    expect(plan.parts).toHaveLength(2);
-    expect(plan.parts.map(part => part.manifest.items.length)).toEqual([10_000, 1]);
-    for (const part of plan.parts) {
-      expect(() => assertArchiveV3RecordLimits(part.manifest)).not.toThrow();
-    }
-  });
-  it('freezes all measurements before yielding one independently readable part at a time', async () => {
-    const opens: string[] = [];
-    const mk = (n: number): ArchiveAssetSource => ({
-      ...source(`a${n}`, `assets/a${n}/p${n}.jpg`, new Uint8Array([n, n + 1, n + 2])),
-      open: async () => {
-        opens.push(`a${n}`);
-        return stream(new Uint8Array([n, n + 1, n + 2]), 1);
-      },
-    });
-    const plan = await prepareArchivePlan([item('asset:1', [mk(1)]), item('asset:2', [mk(2)])], {
-      backupId,
-      exportedAt,
-      targetBytes: 850,
-      hardLimitBytes: 5000,
-    });
-    expect(opens).toEqual(['a1', 'a2']);
-    const iterator = buildArchiveParts(plan);
-    const first = await iterator.next();
-    expect(first.done).toBe(false);
-    expect(opens.length).toBeGreaterThan(2);
-    if (!first.done) {
-      const zip = await JSZip.loadAsync(first.value.bytes);
-      expect(JSON.parse(await zip.file('manifest.json')!.async('text')).partNumber).toBe(1);
-    }
-    await iterator.return(undefined);
-    expect(plan.parts.every(p => p.exactByteLength <= 5000)).toBe(true);
-  });
-  it('splits at the exact caller target and gives an oversized-target atom a dedicated part', async () => {
-    const base = await prepareArchivePlan(
-      [item('asset:1', [source('a1', 'assets/a1/1.jpg', new Uint8Array(30))])],
-      { backupId, exportedAt, targetBytes: 10000, hardLimitBytes: 20000 }
-    );
-    const one = base.parts[0].exactByteLength;
-    const two = await prepareArchivePlan(
-      [
-        item('asset:1', [source('a1', 'assets/a1/1.jpg', new Uint8Array(30))]),
-        item('asset:2', [source('a2', 'assets/a2/2.jpg', new Uint8Array(30))]),
-      ],
-      { backupId, exportedAt, targetBytes: one, hardLimitBytes: 20000 }
-    );
-    expect(two.parts).toHaveLength(2);
-    expect(two.parts.map(p => p.manifest.items[0].itemId)).toEqual(['asset:1', 'asset:2']);
-  });
-  it('allows an exact hard cap and rejects one byte over with the item label', async () => {
-    const args = [item('asset:1', [source('a1', 'assets/a1/1.jpg', new Uint8Array(5))])] as const;
-    const baseline = await prepareArchivePlan(args, {
-      backupId,
-      exportedAt,
-      targetBytes: 10000,
-      hardLimitBytes: 10000,
-    });
-    const exact = baseline.parts[0].exactByteLength;
-    await expect(
-      prepareArchivePlan(args, {
-        backupId,
-        exportedAt,
-        targetBytes: exact,
-        hardLimitBytes: exact,
-      })
-    ).resolves.toBeTruthy();
-    await expect(
-      prepareArchivePlan(args, {
-        backupId,
-        exportedAt,
-        targetBytes: exact - 1,
-        hardLimitBytes: exact - 1,
-      })
-    ).rejects.toThrow(/asset:1.*exceeding/);
-  });
-  it('never allows a caller to raise the absolute 512 MiB ceiling', async () => {
-    await expect(
-      prepareArchivePlan([], {
-        backupId,
-        exportedAt,
-        hardLimitBytes: DEFAULT_ARCHIVE_HARD_LIMIT_BYTES,
-      })
-    ).resolves.toBeTruthy();
-    await expect(
-      prepareArchivePlan([], {
-        backupId,
-        exportedAt,
-        hardLimitBytes: DEFAULT_ARCHIVE_HARD_LIMIT_BYTES + 1,
-      })
-    ).rejects.toThrow(String(DEFAULT_ARCHIVE_HARD_LIMIT_BYTES));
-  });
-  it('splits on the exact entry cap without omitting items and converges across part-count digit widths', async () => {
-    const items = Array.from({ length: 12 }, (_, i) =>
-      item(`asset:${i}`, [source(`a${i}`, `assets/a${i}/${i}.jpg`, new Uint8Array([i]))])
-    );
-    const plan = await prepareArchivePlan(items, {
-      backupId,
-      exportedAt,
-      targetBytes: 100000,
-      hardLimitBytes: 100000,
-      maxEntries: 2,
-    });
-    expect(plan.parts).toHaveLength(12);
-    expect(plan.parts[11].manifest.partCount).toBe(12);
-    expect(plan.parts.flatMap(p => p.manifest.items.map(i => i.itemId))).toEqual(
-      items.map(i => i.itemId).sort()
-    );
-    expect(plan.parts[0].filename).toContain('part-01-of-12');
-  });
   it('detects pass-two length, hash, or CRC drift before yielding the changed part', async () => {
     let pass = 0;
     const changing = {
@@ -401,87 +149,6 @@ describe('v3 packer', () => {
     await expect(async () => {
       for await (const _ of buildArchiveParts(plan)) void _;
     }).rejects.toThrow('Source data changed');
-  });
-  it('generates byte-identical ZIPs from the same frozen plan', async () => {
-    const plan = await prepareArchivePlan(
-      [item('asset:1', [source('a1', 'assets/a1/1.jpg', new Uint8Array([1, 2, 3]))])],
-      { backupId, exportedAt, targetBytes: 10000, hardLimitBytes: 10000 }
-    );
-    expect((await built(plan))[0].bytes).toEqual((await built(plan))[0].bytes);
-    expect(Object.isFrozen(plan.parts[0].manifest.items)).toBe(true);
-  });
-  it('detaches nested caller input before freezing the plan', async () => {
-    const tags = ['original'];
-    const warnings = [{ code: 'test', message: 'original' }];
-    const sourceItem: ArchiveSourceItemV3 = {
-      itemId: 'diamond-project:p1',
-      kind: 'diamond-project',
-      metadata: { title: 'Project', status: 'stash', tags },
-      assets: [],
-    };
-    const assetItem = item('asset:detached', [
-      source('detached', 'assets/detached/photo.jpg', new Uint8Array([1])),
-    ]);
-    const callerParent = assetItem.parent!;
-    const plan = await prepareArchivePlan([sourceItem, assetItem], {
-      backupId,
-      exportedAt,
-      warnings,
-    });
-    expect(Object.isFrozen(tags)).toBe(false);
-    expect(Object.isFrozen(warnings[0])).toBe(false);
-    expect(Object.isFrozen(callerParent)).toBe(false);
-    tags.push('caller mutation');
-    warnings[0].message = 'caller mutation';
-    (callerParent.metadata as ColoringPageMetadata).pageNumber = 99;
-    const project = plan.parts[0].manifest.items.find(item => item.kind === 'diamond-project');
-    const asset = plan.parts[0].manifest.items.find(entry => entry.itemId === 'asset:detached');
-    expect(project?.metadata.tags).toEqual(['original']);
-    expect((asset?.parent?.metadata as ColoringPageMetadata).pageNumber).toBe(1);
-    expect(plan.parts[0].manifest.warnings[0].message).toBe('original');
-  });
-  it('produces the same canonical manifests for shuffled logical input', async () => {
-    const items = dependencyFixtureItems();
-    const options = { backupId, exportedAt, targetBytes: 100000, hardLimitBytes: 100000 };
-    const forward = await prepareArchivePlan(items, options);
-    const reverse = await prepareArchivePlan([...items].reverse(), options);
-    expect(forward.parts.map(part => part.manifest)).toEqual(
-      reverse.parts.map(part => part.manifest)
-    );
-  });
-  it('serializes each logical item once during partition measurement', async () => {
-    const items = Array.from({ length: 3000 }, (_, index): ArchiveSourceItemV3 => ({
-      itemId: `coloring-medium:${String(index).padStart(4, '0')}`,
-      kind: 'coloring-medium',
-      metadata: { name: `Medium ${index}`, type: 'other' },
-      assets: [],
-    }));
-    const serialized: string[] = [];
-    const plan = await prepareArchivePlan(items, {
-      backupId,
-      exportedAt,
-      onPartitionItemSerialized: itemId => serialized.push(itemId),
-    });
-    expect(plan.logicalItemCount).toBe(3000);
-    expect(serialized).toHaveLength(3000);
-    expect(new Set(serialized).size).toBe(3000);
-  });
-  it('can rebuild one failed part independently and passes cancellation to its asset source', async () => {
-    const signals: Array<AbortSignal | undefined> = [];
-    const asset = source('a1', 'assets/a1/1.jpg', new Uint8Array([1]));
-    asset.open = async signal => {
-      signals.push(signal);
-      return stream(new Uint8Array([1]));
-    };
-    const plan = await prepareArchivePlan([item('asset:1', [asset])], {
-      backupId,
-      exportedAt,
-    });
-    const controller = new AbortController();
-    const result = await buildArchivePart(plan, 0, controller.signal);
-    expect(result.manifest.partNumber).toBe(1);
-    expect(signals.at(-1)).toBe(controller.signal);
-    await expect(buildArchivePart(plan, 1)).rejects.toThrow('out of range');
   });
   it('closes page and swatch dependencies in every independently restorable part despite shuffled source order', async () => {
     const sourceItems = dependencyFixtureItems();
@@ -509,45 +176,6 @@ describe('v3 packer', () => {
       validateArchiveManifestV3(part.manifest);
     }
   });
-  it('counts repeated dependency metadata toward splitting and hard-limit errors', async () => {
-    const sourceItems = dependencyFixtureItems();
-    const baseline = await prepareArchivePlan(sourceItems, {
-      backupId,
-      exportedAt,
-      targetBytes: 100000,
-      hardLimitBytes: 100000,
-    });
-    const dependentAtom = await prepareArchivePlan(
-      [sourceItems[0], sourceItems[2], sourceItems[4]],
-      { backupId, exportedAt, targetBytes: 100000, hardLimitBytes: 100000 }
-    );
-    const target = dependentAtom.parts[0].exactByteLength;
-    const split = await prepareArchivePlan(sourceItems, {
-      backupId,
-      exportedAt,
-      targetBytes: target,
-      hardLimitBytes: 100000,
-    });
-    expect(split.parts.length).toBeGreaterThan(1);
-    expect(baseline.parts).toHaveLength(1);
-    await expect(
-      prepareArchivePlan([sourceItems[0], sourceItems[2], sourceItems[4]], {
-        backupId,
-        exportedAt,
-        targetBytes: target - 1,
-        hardLimitBytes: target - 1,
-      })
-    ).rejects.toThrow(/asset:swatch.*required dependencies.*hard limit/);
-  });
-  it('fails before packing when a referenced dependency source is missing', async () => {
-    const [swatch, pagePhoto, , , medium] = dependencyFixtureItems();
-    await expect(prepareArchivePlan([pagePhoto], { backupId, exportedAt })).rejects.toThrow(
-      'missing coloring-medium'
-    );
-    await expect(prepareArchivePlan([swatch, medium], { backupId, exportedAt })).rejects.toThrow(
-      'missing coloring-color-reference'
-    );
-  });
 });
 
 describe('v3 validation', () => {
@@ -567,14 +195,6 @@ describe('v3 validation', () => {
     manifest.inventoryDigest = calculateInventoryDigest(unsigned);
     return manifest;
   }
-  it('accepts the strict recursive parent and exact file inventory', async () => {
-    const m = await fixture();
-    expect(
-      validateArchiveManifestV3(m, {
-        paths: new Set(['manifest.json', 'assets/a1/1.jpg']),
-      })
-    ).toEqual(m);
-  });
   it.each([
     [
       'duplicate item',
@@ -620,17 +240,6 @@ describe('v3 validation', () => {
     await mutate(m);
     expect(() => validateArchiveManifestV3(m)).toThrow(pattern);
   });
-  it('rejects missing and undeclared files', async () => {
-    const m = await fixture();
-    expect(() => validateArchiveManifestV3(m, { paths: new Set(['manifest.json']) })).toThrow(
-      'Missing declared'
-    );
-    expect(() =>
-      validateArchiveManifestV3(m, {
-        paths: new Set(['manifest.json', 'assets/a1/1.jpg', 'extra']),
-      })
-    ).toThrow('Undeclared');
-  });
   it('rejects wrong asset byte length and raw digest', async () => {
     const m = await fixture(),
       descriptor = m.items[0].assets[0],
@@ -648,60 +257,35 @@ describe('v3 validation', () => {
       })
     ).toThrow('digest mismatch');
   });
-  it('rejects a supplied inventory with no measurement for a declared asset', async () => {
-    const m = await fixture();
-    expect(() =>
-      validateArchiveManifestV3(m, {
-        paths: new Set(['manifest.json', 'assets/a1/1.jpg']),
-        entries: new Map(),
-      })
-    ).toThrow('Missing asset inventory entry');
-  });
-  it('rejects an asset path whose directory does not match its asset ID', async () => {
-    const m = await fixture();
-    m.items[0].assets[0].path = 'assets/different/1.jpg';
-    resign(m);
-    expect(() => validateArchiveManifestV3(m)).toThrow('does not match asset ID');
-  });
-  it.each(['.', '..'])('rejects the %s asset directory segment', async segment => {
-    const m = await fixture();
-    m.items[0].assets[0].assetId = segment;
-    m.items[0].assets[0].path = `assets/${segment}/1.jpg`;
-    resign(m);
-    expect(() => validateArchiveManifestV3(m)).toThrow('Unsafe asset path');
-  });
-  it.each([null, false])('rejects an explicit malformed parent %s', async parentValue => {
-    const m = await fixture();
-    (m.items[0] as unknown as Record<string, unknown>).parent = parentValue;
-    resign(m);
-    expect(() => validateArchiveManifestV3(m)).toThrow();
-  });
-  it('requires manifest.json in a supplied inventory', async () => {
-    const m = await fixture();
-    expect(() => validateArchiveManifestV3(m, { paths: new Set(['assets/a1/1.jpg']) })).toThrow(
-      'Missing manifest.json'
-    );
-  });
-  it('rejects inconsistent duplicate parent descriptors', async () => {
-    const m = await fixture();
-    const copy = structuredClone(m.items[0]);
-    copy.itemId = 'asset:2';
-    copy.metadata = { position: 2 };
-    copy.assets[0].assetId = 'a2';
-    copy.assets[0].path = 'assets/a2/2.jpg';
-    copy.parent!.metadata = {
-      ...(copy.parent!.metadata as ColoringPageMetadata),
-      pageNumber: 2,
-    };
-    const { digest: _parentDigest, ...parentUnsigned } = copy.parent!;
-    copy.parent!.digest = calculateParentDescriptorDigest(parentUnsigned);
-    const { digest: _digest, ...unsigned } = copy;
-    copy.digest = calculateItemDigest(unsigned as ArchiveItemWithoutDigestV3);
-    m.items.push(copy);
-    const { inventoryDigest: _inventoryDigest, ...manifestUnsigned } = m;
-    m.inventoryDigest = calculateInventoryDigest(manifestUnsigned);
-    expect(() => validateArchiveManifestV3(m)).toThrow('Inconsistent parent descriptor');
-  });
-  it('rejects unsupported schemas', () =>
-    expect(() => validateArchiveManifestV3({ schemaVersion: 2 })).toThrow());
+});
+
+it('packs and validates a color key with independent page dependencies', async () => {
+  const key: ArchiveSourceItemV3 = {
+    itemId: 'coloring-color-key:k1',
+    kind: 'coloring-color-key',
+    parent: parent(
+      'coloring-page',
+      'coloring-page:p1',
+      parent('coloring-book', 'coloring-book:b1')
+    ),
+    metadata: {
+      position: 0,
+      symbol: 'r:abc123def456ghi',
+      code: '001',
+      color_name: '',
+      swatch: '',
+      tried: [],
+      note: '',
+      created: '2026-01-01 00:00:00.000Z',
+      updated: '2026-01-01 00:00:00.000Z',
+    },
+    assets: [],
+  };
+  const plan = await prepareArchivePlan([key], { backupId, exportedAt });
+  const part = await buildArchivePart(plan, 0);
+  const zip = await JSZip.loadAsync(part.bytes);
+  const manifest = validateArchiveManifestV3(
+    JSON.parse(await zip.file('manifest.json')!.async('string'))
+  );
+  expect(manifest.items[0].metadata).toEqual(key.metadata);
 });

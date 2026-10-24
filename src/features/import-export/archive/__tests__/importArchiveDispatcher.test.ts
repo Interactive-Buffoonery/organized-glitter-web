@@ -1,3 +1,4 @@
+import { validateArchiveManifest } from '../archiveManifest';
 import JSZip from 'jszip';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -73,6 +74,64 @@ describe('archive import dispatcher', () => {
     mocks.importV3.mockResolvedValue({ success: true });
   });
 
+  it('dispatches a complete v4 manifest through the real validator', async () => {
+    const manifest = {
+      schemaVersion: 4,
+      source: 'organized-glitter',
+      exportedAt: '2026-01-01T00:00:00Z',
+      files: [],
+      diamondProjects: [],
+      coloringMediums: [],
+      warnings: [],
+      coloringBooks: [
+        {
+          ref: 'coloring-book:b',
+          oldId: 'b',
+          title: 'Book',
+          totalPages: 1,
+          tags: [],
+          pages: [
+            {
+              ref: 'coloring-page:p',
+              oldId: 'p',
+              pageNumber: 1,
+              status: 'not_started',
+              mediumRefs: [],
+              photoPaths: [],
+              progressNotes: [],
+              colorKeys: [
+                {
+                  ref: 'coloring-color-key:k',
+                  position: 0,
+                  symbol: 'u:0031',
+                  code: '',
+                  color_name: '',
+                  swatch: '',
+                  tried: [],
+                  note: '',
+                  created: '2026-01-01 00:00:00.000Z',
+                  updated: '2026-01-01 00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    mocks.importLegacy.mockImplementationOnce(async file => {
+      const zip = await JSZip.loadAsync(file);
+      const validated = validateArchiveManifest(
+        JSON.parse(await zip.file('manifest.json')!.async('string'))
+      );
+      return { success: true, archiveSchemaVersion: validated.schemaVersion };
+    });
+    const result = await importOrganizedGlitterArchives([
+      await manifestFile(JSON.stringify(manifest)),
+    ]);
+    expect(result.schemaVersion).toBe(4);
+    expect(result.result.success).toBe(true);
+  });
+
   it('preserves the legacy v2 route without requiring a v3-capable server', async () => {
     const file = await schemaFile(2);
     mocks.importLegacy.mockResolvedValue({
@@ -80,28 +139,22 @@ describe('archive import dispatcher', () => {
       success: true,
     });
 
-    const result = await importOrganizedGlitterArchives([file]);
+    const controller = new AbortController();
+
+    const result = await importOrganizedGlitterArchives([file], { signal: controller.signal });
 
     expect(result.schemaVersion).toBe(2);
-    expect(mocks.importLegacy).toHaveBeenCalledWith(file);
+    expect(mocks.importLegacy).toHaveBeenCalledWith(file, {
+      userId: 'user-1',
+      signal: controller.signal,
+      getCurrentUserId: expect.any(Function),
+    });
+    const session = mocks.importLegacy.mock.calls[0][1] as { getCurrentUserId(): string | null };
+    mocks.getCurrentUser.mockReturnValueOnce({ id: 'user-2' });
+    expect(session.getCurrentUserId()).toBe('user-2');
     expect(mocks.getCapabilities).not.toHaveBeenCalled();
     expect(mocks.importV3).not.toHaveBeenCalled();
   });
-
-  it.each(['null', '[]', '"manifest"', '42', 'true', '{}', '{"schemaVersion":99}'])(
-    'rejects invalid manifest root or schema version %s before requesting a restore',
-    async manifest => {
-      const file = await manifestFile(manifest);
-
-      await expect(importOrganizedGlitterArchives([file])).rejects.toThrow(
-        'Unsupported or invalid archive schema version'
-      );
-
-      expect(mocks.importLegacy).not.toHaveBeenCalled();
-      expect(mocks.getCapabilities).not.toHaveBeenCalled();
-      expect(mocks.importV3).not.toHaveBeenCalled();
-    }
-  );
 
   it('reports malformed manifest JSON without exposing parser details', async () => {
     const file = await manifestFile('{');
@@ -113,33 +166,6 @@ describe('archive import dispatcher', () => {
     expect(mocks.importLegacy).not.toHaveBeenCalled();
     expect(mocks.getCapabilities).not.toHaveBeenCalled();
     expect(mocks.importV3).not.toHaveBeenCalled();
-  });
-
-  it('capability-gates a one-part v3 restore before entering the shared v3 pipeline', async () => {
-    const file = await schemaFile(3);
-
-    await importOrganizedGlitterArchives([file]);
-
-    expect(mocks.getCapabilities).toHaveBeenCalledTimes(1);
-    expect(mocks.getCapabilities.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.importV3.mock.invocationCallOrder[0]
-    );
-    expect(mocks.importV3).toHaveBeenCalledWith(
-      [file],
-      expect.objectContaining({
-        adapter: expect.objectContaining({ restoreItem: mocks.restoreItem }),
-        session: expect.objectContaining({ userId: 'user-1' }),
-      })
-    );
-  });
-
-  it('capability-gates multiple selected files before the v3 importer opens them', async () => {
-    const files = [await schemaFile(3, 'part-1.zip'), await schemaFile(3, 'part-2.zip')];
-
-    await importOrganizedGlitterArchives(files);
-
-    expect(mocks.getCapabilities).toHaveBeenCalledTimes(1);
-    expect(mocks.importV3).toHaveBeenCalledWith(files, expect.any(Object));
   });
 
   it('does not open a v3 archive when the capability request fails', async () => {

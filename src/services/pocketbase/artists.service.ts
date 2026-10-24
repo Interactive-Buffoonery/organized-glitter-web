@@ -8,19 +8,14 @@ import { pb } from '@/lib/pocketbase';
 import { Collections, ArtistsResponse } from '@/types/pocketbase.types';
 import { ArtistDTO } from '@/services/types';
 import { ErrorHandler } from './base/ErrorHandler';
-import { isAuthenticated, getCurrentUserId } from '@/services/auth';
+import { requireUserId } from './base/requireUserId';
 import { FilterBuilder } from '@/services/pocketbase/base/filterBuilder';
-
-function requireUserId(): string {
-  if (!isAuthenticated()) {
-    throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  }
-  const userId = getCurrentUserId();
-  if (!userId) {
-    throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  }
-  return userId;
-}
+import {
+  captureSessionIdentity,
+  isCurrentSessionIdentity,
+  type SessionIdentity,
+} from '@/services/auth/sessionIdentity';
+import { SessionChangedError, isSessionChangedError } from '@/services/auth/sessionRecovery';
 
 /** Narrowed list item - only the fields actually fetched by list() */
 export interface ArtistListItem {
@@ -107,12 +102,19 @@ export class ArtistsService {
   }
 
   /** Create an artist for the current user */
-  static async create(data: { name: string }): Promise<ArtistDTO> {
+  static async create(
+    data: { name: string },
+    sessionIdentity: SessionIdentity = captureSessionIdentity()
+  ): Promise<ArtistDTO> {
     const userId = requireUserId();
+    if (!isCurrentSessionIdentity(sessionIdentity) || sessionIdentity.accountId !== userId) {
+      throw new SessionChangedError();
+    }
 
-    return ErrorHandler.handleAsync(async () => {
+    try {
       const trimmed = data.name.trim();
       const existing = await this.findByName(trimmed, userId);
+      if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
       if (existing) {
         throw ErrorHandler.createError(
           'validation',
@@ -126,8 +128,12 @@ export class ArtistsService {
         name: trimmed,
         user: userId,
       });
+      if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
       return toArtistDTO(record);
-    }, 'Artists.create');
+    } catch (error) {
+      if (isSessionChangedError(error)) throw error;
+      throw ErrorHandler.handleError(error, 'Artists.create');
+    }
   }
 
   /** Update an artist (verifies ownership) */
@@ -170,11 +176,18 @@ export class ArtistsService {
   }
 
   /** Delete an artist (verifies ownership) */
-  static async delete(id: string): Promise<void> {
+  static async delete(
+    id: string,
+    sessionIdentity: SessionIdentity = captureSessionIdentity()
+  ): Promise<void> {
     const userId = requireUserId();
+    if (!isCurrentSessionIdentity(sessionIdentity) || sessionIdentity.accountId !== userId) {
+      throw new SessionChangedError();
+    }
 
-    return ErrorHandler.handleAsync(async () => {
+    try {
       const existing = await pb.collection(Collections.Artists).getOne(id, { fields: 'id,user' });
+      if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
       if (existing.user !== userId) {
         throw ErrorHandler.createError(
           'permission',
@@ -184,7 +197,10 @@ export class ArtistsService {
       }
 
       await pb.collection(Collections.Artists).delete(id);
-    }, 'Artists.delete');
+    } catch (error) {
+      if (isSessionChangedError(error)) throw error;
+      throw ErrorHandler.handleError(error, 'Artists.delete');
+    }
   }
 
   /** Get project counts for all artists owned by the current user. */

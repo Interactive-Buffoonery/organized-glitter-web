@@ -108,7 +108,10 @@ const ProjectDetail = () => {
   const hasOptimisticData =
     navigationState?.fromNavigation &&
     navigationState?.projectData &&
-    navigationState?.projectId === projectId;
+    navigationState?.projectId === projectId &&
+    navigationState.projectData.id === projectId &&
+    Boolean(user?.id) &&
+    navigationState.projectData.userId === user?.id;
 
   const { data: project, isLoading: loading } = useProjectDetailQuery(
     projectId,

@@ -4,6 +4,9 @@ import type { PocketBaseUser } from '@/contexts/AuthContext';
 import type { AuthResult, OAuthProvider } from './types';
 import { authLogger } from './shared';
 import { getStructuredErrorReason } from '@/utils/error/structuredErrorReason';
+import { captureSessionIdentity, isCurrentSessionIdentity } from './sessionIdentity';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
+import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 
 const OAUTH_PROVIDERS: readonly OAuthProvider[] = ['apple', 'google', 'discord'];
 
@@ -85,16 +88,28 @@ function accountStillMatches(proof: FreshSignInMethodProof): boolean {
   return pb.authStore.record?.id === proof.userId && pb.authStore.token === proof.authToken;
 }
 
-export async function listConfiguredOAuthProviders(): Promise<OAuthProvider[]> {
-  const methods = await pb.collection('users').listAuthMethods();
+export async function listConfiguredOAuthProviders(signal?: AbortSignal): Promise<OAuthProvider[]> {
+  const methods = await pb.collection('users').listAuthMethods({ signal, requestKey: null });
   return normalizeOAuthProviders(methods);
 }
 
 export async function listAccountSignInMethods(userId: string): Promise<AccountSignInMethod[]> {
-  const [configuredProviders, externalAuths] = await Promise.all([
-    listConfiguredOAuthProviders(),
-    pb.collection('users').listExternalAuths(userId),
-  ]);
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const [configuredProviders, externalAuths] = await Promise.race([
+    Promise.all([
+      listConfiguredOAuthProviders(controller.signal),
+      pb
+        .collection('users')
+        .listExternalAuths(userId, { signal: controller.signal, requestKey: null }),
+    ]),
+    new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort();
+        reject(new Error('Sign-in method lookup timed out'));
+      }, 15_000);
+    }),
+  ]).finally(() => clearTimeout(timeout));
 
   const configured = new Set(configuredProviders);
   const linked = new Set<OAuthProvider>();
@@ -172,22 +187,24 @@ export async function authenticateWithOAuth2(
   expectedUserId?: string,
   proof?: FreshSignInMethodProof
 ): Promise<OAuthActionResult> {
+  const initiatingSession = captureSessionIdentity();
   const previousToken = pb.authStore.token;
   const previousRecord = pb.authStore.record;
+  const client = action === 'connect' ? pb : new PocketBase(pb.baseURL, new BaseAuthStore());
 
   try {
     authLogger.debug(`Attempting OAuth2 ${action} with ${provider}`);
 
     // Keep this call before the first await. PocketBase opens its popup synchronously,
     // which preserves Safari's click gesture.
-    const authPromise = pb.collection('users').authWithOAuth2({
+    const authPromise = client.collection('users').authWithOAuth2({
       provider,
       ...(proof ? { createData: { og_step_up_proof: proof.value } } : {}),
     });
     const authData = await authPromise;
 
     if (expectedUserId && authData.record.id !== expectedUserId) {
-      pb.authStore.save(previousToken, previousRecord);
+      if (action === 'connect') pb.authStore.save(previousToken, previousRecord);
       authLogger.warn('OAuth2 account link returned a different user', { provider });
       return {
         success: false,
@@ -196,9 +213,27 @@ export async function authenticateWithOAuth2(
       };
     }
 
+    if (action === 'sign in') {
+      const applied = await deletionIntents.applyAuthIfClear(
+        POCKETBASE_URL,
+        authData.record.id,
+        () => {
+          if (!isCurrentSessionIdentity(initiatingSession)) return false;
+          pb.authStore.save(authData.token, authData.record);
+          return true;
+        }
+      );
+      if (!applied)
+        return {
+          success: false,
+          reason: 'account_changed',
+          error: 'Your session changed. Try again.',
+        };
+    }
+
     return {
       success: true,
-      user: authData.record as PocketBaseUser,
+      user: authData.record as unknown as PocketBaseUser,
     };
   } catch (error) {
     authLogger.error(`OAuth2 ${action} with ${provider} failed`, {
@@ -219,6 +254,8 @@ export async function authenticateWithOAuth2(
       ...(conflict ? { conflict: true } : {}),
       error: oauthErrorMessage(error, provider, action),
     };
+  } finally {
+    if (client !== pb) client.authStore.clear();
   }
 }
 
@@ -357,8 +394,14 @@ export async function requestOAuthSignInMethodProof(
   userId: string
 ): Promise<StepUpResult> {
   const value = createProofValue();
+  const sessionIdentity = captureSessionIdentity();
   const authToken = pb.authStore.token;
-  if (!authToken || pb.authStore.record?.id !== userId) {
+  if (
+    !authToken ||
+    pb.authStore.record?.id !== userId ||
+    sessionIdentity.accountId !== userId ||
+    !isCurrentSessionIdentity(sessionIdentity)
+  ) {
     return {
       success: false,
       reason: 'account_changed',
@@ -379,7 +422,11 @@ export async function requestOAuthSignInMethodProof(
       },
     });
     const authData = await authPromise;
-    if (authData.record.id !== userId || pb.authStore.token !== authToken) {
+    if (
+      authData.record.id !== userId ||
+      pb.authStore.token !== authToken ||
+      !isCurrentSessionIdentity(sessionIdentity)
+    ) {
       return {
         success: false,
         reason: 'account_changed',

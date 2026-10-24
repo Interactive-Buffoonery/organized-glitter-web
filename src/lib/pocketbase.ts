@@ -1,4 +1,5 @@
-import PocketBase from 'pocketbase';
+import PocketBase, { type SendOptions } from 'pocketbase';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import { createLogger } from '@/utils/logger';
@@ -7,8 +8,10 @@ import {
   isSessionTokenInactive,
   recordCompletedSessionCreate,
   reportInvalidSession,
+  retainSignedOutCreateTokens,
   SessionChangedError,
 } from '@/services/auth/sessionRecovery';
+import { getSessionIdentityTracker, type SessionIdentity } from '@/services/auth/sessionEpoch';
 import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 
 const pbLogger = createLogger('PocketBase');
@@ -29,6 +32,12 @@ pbLogger.debug('PocketBase Environment:', {
 
 // Create and configure PocketBase client
 export const pb = new PocketBase(POCKETBASE_URL) as TypedPocketBase;
+const sessionIdentityTracker = getSessionIdentityTracker(pb.authStore);
+const requestSessionIdentity = Symbol('requestSessionIdentity');
+
+type SessionTrackedOptions = SendOptions & {
+  [requestSessionIdentity]?: SessionIdentity;
+};
 
 // Disable PocketBase SDK auto-cancellation in all environments.
 // React Query coordinates request lifecycle (caching, dedup, AbortSignal).
@@ -110,11 +119,13 @@ const getMinRequestInterval = () => {
   return Math.min(baseInterval * multiplier * Math.pow(2, consecutiveRateLimits - 1), maxDelay);
 };
 
-pb.beforeSend = function (url: string, options: RequestInit & Record<string, unknown>) {
+pb.beforeSend = function (url: string, options: SessionTrackedOptions) {
   const pathname = new URL(url).pathname;
   const isAuthRequest =
     pathname.includes('/auth-') || pathname.includes('/request-') || pathname.includes('/confirm-');
   const token = pb.authStore.token;
+  const sessionIdentity = sessionIdentityTracker.capture();
+  options[requestSessionIdentity] = sessionIdentity;
   if (!isAuthRequest && token && !pb.authStore.isValid) {
     reportInvalidSession(token);
     throw new Error('Your session expired. Sign in and try again.');
@@ -131,8 +142,12 @@ pb.beforeSend = function (url: string, options: RequestInit & Record<string, unk
       const isAuth = pb.authStore.isValid;
       pbLogger.debug(`Rate limiting delay: ${delay}ms for ${url} (auth: ${isAuth})`);
     }
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       setTimeout(() => {
+        if (!sessionIdentityTracker.isCurrent(sessionIdentity)) {
+          reject(new SessionChangedError());
+          return;
+        }
         lastRequestTime = Date.now();
         resolve({ url, options });
       }, delay);
@@ -146,23 +161,30 @@ pb.beforeSend = function (url: string, options: RequestInit & Record<string, unk
 pb.afterSend = function (
   response: Response,
   data: unknown,
-  options?: { headers?: HeadersInit; method?: string }
+  options?: SessionTrackedOptions
 ): unknown {
   const requestToken = new Headers(options?.headers)
     .get('Authorization')
     ?.replace(/^Bearer\s+/i, '');
+  const originatingIdentity = options?.[requestSessionIdentity];
+  const identityIsCurrent = originatingIdentity
+    ? sessionIdentityTracker.isCurrent(originatingIdentity)
+    : true;
+  const method = options?.method?.toUpperCase();
   if (
     response.ok &&
-    requestToken &&
-    isSessionTokenInactive(requestToken) &&
-    options?.method?.toUpperCase() !== 'GET'
+    method !== 'GET' &&
+    (!identityIsCurrent || (requestToken && isSessionTokenInactive(requestToken)))
   ) {
-    if (options?.method?.toUpperCase() === 'POST') {
+    if (method === 'POST' && requestToken) {
       const collection = new URL(response.url || '/', pb.baseURL).pathname.match(
         /^\/api\/collections\/([^/]+)\/records$/
       )?.[1];
       const id = typeof data === 'object' && data !== null && 'id' in data ? data.id : undefined;
       if (collection && typeof id === 'string') {
+        if (originatingIdentity?.accountId) {
+          retainSignedOutCreateTokens(originatingIdentity.accountId, [requestToken]);
+        }
         recordCompletedSessionCreate(requestToken, collection, id);
       }
     }
@@ -171,6 +193,7 @@ pb.afterSend = function (
   if (
     response.status === 401 &&
     requestToken &&
+    identityIsCurrent &&
     requestToken === pb.authStore.token &&
     !new URL(response.url || '/', pb.baseURL).pathname.includes('/auth-')
   ) {
@@ -202,6 +225,47 @@ pb.afterSend = function (
     });
   }
   return data;
+};
+
+// Read IndexedDB at the request boundaries, rather than relying on BroadcastChannel
+// delivery timing. A pending intent in another tab blocks writes and late reads.
+const prepareSessionRequest = pb.beforeSend;
+pb.beforeSend = async function (url: string, options: SessionTrackedOptions) {
+  const identity = sessionIdentityTracker.capture();
+  const pathname = new URL(url).pathname;
+  const isAccountRequest =
+    identity.accountId && !pathname.includes('/auth-') && !pathname.startsWith('/api/auth/');
+  const checkFence = async () => {
+    if (!isAccountRequest) return;
+    try {
+      const intent = await deletionIntents.get(POCKETBASE_URL, identity.accountId!);
+      if (intent || !sessionIdentityTracker.isCurrent(identity)) throw new SessionChangedError();
+    } catch {
+      throw new SessionChangedError();
+    }
+  };
+  await checkFence();
+  const prepared = await prepareSessionRequest!(url, options);
+  await checkFence();
+  return prepared;
+};
+const finishSessionRequest = pb.afterSend;
+pb.afterSend = function (response: Response, data: unknown, options?: SessionTrackedOptions) {
+  const identity = options?.[requestSessionIdentity];
+  const identityIsCurrent = identity ? sessionIdentityTracker.isCurrent(identity) : true;
+  const finished = response.ok ? finishSessionRequest!(response, data, options ?? {}) : undefined;
+  if (identity?.accountId && identityIsCurrent) {
+    return deletionIntents.get(POCKETBASE_URL, identity.accountId).then(
+      intent => {
+        if (intent || !sessionIdentityTracker.isCurrent(identity)) throw new SessionChangedError();
+        return response.ok ? finished : finishSessionRequest!(response, data, options ?? {});
+      },
+      () => {
+        throw new SessionChangedError();
+      }
+    );
+  }
+  return response.ok ? finished : finishSessionRequest!(response, data, options ?? {});
 };
 
 // Configure auth store options for better security

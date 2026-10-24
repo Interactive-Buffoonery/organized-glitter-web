@@ -46,6 +46,12 @@ import '@fontsource/caveat/700.css';
 
 const shouldEnableReactQueryDevtools = import.meta.env.DEV && __APP_TEST_ENV__ !== 'test';
 
+if (__APP_TEST_ENV__ === 'test') {
+  void import('./e2e/accountDeletionBridge').then(({ installAccountDeletionBridge }) => {
+    installAccountDeletionBridge();
+  });
+}
+
 // Flip the mounted flags once the app reports itself live. `app-loaded` can
 // also dismiss only the splash, so the root marker is the precise "real
 // content is ready" signal. Until then uncaught errors are still treated as

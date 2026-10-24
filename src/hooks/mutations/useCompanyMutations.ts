@@ -16,11 +16,18 @@ import { CompanyDTO } from '@/services/types';
 import { CompaniesService, type CompanyListItem } from '@/services/pocketbase/companies.service';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
+import { adaptSessionScopedCallbacks } from '@/hooks/mutations/adaptSessionScopedCallbacks';
 import { isRecordInUseError, isServiceError } from '@/services/errors';
 import { createLogger } from '@/utils/logger';
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
-import { isSessionChangedError } from '@/services/auth/sessionRecovery';
+import { SessionChangedError, isSessionChangedError } from '@/services/auth/sessionRecovery';
+import {
+  captureSessionIdentity,
+  isCurrentSessionIdentity,
+  type SessionIdentity,
+} from '@/services/auth/sessionIdentity';
+import type { MutateOptions, UseMutationResult } from '@tanstack/react-query';
 
 const logger = createLogger('CompanyMutations');
 
@@ -177,11 +184,16 @@ export interface UpdateCompanyData {
 export function useCreateCompany({ notifyOnSuccess = true }: { notifyOnSuccess?: boolean } = {}) {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (data: CreateCompanyData): Promise<CompanyDTO> => {
-      return CompaniesService.create(data);
+  type Variables = { data: CreateCompanyData; sessionIdentity: SessionIdentity };
+  type Callbacks = MutateOptions<CompanyDTO, Error, CreateCompanyData>;
+  const mutation = useMutation<CompanyDTO, Error, Variables, SessionIdentity>({
+    onMutate: variables => variables.sessionIdentity,
+    mutationFn: async ({ data, sessionIdentity }): Promise<CompanyDTO> => {
+      if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
+      return CompaniesService.create(data, sessionIdentity);
     },
-    onSuccess: created => {
+    onSuccess: (created, { sessionIdentity }) => {
+      if (!isCurrentSessionIdentity(sessionIdentity)) return;
       capture(AnalyticsEvent.COMPANY_CREATED);
       insertCreatedCompanyIntoAllCompanyQueriesCache(queryClient, companyDtoToListItem(created));
       queryClient.invalidateQueries({ queryKey: queryKeys.companies.all });
@@ -195,8 +207,8 @@ export function useCreateCompany({ notifyOnSuccess = true }: { notifyOnSuccess?:
       }
       logger.info('Company created', { id: created.id });
     },
-    onError: (error: Error) => {
-      if (isSessionChangedError(error)) return;
+    onError: (error: Error, { sessionIdentity }) => {
+      if (!isCurrentSessionIdentity(sessionIdentity) || isSessionChangedError(error)) return;
       logger.error('Failed to create company', error);
       const message =
         isServiceError(error) && error.type === 'validation'
@@ -205,6 +217,20 @@ export function useCreateCompany({ notifyOnSuccess = true }: { notifyOnSuccess?:
       notify({ kind: 'error', title: 'Company creation failed', description: message });
     },
   });
+  return {
+    ...mutation,
+    variables: mutation.variables?.data,
+    mutate: (data: CreateCompanyData, options?: Callbacks) =>
+      mutation.mutate(
+        { data, sessionIdentity: captureSessionIdentity() },
+        adaptSessionScopedCallbacks(options, variables => variables.data)
+      ),
+    mutateAsync: (data: CreateCompanyData, options?: Callbacks) =>
+      mutation.mutateAsync(
+        { data, sessionIdentity: captureSessionIdentity() },
+        adaptSessionScopedCallbacks(options, variables => variables.data)
+      ),
+  } as UseMutationResult<CompanyDTO, Error, CreateCompanyData>;
 }
 
 export function useUpdateCompany() {

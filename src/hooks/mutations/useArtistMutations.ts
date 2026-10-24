@@ -11,11 +11,18 @@ import { ArtistDTO } from '@/services/types';
 import { ArtistsService, type ArtistListItem } from '@/services/pocketbase/artists.service';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
+import { adaptSessionScopedCallbacks } from '@/hooks/mutations/adaptSessionScopedCallbacks';
 import { isRecordInUseError, isServiceError } from '@/services/errors';
 import { createLogger } from '@/utils/logger';
 import { capture } from '@/services/analytics-escape-hatch';
 import { AnalyticsEvent } from '@/services/analytics-events';
-import { isSessionChangedError } from '@/services/auth/sessionRecovery';
+import { SessionChangedError, isSessionChangedError } from '@/services/auth/sessionRecovery';
+import {
+  captureSessionIdentity,
+  isCurrentSessionIdentity,
+  type SessionIdentity,
+} from '@/services/auth/sessionIdentity';
+import type { MutateOptions, UseMutationResult } from '@tanstack/react-query';
 
 const logger = createLogger('ArtistMutations');
 
@@ -63,11 +70,16 @@ export interface UpdateArtistData {
 export function useCreateArtist({ notifyOnSuccess = true }: { notifyOnSuccess?: boolean } = {}) {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (data: CreateArtistData): Promise<ArtistDTO> => {
-      return ArtistsService.create(data);
+  type Variables = { data: CreateArtistData; sessionIdentity: SessionIdentity };
+  type Callbacks = MutateOptions<ArtistDTO, Error, CreateArtistData>;
+  const mutation = useMutation<ArtistDTO, Error, Variables, SessionIdentity>({
+    onMutate: variables => variables.sessionIdentity,
+    mutationFn: async ({ data, sessionIdentity }): Promise<ArtistDTO> => {
+      if (!isCurrentSessionIdentity(sessionIdentity)) throw new SessionChangedError();
+      return ArtistsService.create(data, sessionIdentity);
     },
-    onSuccess: created => {
+    onSuccess: (created, { sessionIdentity }) => {
+      if (!isCurrentSessionIdentity(sessionIdentity)) return;
       capture(AnalyticsEvent.ARTIST_CREATED);
       queryClient.setQueriesData({ queryKey: queryKeys.artists.all }, cached =>
         insertCreatedArtistIntoArtistQueriesCache(cached, {
@@ -86,8 +98,8 @@ export function useCreateArtist({ notifyOnSuccess = true }: { notifyOnSuccess?: 
       }
       logger.info('Artist created', { id: created.id });
     },
-    onError: (error: Error) => {
-      if (isSessionChangedError(error)) return;
+    onError: (error: Error, { sessionIdentity }) => {
+      if (!isCurrentSessionIdentity(sessionIdentity) || isSessionChangedError(error)) return;
       logger.error('Failed to create artist', error);
       const message =
         isServiceError(error) && error.type === 'validation'
@@ -96,6 +108,20 @@ export function useCreateArtist({ notifyOnSuccess = true }: { notifyOnSuccess?: 
       notify({ kind: 'error', title: 'Artist creation failed', description: message });
     },
   });
+  return {
+    ...mutation,
+    variables: mutation.variables?.data,
+    mutate: (data: CreateArtistData, options?: Callbacks) =>
+      mutation.mutate(
+        { data, sessionIdentity: captureSessionIdentity() },
+        adaptSessionScopedCallbacks(options, variables => variables.data)
+      ),
+    mutateAsync: (data: CreateArtistData, options?: Callbacks) =>
+      mutation.mutateAsync(
+        { data, sessionIdentity: captureSessionIdentity() },
+        adaptSessionScopedCallbacks(options, variables => variables.data)
+      ),
+  } as UseMutationResult<ArtistDTO, Error, CreateArtistData>;
 }
 
 export function useUpdateArtist() {

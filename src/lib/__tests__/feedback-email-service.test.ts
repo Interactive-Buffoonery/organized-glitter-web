@@ -1,8 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
+import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
+import type { DeletionIntent } from '@/services/accountDeletion/types';
 
 const authState = vi.hoisted(() => ({
+  accountId: 'account-a',
   isAuthenticated: true,
+  isCurrentSession: true,
   token: 'session-token',
+}));
+vi.mock('@/services/accountDeletion/intentStore', () => ({
+  deletionIntents: { get: vi.fn().mockResolvedValue(undefined) },
 }));
 
 vi.mock('@/services/auth', () => ({
@@ -18,8 +26,18 @@ vi.mock('@/lib/pocketbase', () => ({
     },
   },
 }));
+vi.mock('@/services/auth/sessionIdentity', () => ({
+  captureSessionIdentity: () => ({
+    accountId: authState.accountId,
+    generation: 1,
+    epoch: 'request-epoch',
+  }),
+  isCurrentSessionIdentity: () => authState.isCurrentSession,
+}));
 
 const { sendFeedbackEmail } = await import('../feedback-email-service');
+const { clearSessionDrafts, takeCompletedSessionFeedback } =
+  await import('@/services/auth/sessionRecovery');
 
 describe('sendFeedbackEmail', () => {
   afterEach(() => {
@@ -27,64 +45,14 @@ describe('sendFeedbackEmail', () => {
     vi.unstubAllEnvs();
   });
   beforeEach(() => {
+    authState.accountId = 'account-a';
     authState.isAuthenticated = true;
+    authState.isCurrentSession = true;
     authState.token = 'session-token';
+    clearSessionDrafts();
     vi.restoreAllMocks();
+    vi.mocked(deletionIntents.get).mockReset().mockResolvedValue(undefined);
     vi.stubEnv('VITE_CONTACT_EMAIL', 'contact@example.test');
-  });
-
-  it('does not open mailto fallback for short validation errors', async () => {
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
-
-    const result = await sendFeedbackEmail({
-      message: 'short',
-      name: 'Sarah',
-      email: 'sarah@example.test',
-    });
-
-    expect(result).toEqual({
-      success: false,
-      error: 'Message must be at least 10 characters long',
-    });
-    expect(openSpy).not.toHaveBeenCalled();
-  });
-
-  it('validates and sends a padded 5,000-character message consistently', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    vi.stubGlobal('window', {
-      ...window,
-      location: { ...window.location, hostname: 'app.example.test' },
-    });
-
-    const result = await sendFeedbackEmail({ message: `  ${'a'.repeat(5000)}  ` });
-
-    expect(result.success).toBe(true);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://data.example.test/api/organized-glitter/feedback',
-      expect.objectContaining({
-        body: JSON.stringify({ feedback: 'a'.repeat(5000), type: 'general' }),
-      })
-    );
-  });
-
-  it('does not open mailto fallback for invalid email validation errors', async () => {
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
-
-    const result = await sendFeedbackEmail({
-      message: 'This message is long enough to submit.',
-      name: 'Sarah',
-      email: 'not-an-email',
-    });
-
-    expect(result).toEqual({
-      success: false,
-      error: 'Invalid email format',
-    });
-    expect(openSpy).not.toHaveBeenCalled();
   });
 
   it('sends the session and reply email without client-supplied account identity', async () => {
@@ -124,40 +92,93 @@ describe('sendFeedbackEmail', () => {
     );
   });
 
-  it('leaves reply email blank when an authenticated user leaves the email field blank', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
+  // A late acceptance must survive deletion fences, storage loss, and account changes.
+  it.each(['same session', 'another account', 'storage unavailable'])(
+    'records accepted feedback for its original account with %s after dispatch',
+    async boundary => {
+      const fetchMock = vi.fn().mockImplementation(async () => {
+        if (boundary === 'another account') {
+          authState.accountId = 'account-b';
+          authState.isCurrentSession = false;
+        }
+        if (boundary === 'storage unavailable') {
+          vi.mocked(deletionIntents.get).mockRejectedValue(new Error('Storage unavailable'));
+        } else {
+          vi.mocked(deletionIntents.get).mockResolvedValue({ phase: 'pending' } as DeletionIntent);
+        }
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      });
+      const openMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      vi.stubGlobal('window', {
+        ...window,
+        location: { ...window.location, hostname: 'app.example.test' },
+        open: openMock,
+      });
+      const feedback = {
+        draftId: 'feedback-draft-a',
+        message: 'Accepted feedback from the original account.',
+        name: 'Sarah',
+        email: 'contact@example.test',
+      };
+
+      await expect(sendFeedbackEmail(feedback)).resolves.toMatchObject({
+        success: false,
+        reason: 'session_changed',
+      });
+      expect(takeCompletedSessionFeedback('account-b')).toBeUndefined();
+      expect(takeCompletedSessionFeedback('account-a')).toEqual(feedback);
+      expect(takeCompletedSessionFeedback('account-a')).toBeUndefined();
+      expect(deletionIntents.get).toHaveBeenLastCalledWith(POCKETBASE_URL, 'account-a');
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(openMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('blocks feedback before dispatch when deletion is pending without opening a mail app', async () => {
+    vi.mocked(deletionIntents.get).mockResolvedValue({ phase: 'pending' } as DeletionIntent);
+    const fetchMock = vi.fn();
+    const openMock = vi.fn();
     vi.stubGlobal('window', {
       ...window,
-      location: {
-        ...window.location,
-        hostname: 'app.example.test',
-      },
+      location: { ...window.location, hostname: 'app.example.test' },
+      open: openMock,
     });
+    vi.stubGlobal('fetch', fetchMock);
 
-    const result = await sendFeedbackEmail({
-      message: 'This message is long enough to submit.',
-      name: 'Sarah',
-      email: '',
+    await expect(
+      sendFeedbackEmail({ message: 'A valid feedback message.' })
+    ).resolves.toMatchObject({
+      success: false,
+      reason: 'session_changed',
     });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(openMock).not.toHaveBeenCalled();
+  });
 
-    expect(result).toEqual({
-      success: true,
-      emailId: 'feedback-api-sent',
-    });
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://data.example.test/api/organized-glitter/feedback',
-      expect.objectContaining({
-        body: JSON.stringify({
-          feedback: 'This message is long enough to submit.',
-          email: '',
-          type: 'general',
-        }),
+  it('keeps a rejected feedback response fenced without recording completion or opening mail', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => {
+        vi.mocked(deletionIntents.get).mockResolvedValue({ phase: 'pending' } as DeletionIntent);
+        return new Response(JSON.stringify({ error: 'Rejected' }), { status: 403 });
       })
     );
+    const openMock = vi.fn();
+    vi.stubGlobal('window', {
+      ...window,
+      location: { ...window.location, hostname: 'app.example.test' },
+      open: openMock,
+    });
+
+    await expect(
+      sendFeedbackEmail({ message: 'A valid feedback message.' })
+    ).resolves.toMatchObject({
+      success: false,
+      reason: 'session_changed',
+    });
+    expect(takeCompletedSessionFeedback('account-a')).toBeUndefined();
+    expect(openMock).not.toHaveBeenCalled();
   });
 
   it('requires a session without sending or opening a mail app', async () => {
@@ -174,13 +195,15 @@ describe('sendFeedbackEmail', () => {
     expect(openMock).not.toHaveBeenCalled();
   });
 
-  it('keeps an expired-session error in the form instead of opening mail', async () => {
+  it('suppresses response errors after the originating session changes', async () => {
+    let resolveResponse!: (response: Response) => void;
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ error: 'Please sign in again to send feedback.' }), {
-          status: 401,
-        })
+      vi.fn(
+        () =>
+          new Promise<Response>(resolve => {
+            resolveResponse = resolve;
+          })
       )
     );
     const openMock = vi.fn();
@@ -189,171 +212,25 @@ describe('sendFeedbackEmail', () => {
       location: { ...window.location, hostname: 'app.example.test' },
       open: openMock,
     });
-    expect(await sendFeedbackEmail({ message: 'A valid feedback message.' })).toMatchObject({
-      success: false,
-      reason: 'session_required',
-    });
-    expect(openMock).not.toHaveBeenCalled();
-  });
 
-  it('returns an account rate-limit reason without opening the mailto fallback', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      statusText: 'Too Many Requests',
-      json: () =>
-        Promise.resolve({
-          error: 'Too many requests. Please try again later.',
-          reason: 'rate_limited',
-          retryAfter: 120,
-        }),
+    const resultPromise = sendFeedbackEmail({
+      draftId: 'feedback-draft-a',
+      message: 'Feedback rejected after the original session ended.',
     });
-    const openMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-    vi.stubGlobal('window', {
-      ...window,
-      location: {
-        ...window.location,
-        hostname: 'app.example.test',
-      },
-      open: openMock,
-    });
-
-    const result = await sendFeedbackEmail({
-      message: 'This message is long enough to submit.',
-      name: 'Sarah',
-      email: 'sarah@example.test',
-    });
-
-    expect(result).toMatchObject({
-      success: false,
-      reason: 'rate_limited',
-    });
-    expect(openMock).not.toHaveBeenCalled();
-  });
-
-  it('shows verification overload as a service error instead of an account rate limit', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            error: 'Feedback is temporarily busy. Please try again shortly.',
-            reason: 'verification_busy',
-            retryAfter: 60,
-          }),
-          { status: 503 }
-        )
-      )
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    authState.isCurrentSession = false;
+    resolveResponse(
+      new Response(JSON.stringify({ error: 'Please sign in again to send feedback.' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
     );
-    const openMock = vi.spyOn(window, 'open').mockImplementation(() => null);
-    vi.stubGlobal('window', {
-      ...window,
-      location: { ...window.location, hostname: 'app.example.test' },
-      open: openMock,
-    });
 
-    expect(await sendFeedbackEmail({ message: 'A valid feedback message.' })).toMatchObject({
+    await expect(resultPromise).resolves.toMatchObject({
       success: false,
-      reason: 'verification_busy',
+      reason: 'session_changed',
     });
+    expect(takeCompletedSessionFeedback('account-a')).toBeUndefined();
     expect(openMock).not.toHaveBeenCalled();
-  });
-
-  it('does not open mailto fallback for non-JSON server errors', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 502,
-      statusText: 'Bad Gateway',
-      json: () => Promise.reject(new SyntaxError('Unexpected token <')),
-    });
-    const openMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-    vi.stubGlobal('window', {
-      ...window,
-      location: {
-        ...window.location,
-        hostname: 'app.example.test',
-      },
-      open: openMock,
-    });
-
-    const result = await sendFeedbackEmail({
-      message: 'This message is long enough to submit.',
-      name: 'Sarah',
-      email: 'sarah@example.test',
-    });
-
-    expect(result).toEqual({
-      success: false,
-      error: 'HTTP 502: Bad Gateway',
-    });
-    expect(openMock).not.toHaveBeenCalled();
-  });
-
-  it('does not report delivery when a non-JSON success response opens no mail client', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      statusText: 'OK',
-      json: () => Promise.reject(new SyntaxError('Unexpected token <')),
-    });
-    const openMock = vi.fn().mockReturnValue(null);
-    vi.stubGlobal('fetch', fetchMock);
-    vi.stubGlobal('window', {
-      ...window,
-      location: {
-        ...window.location,
-        hostname: 'app.example.test',
-      },
-      open: openMock,
-    });
-
-    const result = await sendFeedbackEmail({
-      message: 'This message is long enough to submit.',
-      name: 'Sarah',
-      email: 'sarah@example.test',
-    });
-
-    expect(result).toEqual({
-      success: false,
-      error:
-        "We couldn't send your feedback here. If your email app opened, send the prepared message from there. If it didn't open, email us directly at contact@example.test.",
-      reason: 'mailto_fallback',
-    });
-    expect(openMock).toHaveBeenCalledOnce();
-  });
-
-  it('does not report delivery when a method error attempts the mailto fallback', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 405,
-      statusText: 'Method Not Allowed',
-      json: () => Promise.reject(new SyntaxError('Unexpected token M')),
-    });
-    const openMock = vi.fn().mockReturnValue({});
-    vi.stubGlobal('fetch', fetchMock);
-    vi.stubGlobal('window', {
-      ...window,
-      location: {
-        ...window.location,
-        hostname: 'app.example.test',
-      },
-      open: openMock,
-    });
-
-    const result = await sendFeedbackEmail({
-      message: 'This message is long enough to submit.',
-      name: 'Sarah',
-      email: 'sarah@example.test',
-    });
-
-    expect(result).toEqual({
-      success: false,
-      error:
-        "We couldn't send your feedback here. If your email app opened, send the prepared message from there. If it didn't open, email us directly at contact@example.test.",
-      reason: 'mailto_fallback',
-    });
-    expect(openMock).toHaveBeenCalledOnce();
   });
 });

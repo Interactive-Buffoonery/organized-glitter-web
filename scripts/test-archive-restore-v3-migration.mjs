@@ -79,6 +79,32 @@ try {
   } finally {
     retained.close();
   }
+  copyFileSync(
+    path.join(root, 'pb_migrations', '1792700002_archive_color_keys.js'),
+    path.join(migrationsDir, '1792700002_archive_color_keys.js')
+  );
+  result = migrate('up');
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  result = migrate('down');
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  result = migrate('up');
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const keyReceipts = new DatabaseSync(path.join(dataDir, 'data.db'));
+  try {
+    const collection = keyReceipts
+      .prepare("SELECT fields FROM _collections WHERE name = 'archive_restore_items'")
+      .get();
+    assert.ok(
+      JSON.parse(collection.fields)
+        .find(field => field.name === 'item_kind')
+        .values.includes('coloring-color-key')
+    );
+    keyReceipts.prepare("UPDATE archive_restore_items SET item_kind = 'coloring-color-key'").run();
+  } finally {
+    keyReceipts.close();
+  }
+  result = migrate('down');
+  assert.notEqual(result.status, 0, 'color key receipt migration must refuse populated rollback');
   console.log('archive restore v3 empty and populated migration rollback checks passed');
 } finally {
   rmSync(runDir, { recursive: true, force: true });

@@ -15,7 +15,7 @@ import {
   ColoringPagesStatusOptions,
 } from '@/types/pocketbase.types';
 import { ErrorHandler } from './base/ErrorHandler';
-import { getCurrentUserId, isAuthenticated } from '@/services/auth';
+import { requireUserId } from './base/requireUserId';
 import type { Tag } from '@/types/tag';
 import { clearOptionalRelation, normalizeOptionalRelation } from './relationClear';
 import { expectedRevisionOptions } from './expectedRevision';
@@ -38,13 +38,6 @@ import type {
 } from '@/types/stats';
 
 const coloringLogger = createLogger('ColoringService');
-
-function requireUserId(): string {
-  if (!isAuthenticated()) throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  const userId = getCurrentUserId();
-  if (!userId) throw ErrorHandler.createError('auth', 'User not authenticated', false);
-  return userId;
-}
 
 export interface ColoringBookDTO {
   id: string;

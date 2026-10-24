@@ -1,3 +1,4 @@
+import { archiveColorKeySchema } from './colorKeySchema';
 import { COLORING_BOOK_MAX_PAGES } from '@/constants/coloringBookMetadata';
 import { assertArchiveManifestRecordLimits } from '@/features/import-export/archive/archiveImportLimits';
 import type {
@@ -34,7 +35,11 @@ export function validateArchiveManifest(value: unknown): OrganizedGlitterArchive
   const manifest = value as Partial<OrganizedGlitterArchiveManifestV1>;
   assertArchiveManifestRecordLimits(manifest);
 
-  if (manifest.schemaVersion !== 1 && manifest.schemaVersion !== 2) {
+  if (
+    manifest.schemaVersion !== 1 &&
+    manifest.schemaVersion !== 2 &&
+    manifest.schemaVersion !== 4
+  ) {
     throw new Error(`Unsupported archive schema version: ${String(manifest.schemaVersion)}`);
   }
 
@@ -99,6 +104,7 @@ export function validateArchiveManifest(value: unknown): OrganizedGlitterArchive
     }
   }
 
+  const colorKeyRefs = new Set<string>();
   const coloringBookRefs = new Set<string>();
   const coloringPageRefs = new Set<string>();
   for (const book of manifest.coloringBooks) {
@@ -147,6 +153,15 @@ export function validateArchiveManifest(value: unknown): OrganizedGlitterArchive
       }
       if (page.mediumIds !== undefined) {
         assertArray(page.mediumIds, 'coloring page mediumIds');
+      }
+      if (page.colorKeys !== undefined) {
+        assertArray(page.colorKeys, 'color keys');
+        for (const key of page.colorKeys) {
+          archiveColorKeySchema.parse(key);
+          if (colorKeyRefs.has(key.ref))
+            throw new Error('Archive contains a duplicate color key reference');
+          colorKeyRefs.add(key.ref);
+        }
       }
       if (page.colorReference !== undefined) {
         const reference = page.colorReference;

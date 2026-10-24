@@ -106,7 +106,7 @@ const TimelineDateEditor = ({
   const trigger = (
     <button
       type="button"
-      aria-label={`Edit ${label} date`}
+      aria-label={`Edit ${label} date: ${isSet ? formattedDisplay : 'Not set'}`}
       className={cn(
         'cursor-pointer rounded-sm text-left transition-colors',
         'decoration-border underline-offset-4 hover:underline',

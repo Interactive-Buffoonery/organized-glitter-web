@@ -1,4 +1,5 @@
 import { notify } from '@/lib/notifications';
+import { captureSessionIdentity, isCurrentSessionIdentity } from '@/services/auth/sessionIdentity';
 
 /**
  * @fileoverview Simplified Project Navigation Hooks
@@ -117,6 +118,8 @@ export const useNavigateToProject = () => {
         dashboardContext,
       } = options;
 
+      const sessionIdentity = captureSessionIdentity();
+
       try {
         logger.debug('🧭 Navigating to project', {
           projectId,
@@ -189,6 +192,7 @@ export const useNavigateToProject = () => {
 
         // Add verification to check if navigation actually happened
         setTimeout(() => {
+          if (!isCurrentSessionIdentity(sessionIdentity)) return;
           const afterNavigation = {
             currentUrl: window.location.href,
             currentPathname: window.location.pathname,

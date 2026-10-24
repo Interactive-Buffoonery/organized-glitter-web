@@ -22,13 +22,21 @@ import {
   POCKETBASE_BASELINE_VERSION,
   POCKETBASE_VERSION,
 } from './install-pocketbase.mjs';
-import { applyIndexInventory } from './validate-pocketbase-upgrade.mjs';
+import {
+  applyIndexInventory,
+  readBaseMigrations,
+  replayIndexEvidence,
+} from './validate-pocketbase-upgrade.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const runRoot = path.join(root, '.tmp', 'protected-file-upgrade');
 mkdirSync(runRoot, { recursive: true });
 const runDir = mkdtempSync(path.join(runRoot, 'run-'));
-const report = { fixture: 'PocketBase 0.40.1 prior schema to 0.40.4', runDir, checks: [] };
+const report = {
+  fixture: `PocketBase ${POCKETBASE_BASELINE_VERSION} prior schema to ${POCKETBASE_VERSION}`,
+  runDir,
+  checks: [],
+};
 const recordCheck = (name, detail) => report.checks.push({ name, ...detail });
 const dataDir = path.join(runDir, 'pb_data');
 const migrationDir = path.join(runDir, 'migrations');
@@ -234,7 +242,17 @@ try {
   const inventory = JSON.parse(
     readFileSync(path.join(root, 'scripts/fixtures/production-index-inventory.json'), 'utf8')
   );
-  await admin.collections.import(applyIndexInventory(priorSchema, inventory), false);
+  const replayedIndexes = await replayIndexEvidence({
+    schema: priorSchema,
+    inventory,
+    migrations: readBaseMigrations({ baseCommit: 'HEAD' }),
+    binary: baseline,
+    workDir: path.join(runDir, 'index-evidence'),
+  });
+  await admin.collections.import(
+    applyIndexInventory(priorSchema, inventory, { replayedIndexes }),
+    false
+  );
   const ownerUser = await admin.collection('users').create({
     email: 'files-owner@localhost.test',
     username: 'files-owner',

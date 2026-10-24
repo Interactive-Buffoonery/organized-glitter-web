@@ -184,7 +184,7 @@ The archive does not include auth tokens, passwords, email, profile data, or pri
 
 Diamond project metadata includes color count.
 Export reads the source records again after building the ZIP. If a project,
-book, page, medium, reference, or progress note changed during export, the
+book, page, medium, reference, color key, or progress note changed during export, the
 download fails and asks you to retry after edits stop. This is a best-effort
 check across separate PocketBase reads, not a database transaction: an edit
 after the final read cannot be detected.
@@ -204,7 +204,9 @@ expanded entry, and 2 GiB of total expanded data. A non-manifest entry may
 expand by at most 1,000 times its compressed size. The manifest limit is 64 MiB.
 Legacy manifests support at most 10,000 files, diamond projects, coloring
 mediums, coloring books, and warnings per array, 100,000 coloring pages in
-total, and 10,000 nested note, photo, tag, and medium references combined. A
+total, and 10,000 nested note, photo, tag, and medium references combined. Color keys have a
+separate 100,000-row budget, with at most 500 per page. The combined record
+limit, including keys and pages, is 200,000. Export uses the same limits. A
 coloring page supports at most 99 photos. V3 manifests support at most 10,000
 items and warnings per part, with server-sized metadata lists. The v3 packer
 rejects excess warnings without dropping them and rejects metadata lists above
@@ -277,11 +279,12 @@ confirmed created, prepared parent, already applied, and asset responses.
 Cancellation or a lost response can leave a write unconfirmed; retry the same
 part to learn its final outcome. Cache refresh is best effort after confirmed
 writes and cannot turn them into restore failures. An old server can still
-restore legacy v1/v2 ZIPs; a v3 restore requires the v3 capability response.
+restore legacy v1/v2 ZIPs without color keys. V4 needs the color-key restore
+route, and a v3 restore requires the v3 capability response.
 Network and authorization errors stop the restore rather than suggesting that
 the server is outdated.
 
-### Legacy v1/v2 restore
+### Legacy v1/v2/v4 restore
 
 Behavior:
 
@@ -369,7 +372,8 @@ References:
 
 ## Color reference archive extension
 
-Archive exports now use schema version 2. Version 1 remains importable; older
+Archive exports use schema version 2, or version 4 when color keys are present.
+Version 1 remains importable; older
 application versions reject version 2 rather than silently losing color references.
 Each coloring page can contain `colorReference` with a portable reference, exact
 plain-text `notes`, and `photoPaths`. Swatch files use `coloring-swatch-photo` and
@@ -390,3 +394,42 @@ If a later photo transaction fails, additions already committed by earlier
 transactions stay in that summary so a retry can continue from receipts.
 Deploy the updated color-reference hook before the client; older hook responses
 without this metadata are reported as incomplete and keep import recovery state.
+
+## Color key archive extension
+
+Legacy exports containing color keys use schema version 4; exports without keys
+remain version 2. Version 3 is reserved for the existing multipart format.
+This follows the color-reference extension rule above: older applications reject
+an unsupported version instead of silently restoring an incomplete backup.
+Versions 1 and 2 still restore without a color key section.
+
+Each page can contain optional `colorKeys` entries with a portable `ref`,
+`position`, `symbol`, `code`, `color_name`, `swatch`, `tried`, `note`, `created`,
+and `updated`. Export includes every key under its exported page. Keys with no
+exported page are omitted, matching color references. Source user IDs are not
+included. `coloring_symbol_requests`, maintainer status, contact details, and
+protected request photos are never exported.
+
+Restore maps keys to the destination pages and the authenticated restoring user.
+Legacy restore sends at most 500 keys in one request per page. All keys and one
+page receipt commit in a single transaction, with one ownership check and one
+receipt lookup. Normal key validation and archived timestamps are preserved. If
+the destination page already has any keys and no receipt for this restore, the
+whole page's keys are skipped with one warning, preserving saved choices.
+A retry of a completed page returns only its surviving keys without overwriting
+edits. Deleted keys stay deleted and are omitted from the returned reference map.
+A deleted destination or changed archive item reports a conflict and asks the
+user to export again. Invalid keys roll back the entire page batch and receipt.
+Legacy receipt identity uses the archive fingerprint and original page ref;
+the digest still includes the destination page ID.
+
+Multipart v3 `coloring-color-key` items are restore-only in the web app: web
+export does not pack these items. They contain the same metadata, a page parent
+descriptor, and no assets. Existing per-item descriptor, digest, dependency, and
+receipt rules apply. Older v3 clients reject the unknown item kind before writing
+records; older servers reject the unsupported item rather than claiming it was
+restored. Deploy the receipt migration and archive hooks before the client.
+
+An `r:<id>` symbol is retained exactly. When its request is not readable in the
+restoring account, clients render the neutral placeholder. The normal backend
+hook may replace it with a resolved symbol for a same-user request.

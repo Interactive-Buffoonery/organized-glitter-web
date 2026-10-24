@@ -3,7 +3,7 @@ import { capture, captureException } from '@/services/analytics-escape-hatch';
 import { classifyExternalError } from '@/utils/error/exceptionContext';
 
 const IMPORT_EXPORT_SURFACE = 'settings_data' as const;
-const SUPPORTED_ARCHIVE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3];
+const SUPPORTED_ARCHIVE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4];
 
 type ImportExportSource = 'archive' | 'dac_csv' | 'organized_csv' | 'bulk_photos';
 export type ImportExportStatus = 'success' | 'partial' | 'failed';
@@ -35,6 +35,7 @@ type ImportExportExceptionOperation =
   | 'preview_dac_csv'
   | 'read_archive_manifest'
   | 'restore_coloring_color_reference'
+  | 'restore_coloring_color_key'
   | 'restore_coloring_page_metadata';
 
 type AnalyticsEventName = (typeof AnalyticsEvent)[keyof typeof AnalyticsEvent];

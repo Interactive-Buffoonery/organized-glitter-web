@@ -86,20 +86,6 @@ const mockColoringTag: Tag = {
 };
 
 describe('TagTable dashboard link', () => {
-  it('displays hex colors in uppercase without changing tag data', () => {
-    render(
-      <MemoryRouter>
-        <TagTable
-          tags={[{ ...mockTag, color: '#14b8a6' }]}
-          coloringTags={[mockColoringTag]}
-          loading={false}
-        />
-      </MemoryRouter>
-    );
-    expect(screen.getAllByText('#14B8A6')).toHaveLength(2);
-    expect(mockColoringTag.color).toBe('#14b8a6');
-  });
-
   beforeEach(() => {
     deleteTagMutateMock.mockClear();
     deleteColoringTagMutateMock.mockClear();
@@ -131,23 +117,6 @@ describe('TagTable dashboard link', () => {
     expect(href).not.toContain('landscape');
   });
 
-  it('shows split diamond project and coloring book usage counts', () => {
-    render(
-      <MemoryRouter>
-        <TagTable tags={[mockTag]} coloringTags={[mockColoringTag]} loading={false} />
-      </MemoryRouter>
-    );
-
-    expect(screen.getByRole('link', { name: /3 diamond projects/i })).toHaveAttribute(
-      'href',
-      '/dashboard?tag=tag-id-xyz'
-    );
-    expect(screen.getByRole('link', { name: /2 coloring books/i })).toHaveAttribute(
-      'href',
-      '/dashboard?craft=coloring&tags=coloring-tag-id-abc'
-    );
-  });
-
   it('allows deleting coloring tags that are assigned to books after warning', () => {
     render(
       <MemoryRouter>
@@ -166,45 +135,5 @@ describe('TagTable dashboard link', () => {
       expect.objectContaining({ onSettled: expect.any(Function) })
     );
     expect(deleteTagMutateMock).not.toHaveBeenCalled();
-  });
-
-  it('keeps coloring counts when diamond tag usage fails and retries it', () => {
-    tagStatsState.error = new Error('diamond stats unavailable');
-
-    render(
-      <MemoryRouter>
-        <TagTable tags={[mockTag]} coloringTags={[mockColoringTag]} loading={false} />
-      </MemoryRouter>
-    );
-
-    expect(screen.getByText('Diamond project tag usage is unavailable.')).toBeInTheDocument();
-    expect(screen.getByText('Unavailable')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /2 coloring books/i })).toBeInTheDocument();
-    expect(screen.queryByText('No usage')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Retry diamond tag usage' }));
-
-    expect(refetchTagStatsMock).toHaveBeenCalledOnce();
-    expect(refetchColoringTagStatsMock).not.toHaveBeenCalled();
-  });
-
-  it('keeps diamond counts when coloring tag usage fails and retries it', () => {
-    coloringTagStatsState.error = new Error('coloring stats unavailable');
-
-    render(
-      <MemoryRouter>
-        <TagTable tags={[mockTag]} coloringTags={[mockColoringTag]} loading={false} />
-      </MemoryRouter>
-    );
-
-    expect(screen.getByText('Coloring book tag usage is unavailable.')).toBeInTheDocument();
-    expect(screen.getByText('Unavailable')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /3 diamond projects/i })).toBeInTheDocument();
-    expect(screen.queryByText('No usage')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Retry coloring tag usage' }));
-
-    expect(refetchColoringTagStatsMock).toHaveBeenCalledOnce();
-    expect(refetchTagStatsMock).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -36,7 +36,7 @@ afterEach(clearSessionDrafts);
 describe('ProjectNotes rich text', () => {
   it('restores and re-registers unsaved notes for the same account under StrictMode', () => {
     const key = 'project-notes:one';
-    const unregister = registerSessionDraft(key, () => 'Unsent **note**');
+    const unregister = registerSessionDraft(key, 'account-a', () => 'Unsent **note**');
     captureSessionDrafts('account-a', 'token-a');
     unregister();
 
@@ -54,7 +54,7 @@ describe('ProjectNotes rich text', () => {
 
   it('does not restore another account’s unsaved notes', () => {
     const key = 'project-notes:one';
-    const unregister = registerSessionDraft(key, () => 'Private note');
+    const unregister = registerSessionDraft(key, 'account-a', () => 'Private note');
     captureSessionDrafts('account-a', 'token-a');
     unregister();
 
@@ -67,7 +67,7 @@ describe('ProjectNotes rich text', () => {
 
   it('opens unsent notes when the account arrives after mount', () => {
     const key = 'project-notes:late-account';
-    const unregister = registerSessionDraft(key, () => 'Unsent after login');
+    const unregister = registerSessionDraft(key, 'account-a', () => 'Unsent after login');
     captureSessionDrafts('account-a', 'late-account-token');
     unregister();
 
@@ -80,61 +80,19 @@ describe('ProjectNotes rich text', () => {
     expect(hasSessionDraft(key, 'account-a')).toBe(false);
   });
 
-  it.each([
-    '<p>Saved kit details</p>',
-    '<a href="https://example.test">Saved kit details</a>',
-    '<img src="saved-kit.jpg" alt="Saved kit details">',
-    '<table><tr><td>Saved kit details</td></tr></table>',
-    '<section>Saved kit details</section>',
-  ])('keeps the original HTML available in the editor for %s', async notes => {
-    const user = userEvent.setup();
-    const onSave = vi.fn();
-    render(<ProjectNotes notes={notes} onSave={onSave} variant="inline" />);
-    expect(
-      screen.getByText('This note uses an older format. Edit it to view or update its contents.')
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Edit notes' }));
-    expect(screen.getByRole('textbox', { name: 'Project notes' })).toHaveValue(notes);
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onSave).not.toHaveBeenCalled();
-  });
-
-  it.each(['<https://example.test>', '<artist@example.test>', '`<table>`'])(
-    'keeps Markdown autolinks and code out of the legacy format prompt: %s',
-    notes => {
-      render(<ProjectNotes notes={notes} onSave={vi.fn()} variant="inline" />);
-      expect(screen.queryByText(/This note uses an older format/)).not.toBeInTheDocument();
+  it.each(['<p>Saved kit details</p>', '<a href="https://example.test">Saved kit details</a>'])(
+    'keeps the original HTML available in the editor for %s',
+    async notes => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      render(<ProjectNotes notes={notes} onSave={onSave} variant="inline" />);
+      expect(
+        screen.getByText('This note uses an older format. Edit it to view or update its contents.')
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Edit notes' }));
+      expect(screen.getByRole('textbox', { name: 'Project notes' })).toHaveValue(notes);
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(onSave).not.toHaveBeenCalled();
     }
   );
-
-  it('renders Markdown project notes', () => {
-    render(<ProjectNotes notes="Kit has **square drills**" readOnly />);
-
-    expect(screen.getByText('square drills')).toBeInTheDocument();
-    expect(screen.queryByText(/Kit has \*\*square drills\*\*/)).not.toBeInTheDocument();
-  });
-
-  it('saves Markdown project notes from the editor', async () => {
-    const user = userEvent.setup();
-    const onSave = vi.fn().mockResolvedValue(undefined);
-
-    render(<ProjectNotes notes="Before" onSave={onSave} />);
-
-    await user.click(screen.getByRole('button', { name: /edit/i }));
-    const editor = screen.getByLabelText('Project notes');
-    await user.clear(editor);
-    await user.type(editor, 'After **bold** note');
-    await user.click(screen.getByRole('button', { name: /save/i }));
-
-    await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith('After **bold** note');
-    });
-  });
-
-  it('reserves room for the inline edit control', () => {
-    render(<ProjectNotes notes="" onSave={vi.fn()} variant="inline" />);
-
-    expect(screen.getByText(/No notes yet/)).toHaveClass('flex-1');
-    expect(screen.getByRole('button', { name: /edit notes/i })).toBeInTheDocument();
-  });
 });

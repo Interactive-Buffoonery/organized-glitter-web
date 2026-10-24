@@ -19,8 +19,18 @@
 - `sessionRecovery.ts`: invalid-session signals and temporary, account-bound form
   drafts held in memory for the current tab.
 - `sessionDraftKeys.ts`: shared keys for forms that participate in session recovery.
+- `sessionIdentity.ts`: shared app-facing capture and comparison of session identities.
+- `sessionEpoch.ts`: live cross-tab session epochs and auth-store transition barriers.
 
 ## Expired web sessions
+
+Requests and mutation continuations capture an account and session epoch before
+starting work. Same-account token refresh preserves the epoch. Sign-out and
+account changes retire it before the auth store writes its new state, so delayed
+responses cannot publish into a newer session, even before storage events arrive.
+Updated tabs share the epoch through local storage. Unavailable storage or an
+interrupted transition fails closed until a subsequent auth mutation establishes
+a usable epoch.
 
 `AuthProvider` checks the token when the tab becomes visible and every minute
 while it is visible. It refreshes tokens within two minutes of expiry. A failed

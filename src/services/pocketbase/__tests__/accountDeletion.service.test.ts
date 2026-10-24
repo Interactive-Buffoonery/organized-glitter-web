@@ -1,233 +1,260 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AccountDeletionService } from '../accountDeletion.service';
 
-const pbMock = vi.hoisted(() => {
-  type CollectionMethods = {
-    getList: ReturnType<typeof vi.fn>;
-    create: ReturnType<typeof vi.fn>;
-    delete: ReturnType<typeof vi.fn>;
-  };
-
-  const createListResult = (totalItems = 0) => ({
-    page: 1,
-    perPage: 1,
-    totalItems,
-    totalPages: totalItems > 0 ? 1 : 0,
-    items: totalItems > 0 ? [{ id: 'record-1' }] : [],
-  });
-
-  const collections: Record<string, CollectionMethods> = {};
-
-  const createMethods = (): CollectionMethods => ({
-    getList: vi.fn().mockResolvedValue(createListResult()),
-    create: vi.fn().mockResolvedValue({ id: 'audit-1' }),
-    delete: vi.fn().mockResolvedValue(true),
-  });
-
-  const methods = (collection: string): CollectionMethods => {
-    collections[collection] ??= createMethods();
-    return collections[collection];
-  };
-
-  return {
-    pb: {
-      collection: vi.fn((collection: string) => methods(collection)),
-      filter: vi.fn((expr: string) => expr),
-      authStore: {
-        record: null as Record<string, unknown> | null,
+const mocks = vi.hoisted(() => ({
+  store: {
+    create: vi.fn(),
+    update: vi.fn(),
+    get: vi.fn(),
+    markSubmitted: vi.fn(),
+    cancelPrepared: vi.fn(),
+  },
+  identity: { accountId: 'account-a', generation: 1, epoch: 'epoch-a' },
+  current: true,
+  token: 'test-session',
+  stop: vi.fn(),
+  arm: vi.fn(),
+  release: vi.fn(),
+  resume: vi.fn(),
+  cancel: vi.fn(),
+}));
+vi.mock('@/services/accountDeletion/intentStore', () => ({ deletionIntents: mocks.store }));
+vi.mock('@/services/auth/sessionIdentity', () => ({
+  captureSessionIdentity: () => mocks.identity,
+  isCurrentSessionIdentity: () => mocks.current,
+}));
+vi.mock('@/lib/pocketbase', () => ({
+  pb: {
+    authStore: {
+      record: { id: 'account-a' },
+      get token() {
+        return mocks.token;
       },
     },
-    collections,
-    createListResult,
-    methods,
-    reset: () => {
-      for (const collection of Object.keys(collections)) {
-        delete collections[collection];
-      }
-      pbMock.pb.collection.mockClear();
-      pbMock.pb.filter.mockClear();
-      pbMock.pb.authStore.record = null;
-    },
-  };
-});
-
-const authMock = vi.hoisted(() => ({
-  isAuthenticated: vi.fn(() => true),
-  getCurrentUserId: vi.fn(() => 'user12345678901'),
+  },
 }));
-
-vi.mock('@/lib/pocketbase', () => ({ pb: pbMock.pb }));
-vi.mock('@/services/auth', () => authMock);
-vi.mock('@/utils/logger', () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  }),
+vi.mock('@/lib/pocketbaseConfig', () => ({ POCKETBASE_URL: 'http://localhost:8090' }));
+vi.mock('@/services/accountDeletion/analytics', () => ({
+  suspendDeletionAnalytics: mocks.stop,
+  armDeletionTransportFence: mocks.arm,
+  releaseDeletionTransportFence: mocks.release,
+  resumeDeletionAnalytics: mocks.resume,
 }));
+vi.mock('@/services/analytics-preference', () => ({ syncAnalyticsConsent: vi.fn() }));
+vi.mock('@/lib/queryClient', () => ({ queryClient: { cancelQueries: mocks.cancel } }));
 
-import { ACCOUNT_DELETION_PLAN, AccountDeletionService } from '../accountDeletion.service';
-import { Collections } from '@/types/pocketbase.types';
-import type { PocketBaseUser } from '@/contexts/AuthContext';
-
-const user: PocketBaseUser = {
-  id: 'user12345678901',
-  email: 'sarah@example.test',
-  username: 'sarah',
-  created: '2026-01-01T00:00:00.000Z',
-  updated: '2026-01-01T00:00:00.000Z',
-};
-
-const serviceError = (type: string, message: string, status?: number) => ({
-  type,
-  message,
-  status,
-  retryable: false,
+const proof = () => ({
+  action: 'delete_account' as const,
+  accountId: 'account-a',
+  value: 'x'.repeat(43),
+  identity: mocks.identity,
+  expiresAt: Date.now() + 300_000,
 });
+const intent = () => ({
+  version: 1 as const,
+  backendUrl: 'http://localhost:8090',
+  accountId: 'account-a',
+  proof: 'x'.repeat(43),
+  phase: 'pending' as const,
+  cleanup: 'pending' as const,
+  localCleanupDone: false,
+  dispatch: 'submitted' as const,
+});
+const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
-describe('AccountDeletionService', () => {
+describe('guarded account deletion', () => {
   beforeEach(() => {
-    pbMock.reset();
-    authMock.isAuthenticated.mockReturnValue(true);
-    authMock.getCurrentUserId.mockReturnValue(user.id);
-  });
-
-  it('creates an audit request before deleting the user record', async () => {
-    pbMock.methods(Collections.Projects).getList.mockResolvedValue(pbMock.createListResult(2));
-
-    await expect(
-      AccountDeletionService.deleteAccount({ user, notes: '  Leaving feedback  ' })
-    ).resolves.toEqual({ status: 'deleted' });
-
-    const auditCreate = pbMock.methods(Collections.AccountDeletions).create;
-    const userDelete = pbMock.methods(Collections.Users).delete;
-
-    expect(auditCreate).toHaveBeenCalledWith({
-      user_id: user.id,
-      user_email: user.email,
-      signup_method: 'unknown',
-      notes: 'Leaving feedback',
-      usage_snapshot: expect.objectContaining({
-        version: 1,
-        requestedAt: expect.any(String),
-        counts: expect.objectContaining({
-          [Collections.Projects]: 2,
-        }),
-        snapshotErrors: [],
-      }),
-    });
-    expect(auditCreate.mock.invocationCallOrder[0]).toBeLessThan(
-      userDelete.mock.invocationCallOrder[0]
+    vi.clearAllMocks();
+    mocks.current = true;
+    mocks.token = 'test-session';
+    mocks.arm.mockReturnValue('fence-a');
+    mocks.store.create.mockImplementation(async value => value);
+    mocks.store.update.mockImplementation(async value => value);
+    mocks.store.markSubmitted.mockImplementation(async value => ({
+      ...value,
+      dispatch: 'submitted',
+    }));
+    mocks.store.cancelPrepared.mockResolvedValue(true);
+    mocks.store.get.mockResolvedValue(intent());
+    mocks.cancel.mockResolvedValue(undefined);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(response({ status: 'deleted', cleanup: 'pending' }))
     );
-    expect(userDelete).toHaveBeenCalledWith(user.id);
   });
 
-  it('captures signup_method from the current auth record when available', async () => {
-    pbMock.pb.authStore.record = {
-      id: user.id,
-      signup_method: 'google',
-    };
-
-    await AccountDeletionService.deleteAccount({ user });
-
-    expect(pbMock.methods(Collections.AccountDeletions).create).toHaveBeenCalledWith(
+  it('commits intent before exactly one guarded POST with only the wire contract', async () => {
+    await expect(AccountDeletionService.deleteAccount(proof())).resolves.toMatchObject({
+      phase: 'deleted',
+      cleanup: 'pending',
+    });
+    expect(mocks.store.create).toHaveBeenCalledOnce();
+    expect(mocks.store.create.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(fetch).mock.invocationCallOrder[0]
+    );
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(
+      'http://localhost:8090/api/account/delete',
       expect.objectContaining({
-        signup_method: 'google',
+        method: 'POST',
+        body: JSON.stringify({ proof: 'x'.repeat(43), confirmed: true }),
+        headers: expect.objectContaining({ Authorization: 'Bearer test-session' }),
       })
     );
   });
 
-  it('does not manually delete child collections', async () => {
-    await AccountDeletionService.deleteAccount({ user });
+  it('does not send when durable storage is unavailable', async () => {
+    mocks.store.create.mockRejectedValue(new Error('quota'));
+    await expect(AccountDeletionService.deleteAccount(proof())).rejects.toMatchObject({
+      reason: 'storage',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
 
-    const childDeletes = Object.entries(pbMock.collections).filter(
-      ([collection, methods]) =>
-        collection !== Collections.Users && methods.delete.mock.calls.length
+  it('does not replace an intent already admitted by another tab', async () => {
+    mocks.store.create.mockResolvedValue({ ...intent(), proof: 'y'.repeat(43) });
+    await expect(AccountDeletionService.deleteAccount(proof())).rejects.toMatchObject({
+      reason: 'pending',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['persistence', 'query cancellation'])('fences the session after %s', async boundary => {
+    (boundary === 'persistence' ? mocks.store.create : mocks.cancel).mockImplementation(
+      async value => {
+        mocks.current = false;
+        return value;
+      }
     );
-
-    expect(childDeletes).toEqual([]);
-    expect(pbMock.methods(Collections.Users).delete).toHaveBeenCalledWith(user.id);
-  });
-
-  it('records snapshot count failures without blocking deletion', async () => {
-    pbMock
-      .methods(Collections.ColoringPages)
-      .getList.mockRejectedValue(serviceError('network', 'Stats unavailable'));
-
-    await expect(AccountDeletionService.deleteAccount({ user })).resolves.toEqual({
-      status: 'deleted',
+    await expect(AccountDeletionService.deleteAccount(proof())).rejects.toMatchObject({
+      reason: 'account_changed',
     });
-
-    const auditPayload = pbMock.methods(Collections.AccountDeletions).create.mock.calls[0][0];
-    expect(auditPayload.usage_snapshot.snapshotErrors).toEqual(
-      expect.arrayContaining([
-        {
-          collection: Collections.ColoringPages,
-          message: 'Stats unavailable',
-        },
-      ])
-    );
-    expect(pbMock.methods(Collections.Users).delete).toHaveBeenCalledWith(user.id);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.store.cancelPrepared).toHaveBeenCalledOnce();
   });
 
-  it('aborts user deletion when the audit request cannot be created', async () => {
-    pbMock
-      .methods(Collections.AccountDeletions)
-      .create.mockRejectedValue(serviceError('validation', 'Audit invalid', 400));
-
-    await expect(AccountDeletionService.deleteAccount({ user })).rejects.toMatchObject({
-      type: 'validation',
-      message: 'Audit invalid',
+  it('keeps a submitted receipt uncertain if the fetch fails before a response', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('network'));
+    await expect(AccountDeletionService.deleteAccount(proof())).rejects.toMatchObject({
+      reason: 'uncertain',
     });
-    expect(pbMock.methods(Collections.Users).delete).not.toHaveBeenCalled();
+    expect(mocks.store.markSubmitted).toHaveBeenCalledOnce();
+    expect(mocks.store.cancelPrepared).not.toHaveBeenCalled();
   });
-
-  it('returns already_deleted when the current user record is gone after audit capture', async () => {
-    pbMock
-      .methods(Collections.Users)
-      .delete.mockRejectedValue(serviceError('not_found', 'Missing user', 404));
-
-    await expect(AccountDeletionService.deleteAccount({ user })).resolves.toEqual({
-      status: 'already_deleted',
-    });
-  });
-
-  it('throws a stage-aware error when user deletion fails after audit capture', async () => {
-    pbMock
-      .methods(Collections.Users)
-      .delete.mockRejectedValue(serviceError('permission', 'Not allowed', 403));
-
-    await expect(AccountDeletionService.deleteAccount({ user })).rejects.toMatchObject({
-      type: 'permission',
-      message:
-        'Your deletion request was captured, but account removal could not finish. Please contact support.',
-      status: 403,
-      details: {
-        stage: 'user_delete',
-        auditCaptured: true,
-      },
-    });
-  });
-
-  it('keeps the documented cascade plan aligned with the PocketBase schema', () => {
-    const schema = JSON.parse(
-      readFileSync(resolve(process.cwd(), 'docs/pocketbase/collections.schema.json'), 'utf8')
-    ) as Array<{
-      name: string;
-      fields: Array<{ name: string; type: string; cascadeDelete?: boolean }>;
-    }>;
-
-    for (const entry of ACCOUNT_DELETION_PLAN.cascadeCollections) {
-      const collection = schema.find(item => item.name === entry.collection);
-      const relation = collection?.fields.find(
-        field => field.type === 'relation' && field.name === entry.relation
+  it('bounds a deletion fetch that never returns without replaying it', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
+      const pending = AccountDeletionService.deleteAccount(proof()).then(
+        () => undefined,
+        error => error
       );
-
-      expect(relation, `${entry.collection}.${entry.relation}`).toMatchObject({
-        cascadeDelete: true,
-      });
+      await vi.advanceTimersByTimeAsync(30_000);
+      await expect(pending).resolves.toMatchObject({ reason: 'uncertain' });
+      expect(fetch).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
     }
+  });
+
+  it('rejects stale fresh authorization before persisting or sending', async () => {
+    await expect(
+      AccountDeletionService.deleteAccount({ ...proof(), expiresAt: Date.now() - 1 })
+    ).rejects.toMatchObject({ reason: 'verification' });
+    expect(mocks.store.create).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([401, 403, 500])(
+    'retains uncertain intent after HTTP %i and never refreshes or replays',
+    async status => {
+      vi.mocked(fetch).mockResolvedValue(response({ message: 'rejected' }, status));
+      await expect(AccountDeletionService.deleteAccount(proof())).rejects.toMatchObject({
+        reason: 'uncertain',
+      });
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(mocks.store.update).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    {},
+    { status: 'deleted' },
+    { status: 'deleted', cleanup: 'unknown' },
+    { status: 'already_deleted', cleanup: 'completed' },
+  ])('treats malformed success as uncertain', async body => {
+    vi.mocked(fetch).mockResolvedValue(response(body));
+    await expect(AccountDeletionService.retry(intent())).rejects.toMatchObject({
+      reason: 'uncertain',
+    });
+    expect(mocks.store.update).not.toHaveBeenCalled();
+  });
+
+  it('recovers the same proof without the current session or its expired token', async () => {
+    mocks.current = false;
+    mocks.token = 'another-account-session';
+    await AccountDeletionService.retry(intent());
+    const options = vi.mocked(fetch).mock.calls[0][1]!;
+    expect(new Headers(options.headers).has('Authorization')).toBe(false);
+    expect(options.credentials).toBe('omit');
+    expect(options.body).toBe(JSON.stringify({ proof: intent().proof, confirmed: true }));
+  });
+
+  it('retains pending intent on lost response', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('network'));
+    await expect(AccountDeletionService.retry(intent())).rejects.toMatchObject({
+      reason: 'uncertain',
+    });
+    expect(mocks.store.update).not.toHaveBeenCalled();
+  });
+  it('sends one user-initiated authenticated same-proof retry after fresh verification', async () => {
+    await AccountDeletionService.retryAuthenticated(intent(), proof(), true);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(new Headers(vi.mocked(fetch).mock.calls[0][1]!.headers).get('Authorization')).toBe(
+      'Bearer test-session'
+    );
+    await expect(
+      AccountDeletionService.retryAuthenticated(
+        intent(),
+        {
+          ...proof(),
+          value: 'y'.repeat(43),
+        },
+        true
+      )
+    ).rejects.toMatchObject({ reason: 'verification' });
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it('requires a distinct recovery confirmation at the authenticated send boundary', async () => {
+    await expect(
+      AccountDeletionService.retryAuthenticated(intent(), proof(), false)
+    ).rejects.toMatchObject({
+      reason: 'verification',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a known expired original session before authenticated retry', async () => {
+    mocks.token = `header.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 1 }))}.signature`;
+    await expect(
+      AccountDeletionService.retryAuthenticated(intent(), proof(), true)
+    ).rejects.toMatchObject({
+      reason: 'verification',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('saves confirmed deletion independently from a changed interactive session', async () => {
+    vi.mocked(fetch).mockImplementation(async () => {
+      mocks.current = false;
+      return response({ status: 'deleted', cleanup: 'completed' });
+    });
+    await expect(AccountDeletionService.deleteAccount(proof())).resolves.toMatchObject({
+      phase: 'deleted',
+      cleanup: 'completed',
+    });
+    expect(mocks.store.update).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'account-a', phase: 'deleted' })
+    );
   });
 });

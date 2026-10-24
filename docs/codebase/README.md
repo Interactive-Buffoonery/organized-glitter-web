@@ -22,6 +22,10 @@ Orientation for humans and agents before touching unfamiliar areas. Commands and
 
 ### Web session recovery
 
+[`sessionIdentity.ts`](../../src/services/auth/sessionIdentity.ts) exposes session
+capture and comparison backed by the live cross-tab epoch and auth-write barrier
+in [`sessionEpoch.ts`](../../src/services/auth/sessionEpoch.ts).
+
 [`src/contexts/AuthContext/AuthContext.tsx`](../../src/contexts/AuthContext/AuthContext.tsx)
 owns token refresh, invalid-session cleanup, and auth state. The PocketBase
 request boundary in [`src/lib/pocketbase.ts`](../../src/lib/pocketbase.ts)
@@ -75,13 +79,7 @@ at fire time a ready root no-ops and an unmarked root shows `#app-error`.
 `handleFatalError` still sets `data-app-ready` before dispatching `app-loaded`.
 Splash dismiss via `app-loaded` does not complete the failsafe.
 
-The coverage test in `src/pages/__tests__/appReadyCoverage.test.ts` parses TSX
-syntax to check readiness calls in gates and fallbacks. Comments, literal text,
-and JSX text cannot hide a call or count as one; template interpolation calls
-remain visible. It also asserts that no caller uses a bang-gated
-`useAppReady(!...)`. When adding a new interactive page, add it to the test's
-bare-`useAppReady()` list. Login, Register, and splash-only gates have their
-own assertions. The loading shell, retry, error display, and the `app-loaded`
+The loading shell, retry, error display, and the `app-loaded`
 listener stay in `public/js/loading.js` so recovery still works if the main
 bundle fails. Production Vite HTML injects `/assets/*.js` into `<head>`. Source
 `index.html` used to keep `/js/loading.js` at the end of `<body>`, so React

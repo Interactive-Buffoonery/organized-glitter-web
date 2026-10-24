@@ -1,7 +1,10 @@
-import { ClientResponseError } from 'pocketbase';
+import PocketBase, { BaseAuthStore, ClientResponseError } from 'pocketbase';
 import { pb } from '@/lib/pocketbase';
 import type { PocketBaseUser } from '@/contexts/AuthContext';
 import { ErrorHandler } from '@/services/pocketbase/base/ErrorHandler';
+import { captureSessionIdentity, isCurrentSessionIdentity } from './sessionIdentity';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
+import { POCKETBASE_URL } from '@/lib/pocketbaseConfig';
 import type { AuthResult, LoginData, RegisterData } from './types';
 import {
   authLogger,
@@ -37,6 +40,7 @@ const isEmailVerificationRequired = ({
 };
 
 export const loginWithPassword = async (data: LoginData): Promise<AuthResult> => {
+  const initiatingSession = captureSessionIdentity();
   const normalizedEmail = normalizeEmail(data.email);
 
   authLogger.debug('Starting password login');
@@ -70,20 +74,42 @@ export const loginWithPassword = async (data: LoginData): Promise<AuthResult> =>
     authLogger.warn('Proceeding with password login despite a connectivity warning');
   }
 
+  if (!isCurrentSessionIdentity(initiatingSession)) {
+    authLogger.warn('Skipping password login because the session changed');
+    return {
+      success: false,
+      error: 'Your session changed. Please try signing in again.',
+    };
+  }
+
+  let client: PocketBase | undefined;
   try {
     authLogger.debug('Attempting password authentication');
-
-    const authData = await pb.collection('users').authWithPassword(normalizedEmail, data.password);
+    client = new PocketBase(pb.baseURL, new BaseAuthStore());
+    const authData = await client
+      .collection('users')
+      .authWithPassword(normalizedEmail, data.password);
 
     authLogger.debug('Password authentication completed');
 
-    const userRecord = authData.record as PocketBaseUser;
+    const userRecord = authData.record as unknown as PocketBaseUser;
 
     if (isEmailVerificationRequired({ record: userRecord })) {
       authLogger.warn('Password login requires email verification');
-      pb.authStore.clear();
       return emailVerificationRequired(normalizedEmail);
     }
+
+    const applied = await deletionIntents.applyAuthIfClear(
+      POCKETBASE_URL,
+      authData.record.id,
+      () => {
+        if (!isCurrentSessionIdentity(initiatingSession)) return false;
+        pb.authStore.save(authData.token, authData.record);
+        return true;
+      }
+    );
+    if (!applied)
+      return { success: false, error: 'Your session changed. Please try signing in again.' };
 
     authLogger.debug('Password login allowed');
 
@@ -94,7 +120,6 @@ export const loginWithPassword = async (data: LoginData): Promise<AuthResult> =>
   } catch (error) {
     if (isEmailVerificationRequired({ error })) {
       authLogger.warn('Password login requires email verification');
-      pb.authStore.clear();
       return emailVerificationRequired(normalizedEmail);
     }
 
@@ -128,6 +153,8 @@ export const loginWithPassword = async (data: LoginData): Promise<AuthResult> =>
       success: false,
       error: errorMessage,
     };
+  } finally {
+    client?.authStore.clear();
   }
 };
 

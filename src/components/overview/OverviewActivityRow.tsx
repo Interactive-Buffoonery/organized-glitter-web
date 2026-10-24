@@ -21,7 +21,6 @@ export function OverviewActivityRow({ item }: OverviewActivityRowProps) {
     <li className="border-border/60 border-b last:border-b-0">
       <Link
         to={item.href}
-        aria-label={`Open ${item.title}`}
         className="group hover:bg-background/35 focus-visible:ring-ring/50 grid gap-3 py-4 transition-colors duration-300 focus-visible:ring-[3px] focus-visible:outline-none sm:grid-cols-[minmax(0,1fr)_11rem_11rem_8rem] sm:items-center sm:gap-4 sm:px-2"
       >
         <span className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[4rem_minmax(0,1fr)] sm:gap-4">

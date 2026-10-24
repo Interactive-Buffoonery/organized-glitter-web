@@ -545,3 +545,132 @@ routerAdd(
   },
   $apis.requireAuth('users')
 );
+
+routerAdd(
+  'POST',
+  '/api/archive/restore-color-keys',
+  e => {
+    if (!e.auth.getBool('verified')) throw new ForbiddenError('Email verification is required.');
+    const body = e.requestInfo().body;
+    if (
+      typeof body.archiveFingerprint !== 'string' ||
+      !body.archiveFingerprint ||
+      body.archiveFingerprint.length > 255 ||
+      typeof body.pageId !== 'string' ||
+      typeof body.pageRef !== 'string' ||
+      !/^coloring-page:[a-z0-9][a-z0-9:._-]*$/.test(body.pageRef) ||
+      body.pageRef.length > 220 ||
+      !Array.isArray(body.keys) ||
+      !body.keys.length ||
+      body.keys.length > 500
+    ) {
+      throw new BadRequestError('Invalid archive color keys request.');
+    }
+    const refs = new Set();
+    for (const key of body.keys) {
+      if (
+        !key ||
+        typeof key !== 'object' ||
+        Array.isArray(key) ||
+        typeof key.ref !== 'string' ||
+        key.ref.length > 255 ||
+        !/^coloring-color-key:[a-z0-9][a-z0-9:._-]*$/.test(key.ref) ||
+        refs.has(key.ref)
+      )
+        throw new BadRequestError('Invalid or duplicate archive color key.');
+      refs.add(key.ref);
+    }
+    const authId = e.auth.id;
+    const backupId = $security.sha256('legacy-color-keys:' + body.archiveFingerprint);
+    const itemId = 'coloring-color-key:page:' + body.pageRef;
+    const digest = $security.sha256(
+      JSON.stringify({
+        pageId: body.pageId,
+        keys: body.keys.map(key =>
+          Object.keys(key)
+            .sort()
+            .map(field => [field, key[field]])
+        ),
+      })
+    );
+    const conflict = () =>
+      new ApiError(
+        409,
+        'These color keys conflict with an earlier restore. Export again to restore them.'
+      );
+    const keyId = ref => $security.sha256(authId + '\0' + backupId + '\0' + ref).slice(0, 15);
+    const context = new Context(e.request.context(), 'organized_glitter_archive_restore', true);
+    let result;
+    e.app.runInTransaction(app => {
+      const page = app.findRecordById('coloring_pages', body.pageId);
+      const book = app.findRecordById('coloring_books', page.getString('book'));
+      if (book.getString('user') !== authId) throw new ForbiddenError();
+      const receipts = app.findRecordsByFilter(
+        'archive_restore_items',
+        'user = {:user} && backup_id = {:backup} && item_id = {:item}',
+        '',
+        1,
+        0,
+        { user: authId, backup: backupId, item: itemId }
+      );
+      if (receipts.length && receipts[0].getString('item_digest') !== digest) throw conflict();
+      if (receipts.length) {
+        const existing = app.findRecordsByIds(
+          'coloring_page_color_keys',
+          body.keys.map(key => keyId(key.ref))
+        );
+        const ownedIds = new Set(
+          existing
+            .filter(row => row.getString('user') === authId && row.getString('page') === page.id)
+            .map(row => row.id)
+        );
+        result = {
+          outcome: 'already_applied',
+          refMap: Object.fromEntries(
+            body.keys
+              .filter(key => ownedIds.has(keyId(key.ref)))
+              .map(key => [key.ref, keyId(key.ref)])
+          ),
+        };
+        return;
+      }
+      const existing = app.findRecordsByFilter(
+        'coloring_page_color_keys',
+        'page = {:page}',
+        '',
+        1,
+        0,
+        { page: page.id }
+      );
+      if (existing.length) {
+        result = { outcome: 'skipped', refMap: {} };
+        return;
+      }
+      const refMap = {};
+      const collection = app.findCollectionByNameOrId('coloring_page_color_keys');
+      for (const key of body.keys) {
+        const metadata = { ...key };
+        delete metadata.ref;
+        const record = new Record(collection);
+        record.set('id', keyId(key.ref));
+        record.set('user', authId);
+        record.set('page', page.id);
+        require(`${__hooks}/archive_color_keys.js`).saveKey(app, record, metadata, context);
+        refMap[key.ref] = record.id;
+      }
+      const receipt = new Record(app.findCollectionByNameOrId('archive_restore_items'));
+      receipt.set('user', authId);
+      receipt.set('backup_id', backupId);
+      receipt.set('item_id', itemId);
+      receipt.set('item_kind', 'coloring-color-key');
+      receipt.set('item_digest', digest);
+      receipt.set('state', 'complete');
+      receipt.set('target_collection', 'coloring_pages');
+      receipt.set('target_record_id', page.id);
+      app.save(receipt);
+      result = { outcome: 'created', refMap };
+    });
+    return e.json(200, result);
+  },
+  $apis.requireAuth('users')
+);

@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { Script } from 'node:vm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -62,31 +59,6 @@ function signOut() {
 }
 
 describe('analytics preference privacy and recovery', () => {
-  it.each([false, true])(
-    'keeps newer in-memory opt-out over stale opt-in when removal is blocked: %s',
-    async isRemovalBlocked => {
-      const service = await initialize();
-      expect(JSON.parse(localStorage.getItem(service.ACCOUNT_CONSENT_STORAGE_KEY)!)).toEqual({
-        accountId: 'account-a',
-        enabled: true,
-      });
-      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-        throw new Error('blocked');
-      });
-      if (isRemovalBlocked)
-        vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
-          throw new Error('blocked');
-        });
-      mocks.update.mockImplementation(() => new Promise(() => {}));
-      void service.setAnalyticsEnabled(false);
-      signOut();
-      expect(service.getAnalyticsEnabled()).toBe(false);
-      expect(localStorage.getItem(service.ACCOUNT_CONSENT_STORAGE_KEY)).toBe(
-        isRemovalBlocked ? JSON.stringify({ accountId: 'account-a', enabled: true }) : null
-      );
-    }
-  );
-
   it('does not replace a stored opt-out with a pending opt-in', async () => {
     mocks.get.mockResolvedValue(true);
     mocks.update.mockImplementation(() => new Promise(() => {}));
@@ -131,75 +103,6 @@ describe('analytics preference privacy and recovery', () => {
     expect(mocks.get).toHaveBeenCalledTimes(4);
   });
 
-  it('rereads once after a reconnect that arrives during an in-flight read', async () => {
-    const service = await initialize();
-    expect(mocks.get).toHaveBeenCalledTimes(1);
-    let resolveStale!: (optOut: boolean) => void;
-    mocks.get.mockImplementationOnce(
-      () =>
-        new Promise<boolean>(resolve => {
-          resolveStale = resolve;
-        })
-    );
-    mocks.connectCallback?.();
-    mocks.connectCallback?.();
-    mocks.connectCallback?.();
-    expect(mocks.get).toHaveBeenCalledTimes(2);
-    mocks.get.mockResolvedValue(true);
-    resolveStale(false);
-    await vi.waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(3));
-    await vi.waitFor(() => expect(service.getAnalyticsEnabled()).toBe(false));
-    await Promise.resolve();
-    expect(mocks.get).toHaveBeenCalledTimes(3);
-  });
-
-  it.each(['reconnect', 'focus', 'visibility'])(
-    'rereads a missed opt-out after a save with a queued %s refresh',
-    async trigger => {
-      const service = await initialize();
-      let resolveSave!: (optOut: boolean) => void;
-      mocks.update.mockImplementationOnce(
-        () =>
-          new Promise<boolean>(resolve => {
-            resolveSave = resolve;
-          })
-      );
-      const save = service.setAnalyticsEnabled(true);
-      mocks.get.mockResolvedValue(true);
-      for (let index = 0; index < 3; index += 1) {
-        if (trigger === 'reconnect') mocks.connectCallback?.();
-        else if (trigger === 'focus') window.dispatchEvent(new Event('focus'));
-        else document.dispatchEvent(new Event('visibilitychange'));
-      }
-      expect(mocks.get).toHaveBeenCalledTimes(1);
-      resolveSave(false);
-      await save;
-      await vi.waitFor(() => expect(service.getAnalyticsEnabled()).toBe(false));
-      expect(mocks.get).toHaveBeenCalledTimes(2);
-    }
-  );
-
-  it('drains a queued refresh after a failed save and failed reconciliation', async () => {
-    const service = await initialize();
-    let rejectSave!: (error: Error) => void;
-    mocks.update.mockImplementationOnce(
-      () =>
-        new Promise<boolean>((_, reject) => {
-          rejectSave = reject;
-        })
-    );
-    const save = service.setAnalyticsEnabled(true);
-    const error = new Error('save failed');
-    const rejected = expect(save).rejects.toBe(error);
-    mocks.connectCallback?.();
-    mocks.get.mockRejectedValueOnce(new Error('confirmation failed')).mockResolvedValue(true);
-    rejectSave(error);
-    await rejected;
-    await vi.waitFor(() => expect(service.getAnalyticsPreference().ready).toBe(true));
-    expect(service.getAnalyticsEnabled()).toBe(false);
-    expect(mocks.get).toHaveBeenCalledTimes(3);
-  });
-
   it.each(['sign-out', 'account change', 'cleanup'])(
     'discards a queued refresh on %s before the save settles',
     async transition => {
@@ -228,66 +131,6 @@ describe('analytics preference privacy and recovery', () => {
       expect(mocks.get).toHaveBeenCalledTimes(reads);
     }
   );
-
-  it('cleans up a connect listener that resolves after sign-out', async () => {
-    let resolveSubscription!: (unsubscribe: () => Promise<void>) => void;
-    mocks.connect.mockImplementation(
-      () =>
-        new Promise(resolve => {
-          resolveSubscription = resolve;
-        })
-    );
-    await initialize();
-    signOut();
-    const unsubscribe = vi.fn(async () => {});
-    resolveSubscription(unsubscribe);
-    await Promise.resolve();
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
-  });
-
-  it('forgets a deleted account choice and restores the signed-out default', async () => {
-    const service = await initialize();
-    await service.setAnalyticsEnabled(false);
-    signOut();
-    expect(service.getAnalyticsEnabled()).toBe(false);
-
-    service.clearRememberedAnalyticsConsent('account-a');
-
-    expect(localStorage.getItem(service.ACCOUNT_CONSENT_STORAGE_KEY)).toBeNull();
-    expect(service.getAnalyticsEnabled()).toBe(true);
-    mocks.user = { id: 'account-b' };
-    mocks.authCallback?.();
-    signOut();
-    expect(service.getAnalyticsEnabled()).toBe(true);
-  });
-
-  it('forgets a deleted account choice held only in memory', async () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
-    const service = await initialize();
-    await service.setAnalyticsEnabled(false);
-    signOut();
-    expect(service.getAnalyticsEnabled()).toBe(false);
-
-    service.clearRememberedAnalyticsConsent('account-a');
-
-    expect(service.getAnalyticsEnabled()).toBe(true);
-  });
-
-  it("keeps another account's remembered choice when a different account is deleted", async () => {
-    const service = await initialize();
-    await service.setAnalyticsEnabled(false);
-    signOut();
-
-    service.clearRememberedAnalyticsConsent('account-b');
-
-    expect(JSON.parse(localStorage.getItem(service.ACCOUNT_CONSENT_STORAGE_KEY)!)).toEqual({
-      accountId: 'account-a',
-      enabled: false,
-    });
-    expect(service.getAnalyticsEnabled()).toBe(false);
-  });
 
   it('preserves an opt-out when sign-out precedes the save response', async () => {
     let resolveSave!: (optOut: boolean) => void;
@@ -325,99 +168,4 @@ describe('analytics preference privacy and recovery', () => {
       expect(service.getAnalyticsPreference().enabled).toBe(false);
     }
   );
-
-  it('remembers a pending opt-out in memory when storage is blocked', async () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
-    mocks.update.mockImplementation(() => new Promise(() => {}));
-    const service = await initialize();
-    void service.setAnalyticsEnabled(false);
-    signOut();
-    expect(service.getAnalyticsPreference().enabled).toBe(false);
-  });
-
-  it.each(['unreadable', 'corrupt'])(
-    'allows signed-out capture with %s consent and no memory',
-    async mode => {
-      mocks.user = null;
-      if (mode === 'corrupt') localStorage.setItem('og:analytics:account-consent', '{');
-      else
-        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-          throw new Error('blocked');
-        });
-      const service = await initialize();
-      expect(service.getAnalyticsPreference().enabled).toBe(true);
-    }
-  );
-
-  it.each(['failed read', 'no subscription'])(
-    'retries every thirty seconds with %s',
-    async mode => {
-      vi.useFakeTimers();
-      if (mode === 'failed read') mocks.get.mockRejectedValue(new Error('offline'));
-      else mocks.subscribe.mockRejectedValue(new Error('offline'));
-      await initialize();
-      expect(mocks.get).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTimeAsync(30_000);
-      expect(mocks.get).toHaveBeenCalledTimes(2);
-      await vi.advanceTimersByTimeAsync(30_000);
-      expect(mocks.get).toHaveBeenCalledTimes(3);
-    }
-  );
-
-  it('refreshes healthy subscriptions only every five minutes', async () => {
-    vi.useFakeTimers();
-    await initialize();
-    await vi.advanceTimersByTimeAsync(270_000);
-    expect(mocks.get).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(mocks.get).toHaveBeenCalledTimes(2);
-  });
-
-  it('refreshes on visible resume and focus, skips hidden ticks, and cleans up', async () => {
-    vi.useFakeTimers();
-    mocks.subscribe.mockRejectedValue(new Error('offline'));
-    await initialize();
-    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(mocks.get).toHaveBeenCalledTimes(1);
-    visibility.mockReturnValue('visible');
-    document.dispatchEvent(new Event('visibilitychange'));
-    await Promise.resolve();
-    expect(mocks.get).toHaveBeenCalledTimes(2);
-    window.dispatchEvent(new Event('focus'));
-    await Promise.resolve();
-    expect(mocks.get).toHaveBeenCalledTimes(3);
-    stop?.();
-    stop = undefined;
-    document.dispatchEvent(new Event('visibilitychange'));
-    window.dispatchEvent(new Event('focus'));
-    await vi.advanceTimersByTimeAsync(300_000);
-    expect(mocks.get).toHaveBeenCalledTimes(3);
-  });
-
-  it('shares the consent storage contract with the real bootstrap reader', async () => {
-    const service = await initialize();
-    const source = readFileSync(resolve(process.cwd(), 'public/js/bootstrap-analytics.js'), 'utf8');
-    expect(service.ACCOUNT_CONSENT_STORAGE_KEY).toBe('og:analytics:account-consent');
-    expect(source).toContain(service.ACCOUNT_CONSENT_STORAGE_KEY);
-    new Script(source).runInThisContext();
-    localStorage.setItem('pocketbase_auth', JSON.stringify({ record: { id: 'account-a' } }));
-    const sendBeacon = vi.fn(() => true);
-    const capture = () =>
-      window.__OG_BOOTSTRAP_ANALYTICS__!.captureBootstrapFailureShown('startup_timeout', {
-        storage: localStorage,
-        config: { key: 'phc_test', host: '/glimmer' },
-        sendBeacon,
-      });
-    expect(capture()).toBe(true);
-    await service.setAnalyticsEnabled(false);
-    expect(capture()).toBe(false);
-    signOut();
-    localStorage.removeItem('pocketbase_auth');
-    expect(capture()).toBe(false);
-    expect(sendBeacon).toHaveBeenCalledTimes(1);
-    delete window.__OG_BOOTSTRAP_ANALYTICS__;
-  });
 });

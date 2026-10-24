@@ -2,9 +2,11 @@
 
 GitHub Actions retains scope, static, unit/server, React, build/budget and
 publication gates and adds `Complete PR validation` on GitHub-hosted
-`ubuntu-24.04`. It runs the existing strict `pnpm test:pr` orchestration rather
-than maintaining a second test inventory. `CI result` fails closed unless every
-expected job succeeds, including complete PR validation.
+`ubuntu-24.04`. It runs `pnpm test:pr:ci`, the `pnpm test:pr` phase plan
+minus the static, unit, React, build and publication phases that sibling jobs
+already run. Its report marks each of those phases `delegated-to-<job>`.
+`CI result` fails closed unless every expected job succeeds, including complete
+PR validation.
 
 ## Cloud drafts and complete validation
 
@@ -49,6 +51,10 @@ workflow. Before merge, both must pass for the latest PR commit, with complete
 backend/browser coverage. The complete job checks out the exact event PR head
 SHA and uses the event base SHA for comparisons. Record both SHAs in the PR.
 No branch protection or repository permissions are changed by this work.
+
+The `dev` merge queue runs the same workflow on `merge_group` events. Each queue
+run compares the queued commit with the queue base SHA, so it checks a PR
+together with `dev` and every PR ahead of it.
 
 Actions uses ordinary `pull_request` semantics, read-only contents permission,
 no persisted checkout credentials, bounded timeouts and cancellation of

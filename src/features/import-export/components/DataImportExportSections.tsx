@@ -1430,12 +1430,13 @@ export function DataImportExportSections({ disabled = false }: DataImportExportS
   const hasConfirmedBulkRows = bulkPhotoImport.rows.some(isImportableBulkRow);
   const importBusy = disabled || projectImportLoading || metadataLoading;
   const hasProjectImportResult =
-    importStats.total > 0 ||
-    importStats.successful > 0 ||
-    importStats.failed > 0 ||
-    importStats.errors.length > 0 ||
-    importStats.tagWarnings.length > 0 ||
-    importStats.validationIssues.length > 0;
+    !projectImportLoading &&
+    (importStats.total > 0 ||
+      importStats.successful > 0 ||
+      importStats.failed > 0 ||
+      importStats.errors.length > 0 ||
+      importStats.tagWarnings.length > 0 ||
+      importStats.validationIssues.length > 0);
   const showOrganizedCsvImportResult =
     projectImportResultMode === 'organized-csv' && hasProjectImportResult;
   const showDacImportResult = projectImportResultMode === 'dac' && hasProjectImportResult;

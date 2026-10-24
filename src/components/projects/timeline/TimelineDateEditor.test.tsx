@@ -43,50 +43,27 @@ describe('TimelineDateEditor', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('normalizes slash dates before submitting with Enter', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <TimelineDateEditorHarness
-        dateKey="dateStarted"
-        label="Started"
-        value={null}
-        projectId="project-123"
-        isSet={false}
-        formattedDisplay=""
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Edit Started date' }));
-    await user.type(screen.getByRole('textbox', { name: 'Started date' }), '7/3/2024');
-    await user.keyboard('{Enter}');
-
-    expect(updateDatesMutationState.mutate).toHaveBeenCalledWith(
-      { projectId: 'project-123', dateStarted: '2024-07-03' },
-      { onSuccess: expect.any(Function) }
-    );
-  });
-
-  it('saves a completion date without sending the displayed status', async () => {
-    const user = userEvent.setup();
+  it.each([
+    { value: null, isSet: false, formattedDisplay: '', visibleText: 'Not set' },
+    {
+      value: '2026-09-20',
+      isSet: true,
+      formattedDisplay: 'Sep 20, 2026',
+      visibleText: 'Sep 20, 2026',
+    },
+  ])('includes the visible date in the trigger name: $visibleText', props => {
     render(
       <TimelineDateEditorHarness
         dateKey="dateCompleted"
         label="Completed"
-        value={null}
         projectId="project-123"
-        currentStatus="progress"
-        isSet={false}
-        formattedDisplay=""
+        {...props}
       />
     );
-    await user.click(screen.getByRole('button', { name: 'Edit Completed date' }));
-    await user.type(screen.getByRole('textbox', { name: 'Completed date' }), '9/20/2026');
-    await user.keyboard('{Enter}');
-    expect(updateDatesMutationState.mutate).toHaveBeenCalledWith(
-      { projectId: 'project-123', dateCompleted: '2026-09-20' },
-      { onSuccess: expect.any(Function) }
-    );
+
+    expect(
+      screen.getByRole('button', { name: `Edit Completed date: ${props.visibleText}` })
+    ).toHaveTextContent(props.visibleText);
   });
 
   it('keeps the date draft open when the save fails', async () => {
@@ -106,7 +83,7 @@ describe('TimelineDateEditor', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Edit Completed date' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Completed date: Not set' }));
     await user.type(screen.getByRole('textbox', { name: 'Completed date' }), '9/20/2026');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -141,7 +118,7 @@ describe('TimelineDateEditor', () => {
         formattedDisplay=""
       />
     );
-    await user.click(screen.getByRole('button', { name: 'Edit Completed date' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Completed date: Not set' }));
     await user.type(screen.getByRole('textbox', { name: 'Completed date' }), '9/20/2026');
 
     act(() => {
@@ -174,7 +151,7 @@ describe('TimelineDateEditor', () => {
       formattedDisplay: '',
     };
     const { rerender } = render(<TimelineDateEditorHarness {...props} projectId="project-a" />);
-    await user.click(screen.getByRole('button', { name: 'Edit Completed date' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Completed date: Not set' }));
     await user.type(screen.getByRole('textbox', { name: 'Completed date' }), '9/20/2026');
 
     rerender(<TimelineDateEditorHarness {...props} projectId="project-b" />);

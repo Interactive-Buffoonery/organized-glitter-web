@@ -45,6 +45,11 @@ import {
 } from '@/hooks/queries/shared/queryOptionsFactory';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { invalidateStatsQueries } from '@/hooks/mutations/statsInvalidation';
+import { getSessionIdentityTracker } from '@/services/auth/sessionEpoch';
+import { deletionIntents } from '@/services/accountDeletion/intentStore';
+
+const SESSION_RENEW_WINDOW_SECONDS = 6 * 24 * 60 * 60;
+const SESSION_RENEW_RETRY_MS = 10 * 60 * 1000;
 
 const authLogger = createLogger('AuthProvider');
 
@@ -190,7 +195,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             queryClient.prefetchQuery(artistsOptions(currentUser.id));
             queryClient.prefetchQuery(tagsOptions(currentUser.id));
           } else {
-            if (pb.authStore.token) pb.authStore.clear();
             authLogger.debug('No valid session found');
             authLogger.debug('Initial auth check: User IS NOT valid or present.');
             setUser(null);
@@ -269,19 +273,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const removeInvalidSessionListener = subscribeToInvalidSession(token => {
       if (token !== pb.authStore.token || !pb.authStore.record) return;
       const invalidAccountId = pb.authStore.record.id;
-      const activeAccountId = activeUserIdRef.current;
-      retireSessionTokens(sessionTokensRef.current, activeAccountId);
-      markSessionTokenInactive(token);
-      retainSignedOutCreateTokens(invalidAccountId, [token]);
-      if (!activeAccountId || activeAccountId === invalidAccountId) {
-        captureSessionDrafts(invalidAccountId, token);
-      }
-      void queryClient.cancelQueries();
-      pb.authStore.clear();
+      const invalidIdentity = getSessionIdentityTracker(pb.authStore).capture();
+      const claimId = crypto.randomUUID();
+      void deletionIntents
+        .claimSignOut(POCKETBASE_URL, invalidAccountId, invalidIdentity.epoch, claimId)
+        .then(async claimed => {
+          if (
+            !claimed ||
+            token !== pb.authStore.token ||
+            !getSessionIdentityTracker(pb.authStore).isCurrent(invalidIdentity)
+          ) {
+            if (claimed)
+              await deletionIntents.releaseSignOut(POCKETBASE_URL, invalidAccountId, claimId);
+            return;
+          }
+          const activeAccountId = activeUserIdRef.current;
+          retireSessionTokens(sessionTokensRef.current, activeAccountId);
+          markSessionTokenInactive(token);
+          retainSignedOutCreateTokens(invalidAccountId, [token]);
+          if (!activeAccountId || activeAccountId === invalidAccountId) {
+            captureSessionDrafts(invalidAccountId, token);
+          }
+          void queryClient.cancelQueries();
+          pb.authStore.clear();
+        })
+        .catch(() => {
+          authLogger.warn('Account recovery could not be checked; retaining session and drafts');
+        });
     });
     const removeListener = initializeAuth();
+    const sessionIdentityTracker = getSessionIdentityTracker(pb.authStore);
 
     let refreshPromise: Promise<void> | null = null;
+    let failedRefresh = { token: '', at: 0 };
     const checkSession = () => {
       const token = pb.authStore.token;
       if (!token || !pb.authStore.record || refreshPromise) return;
@@ -289,11 +313,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         reportInvalidSession(token);
         return;
       }
-      if (!isTokenExpired(token, 120)) return;
+      // Renews about once a day while in use; tuned for the 7-day users token.
+      if (!isTokenExpired(token, SESSION_RENEW_WINDOW_SECONDS)) return;
+      if (
+        token === failedRefresh.token &&
+        Date.now() - failedRefresh.at < SESSION_RENEW_RETRY_MS &&
+        !isTokenExpired(token, SESSION_RENEW_RETRY_MS / 1000)
+      ) {
+        return;
+      }
       const generation = sessionGenerationRef.current;
+      const sessionIdentity = sessionIdentityTracker.capture();
       refreshPromise = UsersService.refreshDetachedSession(token, pb.authStore.record)
         .then(result => {
-          if (token === pb.authStore.token && generation === sessionGenerationRef.current) {
+          if (
+            token === pb.authStore.token &&
+            generation === sessionGenerationRef.current &&
+            sessionIdentityTracker.isCurrent(sessionIdentity)
+          ) {
             pb.authStore.save(result.token, result.record);
           }
         })
@@ -301,11 +338,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (
             token === pb.authStore.token &&
             generation === sessionGenerationRef.current &&
+            sessionIdentityTracker.isCurrent(sessionIdentity) &&
             ((error instanceof ClientResponseError && error.status === 401) ||
               !pb.authStore.isValid)
           ) {
             reportInvalidSession(token);
           } else {
+            failedRefresh = { token, at: Date.now() };
             authLogger.warn('Session refresh failed; keeping the current session', error);
           }
         })
@@ -338,22 +377,55 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const signOut = useCallback(async () => {
-    // Prevent multiple simultaneous logout attempts
+    const tracker = getSessionIdentityTracker(pb.authStore);
+    const identity = tracker.capture();
+    const originalToken = pb.authStore.token;
+    const departingUserId = identity.accountId ?? user?.id;
     if (isSigningOut.current) {
       authLogger.debug('SignOut already in progress, skipping...');
       return { success: true, error: null };
     }
-
     isSigningOut.current = true;
+    if (departingUserId) {
+      try {
+        const claimId = crypto.randomUUID();
+        const claimed = await deletionIntents.claimSignOut(
+          POCKETBASE_URL,
+          departingUserId,
+          identity.epoch,
+          claimId
+        );
+        if (!tracker.isCurrent(identity) || pb.authStore.token !== originalToken) {
+          if (claimed)
+            await deletionIntents.releaseSignOut(POCKETBASE_URL, departingUserId, claimId);
+          isSigningOut.current = false;
+          return { success: false, error: new Error('Your session changed. Try again.') };
+        }
+        if (!claimed) {
+          isSigningOut.current = false;
+          return {
+            success: false,
+            error: new Error('Resolve your pending account deletion before signing out.'),
+          };
+        }
+      } catch {
+        isSigningOut.current = false;
+        return {
+          success: false,
+          error: new Error(
+            'Account recovery could not be checked. Your unfinished edits have been kept.'
+          ),
+        };
+      }
+    }
     setIsLoading(true);
-    const departingUserId = user?.id ?? getCurrentUser()?.id;
 
     try {
       authLogger.debug('Starting logout process...');
       authLogout();
       retireSessionTokens(sessionTokensRef.current, departingUserId ?? null);
       sessionGenerationRef.current += 1;
-      clearSessionDrafts();
+      clearSessionDrafts(departingUserId);
       activeUserIdRef.current = null;
       setUser(null);
       setIsAuthenticated(false);

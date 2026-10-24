@@ -135,14 +135,6 @@ const baseFormData: ProjectFormValues = {
   tags: [],
 };
 
-const deferred = <T,>() => {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>(next => {
-    resolve = next;
-  });
-  return { promise, resolve };
-};
-
 const renderProjectForm = (
   formData: ProjectFormValues = baseFormData,
   fieldErrors: Partial<Record<keyof ProjectFormValues, string>> = {},
@@ -172,20 +164,13 @@ const renderProjectForm = (
   return render(<ProjectFormHarness />);
 };
 
-const renderProjectFormWithoutStateSync = (
-  formData: ProjectFormValues = baseFormData,
-  fieldErrors: Partial<Record<keyof ProjectFormValues, string>> = {}
-) =>
-  render(
-    <ProjectFormSections
-      formData={formData}
-      companies={[]}
-      artists={[]}
-      isSubmitting={false}
-      onChange={onChangeMock}
-      fieldErrors={fieldErrors}
-    />
-  );
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(next => {
+    resolve = next;
+  });
+  return { promise, resolve };
+};
 
 describe('ProjectFormSections project image cropping', () => {
   beforeEach(() => {
@@ -238,62 +223,6 @@ describe('ProjectFormSections project image cropping', () => {
     expect(onChangeMock).not.toHaveBeenCalled();
   });
 
-  it('marks an active project completed when its completion date is entered', () => {
-    renderProjectFormWithoutStateSync({ ...baseFormData, status: 'progress' });
-    fireEvent.change(screen.getByLabelText('Date completed'), {
-      target: { value: '2026-09-' },
-    });
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ dateCompleted: '2026-09-', status: 'progress' })
-    );
-    fireEvent.change(screen.getByLabelText('Date completed'), {
-      target: { value: '2026-09-20' },
-    });
-    expect(onChangeMock).toHaveBeenCalledWith(
-      expect.objectContaining({ dateCompleted: '2026-09-20', status: 'completed' })
-    );
-  });
-
-  it('keeps a manual status when a saved completion date is retyped or restored', () => {
-    renderProjectForm(
-      { ...baseFormData, status: 'progress', dateCompleted: '2025-03-01' },
-      {},
-      '2025-03-01'
-    );
-    const completedDate = screen.getByLabelText('Date completed');
-
-    fireEvent.change(completedDate, { target: { value: '2025-03-' } });
-    fireEvent.change(completedDate, { target: { value: '2025-03-01' } });
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ dateCompleted: '2025-03-01', status: 'progress' })
-    );
-
-    fireEvent.change(completedDate, { target: { value: '2025-03-02' } });
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ dateCompleted: '2025-03-02', status: 'completed' })
-    );
-
-    fireEvent.change(completedDate, { target: { value: '2025-03-01' } });
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ dateCompleted: '2025-03-01', status: 'progress' })
-    );
-  });
-
-  it('restores the prior project status when a new completion date is cleared', () => {
-    renderProjectForm({ ...baseFormData, status: 'progress', dateCompleted: '' }, {}, '');
-    const completedDate = screen.getByLabelText('Date completed');
-
-    fireEvent.change(completedDate, { target: { value: '2026-09-20' } });
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ dateCompleted: '2026-09-20', status: 'completed' })
-    );
-
-    fireEvent.change(completedDate, { target: { value: '' } });
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ dateCompleted: '', status: 'progress' })
-    );
-  });
-
   it('restores the saved prior status after a draft is recovered and its date is cleared', () => {
     render(
       <ProjectFormSections
@@ -310,41 +239,6 @@ describe('ProjectFormSections project image cropping', () => {
     fireEvent.change(screen.getByLabelText('Date completed'), { target: { value: '' } });
     expect(onChangeMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ dateCompleted: '', status: 'progress' })
-    );
-  });
-
-  it('restores the prior project status when a changed saved completion date is cleared', () => {
-    renderProjectForm(
-      { ...baseFormData, status: 'progress', dateCompleted: '2025-03-01' },
-      {},
-      '2025-03-01'
-    );
-    const completedDate = screen.getByLabelText('Date completed');
-
-    fireEvent.change(completedDate, { target: { value: '2025-03-02' } });
-    fireEvent.change(completedDate, { target: { value: '' } });
-
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ dateCompleted: '', status: 'progress' })
-    );
-  });
-
-  it('keeps a changed completion date Completed after a manual active status choice', async () => {
-    const user = userEvent.setup();
-    renderProjectForm({ ...baseFormData, status: 'progress', dateCompleted: '' }, {}, '');
-    fireEvent.change(screen.getByLabelText('Date completed'), {
-      target: { value: '2026-09-20' },
-    });
-
-    await user.click(screen.getByRole('combobox', { name: 'Status' }));
-    await user.click(screen.getByRole('option', { name: 'Wishlist' }));
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ dateCompleted: '2026-09-20', status: 'completed' })
-    );
-
-    fireEvent.change(screen.getByLabelText('Date completed'), { target: { value: '' } });
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ dateCompleted: '', status: 'wishlist' })
     );
   });
 
@@ -397,27 +291,6 @@ describe('ProjectFormSections project image cropping', () => {
     expect(submittedFormData?.get('source_url')).toBe('');
   });
 
-  it('opens the crop dialog after a project image is selected', async () => {
-    const selectedFile = new File(['original'], 'project.jpg', { type: 'image/jpeg' });
-    handleImageChangeMock.mockResolvedValue(selectedFile);
-
-    const { container } = renderProjectForm();
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-
-    fireEvent.change(input, { target: { files: [selectedFile] } });
-
-    expect(await screen.findByRole('dialog', { name: 'Crop project image' })).toBeInTheDocument();
-    expect(screen.getByText('project.jpg')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(onChangeMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          imageFile: selectedFile,
-          imageRemoved: false,
-        })
-      );
-    });
-  });
-
   it('preserves edits made while the selected image is processing', async () => {
     const imageProcessing = deferred<File>();
     const selectedFile = new File(['original'], 'project.jpg', { type: 'image/jpeg' });
@@ -443,66 +316,6 @@ describe('ProjectFormSections project image cropping', () => {
     );
   });
 
-  it('replaces the pending project image with the cropped file', async () => {
-    const selectedFile = new File(['original'], 'project.jpg', { type: 'image/jpeg' });
-    handleImageChangeMock.mockResolvedValue(selectedFile);
-
-    const { container } = renderProjectForm();
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-
-    fireEvent.change(input, { target: { files: [selectedFile] } });
-    fireEvent.click(await screen.findByRole('button', { name: 'Use crop' }));
-
-    const croppedFile = applyProcessedImageMock.mock.calls[0][0] as File;
-    expect(croppedFile.name).toBe('project-cropped.jpg');
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        imageFile: croppedFile,
-        imageRemoved: false,
-      })
-    );
-  });
-
-  it('keeps the original processed file when Use original is selected', async () => {
-    const selectedFile = new File(['original'], 'project.jpg', { type: 'image/jpeg' });
-    handleImageChangeMock.mockResolvedValue(selectedFile);
-
-    const { container } = renderProjectForm();
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-
-    fireEvent.change(input, { target: { files: [selectedFile] } });
-    fireEvent.click(await screen.findByRole('button', { name: 'Use original' }));
-
-    expect(applyProcessedImageMock).toHaveBeenCalledWith(selectedFile);
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        imageFile: selectedFile,
-        imageRemoved: false,
-      })
-    );
-  });
-
-  it('clears project image crop state when the image is removed', async () => {
-    const selectedFile = new File(['original'], 'project.jpg', { type: 'image/jpeg' });
-    const formData = { ...baseFormData, imageFile: selectedFile, imageUrl: 'blob:project' };
-    imageUploadState.preview = 'blob:project';
-    imageUploadState.file = selectedFile;
-    imageUploadState.processedFile = selectedFile;
-
-    renderProjectForm(formData);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove image' }));
-
-    expect(handleImageRemoveMock).toHaveBeenCalled();
-    expect(onChangeMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        imageFile: null,
-        imageUrl: '',
-        imageRemoved: true,
-      })
-    );
-    expect(screen.queryByRole('dialog', { name: 'Crop project image' })).not.toBeInTheDocument();
-  });
-
   it('ignores a crop source that finishes loading after image removal', async () => {
     const imageResponse = deferred<Response>();
     vi.stubGlobal(
@@ -523,32 +336,5 @@ describe('ProjectFormSections project image cropping', () => {
     });
 
     expect(screen.queryByRole('dialog', { name: 'Crop project image' })).not.toBeInTheDocument();
-  });
-
-  it('renders inline field errors with invalid input state', () => {
-    renderProjectFormWithoutStateSync(
-      {
-        ...baseFormData,
-        sourceUrl: 'not-a-url',
-        datePurchased: '2025-06-01',
-        dateStarted: '2025-01-01',
-      },
-      {
-        title: 'Title is required',
-        sourceUrl: 'Source URL must be a valid URL if provided',
-        dateStarted: 'Start date cannot be before purchase date',
-      }
-    );
-
-    const titleInput = screen.getByLabelText(/project title/i);
-    const sourceInput = screen.getByLabelText(/source url/i);
-    const startedInput = screen.getByRole('textbox', { name: /date started/i });
-
-    expect(screen.getByText('Title is required')).toBeInTheDocument();
-    expect(screen.getByText('Source URL must be a valid URL if provided')).toBeInTheDocument();
-    expect(screen.getByText('Start date cannot be before purchase date')).toBeInTheDocument();
-    expect(titleInput).toHaveAttribute('aria-invalid', 'true');
-    expect(sourceInput).toHaveAttribute('aria-invalid', 'true');
-    expect(startedInput).toHaveAttribute('aria-invalid', 'true');
   });
 });

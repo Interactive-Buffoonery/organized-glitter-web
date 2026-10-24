@@ -112,11 +112,6 @@ disables automatic chunk recovery rather than restoring unbounded reloads.
 
 ## Validation
 
-`test/bootstrap-resources.test.ts`, `test/loading-script.test.ts`, and
-`src/utils/perf/__tests__/chunkLoadingRetry.test.ts` cover the retry policy,
-initial entry/dependency/CSS failures, readiness, duplicate initialization,
-native graph fallback, cross-document budgets, privacy, and static focus.
-
 The integrated build is also tested in a real browser with initial
 entry, dependency, and stylesheet 429/503/network faults, persistent faults,
 and permanent 404s. Check that the module graph is requested only after

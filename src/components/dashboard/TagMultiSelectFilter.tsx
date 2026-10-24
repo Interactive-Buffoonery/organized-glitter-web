@@ -69,6 +69,13 @@ const TagMultiSelectFilter = ({
     [selectedValues, optionsByValue, resolvedPlaceholder, itemLabel.plural]
   );
 
+  const selectionDescription =
+    selectedValues.length > 0
+      ? `${selectedValues.length} ${itemLabel.plural} selected.`
+      : `No ${itemLabel.plural} selected.`;
+  const triggerCount = selectedValues.length > 1 ? ` ${selectedValues.length}` : '';
+  const accessibleTriggerLabel = `${triggerLabel}${triggerCount}. ${label} filter. ${selectionDescription}`;
+
   const handleCheckedChange = React.useCallback(
     (value: string, checked: boolean) => {
       if (checked) {
@@ -150,11 +157,7 @@ const TagMultiSelectFilter = ({
             variant="ghost"
             className="h-auto min-h-11 w-full justify-between rounded-none px-3 py-2 text-left font-normal hover:bg-transparent"
             aria-expanded={inlineOpen}
-            aria-label={
-              selectedValues.length > 0
-                ? `${label} filter. ${selectedValues.length} ${itemLabel.plural} selected.`
-                : `${label} filter. No ${itemLabel.plural} selected.`
-            }
+            aria-label={accessibleTriggerLabel}
             data-testid="tag-multi-select-trigger"
             onClick={() => setInlineOpen(open => !open)}
           >
@@ -166,9 +169,11 @@ const TagMultiSelectFilter = ({
                 )}
               >
                 {triggerLabel}
-              </span>
+              </span>{' '}
               {selectedValues.length > 1 && (
-                <Badge variant="secondary">{selectedValues.length}</Badge>
+                <Badge variant="secondary" aria-hidden="true">
+                  {selectedValues.length}
+                </Badge>
               )}
             </span>
             <ChevronDown
@@ -191,21 +196,19 @@ const TagMultiSelectFilter = ({
             type="button"
             variant="outline"
             className="bg-background w-full justify-between text-left font-normal"
-            aria-label={
-              selectedValues.length > 0
-                ? `${label} filter. ${selectedValues.length} ${itemLabel.plural} selected.`
-                : `${label} filter. No ${itemLabel.plural} selected.`
-            }
+            aria-label={accessibleTriggerLabel}
             data-testid="tag-multi-select-trigger"
           >
             <span
               className={cn('truncate', selectedValues.length === 0 && 'text-muted-foreground')}
             >
               {triggerLabel}
-            </span>
+            </span>{' '}
             <span className="flex items-center gap-2">
               {selectedValues.length > 1 && (
-                <Badge variant="secondary">{selectedValues.length}</Badge>
+                <Badge variant="secondary" aria-hidden="true">
+                  {selectedValues.length}
+                </Badge>
               )}
               <ChevronDown aria-hidden="true" />
             </span>

@@ -10,28 +10,18 @@ const appUrl = process.env.E2E_APP_URL || 'http://127.0.0.1:3000';
 const isFullSuite = process.env.E2E_QA_SUITE === 'full';
 if (!process.env.E2E_STORAGE_STATE) process.env.E2E_STORAGE_STATE = storageState;
 
-const publicInventory =
-  /[/\\]e2e[/\\](?:(?:home|public-accessibility|page-titles)\.spec\.ts|a11y[/\\]public-a11y\.spec\.ts)$/;
-const publicWebkitInventory =
-  /[/\\]e2e[/\\](?:(?:home|page-titles)\.spec\.ts|a11y[/\\]public-a11y\.spec\.ts)$/;
-const chromiumSmokeInventory = [
-  /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
-  /[/\\]e2e[/\\]ci[/\\](?:authenticated-accessibility-smoke|change-password-accessibility|feedback-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|unverified-login-recovery)\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\](?:archive-legacy-project-local|archive-recovery-local|archive-v3-restore-local|coloring-detail-errors-local|coloring-page-detail|diamond-pagination-url|notes-feed-timeline|project-create-cover-local|project-delete-atomic-local|project-field-clearing|project-inline-dates-local)\.spec\.ts$/,
-];
-const webkitFlowInventory = [
-  /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
-  /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|feedback-accessibility|coloring-book-create-flow|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
-  /[/\\]e2e[/\\]a11y[/\\]mobile-state-a11y\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\](?:archive-v3-restore-local|avatar-crop-local|coloring-detail-errors-local|coloring-page-detail|notes-feed-timeline|project-create-cover-local|project-field-clearing|project-inline-dates-local|randomizer-interruption-local)\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\]int-1093-filter-validation\.spec\.ts$/,
-];
-const chromiumFullInventory = [
-  ...chromiumSmokeInventory,
-  /[/\\]e2e[/\\]ci[/\\]authenticated-contrast\.spec\.ts$/,
+const publicInventory = /[/\\]e2e[/\\]a11y[/\\]public-a11y\.spec\.ts$/;
+const publicWebkitInventory = /[/\\]e2e[/\\]pwa-safe-area\.spec\.ts$/;
+export const chromiumSmokeInventory = [
+  /[/\\]e2e[/\\]authenticated[/\\](?:account-deletion-local|archive-v3-restore-local|import-export-local|project-create-cover-local|project-delete-atomic-local|project-field-clearing|session-expiry-local)\.spec\.ts$/,
+  /[/\\]e2e[/\\]ci[/\\]coloring-book-create-flow\.spec\.ts$/,
   /[/\\]e2e[/\\]a11y[/\\]authenticated-a11y\.spec\.ts$/,
-  /[/\\]e2e[/\\]authenticated[/\\](?:avatar-crop-local|concurrent-edit-local|format-chip-contrast|image-selection-local|import-export-local|int-1093-filter-validation|mobile-touch-targets|notes-feed-keyset-pagination|project-metadata-rollback-local|route-mount|randomizer-interruption-local|session-expiry-local)\.spec\.ts$/,
 ];
+export const webkitFlowInventory = [
+  /[/\\]e2e[/\\]ci[/\\](?:mobile-webkit-smoke|coloring-book-create-flow)\.spec\.ts$/,
+  /[/\\]e2e[/\\]authenticated[/\\]account-deletion-local\.spec\.ts$/,
+];
+export const chromiumFullInventory = chromiumSmokeInventory;
 
 const setupProject: Project = {
   name: 'setup',
@@ -43,11 +33,13 @@ const smokeProjects: Project[] = [
   setupProject,
   {
     name: 'public-chromium-smoke',
-    testMatch: [
-      /[/\\]e2e[/\\]home\.spec\.ts$/,
-      /[/\\]e2e[/\\]ci[/\\]public-accessibility-smoke\.spec\.ts$/,
-    ],
+    testMatch: publicInventory,
     use: { ...devices['Desktop Chrome'] },
+  },
+  {
+    name: 'public-webkit-smoke',
+    testMatch: publicWebkitInventory,
+    use: { ...devices['iPhone 13'] },
   },
   {
     name: 'authenticated-chromium-smoke',
@@ -57,10 +49,8 @@ const smokeProjects: Project[] = [
   },
   {
     name: 'mobile-webkit-smoke',
-    testMatch: [
-      /[/\\]e2e[/\\]authenticated[/\\]app-startup-local\.spec\.ts$/,
-      /[/\\]e2e[/\\]ci[/\\](?:change-password-accessibility|feedback-accessibility|form-draft-recovery|hosting-banner|mobile-webkit-smoke|unverified-login-recovery)\.spec\.ts$/,
-    ],
+    testMatch: webkitFlowInventory,
+    grep: /opens the bottom add menu|creates a book and edits|reverifies the same proof/i,
     dependencies: ['setup'],
     use: { ...devices['iPhone 13'], storageState },
   },
@@ -74,19 +64,20 @@ const fullProjects: Project[] = [
     use: { ...devices['Desktop Chrome'] },
   },
   {
+    name: 'public-webkit-full',
+    testMatch: publicWebkitInventory,
+    use: { ...devices['iPhone 13'] },
+  },
+  {
     name: 'authenticated-chromium-full',
     testMatch: chromiumFullInventory,
     dependencies: ['setup'],
     use: { ...devices['Desktop Chrome'], storageState },
   },
   {
-    name: 'public-webkit-full',
-    testMatch: publicWebkitInventory,
-    use: { ...devices['Desktop Safari'] },
-  },
-  {
     name: 'authenticated-webkit-full',
     testMatch: webkitFlowInventory,
+    grep: /opens the bottom add menu|creates a book and edits|reverifies the same proof/i,
     dependencies: ['setup'],
     use: { ...devices['iPhone 13'], storageState },
   },
@@ -99,12 +90,13 @@ export default defineConfig({
   forbidOnly: true,
   retries: 0,
   workers: 1,
+  preserveOutput: 'never',
   reporter: [
     ['list'],
-    ['html', { outputFolder: process.env.PLAYWRIGHT_HTML_REPORT, open: 'never' }],
-    ...(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE
-      ? ([['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_FILE }]] as const)
-      : []),
+    [
+      './scripts/playwright-safe-qa-reporter.mjs',
+      { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_FILE },
+    ],
   ],
   outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR || 'test-results',
   use: {

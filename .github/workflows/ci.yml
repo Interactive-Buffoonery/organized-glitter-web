@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  merge_group:
   push:
     branches: [main, dev]
   workflow_dispatch:
@@ -37,11 +38,12 @@ jobs:
         env:
           CI_EVENT_NAME: ${{ github.event_name }}
           CI_PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           CI_PUSH_BEFORE_SHA: ${{ github.event.before }}
           CI_EXPLICIT_BASE: ${{ inputs.comparison_base || '04789b9d000e6eb1390ca2a6ae60f855a3b1fca6' }}
           CI_BRANCH_CREATION_BASE: 04789b9d000e6eb1390ca2a6ae60f855a3b1fca6
           CI_HEAD_SHA: ${{ github.sha }}
-          CI_TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
+          CI_TARGET_BRANCH: ${{ github.base_ref || github.event.merge_group.base_ref || github.ref_name }}
         run: node scripts/ci-scope.mjs
 
   static-checks:
@@ -51,6 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
@@ -63,6 +66,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
@@ -76,6 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
@@ -85,9 +90,11 @@ jobs:
 
   publication-security:
     name: Publication security
+    needs: scope
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
+      PUBLICATION_HISTORY_BASE_SHA: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group' || github.event_name == 'push') && needs.scope.outputs.base_sha || '' }}
       VITE_POCKETBASE_URL: http://127.0.0.1:8090
       VITE_APP_URL: http://127.0.0.1:3000
       VITE_APP_VERSION: ${{ github.sha }}
@@ -95,6 +102,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
@@ -125,13 +133,13 @@ jobs:
       - uses: ./.github/actions/setup-project
       - name: Install lockfile-matched browsers and system libraries
         run: pnpm exec playwright install --with-deps chromium webkit
-      - name: Run backend and every strict PR phase
-        run: pnpm test:pr
+      - name: Run backend and browser PR phases
+        run: pnpm test:pr:ci
       - name: Summarize phase outcomes without runtime artifacts
         if: always()
         shell: bash
         run: |
-          for report in .tmp/local-validation/*-pr/report.md; do
+          for report in .tmp/local-validation/*-ci/report.md; do
             if [ -f "$report" ]; then
               cat "$report" >> "$GITHUB_STEP_SUMMARY"
             fi

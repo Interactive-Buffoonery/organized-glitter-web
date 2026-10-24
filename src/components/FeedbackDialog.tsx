@@ -55,6 +55,7 @@ type FeedbackDialogAction =
   | { type: 'userNameChanged'; userName: string; draftId: string }
   | { type: 'userEmailChanged'; userEmail: string; draftId: string }
   | { type: 'submitStarted' }
+  | { type: 'submitStopped' }
   | { type: 'submitSucceeded' }
   | { type: 'submitFailed'; error: string };
 
@@ -117,6 +118,8 @@ function feedbackDialogReducer(
       return { ...state, draftId: action.draftId, userEmail: action.userEmail };
     case 'submitStarted':
       return { ...state, isSubmitting: true, submitError: null };
+    case 'submitStopped':
+      return { ...state, isSubmitting: false };
     case 'submitSucceeded':
       return { ...state, isSubmitting: false, isSubmitted: true };
     case 'submitFailed':
@@ -146,7 +149,6 @@ function FeedbackDialog({
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageLength = state.message.trim().length;
   const isMessageValid = messageLength >= 10 && messageLength <= 5000;
-  const restoredFromSession = useRef(false);
   const recoverySnapshot = useRef(state);
   const draftIdPrefix = useRef<string | null>(null);
   const nextDraftId = useRef(0);
@@ -178,7 +180,6 @@ function FeedbackDialog({
 
     if (isOpen) {
       const draft = restoredDraftRef.current;
-      restoredFromSession.current = Boolean(draft);
       if (draft) {
         recoverySnapshot.current = draft;
         dispatch({ type: 'restored', state: draft });
@@ -201,10 +202,9 @@ function FeedbackDialog({
       completedForAccount: string,
       feedback: { draftId?: string; message: string; name: string; email: string }
     ) => {
-      if (completedForAccount !== accountId || !restoredFromSession.current) return;
+      if (completedForAccount !== accountId) return;
       if (recoverySnapshot.current.draftId !== feedback.draftId) return;
       takeCompletedSessionFeedback(accountId);
-      restoredFromSession.current = false;
       dispatch({ type: 'submitSucceeded' });
     };
     const unsubscribe = subscribeToCompletedSessionFeedback(handleCompleted);
@@ -255,6 +255,12 @@ function FeedbackDialog({
       });
 
       if (!result.success) {
+        if (result.reason === 'session_changed') {
+          if (sessionVersion === sessionVersionRef.current) {
+            dispatch({ type: 'submitStopped' });
+          }
+          return;
+        }
         throw new Error(result.error || 'Failed to send feedback');
       }
 

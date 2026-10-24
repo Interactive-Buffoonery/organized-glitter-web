@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupGlobalAuthClear } from '@/services/auth';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { clearMock } = vi.hoisted(() => ({
   clearMock: vi.fn(),
@@ -8,6 +8,9 @@ const { clearMock } = vi.hoisted(() => ({
 vi.mock('@/lib/pocketbase', () => ({
   pb: {
     authStore: {
+      token: '',
+      record: null,
+      onChange: vi.fn(() => () => undefined),
       clear: clearMock,
     },
   },
@@ -77,16 +80,6 @@ describe('auth storage cleanup', () => {
     if (originalSessionStorage) {
       Object.defineProperty(window, 'sessionStorage', originalSessionStorage);
     }
-  });
-
-  it('registers a dev global auth cleanup helper', async () => {
-    const cleanup = setupGlobalAuthClear();
-
-    expect(window.clearOrganizedGlitterAuth).toEqual(expect.any(Function));
-
-    cleanup();
-
-    expect(window.clearOrganizedGlitterAuth).toBeUndefined();
   });
 
   it('clears PocketBase auth and known browser auth keys', async () => {

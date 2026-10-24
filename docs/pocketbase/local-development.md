@@ -48,7 +48,7 @@ It does not export the hosted account or copy its auth state. See
 ## One-Time Setup
 
 Use the latest tested PocketBase executable for local development. The repository
-installer pins PocketBase 0.40.4 and verifies its archive and binary checksums. The authentication upgrade test also installs a pinned 0.40.1 baseline.
+installer pins PocketBase 0.40.5 and verifies its archive and binary checksums. The authentication upgrade test also installs a pinned 0.40.1 baseline.
 
 Place the executable here:
 
@@ -69,13 +69,13 @@ the official pinned SHA-256 checksum, and can place the executable there:
 pnpm pb:install:test -- --destination=local-pb-db/pocketbase
 ```
 
-Cursor Cloud and other Linux amd64 checkouts can install the matching 0.40.4
+Cursor Cloud and other Linux amd64 checkouts can install the matching 0.40.5
 binary with:
 
 ```bash
 mkdir -p local-pb-db
-curl -fsSL https://github.com/pocketbase/pocketbase/releases/download/v0.40.4/pocketbase_0.40.4_linux_amd64.zip -o /tmp/pocketbase_0.40.4_linux_amd64.zip
-unzip -o /tmp/pocketbase_0.40.4_linux_amd64.zip pocketbase -d local-pb-db
+curl -fsSL https://github.com/pocketbase/pocketbase/releases/download/v0.40.5/pocketbase_0.40.5_linux_amd64.zip -o /tmp/pocketbase_0.40.5_linux_amd64.zip
+unzip -o /tmp/pocketbase_0.40.5_linux_amd64.zip pocketbase -d local-pb-db
 chmod +x local-pb-db/pocketbase
 ```
 
@@ -164,11 +164,21 @@ uses it to create a fresh disposable PocketBase directory under
 Local migration validation uses a separate disposable directory under
 `.tmp/pocketbase-upgrade/`. Given a base commit, it imports that commit's
 sanitized schema with the pinned 0.40.1 baseline, applies only new migration
-files added by the change, then compares the result with a PocketBase 0.40.4
+files added by the change, then compares the result with a PocketBase 0.40.5
 import of the current schema. PocketBase 0.40.4 rejects legacy index metadata
 that ends in a semicolon, so the previous-schema import also applies
 `scripts/fixtures/production-index-inventory.json` and strips those terminators
-before the 0.40.1 collections import:
+before the 0.40.1 collections import. The inventory replaces matching indexes by
+name. Its `$inventoryThroughMigration` key names the last migration the
+inventory reflects. The inventory was refreshed on October 22, 2026 from a
+complete production backup. It lists all 32 production collections and reflects
+migrations through `1792281600_account_deletion_worker.js`. Any other
+base-schema index, including one on a collection with no inventory entry, is
+kept only when replaying the base commit's newer migrations with the 0.40.1
+baseline creates it with the same metadata and SQLite definition. Any other gap
+fails as a stale inventory. When refreshing the inventory from production, list
+every production collection, copy each index definition verbatim, and update
+that key:
 
 ```bash
 pnpm pb:validate:upgrade -- --base-ref=origin/dev
@@ -492,14 +502,16 @@ preserves custom definitions, and leaves physical indexes unchanged. Its rollbac
 keeps the valid metadata rather than restoring definitions that 0.40.4 rejects.
 
 The required `pnpm pb:test:auth-verification` check defaults to checksum-verified
-0.40.1 and 0.40.4 binaries. To use separately verified executables:
+0.40.1 and 0.40.5 binaries. To use separately verified executables:
 
 ```bash
-node scripts/test-auth-verification.mjs --baseline-binary=/path/to/0.40.1/pocketbase --binary=/path/to/0.40.4/pocketbase
+node scripts/test-auth-verification.mjs --baseline-binary=/path/to/0.40.1/pocketbase --binary=/path/to/0.40.5/pocketbase
 ```
 
 The disposable test checks physical index preservation, metadata normalization,
 OAuth account backfill, unverified-token invalidation by rotating the users
 auth-token secret, and verified-user access. Its baseline
-uses the complete production index inventory exported on September 20, 2026,
-including valid indexes absent from the earlier repository snapshot.
+uses the complete production index inventory exported on October 22, 2026. It
+restores the semicolon terminators production carried before
+`1789940323_normalize_legacy_index_metadata.js`, so the normalization check
+still has legacy metadata to repair.

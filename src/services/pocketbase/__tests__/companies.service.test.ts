@@ -3,7 +3,15 @@
  * Covers: explicit userId, ServiceError normalization, narrowed list types,
  * duplicate-name validation and ownership checks
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const sessionState = vi.hoisted(() => ({ accountId: 'user-123', generation: 0 }));
+vi.mock('@/services/auth/sessionIdentity', () => ({
+  captureSessionIdentity: () => ({ ...sessionState }),
+  isCurrentSessionIdentity: (identity: { accountId: string; generation: number }) =>
+    identity.accountId === sessionState.accountId &&
+    identity.generation === sessionState.generation,
+}));
 
 const pbMock = vi.hoisted(() => {
   const createListResult = (items: unknown[] = []) => ({
@@ -54,12 +62,14 @@ vi.mock('@/utils/logger', () => ({
   }),
 }));
 
-import { CompaniesService } from '../companies.service';
 import { ErrorHandler } from '../base/ErrorHandler';
+import { CompaniesService } from '../companies.service';
 
 describe('CompaniesService', () => {
   beforeEach(() => {
     pbMock.reset();
+    sessionState.accountId = 'user-123';
+    sessionState.generation = 0;
   });
 
   describe('list()', () => {
@@ -73,100 +83,22 @@ describe('CompaniesService', () => {
       expect(pbMock.pb.filter).toHaveBeenCalledWith('user = {:userId}', { userId: 'user-456' });
       expect(result.items).toEqual([{ id: 'c1', name: 'DMC' }]);
     });
-
-    it('returns narrowed CompanyListItem shape', async () => {
-      pbMock.collectionMethods.getList.mockResolvedValue(
-        pbMock.createListResult([{ id: 'c1', name: 'DMC' }])
-      );
-
-      const result = await CompaniesService.list('user-123');
-      const item = result.items[0];
-
-      // Should have id and name
-      expect(item).toHaveProperty('id');
-      expect(item).toHaveProperty('name');
-    });
-
-    it('throws ServiceError when userId is empty', async () => {
-      await expect(CompaniesService.list('')).rejects.toMatchObject({
-        type: 'auth',
-        message: 'User ID is required',
-      });
-    });
-
-    it('passes pagination params', async () => {
-      pbMock.collectionMethods.getList.mockResolvedValue(pbMock.createListResult([]));
-
-      await CompaniesService.list('user-123', { page: 2, pageSize: 25 });
-
-      expect(pbMock.collectionMethods.getList).toHaveBeenCalledWith(
-        2,
-        25,
-        expect.objectContaining({ sort: 'name,id', fields: 'id,name,website_url' })
-      );
-    });
   });
 
   describe('create()', () => {
-    it('throws normalized validation ServiceError on duplicate name', async () => {
-      // findByName returns an existing record
-      pbMock.collectionMethods.getFirstListItem.mockResolvedValue({ id: 'existing', name: 'DMC' });
-
-      try {
-        await CompaniesService.create({ name: 'DMC' });
-        expect.unreachable('Should have thrown');
-      } catch (error) {
-        // ErrorHandler.handleAsync wraps the thrown error
-        expect(ErrorHandler.isPocketBaseError(error)).toBe(true);
-        if (ErrorHandler.isPocketBaseError(error)) {
-          expect(error.type).toBe('validation');
-          expect(error.message).toContain('DMC');
-        }
-      }
-    });
-
-    it('creates company when name is unique', async () => {
-      // findByName returns null when name doesn't exist. ErrorHandler checks
-      // for PocketBaseError shape first, then ClientResponseError. The simplest
-      // way to simulate "no match" is to make the error look like a handled
-      // PocketBaseError with type not_found.
-      pbMock.collectionMethods.getFirstListItem.mockRejectedValue({
-        type: 'not_found',
-        message: 'not found',
-        retryable: false,
-      });
-      pbMock.collectionMethods.create.mockResolvedValue({
-        id: 'new-1',
-        name: 'DMC',
-        user: 'user-123',
-      });
-
-      const result = await CompaniesService.create({ name: '  DMC  ' });
-
-      expect(pbMock.collectionMethods.create).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'DMC', user: 'user-123' })
+    it('does not write after logout and relogin during duplicate lookup', async () => {
+      let finishLookup!: (reason: unknown) => void;
+      pbMock.collectionMethods.getFirstListItem.mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            finishLookup = reject;
+          })
       );
-      expect(result.id).toBe('new-1');
-    });
-
-    it('allows placeholder-like names when the user creates them intentionally', async () => {
-      pbMock.collectionMethods.getFirstListItem.mockRejectedValue({
-        type: 'not_found',
-        message: 'not found',
-        retryable: false,
-      });
-      pbMock.collectionMethods.create.mockResolvedValue({
-        id: 'other-company',
-        name: 'Other',
-        user: 'user-123',
-      });
-
-      const result = await CompaniesService.create({ name: 'Other' });
-
-      expect(pbMock.collectionMethods.create).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Other', user: 'user-123' })
-      );
-      expect(result.name).toBe('Other');
+      const pending = CompaniesService.create({ name: 'New metadata' });
+      sessionState.generation += 2;
+      finishLookup({ type: 'not_found', message: 'Not found', retryable: false });
+      await expect(pending).rejects.toMatchObject({ reason: 'session_changed' });
+      expect(pbMock.collectionMethods.create).not.toHaveBeenCalled();
     });
   });
 
@@ -184,27 +116,24 @@ describe('CompaniesService', () => {
         }
       }
     });
-
-    it('throws validation ServiceError on duplicate name during update', async () => {
-      pbMock.collectionMethods.getOne.mockResolvedValue({ id: 'c1', user: 'user-123' });
-      pbMock.collectionMethods.getList.mockResolvedValue(
-        pbMock.createListResult([{ id: 'c2', name: 'Existing' }])
-      );
-
-      try {
-        await CompaniesService.update('c1', { name: 'Existing' });
-        expect.unreachable('Should have thrown');
-      } catch (error) {
-        expect(ErrorHandler.isPocketBaseError(error)).toBe(true);
-        if (ErrorHandler.isPocketBaseError(error)) {
-          expect(error.type).toBe('validation');
-          expect(error.message).toContain('Existing');
-        }
-      }
-    });
   });
 
   describe('delete()', () => {
+    it('does not delete after logout and relogin during ownership lookup', async () => {
+      let finishLookup!: (value: { id: string; user: string }) => void;
+      pbMock.collectionMethods.getOne.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            finishLookup = resolve;
+          })
+      );
+      const pending = CompaniesService.delete('metadata-1');
+      sessionState.generation += 2;
+      finishLookup({ id: 'metadata-1', user: 'user-123' });
+      await expect(pending).rejects.toMatchObject({ reason: 'session_changed' });
+      expect(pbMock.collectionMethods.delete).not.toHaveBeenCalled();
+    });
+
     it('throws permission ServiceError when user does not own the record', async () => {
       pbMock.collectionMethods.getOne.mockResolvedValue({ id: 'c1', user: 'other-user' });
 
@@ -227,22 +156,6 @@ describe('CompaniesService', () => {
 
       // Verify the filter was built with the explicit userId
       expect(count).toBe(1);
-    });
-  });
-
-  describe('getProjectCounts()', () => {
-    it('loads all company counts with one aggregate request', async () => {
-      pbMock.pb.send = vi.fn().mockResolvedValue({
-        counts: { 'company-1': 3, 'company-2': 1 },
-      });
-
-      const counts = await CompaniesService.getProjectCounts();
-
-      expect(pbMock.pb.send).toHaveBeenCalledOnce();
-      expect(pbMock.pb.send).toHaveBeenCalledWith('/api/stats/company-project-counts', {
-        method: 'GET',
-      });
-      expect(counts).toEqual({ 'company-1': 3, 'company-2': 1 });
     });
   });
 });

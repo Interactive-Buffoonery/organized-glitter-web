@@ -9,6 +9,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -18,7 +19,7 @@ import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-export const POCKETBASE_VERSION = '0.40.4';
+export const POCKETBASE_VERSION = '0.40.5';
 export const POCKETBASE_BASELINE_VERSION = '0.40.1';
 
 const BASELINE_ARCHIVES = {
@@ -46,28 +47,28 @@ const BASELINE_ARCHIVES = {
 
 export const POCKETBASE_ARCHIVES = {
   'darwin-arm64': {
-    archive: 'pocketbase_0.40.4_darwin_arm64.zip',
-    sha256: 'eeb619ea4f8a06421daedb946d133bed269fea334a760941d147f76befc25ebc',
-    binarySha256: '510df5401d2f0e4f91b19ab644760783b4edddf7db21e7d63935b2520966a906',
+    archive: 'pocketbase_0.40.5_darwin_arm64.zip',
+    sha256: 'd9a176e0491bc825fff88c2a4edffb07307f785ac2bd9710e82c5d223669fc17',
+    binarySha256: '420d4c192368646c2209ba67c6b741de4a47b2550576dd6676228f6d5c97374c',
   },
   'darwin-x64': {
-    archive: 'pocketbase_0.40.4_darwin_amd64.zip',
-    sha256: '052906521f09f6f23405cd804c930d2b7a1f8eee06d39b85723b5054b2acb4e4',
-    binarySha256: '1eb547415d4b248bc522fc085c1449be3ffc145344e15a2365f2dcd26001a405',
+    archive: 'pocketbase_0.40.5_darwin_amd64.zip',
+    sha256: '3640f0c4d9e0e5a47e321f10ddf6698508d4f20721bcf5dfb7c4192835e5105f',
+    binarySha256: '918b098e28965613b47645458611fa38a394b8ba4313d9c3c85eacd19399bd10',
   },
   'linux-arm64': {
-    archive: 'pocketbase_0.40.4_linux_arm64.zip',
-    sha256: '86095bf8ed9345954f0d2bf0a5fb9b57584ae60b77ebf3b6cd23a8003a3fd418',
-    binarySha256: 'ff4b3cad4a43123e88272cc0f1aad7f1b40279e266b2ea62e376fa008f765e3e',
+    archive: 'pocketbase_0.40.5_linux_arm64.zip',
+    sha256: '570baa1c45d2fb92fc0073582b945ca0ece03cbf9837ccabf49a222f99dd02e3',
+    binarySha256: '86e6a863386091b502068a58edd0f3c3b95f8fd5bd97dc00ec9c7199ec70835e',
   },
   'linux-x64': {
-    archive: 'pocketbase_0.40.4_linux_amd64.zip',
-    sha256: '9042ec818570e79c3628dadcd0a756c1496d9e1173918ec409d133c02f82e5fa',
-    binarySha256: '14ec215bc7aaceda356713cd4b29aa7fcfee854ff2ae1151c5ddba41b43aec8a',
+    archive: 'pocketbase_0.40.5_linux_amd64.zip',
+    sha256: '1dbea1b01eb3dfe64953513859d01e759c96650c4e3264fa4eecd54b769382e4',
+    binarySha256: '6c213b3673c74e08dce6c4c5920ebc33584b53df1edafd04591ddfa3acee76cf',
   },
 };
 
-const RELEASES = { '0.40.1': BASELINE_ARCHIVES, '0.40.4': POCKETBASE_ARCHIVES };
+const RELEASES = { '0.40.1': BASELINE_ARCHIVES, '0.40.5': POCKETBASE_ARCHIVES };
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -135,6 +136,28 @@ export async function downloadPocketBaseArchive(url, { fetchFn = fetch, sleepFn 
   }
 }
 
+/**
+ * Renames finished files into place so concurrent installs sharing one cache
+ * never overwrite a binary another process is running or verifying.
+ */
+export function placeVerifiedBinary(source, destination, metadata) {
+  mkdirSync(path.dirname(destination), { recursive: true });
+  const staged = `${destination}.${process.pid}.tmp`;
+  const stagedMetadata = `${metadataPathFor(destination)}.${process.pid}.tmp`;
+  try {
+    copyFileSync(source, staged);
+    chmodSync(staged, 0o755);
+    writeFileSync(stagedMetadata, `${JSON.stringify(metadata, null, 2)}\n`);
+    // Metadata goes first: if the binary rename never happens, the old binary
+    // fails its checksum on the next run and both files are rewritten.
+    renameSync(stagedMetadata, metadataPathFor(destination));
+    renameSync(staged, destination);
+  } finally {
+    rmSync(staged, { force: true });
+    rmSync(stagedMetadata, { force: true });
+  }
+}
+
 export async function installPocketBase({
   destination,
   fetchFn = fetch,
@@ -177,13 +200,7 @@ export async function installPocketBase({
       throw new Error('Extracted PocketBase executable did not match the pinned binary checksum.');
     }
 
-    mkdirSync(path.dirname(destination), { recursive: true });
-    copyFileSync(extractedBinary, destination);
-    chmodSync(destination, 0o755);
-    writeFileSync(
-      metadataPathFor(destination),
-      `${JSON.stringify({ version, ...release }, null, 2)}\n`
-    );
+    placeVerifiedBinary(extractedBinary, destination, { version, ...release });
     return destination;
   } finally {
     rmSync(temporaryDir, { recursive: true, force: true });

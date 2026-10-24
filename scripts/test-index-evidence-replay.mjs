@@ -10,9 +10,11 @@ import { fileURLToPath } from 'node:url';
 
 import { installPocketBase, POCKETBASE_BASELINE_VERSION } from './install-pocketbase.mjs';
 import {
+  applyDeployedMigrations,
   applyIndexInventory,
   readBaseMigrations,
   replayIndexEvidence,
+  splitDeployedMigrations,
 } from './validate-pocketbase-upgrade.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -160,6 +162,44 @@ assert.deepEqual(
   [{ ...notes, indexes: [] }, jobs],
   'a collection created after the boundary'
 );
+
+// Production can apply a migration before it reaches the base branch, which
+// puts the inventory boundary ahead of the base schema.
+const priorityIndex = 'CREATE INDEX idx_notes_priority ON notes (priority)';
+const addPriority = {
+  name: '1800000000_priority.js',
+  source: migration(`    notes.fields.add(new TextField({ name: 'priority' }));
+    notes.indexes = [...notes.indexes, ${JSON.stringify(priorityIndex)}];
+    app.save(notes);`),
+};
+const aheadInventory = {
+  $inventoryThroughMigration: addPriority.name,
+  notes: [statusIndex, priorityIndex],
+};
+assert.deepEqual(
+  splitDeployedMigrations(
+    ['pb_migrations/1700000000_pending.js', `pb_migrations/${addPriority.name}`],
+    aheadInventory
+  ),
+  {
+    deployed: [`pb_migrations/${addPriority.name}`],
+    pending: ['pb_migrations/1700000000_pending.js'],
+  },
+  'only the inventory boundary migration counts as already deployed'
+);
+const [deployedNotes] = applyIndexInventory(
+  (
+    await withWorkDir(workDir =>
+      applyDeployedMigrations({ schema: [notes], migrations: [addPriority], binary, workDir })
+    )
+  ).filter(collection => collection.name === 'notes'),
+  aheadInventory
+);
+assert.ok(
+  deployedNotes.fields.some(field => field.name === 'priority'),
+  'the deployed migration adds the column its production index needs'
+);
+assert.ok(deployedNotes.indexes.includes(priorityIndex), 'the production index is kept');
 
 const inventory = JSON.parse(
   readFileSync(path.join(root, 'scripts/fixtures/production-index-inventory.json'), 'utf8')

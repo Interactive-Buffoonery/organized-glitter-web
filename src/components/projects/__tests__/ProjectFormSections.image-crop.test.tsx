@@ -197,6 +197,11 @@ describe('ProjectFormSections project image cropping', () => {
     vi.unstubAllGlobals();
   });
 
+  it('leaves the main landmark to the page layout', () => {
+    renderProjectForm();
+    expect(screen.queryByRole('main')).not.toBeInTheDocument();
+  });
+
   it('loads a protected existing cover with the current file token before cropping', async () => {
     const url = 'https://backend.example.test/api/files/projects/example/cover.jpg';
     const fetchMock = vi.fn().mockResolvedValue({

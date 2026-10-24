@@ -268,7 +268,7 @@ const ProjectFormSections = ({
         </>
       ) : null}
 
-      <main className="order-3 min-w-0 lg:order-none lg:col-start-1 lg:row-start-2">
+      <div className="order-3 min-w-0 lg:order-none lg:col-start-1 lg:row-start-2">
         <ProjectSpecsSection
           formData={formData}
           isSubmitting={isSubmitting}
@@ -293,7 +293,7 @@ const ProjectFormSections = ({
           fieldErrors={fieldErrors}
           onFieldChange={handleInputChange}
         />
-      </main>
+      </div>
 
       <aside className="order-2 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1">
         <ProjectCoverImageSection

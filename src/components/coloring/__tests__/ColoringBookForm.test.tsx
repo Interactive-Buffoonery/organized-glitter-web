@@ -85,6 +85,11 @@ describe('ColoringBookForm', () => {
     Element.prototype.scrollIntoView ??= vi.fn();
   });
 
+  it('leaves the main landmark to the page layout', () => {
+    const { container } = renderWithProviders(<ColoringBookForm {...baseProps} />);
+    expect(within(container).queryByRole('main')).not.toBeInTheDocument();
+  });
+
   it('restores a cover file that was waiting in the crop dialog', async () => {
     const user = userEvent.setup();
     const props = { ...baseProps, sessionDraftKey: 'coloring-new-test', accountId: 'user-1' };

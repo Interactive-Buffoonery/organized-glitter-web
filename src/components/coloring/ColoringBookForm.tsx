@@ -447,7 +447,7 @@ export function ColoringBookForm({
           </div>
         ) : null}
 
-        <main
+        <div
           className={cn(
             'min-w-0',
             isDrawerLayout ? 'order-none' : 'order-3 lg:order-none lg:col-start-1 lg:row-start-2'
@@ -467,7 +467,7 @@ export function ColoringBookForm({
           <ColoringBookAcquisitionFields {...sharedProps} />
           <ColoringBookSourceFields {...sharedProps} />
           <ColoringBookNotesFields {...sharedProps} />
-        </main>
+        </div>
 
         <aside
           className={cn(

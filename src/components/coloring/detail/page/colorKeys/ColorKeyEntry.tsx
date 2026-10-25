@@ -140,6 +140,14 @@ function EntryForm({
   const id = useId();
   const { row } = target;
   const triedInput = useRef<HTMLInputElement>(null);
+  // A save can finish after this form was replaced; only a form still on screen may move on.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [code, setCode] = useState(row?.code ?? '');
   const [colorName, setColorName] = useState(row?.color_name ?? '');
   const [swatch, setSwatch] = useState(row?.swatch ?? '');
@@ -234,6 +242,7 @@ function EntryForm({
       notifyError(message);
       return;
     }
+    if (!mounted.current) return;
     if (goNext && next) onNext(next);
     else onClose();
   };
@@ -251,7 +260,7 @@ function EntryForm({
     if (!confirmed) return;
     try {
       await remove.mutateAsync(row.id);
-      onClose();
+      if (mounted.current) onClose();
     } catch (deleteError) {
       logger.warn('Could not delete a color key', deleteError);
       notifyError('Could not delete this color. Try again.');

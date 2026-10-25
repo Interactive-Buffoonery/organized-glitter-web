@@ -116,10 +116,6 @@ function ColorKeyEditor({
   const [off, setOff] = useState<Set<string>>(() => new Set());
   const [picker, setPicker] = useState<'setup' | 'add' | null>(null);
   const [entry, setEntry] = useState<EntryTarget | null>(null);
-  const currentEntry = useRef(entry);
-  useEffect(() => {
-    currentEntry.current = entry;
-  });
 
   const editingIndex = entry?.row ? rows.findIndex(row => row.id === entry.row?.id) : -1;
   const liveEntry: EntryTarget | null =
@@ -248,15 +244,13 @@ function ColorKeyEditor({
   // A row that vanished mid-edit stays listed under its key, so the draft survives.
   const listed = entry?.row && editingIndex < 0 ? [...rows, entry.row] : rows;
   const rowButtonId = (id: string) => `color-keys-${pageId}-row-${id}`;
-  // A save can finish after another row opened; only the form's own session may move on.
-  const opened = entry;
   const closeEntry = () => {
-    if (currentEntry.current !== opened) return;
-    const id = opened?.row?.id;
+    const id = entry?.row?.id;
     flushSync(() => setEntry(null));
     (
       (id && document.getElementById(rowButtonId(id))) ||
-      document.getElementById(`color-keys-${pageId}-add-symbol`)
+      document.getElementById(`color-keys-${pageId}-add-symbol`) ||
+      document.getElementById(`color-keys-${pageId}`)
     )?.focus();
   };
   const entryForm = liveEntry ? (
@@ -268,10 +262,7 @@ function ColorKeyEditor({
       next={next}
       requests={requests}
       onClose={closeEntry}
-      onNext={row => {
-        if (currentEntry.current === opened)
-          setEntry({ row, symbol: row.symbol, position: row.position });
-      }}
+      onNext={row => setEntry({ row, symbol: row.symbol, position: row.position })}
       onRequestSymbol={request => openRequest({ kind: 'entry', request })}
     />
   ) : null;

@@ -339,6 +339,34 @@ describe('Color key entry', () => {
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('700');
   });
 
+  it('keeps a replacement form open when the symbol changed during a save', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    let resolve: (value: unknown) => void = () => {};
+    state.update.mockReturnValueOnce(new Promise(done => (resolve = done)));
+    const { rerender } = render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.click(screen.getByRole('button', { name: 'Save and next: Two' }));
+    state.rows = [key('a', 0, 'u:00A5'), key('b', 1, 'u:0032')];
+    rerender(<ColorKeySection pageId="page-1" />);
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '800');
+    resolve(key('a', 0, 'u:00A5'));
+    await new Promise(done => setTimeout(done, 0));
+    expect(screen.getByRole('form', { name: 'Edit color: Yen sign' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('800');
+  });
+
+  it('focuses the heading when closing the last row after it was removed elsewhere', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    const { rerender } = render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    state.rows = [];
+    rerender(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('heading', { name: 'Color key' })).toHaveFocus();
+  });
+
   it('fills color name and swatch from an earlier code', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:03C8')];

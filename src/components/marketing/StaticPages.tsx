@@ -1,13 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Link, MemoryRouter } from 'react-router-dom';
-import { X } from 'lucide-react';
 
 import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { HostingNoticeContent } from '@/components/layout/HostingNotice';
 import { PrivacyPolicy } from '@/components/legal/PrivacyPolicy';
 import { TermsOfService } from '@/components/legal/TermsOfService';
 import { cn } from '@/lib/utils';
@@ -83,20 +81,6 @@ function StaticPage({ children, currentPage, className }: StaticPageProps) {
           Skip to content
         </a>
         <StaticSiteHeader />
-        {currentPage === 'Home' && (
-          <HostingNoticeContent>
-            <template data-notice-dismiss>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-touch"
-                aria-label="Close hosting notice"
-              >
-                <X aria-hidden="true" />
-              </Button>
-            </template>
-          </HostingNoticeContent>
-        )}
         <main id="main-content" tabIndex={-1} className="flex-grow">
           {children}
         </main>

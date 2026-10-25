@@ -621,7 +621,7 @@ For public marketing and utility surfaces:
 
 Coloring page colors use a read-only Colors summary in the control panel below
 Mediums, with the usual section heading and divider. Editing happens on a
-separate colors screen, which stacks Photos and notes above the color key as
+separate colors screen, which stacks the Color strip section above the color key as
 flat sections.
 
 ## Destructive colors in Dark mode

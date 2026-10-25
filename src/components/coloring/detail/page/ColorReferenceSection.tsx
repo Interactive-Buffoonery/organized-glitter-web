@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ImagePlus } from 'lucide-react';
 import { Section, SectionHeading } from '@/components/shared/Section';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -167,9 +168,10 @@ function ColorReferenceEditor({ pageId, userId }: { pageId: string; userId: stri
     requestAnimationFrame(() => noteButton.current?.querySelector('button')?.focus());
   };
   const disabled = query.isPending || query.isError || save.isPending;
+  const photoCount = query.data?.photos.length ?? 0;
   return (
     <Section variant="bordered" className="space-y-3" landmark={false}>
-      <SectionHeading>Photos and notes</SectionHeading>
+      <SectionHeading>Color strip</SectionHeading>
       {saveError && !editing && !uploadOpen && (
         <p role="alert" className="text-destructive-text text-sm">
           {saveError}
@@ -192,97 +194,6 @@ function ColorReferenceEditor({ pageId, userId }: { pageId: string; userId: stri
           </Button>
         </p>
       )}
-      <div className="grid grid-cols-2 gap-3">
-        {images.data?.map((image, index) => (
-          <div key={image.filename} className="min-w-0 space-y-1">
-            <ColorReferenceViewer {...image} index={index + 1} />
-            <Button
-              type="button"
-              variant="ghost"
-              className="text-destructive-text w-full"
-              disabled={disabled}
-              aria-label={`Remove swatch photo ${index + 1}`}
-              onClick={async () => {
-                if (await confirmDelete('Remove this swatch photo?')) {
-                  if (active.current)
-                    void runSave({ action: 'remove', filename: image.filename }, () => {});
-                }
-              }}
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
-      </div>
-      {!query.isPending && !query.isError && !query.data?.notes && !editing && (
-        <p className="text-muted-foreground text-sm">
-          Add photos of this page's color strip or your swatches, and notes on blends.
-        </p>
-      )}
-      {query.data?.notes && !editing && (
-        <p className="text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">{query.data.notes}</p>
-      )}
-      {editing ? (
-        <div className="space-y-2">
-          <label htmlFor="color-reference-notes" className="text-sm">
-            Color notes
-          </label>
-          <Textarea
-            ref={noteInput}
-            id="color-reference-notes"
-            autoCorrect="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            value={notes}
-            onChange={event => {
-              setNotes(event.target.value);
-              setSaveError(null);
-            }}
-            rows={5}
-            maxLength={100000}
-            disabled={save.isPending}
-          />
-          {saveError && (
-            <p role="alert" className="text-destructive-text text-sm">
-              {saveError}
-            </p>
-          )}
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="link"
-              disabled={save.isPending}
-              onClick={() =>
-                void runSave(
-                  { action: 'notes', notes, baselineNotes: baseline.current },
-                  finishNotes
-                )
-              }
-            >
-              Save
-            </Button>
-            <Button type="button" variant="link" disabled={save.isPending} onClick={finishNotes}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div ref={noteButton}>
-          <Button
-            type="button"
-            variant="link"
-            disabled={disabled}
-            onClick={() => {
-              const value = query.data?.notes ?? '';
-              setNotes(value);
-              baseline.current = value;
-              setEditing(true);
-            }}
-          >
-            {query.data?.notes ? 'Edit note' : 'Add note'}
-          </Button>
-        </div>
-      )}
       <Dialog
         open={uploadOpen}
         onOpenChange={open => {
@@ -292,11 +203,52 @@ function ColorReferenceEditor({ pageId, userId }: { pageId: string; userId: stri
           }
         }}
       >
-        <DialogTrigger asChild>
-          <Button type="button" variant="glass" disabled={disabled}>
-            Add photo
-          </Button>
-        </DialogTrigger>
+        {photoCount ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {images.data?.map((image, index) => (
+              <div key={image.filename} className="min-w-0 space-y-1">
+                <ColorReferenceViewer {...image} index={index + 1} />
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive-text h-auto px-0"
+                  disabled={disabled}
+                  aria-label={`Remove swatch photo ${index + 1}`}
+                  onClick={async () => {
+                    if (await confirmDelete('Remove this swatch photo?')) {
+                      if (active.current)
+                        void runSave({ action: 'remove', filename: image.filename }, () => {});
+                    }
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+            <DialogTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-24 w-full border-dashed shadow-none"
+                disabled={disabled}
+              >
+                <ImagePlus className="size-4" aria-hidden="true" />
+                Add photo
+              </Button>
+            </DialogTrigger>
+          </div>
+        ) : !query.isPending && !query.isError ? (
+          <div className="bg-muted/30 flex min-h-36 flex-col items-center justify-center gap-3 rounded-2xl border px-4 py-6 text-center">
+            <p className="text-muted-foreground text-sm">No photo of the strip yet</p>
+            <DialogTrigger asChild>
+              <Button type="button" variant="outline" disabled={disabled}>
+                <ImagePlus className="size-4" aria-hidden="true" />
+                Add photo
+              </Button>
+            </DialogTrigger>
+          </div>
+        ) : null}
         <DialogContent className="max-h-[85dvh] overflow-y-auto [&>button:last-child]:size-11">
           <DialogHeader>
             <DialogTitle>Add swatch photos</DialogTitle>
@@ -411,6 +363,71 @@ function ColorReferenceEditor({ pageId, userId }: { pageId: string; userId: stri
           </div>
         </DialogContent>
       </Dialog>
+      {query.data?.notes && !editing && (
+        <p className="text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">{query.data.notes}</p>
+      )}
+      {editing ? (
+        <div className="space-y-2">
+          <label htmlFor="color-reference-notes" className="text-sm">
+            Color notes
+          </label>
+          <Textarea
+            ref={noteInput}
+            id="color-reference-notes"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={notes}
+            onChange={event => {
+              setNotes(event.target.value);
+              setSaveError(null);
+            }}
+            rows={5}
+            maxLength={100000}
+            disabled={save.isPending}
+          />
+          {saveError && (
+            <p role="alert" className="text-destructive-text text-sm">
+              {saveError}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="link"
+              disabled={save.isPending}
+              onClick={() =>
+                void runSave(
+                  { action: 'notes', notes, baselineNotes: baseline.current },
+                  finishNotes
+                )
+              }
+            >
+              Save
+            </Button>
+            <Button type="button" variant="link" disabled={save.isPending} onClick={finishNotes}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div ref={noteButton}>
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto px-0"
+            disabled={disabled}
+            onClick={() => {
+              const value = query.data?.notes ?? '';
+              setNotes(value);
+              baseline.current = value;
+              setEditing(true);
+            }}
+          >
+            {query.data?.notes ? 'Edit note' : 'Add note'}
+          </Button>
+        </div>
+      )}
       <ConfirmationDialog />
     </Section>
   );

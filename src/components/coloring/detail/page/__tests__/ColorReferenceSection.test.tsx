@@ -30,7 +30,7 @@ vi.mock('@/hooks/mutations/coloring/useSaveColorReference', () => ({
 vi.mock('@/utils/image/colorReferenceImage', () => ({ prepareColorReferenceImage: state.prepare }));
 vi.mock('@/lib/notifications', () => ({ notifyError: state.error, notifySuccess: vi.fn() }));
 
-describe('Photos and notes', () => {
+describe('Color strip', () => {
   beforeEach(() => {
     state.user = { id: 'owner' };
     state.reference = null;

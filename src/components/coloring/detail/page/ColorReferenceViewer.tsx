@@ -26,7 +26,7 @@ export function ColorReferenceViewer({
         <Button
           type="button"
           variant="ghost"
-          className="h-24 w-full p-0"
+          className="h-24 w-full overflow-hidden rounded-md border p-0"
           aria-label={`Open swatch photo ${index}`}
         >
           <PrivateFileImage
@@ -34,7 +34,7 @@ export function ColorReferenceViewer({
             loading="lazy"
             decoding="async"
             alt={`Swatch sheet ${index}`}
-            className="size-full rounded-md object-contain"
+            className="size-full object-cover"
           />
         </Button>
       </DialogTrigger>

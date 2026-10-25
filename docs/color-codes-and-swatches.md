@@ -1,6 +1,6 @@
 # Color Codes & Swatches
 
-The color reference appears as Photos and notes on the page's colors screen
+The color reference appears as the Color strip section on the page's colors screen
 (`/coloring/:bookId/pages/:pageId/colors`), above the color key. The page detail
 panel shows a read-only Colors summary with up to four photo thumbnails and links
 to the colors screen. Photos are added and removed only on the colors screen.

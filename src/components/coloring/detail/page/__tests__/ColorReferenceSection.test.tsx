@@ -47,6 +47,18 @@ describe('Color strip', () => {
       })
     );
   });
+  it('offers one Add photo button that opens the photo dialog, with or without photos', async () => {
+    const user = userEvent.setup();
+    const view = render(<ColorReferenceSection pageId="page-a" />);
+    expect(screen.getByText('No photo of the strip yet')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add photo' }));
+    expect(screen.getByRole('dialog', { name: 'Add swatch photos' })).toBeInTheDocument();
+    view.unmount();
+    state.reference = { notes: '', photos: ['sheet.jpg'] };
+    render(<ColorReferenceSection pageId="page-a" />);
+    expect(screen.queryByText('No photo of the strip yet')).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Add photo' })).toHaveLength(1);
+  });
   it('saves notes alone without rewriting color codes and allows clearing notes', async () => {
     state.reference = { notes: 'Existing', photos: ['sheet.jpg'] };
     const user = userEvent.setup();

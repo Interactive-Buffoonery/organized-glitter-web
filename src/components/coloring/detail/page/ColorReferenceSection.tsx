@@ -169,6 +169,14 @@ function ColorReferenceEditor({ pageId, userId }: { pageId: string; userId: stri
   };
   const disabled = query.isPending || query.isError || save.isPending;
   const photoCount = query.data?.photos.length ?? 0;
+  const addPhotoTrigger = (className?: string) => (
+    <DialogTrigger asChild>
+      <Button type="button" variant="outline" className={className} disabled={disabled}>
+        <ImagePlus className="size-4" aria-hidden="true" />
+        Add photo
+      </Button>
+    </DialogTrigger>
+  );
   return (
     <Section variant="bordered" className="space-y-3" landmark={false}>
       <SectionHeading>Color strip</SectionHeading>
@@ -226,27 +234,12 @@ function ColorReferenceEditor({ pageId, userId }: { pageId: string; userId: stri
                 </Button>
               </div>
             ))}
-            <DialogTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-24 w-full border-dashed shadow-none"
-                disabled={disabled}
-              >
-                <ImagePlus className="size-4" aria-hidden="true" />
-                Add photo
-              </Button>
-            </DialogTrigger>
+            {addPhotoTrigger('h-24 w-full border-dashed shadow-none')}
           </div>
         ) : !query.isPending && !query.isError ? (
           <div className="bg-muted/30 flex min-h-36 flex-col items-center justify-center gap-3 rounded-2xl border px-4 py-6 text-center">
             <p className="text-muted-foreground text-sm">No photo of the strip yet</p>
-            <DialogTrigger asChild>
-              <Button type="button" variant="outline" disabled={disabled}>
-                <ImagePlus className="size-4" aria-hidden="true" />
-                Add photo
-              </Button>
-            </DialogTrigger>
+            {addPhotoTrigger()}
           </div>
         ) : null}
         <DialogContent className="max-h-[85dvh] overflow-y-auto [&>button:last-child]:size-11">

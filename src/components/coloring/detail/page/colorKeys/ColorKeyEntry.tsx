@@ -30,7 +30,6 @@ import type {
   SymbolRequestPreview,
 } from '@/services/pocketbase/colorKeys.service';
 import { createLogger } from '@/utils/logger';
-import { ColorKeySheet } from './ColorKeySheet';
 import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
 import { requestFor, safeSwatch, symbolDisplayName } from './symbolName';
@@ -42,14 +41,12 @@ export type EntryTarget = {
   row?: ColorKey;
   symbol: string;
   position: number;
-  /** Set when arriving from Save and next, so typing can start right away. */
-  focusCode?: boolean;
 };
 
 interface ColorKeyEntryProps {
   pageId: string;
   userId: string;
-  target: EntryTarget | null;
+  target: EntryTarget;
   positionForNew: number;
   next?: ColorKey;
   requests?: Record<string, SymbolRequestPreview>;
@@ -73,60 +70,45 @@ const tidyHex = (value: string) => {
   return match ? `#${match[1].toUpperCase()}` : value;
 };
 
-export function ColorKeyEntry({ target, onClose, ...props }: ColorKeyEntryProps) {
-  const formKey = target ? `${target.row?.id ?? 'new'}:${target.symbol}` : '';
+export function ColorKeyEntry({ target, ...props }: ColorKeyEntryProps) {
+  const formKey = `${target.row?.id ?? 'new'}:${target.symbol}`;
   const [changed, setChanged] = useState<{ formKey: string; symbol: string } | null>(null);
-  // A closed entry forgets a picked symbol, so reopening the same row starts clean.
   const [goneKey, setGoneKey] = useState('');
-  if (!target && changed) setChanged(null);
-  if (!target && goneKey) setGoneKey('');
-  const gone = Boolean(target) && goneKey === formKey;
-  const symbol = changed?.formKey === formKey ? changed.symbol : target?.symbol;
+  const gone = goneKey === formKey;
+  const symbol = changed?.formKey === formKey ? changed.symbol : target.symbol;
   // A request resolves after a send; it may only touch the form that asked for it.
   const openKey = useRef(formKey);
   useEffect(() => {
     openKey.current = formKey;
+    return () => {
+      openKey.current = '';
+    };
   }, [formKey]);
   const { onRequestSymbol, ...formProps } = props;
-  const request = symbol ? requestFor(symbol, props.requests) : undefined;
-  const name = symbol ? symbolDisplayName(symbol, request) : '';
+  const name = symbolDisplayName(symbol, requestFor(symbol, props.requests));
   return (
-    <ColorKeySheet
-      open={Boolean(target)}
-      onOpenChange={open => !open && onClose()}
-      title={target?.row && !gone ? `Edit color: ${name}` : `Add a color: ${name}`}
-      description="Record the color you used for this symbol."
-      onEscapeKeyDown={event => {
-        // An open suggestion list owns Escape; the combobox closes it.
-        if ((event.target as Element | null)?.getAttribute?.('aria-expanded') === 'true')
-          event.preventDefault();
-      }}
-    >
-      {target && symbol ? (
-        <EntryForm
-          key={formKey}
-          target={target}
-          symbol={symbol}
-          onSymbolChange={picked => setChanged({ formKey, symbol: picked })}
-          gone={gone}
-          onGone={() => setGoneKey(formKey)}
-          onClose={onClose}
-          onRequestSymbol={
-            onRequestSymbol &&
-            (focus =>
-              onRequestSymbol({
-                focus,
-                place: picked => {
-                  if (openKey.current !== formKey) return false;
-                  setChanged({ formKey, symbol: picked });
-                  return true;
-                },
-              }))
-          }
-          {...formProps}
-        />
-      ) : null}
-    </ColorKeySheet>
+    <EntryForm
+      key={formKey}
+      label={target.row && !gone ? `Edit color: ${name}` : `Add a color: ${name}`}
+      target={target}
+      symbol={symbol}
+      onSymbolChange={picked => setChanged({ formKey, symbol: picked })}
+      gone={gone}
+      onGone={() => setGoneKey(formKey)}
+      onRequestSymbol={
+        onRequestSymbol &&
+        (focus =>
+          onRequestSymbol({
+            focus,
+            place: picked => {
+              if (openKey.current !== formKey) return false;
+              setChanged({ formKey, symbol: picked });
+              return true;
+            },
+          }))
+      }
+      {...formProps}
+    />
   );
 }
 
@@ -144,8 +126,10 @@ function EntryForm({
   onSymbolChange,
   gone,
   onGone,
+  label,
 }: Omit<ColorKeyEntryProps, 'onRequestSymbol'> & {
   onRequestSymbol?: (focusChangeSymbol: () => void) => void;
+  label: string;
   target: EntryTarget;
   symbol: string;
   onSymbolChange: (symbol: string) => void;
@@ -281,7 +265,20 @@ function EntryForm({
   const hint = 'text-muted-foreground font-normal';
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+    // Escape closes the form the way it closes a dialog.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+    <form
+      aria-label={label}
+      onSubmit={onSubmit}
+      onKeyDown={event => {
+        // Escape inside a portaled picker or dialog still bubbles here through React.
+        if (event.key !== 'Escape' || !event.currentTarget.contains(event.target as Node)) return;
+        event.preventDefault();
+        onClose();
+      }}
+      className="border-border/70 bg-muted/30 my-1 space-y-4 rounded-lg border p-3"
+      noValidate
+    >
       <div className="flex items-center gap-3">
         <span
           aria-hidden="true"
@@ -322,9 +319,9 @@ function EntryForm({
           spellCheck={false}
           className="h-11 font-mono"
           maxLength={COLOR_KEY_LIMITS.code}
-          // Save and next remounts the form; focus Code so the next row can be typed straight away.
+          // The row button that opened this form is gone; Code is where typing starts.
           // eslint-disable-next-line jsx-a11y/no-autofocus
-          autoFocus={target.focusCode}
+          autoFocus
           value={code}
           onChange={event => {
             setCode(event.target.value);
@@ -516,6 +513,9 @@ function EntryForm({
             Delete
           </Button>
         ) : null}
+        <Button type="button" variant="ghost" className="h-11" onClick={onClose}>
+          Cancel
+        </Button>
         <Button type="submit" variant="glass" className="h-11 flex-1" disabled={busy}>
           Save
         </Button>
@@ -536,6 +536,10 @@ function EntryForm({
         onOpenChange={setPickerOpen}
         userId={userId}
         title="Change symbol"
+        onCloseAutoFocus={event => {
+          event.preventDefault();
+          document.getElementById(`color-keys-${pageId}-change-symbol`)?.focus();
+        }}
         onRequestSymbol={
           onRequestSymbol &&
           (() => {

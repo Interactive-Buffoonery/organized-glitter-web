@@ -289,6 +289,27 @@ describe('Color key sort', () => {
 });
 
 describe('Color key entry', () => {
+  it('edits a color in place and returns focus to its row on Cancel or Escape', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    const [first, second] = screen.getAllByRole('listitem');
+    const form = within(first).getByRole('form', { name: 'Edit color: One' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(within(form).getByRole('combobox', { name: 'Code' })).toHaveFocus();
+    expect(within(second).getByRole('button', { name: /^Two,/ })).toBeInTheDocument();
+
+    await user.click(within(form).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('form')).toBeNull();
+    expect(screen.getByRole('button', { name: /^One,/ })).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('form')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Two,/ })).toHaveFocus();
+  });
+
   it('fills color name and swatch from an earlier code', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:03C8')];
@@ -330,7 +351,7 @@ describe('Color key entry', () => {
     await user.type(screen.getByRole('textbox', { name: 'Swatch hex' }), 'red');
     await user.click(screen.getByRole('button', { name: /^Save$/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Swatch must be a color');
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Edit color: One' })).toBeInTheDocument();
   });
 
   it('creates a new row after the last one from Add symbol', async () => {
@@ -389,14 +410,14 @@ describe('Color key entry', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This color is no longer on this page. Save again to add it back.'
     );
-    expect(screen.getByRole('dialog', { name: 'Add a color: One' })).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Add a color: One' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('654');
     await user.click(screen.getByRole('button', { name: /^Save$/ }));
     expect(state.create).toHaveBeenCalledWith(
       expect.objectContaining({ symbol: 'u:0031', position: 4, code: '654' })
     );
     expect(state.update).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('form')).toBeNull());
   });
 
   it('recreates a vanished row after the latest live position', async () => {
@@ -433,7 +454,7 @@ describe('Color key entry', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Save again to add it back');
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('654');
     await user.click(screen.getByRole('button', { name: 'Save and next: Two' }));
-    expect(await screen.findByRole('dialog', { name: 'Edit color: Two' })).toBeInTheDocument();
+    expect(await screen.findByRole('form', { name: 'Edit color: Two' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveFocus();
   });
 
@@ -446,12 +467,12 @@ describe('Color key entry', () => {
     await user.click(screen.getByRole('button', { name: 'Change symbol' }));
     await user.type(screen.getByRole('searchbox', { name: 'Search symbols' }), 'yen');
     await user.click(screen.getByRole('option', { name: 'Yen sign' }));
-    expect(screen.getByRole('dialog', { name: 'Edit color: Yen sign' })).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Edit color: Yen sign' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('form')).toBeNull());
 
     await user.click(screen.getByRole('button', { name: /^One,/ }));
-    expect(screen.getByRole('dialog', { name: 'Edit color: One' })).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Edit color: One' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^Save$/ }));
     expect(state.update).toHaveBeenCalledWith({
       id: 'a',
@@ -563,7 +584,7 @@ describe('Symbol requests', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Try again' }));
     expect(
-      await screen.findByRole('dialog', { name: 'Edit color: Sent symbol' })
+      await screen.findByRole('form', { name: 'Edit color: Sent symbol' })
     ).toBeInTheDocument();
     expect(state.sendRequest).toHaveBeenCalledTimes(1);
     expect(state.create).toHaveBeenCalledTimes(2);
@@ -666,7 +687,7 @@ describe('Symbol requests', () => {
         "It wasn't used on this color because the color changed."
       )
     );
-    expect(screen.getByRole('dialog', { name: 'Edit color: Two' })).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Edit color: Two' })).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Change symbol' })).toHaveFocus()
     );
@@ -701,7 +722,7 @@ describe('Symbol requests', () => {
     await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
     await user.click(screen.getByRole('button', { name: 'Change symbol' }));
     await sendPhoto(user);
-    expect(screen.getByRole('dialog', { name: 'Edit color: Sent symbol' })).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Edit color: Sent symbol' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('654');
     expect(state.create).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: /^Save$/ }));

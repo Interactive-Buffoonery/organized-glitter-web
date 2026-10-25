@@ -191,7 +191,9 @@ Known concurrency limit: a key saved concurrently with a resolution may keep
   and show what the server has.
 - **Picker.** Search by name or keyword, a recently used row, catalog groups,
   then "Can't find your symbol? Send us a photo and we'll add it."
-- **Entry.** Shows the symbol large with its name. Code autocompletes from the
+- **Entry.** Opens in place of the row on the web, with focus in Code. Cancel or
+  Escape closes it and returns focus to the row. Shows the symbol large with its
+  name. Code autocompletes from the
   user's own earlier keys; picking one fills the color name and swatch last used
   with that code. Fields: code, color name, swatch, tried first, note. "Save and
   next" moves to the next position.

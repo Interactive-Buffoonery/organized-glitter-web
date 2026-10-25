@@ -47,7 +47,7 @@ test('color key: set up symbols, record a color, and keep it after reload', asyn
     await expect(page.getByText('0 of 35 filled in')).toBeVisible();
 
     await page.getByRole('button', { name: /^One,/ }).click();
-    const entry = page.getByRole('dialog');
+    const entry = page.getByRole('form', { name: 'Edit color: One' });
     await entry.getByRole('combobox', { name: 'Code' }).fill('654');
     await entry.getByRole('textbox', { name: /^Color name/ }).fill('Lilac');
     await entry.getByRole('textbox', { name: 'Swatch hex' }).fill('#B79AD6');
@@ -106,7 +106,7 @@ async function seededPage(page: Page, baseURL: string | undefined, testInfo: Tes
   };
 }
 
-test('color key: keyboard flow keeps the sheet, focus and drafts', async ({
+test('color key: keyboard flow keeps focus and drafts in place', async ({
   page,
   baseURL,
 }, testInfo) => {
@@ -124,7 +124,7 @@ test('color key: keyboard flow keeps the sheet, focus and drafts', async ({
   const { pb, pageId, cleanup } = await seededPage(page, baseURL, testInfo);
   try {
     await page.getByRole('button', { name: /^Black spade suit,/ }).click();
-    const entry = page.getByRole('dialog', { name: 'Edit color: Black spade suit' });
+    const entry = page.getByRole('form', { name: 'Edit color: Black spade suit' });
     const code = entry.getByRole('combobox', { name: 'Code' });
     await code.fill('Q65');
     await expect(entry.getByRole('listbox')).toBeVisible();
@@ -136,7 +136,7 @@ test('color key: keyboard flow keeps the sheet, focus and drafts', async ({
     await entry.getByRole('textbox', { name: 'Add a code you tried' }).fill('Q649');
     await entry.getByRole('button', { name: 'Save and next: Black club suit' }).click();
 
-    const nextEntry = page.getByRole('dialog', { name: 'Edit color: Black club suit' });
+    const nextEntry = page.getByRole('form', { name: 'Edit color: Black club suit' });
     await expect(nextEntry).toBeVisible();
     await expect(nextEntry.getByRole('combobox', { name: 'Code' })).toBeFocused();
     await page.keyboard.type('Q700');
@@ -276,10 +276,7 @@ test.describe('on a phone', () => {
     test.use({ viewport, isMobile, hasTouch, userAgent });
   }
 
-  test('color key: pick a symbol and record it in the drawer', async ({
-    page,
-    baseURL,
-  }, testInfo) => {
+  test('color key: pick a symbol and record it in place', async ({ page, baseURL }, testInfo) => {
     test.setTimeout(90000);
     const { pb, pageId, cleanup } = await seededPage(page, baseURL, testInfo);
     try {
@@ -289,7 +286,7 @@ test.describe('on a phone', () => {
       await expect(picker.getByRole('status')).toHaveText(/^\d+ symbols?$/);
       await picker.getByRole('option', { name: 'Yen sign' }).tap();
 
-      const entry = page.getByRole('dialog', { name: 'Add a color: Yen sign' });
+      const entry = page.getByRole('form', { name: 'Add a color: Yen sign' });
       await entry.getByRole('combobox', { name: 'Code' }).fill('Q800');
       await entry.getByRole('textbox', { name: 'Swatch hex' }).fill('b79ad6');
       await entry.getByRole('textbox', { name: /^Color name/ }).tap();
@@ -341,7 +338,7 @@ test.describe('on a phone', () => {
       await request.getByRole('button', { name: 'Send', exact: true }).tap();
       await expect(request).toHaveCount(0);
 
-      const entry = page.getByRole('dialog', { name: 'Edit color: Two w stacked' });
+      const entry = page.getByRole('form', { name: 'Edit color: Two w stacked' });
       await expect(entry).toBeVisible();
       // The protected thumbnail has to load with a file token, including on Mobile Safari.
       const thumbnail = entry.locator('img[alt="Two w stacked"]');

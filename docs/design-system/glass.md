@@ -619,9 +619,10 @@ For public marketing and utility surfaces:
 - `.agents/skills/shadcn-alertdialogaction-variant-prop-ignored/`: the
   destructive-confirm workaround
 
-Coloring page Color Codes & Swatches uses the existing control panel below
-Mediums, with the usual section heading and divider. Thumbnails and plain-text
-notes remain flat within that region. No additional panel or navigation is added.
+Coloring page colors use a read-only Colors summary in the control panel below
+Mediums, with the usual section heading and divider. Editing happens on a
+separate colors screen, which stacks Photos and notes above the color key as
+flat sections.
 
 ## Destructive colors in Dark mode
 

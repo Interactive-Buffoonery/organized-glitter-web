@@ -169,7 +169,7 @@ function ColorReferenceEditor({ pageId, userId }: { pageId: string; userId: stri
   const disabled = query.isPending || query.isError || save.isPending;
   return (
     <Section variant="bordered" className="space-y-3" landmark={false}>
-      <SectionHeading>Color Codes &amp; Swatches</SectionHeading>
+      <SectionHeading>Photos and notes</SectionHeading>
       {saveError && !editing && !uploadOpen && (
         <p role="alert" className="text-destructive-text text-sm">
           {saveError}
@@ -216,7 +216,7 @@ function ColorReferenceEditor({ pageId, userId }: { pageId: string; userId: stri
       </div>
       {!query.isPending && !query.isError && !query.data?.notes && !editing && (
         <p className="text-muted-foreground text-sm">
-          Keep color codes, blends, and swatch photos for this page here.
+          Add photos of this page's color strip or your swatches, and notes on blends.
         </p>
       )}
       {query.data?.notes && !editing && (

@@ -110,7 +110,7 @@ beforeEach(() => {
   state.loadSortPanel.mockReset().mockResolvedValue({ ColorKeySortPanel: SortPanelStandIn });
 });
 
-describe('Colors used setup', () => {
+describe('Color key setup', () => {
   it('starts with 1-9, 0 and a-z on, and saves what is left after toggling', async () => {
     const user = userEvent.setup();
     state.setup.mockResolvedValue([]);
@@ -156,7 +156,7 @@ describe('Colors used setup', () => {
     state.refetch.mockResolvedValue({ isError: false, data: [key('a', 0, 'u:0031')] });
     render(<ColorKeySection pageId="page-1" />);
     await user.click(screen.getByRole('button', { name: 'Start' }));
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Colors used' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Color key' })).toHaveFocus());
     expect(state.error).not.toHaveBeenCalled();
   });
 
@@ -172,7 +172,7 @@ describe('Colors used setup', () => {
   });
 });
 
-describe('Colors used record', () => {
+describe('Color key record', () => {
   it('never puts an unexpected swatch value into a style', () => {
     state.rows = [key('a', 0, 'u:0031', { code: '1', swatch: 'url(https://example.test/x)' })];
     const { container } = render(<ColorKeySection pageId="page-1" />);
@@ -180,7 +180,7 @@ describe('Colors used record', () => {
   });
 });
 
-describe('Colors used sort', () => {
+describe('Color key sort', () => {
   const three = () => [key('a', 0, 'u:0031'), key('b', 1, 'u:0032'), key('c', 2, 'u:0033')];
   const openSort = async (user: ReturnType<typeof userEvent.setup>) => {
     await user.click(screen.getByRole('button', { name: 'Sort' }));
@@ -288,7 +288,7 @@ describe('Colors used sort', () => {
   });
 });
 
-describe('Colors used entry', () => {
+describe('Color key entry', () => {
   it('fills color name and swatch from an earlier code', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:03C8')];

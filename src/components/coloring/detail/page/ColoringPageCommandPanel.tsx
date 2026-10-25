@@ -1,5 +1,4 @@
-import { ColorReferenceSection } from './ColorReferenceSection';
-import { ColorKeySection } from './colorKeys/ColorKeySection';
+import { ColorsSummary } from './ColorsSummary';
 import type { UseColoringPageLifecycleDatesResult } from '@/hooks/coloring/useColoringPageLifecycleDates';
 import type { UseColoringPageMediumSelectionResult } from '@/hooks/coloring/useColoringPageMediumSelection';
 import type { UseColoringPageMysteryRevealResult } from '@/hooks/coloring/useColoringPageMysteryReveal';
@@ -22,6 +21,7 @@ interface ColoringPageCommandPanelProps {
   lifecycleDates: UseColoringPageLifecycleDatesResult;
   mediumSelection: UseColoringPageMediumSelectionResult;
   mysteryReveal: UseColoringPageMysteryRevealResult;
+  returnTo: string;
 }
 
 export function ColoringPageCommandPanel({
@@ -34,6 +34,7 @@ export function ColoringPageCommandPanel({
   lifecycleDates,
   mediumSelection,
   mysteryReveal,
+  returnTo,
 }: ColoringPageCommandPanelProps) {
   return (
     <GlassPanel className="space-y-6 p-4 md:p-5 lg:sticky lg:top-24">
@@ -65,8 +66,7 @@ export function ColoringPageCommandPanel({
         disabled={mediumSelection.isPending}
       />
 
-      <ColorKeySection pageId={page.id} bookLabel={`${book.title}, page ${page.pageNumber}`} />
-      <ColorReferenceSection pageId={page.id} />
+      <ColorsSummary bookId={book.id} pageId={page.id} returnTo={returnTo} />
 
       {book.isMystery ? (
         <ColoringPageMysteryRevealSection

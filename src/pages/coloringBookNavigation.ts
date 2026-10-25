@@ -27,3 +27,12 @@ export const getColoringPageDetailPath = (
   const params = new URLSearchParams({ returnTo: getColoringDashboardReturnPath(returnTo) });
   return `/coloring/${encodeURIComponent(bookId)}/pages/${encodeURIComponent(pageId)}?${params.toString()}`;
 };
+
+export const getColoringPageColorsPath = (
+  bookId: string,
+  pageId: string,
+  returnTo: string
+): string => {
+  const params = new URLSearchParams({ returnTo: getColoringDashboardReturnPath(returnTo) });
+  return `/coloring/${encodeURIComponent(bookId)}/pages/${encodeURIComponent(pageId)}/colors?${params.toString()}`;
+};

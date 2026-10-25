@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CaptureResult } from 'posthog-js';
 import { sanitizeAnalyticsEvent } from '../sanitizeEvent';
+import { sanitizeAnalyticsPath } from '../sanitizePath';
 
 describe('sanitizeAnalyticsEvent', () => {
   it('removes record IDs from SDK URLs, paths and person properties', () => {
@@ -23,6 +24,12 @@ describe('sanitizeAnalyticsEvent', () => {
     expect(result.properties.path).toBe('/coloring/:bookId/pages/:pageId');
     expect(result.properties.$referrer).toBe('https://example.test/projects/:id/edit');
     expect(JSON.stringify(result)).not.toMatch(/private-(book|page|project|search)/);
+  });
+
+  it('removes record IDs from the coloring page colors path', () => {
+    expect(sanitizeAnalyticsPath('/coloring/private-book/pages/private-page/colors')).toBe(
+      '/coloring/:bookId/pages/:pageId/colors'
+    );
   });
 
   it.each(['confirm-password-reset', 'verify-email', 'confirm-email-change'])(

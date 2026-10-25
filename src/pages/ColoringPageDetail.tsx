@@ -204,6 +204,7 @@ const ColoringPageDetail = () => {
             lifecycleDates={lifecycleDates}
             mediumSelection={mediumSelection}
             mysteryReveal={mysteryReveal}
+            returnTo={dashboardPath}
           />
         </div>
       </section>

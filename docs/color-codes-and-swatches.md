@@ -1,12 +1,15 @@
 # Color Codes & Swatches
 
-Coloring page detail includes Color Codes & Swatches below Mediums in the existing
-control panel. Page photos, the main image, Progress, status, dates, and mystery
-controls retain their existing behavior.
+The color reference appears as the Color strip section on the page's colors screen
+(`/coloring/:bookId/pages/:pageId/colors`), above the color key. The page detail
+panel shows a read-only Colors summary with up to four photo thumbnails and links
+to the colors screen. Photos are added and removed only on the colors screen.
 
 A reference can contain multiple full-sheet photos, one plain-text note, or both.
-Add photo opens a preview dialog with Choose photos and Take photo. Compatible
-phones provide camera capture; desktop browsers can offer a file picker instead.
+With no photos, the section shows a single empty tile with Add photo; once photos
+exist, Add photo becomes the last tile in the photo grid. Either way, Add photo
+opens a preview dialog with Choose photos and Take photo. Compatible phones
+provide camera capture; desktop browsers can offer a file picker instead.
 Save photos does not require text. Edit note opens an inline Save/Cancel editor.
 Removing a sheet leaves other sheets and notes intact. Clearing the final content
 removes the reference and returns to the empty state.

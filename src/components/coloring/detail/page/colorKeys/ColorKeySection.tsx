@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ArrowUpDown, Plus } from 'lucide-react';
+import { ArrowUpDown } from 'lucide-react';
 import { ClientResponseError } from 'pocketbase';
 import { Section, SectionHeading } from '@/components/shared/Section';
 import { Button } from '@/components/ui/button';
@@ -12,15 +12,16 @@ import {
 } from '@/hooks/mutations/coloring/useColorKeyMutations';
 import { useAuth } from '@/hooks/useAuth';
 import { notifyError, notifySuccess } from '@/lib/notifications';
-import { cn } from '@/lib/utils';
 import type { ColorKey } from '@/services/pocketbase/colorKeys.service';
 import { createLogger } from '@/utils/logger';
 import { ColorKeyEntry, type EntrySymbolRequest, type EntryTarget } from './ColorKeyEntry';
+import { ColorKeyRowContent } from './ColorKeyRowContent';
+import { ColorKeySetup } from './ColorKeySetup';
+import { copyColorKeys } from './copyColorKeys';
 import { loadSortPanel } from './loadSortPanel';
-import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
 import { SymbolRequestDialog } from './SymbolRequestDialog';
-import { colorKeyCopyText, colorKeyLabel, requestFor, safeSwatch, symbolName } from './symbolName';
+import { colorKeyLabel, requestFor } from './symbolName';
 
 const logger = createLogger('ColorKeySection');
 
@@ -151,18 +152,16 @@ function ColorKeyEditor({
       notifyError('Could not save the symbols. Try again.');
     }
   };
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(colorKeyCopyText(rows, requests));
-      notifySuccess('Copied the colors for this page.');
-    } catch (error) {
-      logger.warn('Could not copy color keys', error);
-      notifyError('Could not copy. Try again.');
-    }
-  };
   const nextPositionIn = (list: typeof rows) =>
     list.reduce((max, row) => Math.max(max, row.position + 1), 0);
   const nextPosition = nextPositionIn(rows);
+  const toggleSetupSymbol = (symbol: string) =>
+    setOff(current => {
+      const nextOff = new Set(current);
+      if (nextOff.has(symbol)) nextOff.delete(symbol);
+      else nextOff.add(symbol);
+      return nextOff;
+    });
   const addSetupSymbol = (symbol: string) => {
     setSetupSymbols(symbols => (symbols.includes(symbol) ? symbols : [...symbols, symbol]));
     setOff(current => {
@@ -245,7 +244,7 @@ function ColorKeyEditor({
     <Section variant="bordered" className="space-y-3" landmark={false}>
       <div className="flex items-center gap-3">
         <SectionHeading id={`color-keys-${pageId}`} tabIndex={-1} className="flex-1 outline-none">
-          Colors used
+          Color key
         </SectionHeading>
         {!showSetup && rows.length > 1 ? (
           <Button
@@ -272,75 +271,17 @@ function ColorKeyEditor({
       )}
 
       {showSetup ? (
-        <div className="space-y-3">
-          <p className="text-muted-foreground text-sm">
-            Turn off the symbols that aren't on this page's strip.
-          </p>
-          <div
-            role="group"
-            aria-label="Symbols on this page"
-            className="grid grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1.5"
-          >
-            {setupSymbols.map(symbol => {
-              const isOn = !off.has(symbol);
-              return (
-                <button
-                  key={symbol}
-                  type="button"
-                  aria-pressed={isOn}
-                  aria-label={symbolName(symbol, requestFor(symbol, requests))}
-                  disabled={setup.isPending}
-                  onClick={() =>
-                    setOff(current => {
-                      const nextOff = new Set(current);
-                      if (isOn) nextOff.add(symbol);
-                      else nextOff.delete(symbol);
-                      return nextOff;
-                    })
-                  }
-                  className={cn(
-                    'flex size-11 items-center justify-center rounded-md border text-lg transition-colors',
-                    isOn
-                      ? 'border-primary bg-primary/10 text-foreground'
-                      : 'border-muted-foreground text-muted-foreground line-through'
-                  )}
-                >
-                  <span aria-hidden="true" className="contents">
-                    <SymbolGlyph symbol={symbol} request={requestFor(symbol, requests)} />
-                  </span>
-                </button>
-              );
-            })}
-            <button
-              id={`color-keys-${pageId}-add-setup-symbol`}
-              type="button"
-              aria-label="Add symbols after z"
-              disabled={setup.isPending}
-              onClick={() => setPicker('setup')}
-              className="border-border text-muted-foreground hover:bg-muted flex size-11 items-center justify-center rounded-md border border-dashed"
-            >
-              <Plus aria-hidden="true" className="size-5" />
-            </button>
-          </div>
-          <p className="text-muted-foreground text-sm">Use + to add symbols after z.</p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              disabled={setup.isPending || setupSymbols.every(symbol => off.has(symbol))}
-              onClick={() => void startSetup()}
-            >
-              {setup.isPending ? 'Saving…' : 'Start'}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={setup.isPending}
-              onClick={() => setSkipped(true)}
-            >
-              Skip
-            </Button>
-          </div>
-        </div>
+        <ColorKeySetup
+          pageId={pageId}
+          symbols={setupSymbols}
+          off={off}
+          requests={requests}
+          saving={setup.isPending}
+          onToggle={toggleSetupSymbol}
+          onAddSymbol={() => setPicker('setup')}
+          onStart={() => void startSetup()}
+          onSkip={() => setSkipped(true)}
+        />
       ) : null}
 
       {!showSetup && !query.isPending && !query.isError ? (
@@ -362,31 +303,7 @@ function ColorKeyEditor({
                       onClick={() => setEntry({ row, symbol: row.symbol, position: row.position })}
                       className="hover:bg-muted/60 flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left disabled:opacity-60"
                     >
-                      <span className="flex w-10 shrink-0 justify-center text-3xl">
-                        <SymbolGlyph symbol={row.symbol} request={request} />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={cn(
-                            'block truncate font-mono text-sm',
-                            !row.code.trim() && 'text-muted-foreground'
-                          )}
-                        >
-                          {row.code.trim() || 'No code yet'}
-                        </span>
-                        {row.color_name ? (
-                          <span className="text-muted-foreground block truncate text-sm">
-                            {row.color_name}
-                          </span>
-                        ) : null}
-                      </span>
-                      {safeSwatch(row.swatch) ? (
-                        <span
-                          aria-hidden="true"
-                          className="border-border size-6 shrink-0 rounded-full border"
-                          style={{ background: safeSwatch(row.swatch) }}
-                        />
-                      ) : null}
+                      <ColorKeyRowContent row={row} request={request} />
                     </button>
                   </li>
                 );
@@ -427,7 +344,7 @@ function ColorKeyEditor({
                   type="button"
                   variant="link"
                   className="ml-auto px-0"
-                  onClick={() => void copy()}
+                  onClick={() => void copyColorKeys(rows, requests)}
                 >
                   Copy
                 </Button>

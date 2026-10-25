@@ -19,6 +19,7 @@ export const APP_ROUTE_PATHS = [
   '/coloring/:id',
   '/coloring/:id/edit',
   '/coloring/:bookId/pages/:pageId',
+  '/coloring/:bookId/pages/:pageId/colors',
   '/projects/:id',
   '/projects/:id/edit',
   '/profile',

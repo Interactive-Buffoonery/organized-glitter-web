@@ -11,7 +11,7 @@ test.use({
   ...(browserName === 'webkit' ? { ...devices['iPhone 13'], browserName } : {}),
 });
 
-test('colors used: set up symbols, record a color, and keep it after reload', async ({
+test('color key: set up symbols, record a color, and keep it after reload', async ({
   page,
   baseURL,
 }, testInfo) => {
@@ -37,6 +37,8 @@ test('colors used: set up symbols, record a color, and keep it after reload', as
       .collection('coloring_pages')
       .getFullList({ filter: pb.filter('book = {:book}', { book: book.id }) });
     await page.goto(`/coloring/${book.id}/pages/${coloringPage.id}`);
+    await page.getByRole('link', { name: 'Track the colors used for this page' }).click();
+    await expect(page).toHaveURL(new RegExp(`/pages/${coloringPage.id}/colors`));
 
     const setup = page.getByRole('group', { name: 'Symbols on this page' });
     await expect(setup).toBeVisible();
@@ -55,6 +57,9 @@ test('colors used: set up symbols, record a color, and keep it after reload', as
     await page.reload();
     await expect(page.getByRole('button', { name: 'One, 654, Lilac' })).toBeVisible();
     await expect(page.getByText('1 of 35 filled in')).toBeVisible();
+    await page.getByRole('link', { name: 'Page 1', exact: true }).click();
+    await expect(page.getByText('654')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Edit colors' })).toBeVisible();
     const saved = await pb.collection('coloring_page_color_keys').getFullList({
       filter: pb.filter('page = {:page}', { page: coloringPage.id }),
       sort: 'position',
@@ -92,7 +97,7 @@ async function seededPage(page: Page, baseURL: string | undefined, testInfo: Tes
   await keys.create({ user, page: second.id, symbol: 'u:2605', position: 0, code: 'Q650' });
   for (const [position, symbol] of ['u:2660', 'u:2663'].entries())
     await keys.create({ user, page: first.id, symbol, position });
-  await page.goto(`/coloring/${book.id}/pages/${first.id}`);
+  await page.goto(`/coloring/${book.id}/pages/${first.id}/colors`);
   return {
     pb,
     book,
@@ -101,7 +106,7 @@ async function seededPage(page: Page, baseURL: string | undefined, testInfo: Tes
   };
 }
 
-test('colors used: keyboard flow keeps the sheet, focus and drafts', async ({
+test('color key: keyboard flow keeps the sheet, focus and drafts', async ({
   page,
   baseURL,
 }, testInfo) => {
@@ -157,7 +162,7 @@ test('colors used: keyboard flow keeps the sheet, focus and drafts', async ({
   }
 });
 
-test('colors used: sort by dragging and by keyboard, and keep the order after reload', async ({
+test('color key: sort by dragging and by keyboard, and keep the order after reload', async ({
   page,
   baseURL,
 }, testInfo) => {
@@ -271,7 +276,7 @@ test.describe('on a phone', () => {
     test.use({ viewport, isMobile, hasTouch, userAgent });
   }
 
-  test('colors used: pick a symbol and record it in the drawer', async ({
+  test('color key: pick a symbol and record it in the drawer', async ({
     page,
     baseURL,
   }, testInfo) => {
@@ -304,7 +309,7 @@ test.describe('on a phone', () => {
     }
   });
 
-  test('colors used: send a photo of a missing symbol and use it on the page', async ({
+  test('color key: send a photo of a missing symbol and use it on the page', async ({
     page,
     baseURL,
   }, testInfo) => {

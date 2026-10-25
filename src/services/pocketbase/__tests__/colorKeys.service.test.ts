@@ -46,6 +46,21 @@ describe('ColorKeysService', () => {
     expect(options.filter).toContain('"user":"owner"');
   });
 
+  it('fills missing text fields so rows can always be rendered', async () => {
+    const sparse = { id: 'key-1', symbol: 'u:0031', code: null };
+    mocks.getFullList.mockResolvedValue([sparse]);
+    mocks.create.mockResolvedValue(sparse);
+    mocks.update.mockResolvedValue(sparse);
+    mocks.send.mockResolvedValue({ items: [sparse] });
+    const filled = expect.objectContaining({ code: '', color_name: '', swatch: '' });
+    expect(await ColorKeysService.list('page-1', 'owner')).toEqual([filled]);
+    expect(
+      await ColorKeysService.create('page-1', 'owner', { symbol: 'u:0031', position: 0 })
+    ).toEqual(filled);
+    expect(await ColorKeysService.update('key-1', 'owner', { code: '' })).toEqual(filled);
+    expect(await ColorKeysService.setup('page-1', 'owner', ['u:0031'])).toEqual([filled]);
+  });
+
   it('refuses to read after the account changes', async () => {
     mocks.userId = 'someone-else';
     await expect(ColorKeysService.list('page-1', 'owner')).rejects.toThrow('account changed');
@@ -107,7 +122,7 @@ describe('ColorKeysService', () => {
     mocks.update.mockResolvedValue({ id: 'key-1', symbol: 'u:03C8' });
     await expect(
       ColorKeysService.update('key-1', 'owner', { symbol: 'r:abcdefghijklmno', code: '1' })
-    ).resolves.toEqual({ id: 'key-1', symbol: 'u:03C8' });
+    ).resolves.toMatchObject({ id: 'key-1', symbol: 'u:03C8' });
     expect(mocks.update).toHaveBeenCalledWith(
       'key-1',
       { symbol: 'r:abcdefghijklmno', code: '1' },

@@ -29,6 +29,14 @@ function requireOwner(userId: string) {
 
 const keys = () => pb.collection(Collections.ColoringPageColorKeys);
 
+/** The generated type says these are always strings; guard rows that arrive without them. */
+const withText = (row: ColorKey): ColorKey => ({
+  ...row,
+  code: row.code ?? '',
+  color_name: row.color_name ?? '',
+  swatch: row.swatch ?? '',
+});
+
 export const ColorKeysService = {
   async list(pageId: string, userId: string): Promise<ColorKey[]> {
     requireOwner(userId);
@@ -37,18 +45,22 @@ export const ColorKeysService = {
       sort: 'position,created',
     });
     requireOwner(userId);
-    return rows;
+    return rows.map(withText);
   },
 
   async create(pageId: string, userId: string, input: ColorKeyInput): Promise<ColorKey> {
     requireOwner(userId);
     const data = parseColorKeyInput(input, false);
-    return keys().create<ColorKey>({ user: userId, page: pageId, ...data }, { requestKey: null });
+    return withText(
+      await keys().create<ColorKey>({ user: userId, page: pageId, ...data }, { requestKey: null })
+    );
   },
 
   async update(id: string, userId: string, input: Partial<ColorKeyInput>): Promise<ColorKey> {
     requireOwner(userId);
-    return keys().update<ColorKey>(id, parseColorKeyInput(input, true), { requestKey: null });
+    return withText(
+      await keys().update<ColorKey>(id, parseColorKeyInput(input, true), { requestKey: null })
+    );
   },
 
   async remove(id: string, userId: string): Promise<void> {
@@ -69,7 +81,7 @@ export const ColorKeysService = {
       body: { page: pageId, symbols },
       requestKey: null,
     });
-    return items;
+    return items.map(withText);
   },
 
   async history(userId: string): Promise<ColorCodeHistoryEntry[]> {
@@ -82,7 +94,7 @@ export const ColorKeysService = {
     });
     const seen = new Map<string, ColorCodeHistoryEntry>();
     for (const item of items) {
-      const code = item.code.trim();
+      const code = (item.code ?? '').trim();
       const key = code.toLowerCase();
       if (code && !seen.has(key))
         seen.set(key, { code, color_name: item.color_name ?? '', swatch: item.swatch ?? '' });

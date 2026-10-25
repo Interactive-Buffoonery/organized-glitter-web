@@ -9,6 +9,11 @@ Color keys are separate from Color Codes & Swatches
 (`coloring_page_color_references`), which stores photos of full reference
 sheets. Both can exist on the same page.
 
+On the web, both are edited on the page's colors screen
+(`/coloring/:bookId/pages/:pageId/colors`). The page detail panel shows a
+read-only Colors summary: a Track the colors used for this page button when the page has
+neither, otherwise thumbnails, codes, progress, Edit colors, and Copy.
+
 ## Product rules
 
 - Keys belong to one page. Symbols vary from page to page, so nothing is copied

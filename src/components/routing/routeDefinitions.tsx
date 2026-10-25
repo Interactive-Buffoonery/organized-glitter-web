@@ -49,6 +49,7 @@ const ColoringDashboard = lazy(() => import('@/pages/ColoringDashboard'));
 const EditColoringBook = lazy(() => import('@/pages/EditColoringBook'));
 const ColoringBookDetail = lazy(() => import('@/pages/ColoringBookDetail'));
 const ColoringPageDetail = lazy(() => import('@/pages/ColoringPageDetail'));
+const ColoringPageColors = lazy(() => import('@/pages/ColoringPageColors'));
 
 export type RouteVerticalAccess = 'public' | 'shared' | 'diamond_painting' | 'coloring_books';
 
@@ -213,6 +214,15 @@ export const APP_ROUTES: RouteDef[] = [
     element: ColoringPageDetail,
     verticalAccess: 'coloring_books',
     metadata: { title: 'Coloring page details | Organized Glitter' },
+    pageOwnsMetadata: true,
+    protected: true,
+    suspense: 'layout',
+  },
+  {
+    path: '/coloring/:bookId/pages/:pageId/colors',
+    element: ColoringPageColors,
+    verticalAccess: 'coloring_books',
+    metadata: { title: 'Coloring page colors | Organized Glitter' },
     pageOwnsMetadata: true,
     protected: true,
     suspense: 'layout',

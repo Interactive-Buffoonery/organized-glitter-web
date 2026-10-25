@@ -8,11 +8,10 @@ import {
   useColorReferenceImages,
 } from '@/hooks/queries/coloring/useColorReference';
 import { useAuth } from '@/hooks/useAuth';
-import { cn } from '@/lib/utils';
 import { getColoringPageColorsPath } from '@/pages/coloringBookNavigation';
 import { copyColorKeys } from './colorKeys/copyColorKeys';
-import { SymbolGlyph } from './colorKeys/SymbolGlyph';
-import { colorKeyLabel, requestFor, safeSwatch } from './colorKeys/symbolName';
+import { ColorKeyRowContent } from './colorKeys/ColorKeyRowContent';
+import { colorKeyLabel, requestFor } from './colorKeys/symbolName';
 
 const MAX_THUMBNAILS = 4;
 
@@ -128,29 +127,14 @@ function ColorsSummaryContent({
             <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5">
               {rows.map(row => {
                 const request = requestFor(row.symbol, requests);
-                const text = row.code.trim() || row.color_name.trim() || 'No code';
                 return (
-                  <li key={row.id} title={text} className="flex min-w-0 items-center gap-2">
+                  <li
+                    key={row.id}
+                    title={row.code.trim() || row.color_name.trim() || undefined}
+                    className="flex min-w-0 items-center gap-2"
+                  >
                     <span className="sr-only">{colorKeyLabel(row, request)}</span>
-                    <span aria-hidden="true" className="flex w-6 shrink-0 justify-center text-lg">
-                      <SymbolGlyph symbol={row.symbol} request={request} />
-                    </span>
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        'min-w-0 flex-1 truncate text-sm',
-                        row.code.trim() ? 'font-mono' : 'text-muted-foreground'
-                      )}
-                    >
-                      {text}
-                    </span>
-                    {safeSwatch(row.swatch) ? (
-                      <span
-                        aria-hidden="true"
-                        className="border-border size-3.5 shrink-0 rounded-full border"
-                        style={{ background: safeSwatch(row.swatch) }}
-                      />
-                    ) : null}
+                    <ColorKeyRowContent row={row} request={request} compact />
                   </li>
                 );
               })}

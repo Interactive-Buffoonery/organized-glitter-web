@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { useMobileDevice } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import type { ColorKey, SymbolRequestPreview } from '@/services/pocketbase/colorKeys.service';
-import { SymbolGlyph } from './SymbolGlyph';
+import { ColorKeyRowContent } from './ColorKeyRowContent';
 import { colorKeyLabel, requestFor } from './symbolName';
 
 /** "Sort Color Order": a side panel on wide screens, a bottom sheet on phones. */
@@ -96,7 +96,6 @@ function SortRow({
 }) {
   const { ref, handleRef, isDragging } = useSortable({ id: row.id, index });
   const request = requestFor(row.symbol, requests);
-  const code = row.code.trim();
   return (
     <li
       ref={ref}
@@ -105,17 +104,7 @@ function SortRow({
         isDragging && 'shadow-lg'
       )}
     >
-      <span aria-hidden="true" className="flex w-10 shrink-0 justify-center text-3xl">
-        <SymbolGlyph symbol={row.symbol} request={request} />
-      </span>
-      <span aria-hidden="true" className="min-w-0 flex-1">
-        <span className={cn('block truncate font-mono text-sm', !code && 'text-muted-foreground')}>
-          {code || 'No code yet'}
-        </span>
-        {row.color_name ? (
-          <span className="text-muted-foreground block truncate text-sm">{row.color_name}</span>
-        ) : null}
-      </span>
+      <ColorKeyRowContent row={row} request={request} showSwatch={false} />
       {/* Only the handle drags, and dnd-kit's default touch hold keeps a swipe scrolling on iOS
           Safari. Stopping pointerdown keeps vaul from taking pointer capture away from dnd-kit. */}
       <button

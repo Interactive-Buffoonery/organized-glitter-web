@@ -130,7 +130,7 @@ describe('Colors summary', () => {
     state.rows = [key(0, 'u:0031', '', 'Lilac'), key(1, 'u:0032')];
     renderSummary();
     expect(screen.getByText('One, no code yet, Lilac')).toBeInTheDocument();
-    expect(screen.getByText('No code')).toBeInTheDocument();
+    expect(screen.getByText('No code yet')).toBeInTheDocument();
   });
 
   it('copies the recorded colors', async () => {

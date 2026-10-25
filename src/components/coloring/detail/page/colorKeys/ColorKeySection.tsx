@@ -12,17 +12,16 @@ import {
 } from '@/hooks/mutations/coloring/useColorKeyMutations';
 import { useAuth } from '@/hooks/useAuth';
 import { notifyError, notifySuccess } from '@/lib/notifications';
-import { cn } from '@/lib/utils';
 import type { ColorKey } from '@/services/pocketbase/colorKeys.service';
 import { createLogger } from '@/utils/logger';
 import { ColorKeyEntry, type EntrySymbolRequest, type EntryTarget } from './ColorKeyEntry';
+import { ColorKeyRowContent } from './ColorKeyRowContent';
 import { ColorKeySetup } from './ColorKeySetup';
 import { copyColorKeys } from './copyColorKeys';
 import { loadSortPanel } from './loadSortPanel';
-import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
 import { SymbolRequestDialog } from './SymbolRequestDialog';
-import { colorKeyLabel, requestFor, safeSwatch } from './symbolName';
+import { colorKeyLabel, requestFor } from './symbolName';
 
 const logger = createLogger('ColorKeySection');
 
@@ -304,31 +303,7 @@ function ColorKeyEditor({
                       onClick={() => setEntry({ row, symbol: row.symbol, position: row.position })}
                       className="hover:bg-muted/60 flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left disabled:opacity-60"
                     >
-                      <span className="flex w-10 shrink-0 justify-center text-3xl">
-                        <SymbolGlyph symbol={row.symbol} request={request} />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={cn(
-                            'block truncate font-mono text-sm',
-                            !row.code.trim() && 'text-muted-foreground'
-                          )}
-                        >
-                          {row.code.trim() || 'No code yet'}
-                        </span>
-                        {row.color_name ? (
-                          <span className="text-muted-foreground block truncate text-sm">
-                            {row.color_name}
-                          </span>
-                        ) : null}
-                      </span>
-                      {safeSwatch(row.swatch) ? (
-                        <span
-                          aria-hidden="true"
-                          className="border-border size-6 shrink-0 rounded-full border"
-                          style={{ background: safeSwatch(row.swatch) }}
-                        />
-                      ) : null}
+                      <ColorKeyRowContent row={row} request={request} />
                     </button>
                   </li>
                 );

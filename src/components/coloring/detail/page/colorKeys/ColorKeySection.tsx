@@ -116,6 +116,10 @@ function ColorKeyEditor({
   const [off, setOff] = useState<Set<string>>(() => new Set());
   const [picker, setPicker] = useState<'setup' | 'add' | null>(null);
   const [entry, setEntry] = useState<EntryTarget | null>(null);
+  const currentEntry = useRef(entry);
+  useEffect(() => {
+    currentEntry.current = entry;
+  });
 
   const editingIndex = entry?.row ? rows.findIndex(row => row.id === entry.row?.id) : -1;
   const liveEntry: EntryTarget | null =
@@ -134,7 +138,7 @@ function ColorKeyEditor({
         ? rows.find(row => row.position > entry.position)
         : undefined;
   const filled = rows.filter(row => row.code.trim()).length;
-  const showSetup = !query.isPending && !query.isError && rows.length === 0 && !skipped;
+  const showSetup = !query.isPending && !query.isError && rows.length === 0 && !skipped && !entry;
 
   const startSetup = async () => {
     const symbols = setupSymbols.filter(symbol => !off.has(symbol));
@@ -244,8 +248,11 @@ function ColorKeyEditor({
   // A row that vanished mid-edit stays listed under its key, so the draft survives.
   const listed = entry?.row && editingIndex < 0 ? [...rows, entry.row] : rows;
   const rowButtonId = (id: string) => `color-keys-${pageId}-row-${id}`;
+  // A save can finish after another row opened; only the form's own session may move on.
+  const opened = entry;
   const closeEntry = () => {
-    const id = entry?.row?.id;
+    if (currentEntry.current !== opened) return;
+    const id = opened?.row?.id;
     flushSync(() => setEntry(null));
     (
       (id && document.getElementById(rowButtonId(id))) ||
@@ -261,7 +268,10 @@ function ColorKeyEditor({
       next={next}
       requests={requests}
       onClose={closeEntry}
-      onNext={row => setEntry({ row, symbol: row.symbol, position: row.position })}
+      onNext={row => {
+        if (currentEntry.current === opened)
+          setEntry({ row, symbol: row.symbol, position: row.position });
+      }}
       onRequestSymbol={request => openRequest({ kind: 'entry', request })}
     />
   ) : null;

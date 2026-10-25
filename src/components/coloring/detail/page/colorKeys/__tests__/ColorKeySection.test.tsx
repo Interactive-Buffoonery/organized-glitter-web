@@ -310,6 +310,35 @@ describe('Color key entry', () => {
     expect(screen.getByRole('button', { name: /^Two,/ })).toHaveFocus();
   });
 
+  it('keeps the draft when another device removes the last row', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    const { rerender } = render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    state.rows = [];
+    rerender(<ColorKeySection pageId="page-1" />);
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('654');
+    expect(screen.queryByRole('group', { name: 'Symbols on this page' })).toBeNull();
+  });
+
+  it('keeps a newer draft open when an earlier save finishes', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    let resolve: (value: unknown) => void = () => {};
+    state.update.mockReturnValueOnce(new Promise(done => (resolve = done)));
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.click(screen.getByRole('button', { name: /^Save$/ }));
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '700');
+    resolve(key('a', 0, 'u:0031'));
+    await waitFor(() => expect(state.update).toHaveBeenCalledTimes(1));
+    await new Promise(done => setTimeout(done, 0));
+    expect(screen.getByRole('form', { name: 'Edit color: Two' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('700');
+  });
+
   it('fills color name and swatch from an earlier code', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:03C8')];

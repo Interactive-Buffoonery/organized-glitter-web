@@ -11,7 +11,7 @@ sheets. Both can exist on the same page.
 
 On the web, both are edited on the page's colors screen
 (`/coloring/:bookId/pages/:pageId/colors`). The page detail panel shows a
-read-only Colors summary: a Track this page's colors button when the page has
+read-only Colors summary: a Track the colors used for this page button when the page has
 neither, otherwise thumbnails, codes, progress, Edit colors, and Copy.
 
 ## Product rules

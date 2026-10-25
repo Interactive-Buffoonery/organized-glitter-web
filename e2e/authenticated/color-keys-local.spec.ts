@@ -37,7 +37,7 @@ test('color key: set up symbols, record a color, and keep it after reload', asyn
       .collection('coloring_pages')
       .getFullList({ filter: pb.filter('book = {:book}', { book: book.id }) });
     await page.goto(`/coloring/${book.id}/pages/${coloringPage.id}`);
-    await page.getByRole('link', { name: "Track this page's colors" }).click();
+    await page.getByRole('link', { name: 'Track the colors used for this page' }).click();
     await expect(page).toHaveURL(new RegExp(`/pages/${coloringPage.id}/colors`));
 
     const setup = page.getByRole('group', { name: 'Symbols on this page' });

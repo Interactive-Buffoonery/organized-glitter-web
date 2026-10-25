@@ -70,7 +70,7 @@ beforeEach(() => {
 describe('Colors summary', () => {
   it('offers one way in when nothing is tracked yet', () => {
     renderSummary();
-    const track = screen.getByRole('link', { name: "Track this page's colors" });
+    const track = screen.getByRole('link', { name: 'Track the colors used for this page' });
     expect(track).toHaveAttribute(
       'href',
       '/coloring/book-1/pages/page-1/colors?returnTo=%2Fdashboard%3Fcraft%3Dcoloring'
@@ -88,7 +88,7 @@ describe('Colors summary', () => {
       'href',
       expect.stringContaining('/coloring/book-1/pages/page-1/colors')
     );
-    expect(screen.queryByRole('link', { name: "Track this page's colors" })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Track the colors used for this page' })).toBeNull();
   });
 
   it('shows photos even before any symbols are set up', () => {
@@ -155,7 +155,7 @@ describe('Colors summary', () => {
     renderSummary();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(state.refetch).toHaveBeenCalled();
-    expect(screen.queryByRole('link', { name: "Track this page's colors" })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Track the colors used for this page' })).toBeNull();
   });
 
   it('keeps the loaded colors and the edit link when photos fail', () => {
@@ -173,6 +173,6 @@ describe('Colors summary', () => {
     renderSummary();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(state.refetch).toHaveBeenCalled();
-    expect(screen.queryByRole('link', { name: "Track this page's colors" })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Track the colors used for this page' })).toBeNull();
   });
 });

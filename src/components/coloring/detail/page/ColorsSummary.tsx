@@ -80,14 +80,9 @@ function ColorsSummaryContent({
           Loading colors…
         </p>
       ) : isEmpty ? (
-        <>
-          <p className="text-muted-foreground text-sm">
-            Keep the symbols, color codes, and strip photos for this page in one place.
-          </p>
-          <Button asChild>
-            <Link to={colorsPath}>Track this page's colors</Link>
-          </Button>
-        </>
+        <Button asChild>
+          <Link to={colorsPath}>Track the colors used for this page</Link>
+        </Button>
       ) : (
         <>
           {images.isError ? (

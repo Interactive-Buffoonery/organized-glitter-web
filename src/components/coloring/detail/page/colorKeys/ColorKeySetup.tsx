@@ -29,9 +29,7 @@ export function ColorKeySetup({
 }) {
   return (
     <div className="space-y-3">
-      <p className="text-muted-foreground text-sm">
-        Turn off the symbols that aren't on this page's strip.
-      </p>
+      <p className="text-muted-foreground text-sm">Tap any symbol your strip doesn't have.</p>
       <div
         role="group"
         aria-label="Symbols on this page"
@@ -72,7 +70,6 @@ export function ColorKeySetup({
           <Plus aria-hidden="true" className="size-5" />
         </button>
       </div>
-      <p className="text-muted-foreground text-sm">Use + to add symbols after z.</p>
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"

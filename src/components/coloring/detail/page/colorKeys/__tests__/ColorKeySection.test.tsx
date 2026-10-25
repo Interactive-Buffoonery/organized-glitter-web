@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ClientResponseError } from 'pocketbase';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -355,6 +355,31 @@ describe('Color key entry', () => {
     expect(screen.getByRole('form', { name: 'Edit color: Yen sign' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('800');
   });
+
+  it.each([
+    ['Save', null],
+    ['Save and next: Two', 'Edit color: Two'],
+  ])(
+    'finishes %s when the saved symbol reaches the list before the save resolves',
+    async (button, after) => {
+      const user = userEvent.setup();
+      state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+      const view = render(<ColorKeySection pageId="page-1" />);
+      state.update.mockImplementation(async ({ id, input }) => {
+        state.rows = [key('a', 0, input.symbol), key('b', 1, 'u:0032')];
+        act(() => view.rerender(<ColorKeySection pageId="page-1" />));
+        return key(id, 0, input.symbol, input);
+      });
+      await user.click(screen.getByRole('button', { name: /^One,/ }));
+      await user.click(screen.getByRole('button', { name: 'Change symbol' }));
+      await user.type(screen.getByRole('searchbox', { name: 'Search symbols' }), 'yen');
+      await user.click(screen.getByRole('option', { name: 'Yen sign' }));
+      await user.click(screen.getByRole('button', { name: button }));
+      if (after) expect(await screen.findByRole('form', { name: after })).toBeInTheDocument();
+      else await waitFor(() => expect(screen.queryByRole('form')).toBeNull());
+      expect(screen.queryByRole('form', { name: 'Edit color: Yen sign' })).toBeNull();
+    }
+  );
 
   it('focuses the heading when closing the last row after it was removed elsewhere', async () => {
     const user = userEvent.setup();

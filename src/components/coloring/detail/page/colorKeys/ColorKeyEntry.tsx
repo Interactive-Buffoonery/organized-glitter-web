@@ -85,6 +85,7 @@ export function ColorKeyEntry({ target, ...props }: ColorKeyEntryProps) {
     };
   }, [formKey]);
   const { onRequestSymbol, ...formProps } = props;
+  const rowKey = target.row?.id ?? 'new';
   const name = symbolDisplayName(symbol, requestFor(symbol, props.requests));
   return (
     <EntryForm
@@ -95,6 +96,12 @@ export function ColorKeyEntry({ target, ...props }: ColorKeyEntryProps) {
       onSymbolChange={picked => setChanged({ formKey, symbol: picked })}
       gone={gone}
       onGone={() => setGoneKey(formKey)}
+      // A save can finish after this form was replaced. It may still move on when its own
+      // saved symbol caused the replacement, but not after Cancel, a row switch or another device.
+      isCurrent={saved =>
+        openKey.current === formKey ||
+        (saved !== undefined && openKey.current === `${rowKey}:${saved}`)
+      }
       onRequestSymbol={
         onRequestSymbol &&
         (focus =>
@@ -127,9 +134,11 @@ function EntryForm({
   gone,
   onGone,
   label,
+  isCurrent,
 }: Omit<ColorKeyEntryProps, 'onRequestSymbol'> & {
   onRequestSymbol?: (focusChangeSymbol: () => void) => void;
   label: string;
+  isCurrent: (savedSymbol?: string) => boolean;
   target: EntryTarget;
   symbol: string;
   onSymbolChange: (symbol: string) => void;
@@ -140,14 +149,6 @@ function EntryForm({
   const id = useId();
   const { row } = target;
   const triedInput = useRef<HTMLInputElement>(null);
-  // A save can finish after this form was replaced; only a form still on screen may move on.
-  const mounted = useRef(false);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
   const [code, setCode] = useState(row?.code ?? '');
   const [colorName, setColorName] = useState(row?.color_name ?? '');
   const [swatch, setSwatch] = useState(row?.swatch ?? '');
@@ -242,7 +243,7 @@ function EntryForm({
       notifyError(message);
       return;
     }
-    if (!mounted.current) return;
+    if (!isCurrent(symbol)) return;
     if (goNext && next) onNext(next);
     else onClose();
   };
@@ -260,7 +261,7 @@ function EntryForm({
     if (!confirmed) return;
     try {
       await remove.mutateAsync(row.id);
-      if (mounted.current) onClose();
+      if (isCurrent()) onClose();
     } catch (deleteError) {
       logger.warn('Could not delete a color key', deleteError);
       notifyError('Could not delete this color. Try again.');

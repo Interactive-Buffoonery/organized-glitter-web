@@ -29,6 +29,10 @@ describe('project detail facts', () => {
     expect(screen.getByText('drills')).toBeVisible();
     expect(screen.getByText('colors')).toBeVisible();
   });
+  it('keeps a saved spec value in its accessible name', () => {
+    render(<ProjectSpecStrip project={{ ...project, colorCount: 58 }} onEdit={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Edit 58 colors' })).toBeVisible();
+  });
   it('links the company to the kit and credits the artist', () => {
     render(
       <ProjectByline

@@ -189,8 +189,8 @@ const ProgressNoteForm = ({
                 variant="ghost"
                 className="text-muted-foreground min-h-11 px-2"
                 disabled={areInputsDisabled}
-                aria-label="Choose progress date"
               >
+                <span className="sr-only">Choose progress date: </span>
                 <CalendarDays className="size-4" />
                 {date === today ? 'Today' : date}
               </Button>

@@ -29,7 +29,7 @@ export function SpecStrip({ items }: { items: SpecStripItem[] }) {
             )}
           >
             {item.value || 'Add'}
-          </span>
+          </span>{' '}
           <span className="text-muted-foreground text-xs font-normal">{item.label}</span>
         </Button>
       ))}

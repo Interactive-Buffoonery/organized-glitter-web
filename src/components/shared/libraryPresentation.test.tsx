@@ -17,7 +17,7 @@ describe('library presentation', () => {
         ]}
       />
     );
-    expect(screen.getByRole('button', { name: 'All 0' })).not.toHaveAttribute('aria-label');
+    expect(screen.getByRole('button', { name: 'All 0' })).toHaveTextContent('All 0');
     expect(screen.queryByRole('button', { name: /Wishlist/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'In progress 12' }));
     expect(onChange).toHaveBeenCalledWith('progress');

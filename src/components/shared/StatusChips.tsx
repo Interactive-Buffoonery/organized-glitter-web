@@ -25,6 +25,7 @@ export function StatusChips<T extends string>({
             aria-pressed={
               Array.isArray(value) ? value.includes(option.value) : value === option.value
             }
+            aria-label={`${option.label}${option.count === undefined ? '' : ` ${option.count}`}`}
             onClick={() => onChange(option.value)}
             className={cn(
               'border-border text-muted-foreground focus-visible:ring-ring min-h-11 shrink-0 rounded-full border px-3 text-sm whitespace-nowrap focus-visible:ring-2',

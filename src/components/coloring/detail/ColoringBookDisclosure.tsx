@@ -19,11 +19,11 @@ export function ColoringBookDisclosure({
   const compact = useIsMobile();
   if (!compact) return <>{children}</>;
   return (
-    <Accordion type="single" collapsible>
+    <Accordion type="single" collapsible className="min-w-0">
       <AccordionItem value={title}>
-        <AccordionTrigger type="button" className="min-h-11 font-sans text-sm">
+        <AccordionTrigger type="button" className="min-h-11 min-w-0 font-sans text-sm">
           <span className="shrink-0">{title}</span>
-          <span className="text-muted-foreground ml-auto truncate text-xs font-normal">
+          <span className="text-muted-foreground ml-auto min-w-0 truncate text-xs font-normal">
             {summary}
           </span>
         </AccordionTrigger>

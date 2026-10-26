@@ -312,7 +312,7 @@ const ColoringBookDetail = () => {
             )}
           </div>
         </header>
-        <div className="grid items-start gap-y-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-x-14">
+        <div className="grid grid-cols-1 items-start gap-y-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-x-14">
           <div className="order-2 min-w-0 lg:order-1 lg:col-start-1 lg:row-start-1">
             {photosQuery.isError && (
               <ColoringDetailRefreshNotice
@@ -340,7 +340,7 @@ const ColoringBookDetail = () => {
             />
           </div>
           <aside className="contents lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:block lg:space-y-6">
-            <div className="order-1">
+            <div className="order-1 min-w-0">
               <ColoringBookHero
                 book={book}
                 coverUrl={coverUrl}
@@ -351,7 +351,7 @@ const ColoringBookDetail = () => {
                 onStatusChange={handleStatusChange}
               />
             </div>
-            <div className="divide-border/60 lg:border-border/60 order-3 divide-y lg:space-y-6 lg:border-t lg:pt-6 [&>section+section]:lg:pt-6">
+            <div className="divide-border/60 lg:border-border/60 order-3 min-w-0 divide-y lg:space-y-6 lg:border-t lg:pt-6 [&>section+section]:lg:pt-6">
               <ColoringBookDisclosure
                 title="About this book"
                 summary={

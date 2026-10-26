@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
 import { ArrowUpDown } from 'lucide-react';
 import { ClientResponseError } from 'pocketbase';
 import { Section, SectionHeading } from '@/components/shared/Section';
@@ -115,6 +116,28 @@ function ColorKeyEditor({
   const [off, setOff] = useState<Set<string>>(() => new Set());
   const [picker, setPicker] = useState<'setup' | 'add' | null>(null);
   const [entry, setEntry] = useState<EntryTarget | null>(null);
+  const saveOpenEntry = useRef<(() => Promise<boolean>) | null>(null);
+  // Moving to another row saves the open one first, so a draft is never dropped silently.
+  // Only the latest tap, Cancel, Save, Save and next or Delete decides what opens after a slow save.
+  const entryRequest = useRef(0);
+  const goTo = async (target: EntryTarget | null, work = saveOpenEntry.current) => {
+    const request = ++entryRequest.current;
+    let saved = saveOpenEntry.current;
+    if (work && !(await work())) return;
+    // Another device can replace the open form mid-save; each replacement is saved before leaving.
+    while (request === entryRequest.current && saveOpenEntry.current !== saved) {
+      saved = saveOpenEntry.current;
+      if (saved && !(await saved())) return;
+    }
+    if (request !== entryRequest.current) return;
+    if (target) setEntry(target);
+    else closeEntry();
+  };
+  const rowTarget = (row: ColorKey): EntryTarget => ({
+    row,
+    symbol: row.symbol,
+    position: row.position,
+  });
 
   const editingIndex = entry?.row ? rows.findIndex(row => row.id === entry.row?.id) : -1;
   const liveEntry: EntryTarget | null =
@@ -133,7 +156,7 @@ function ColorKeyEditor({
         ? rows.find(row => row.position > entry.position)
         : undefined;
   const filled = rows.filter(row => row.code.trim()).length;
-  const showSetup = !query.isPending && !query.isError && rows.length === 0 && !skipped;
+  const showSetup = !query.isPending && !query.isError && rows.length === 0 && !skipped && !entry;
 
   const startSetup = async () => {
     const symbols = setupSymbols.filter(symbol => !off.has(symbol));
@@ -174,7 +197,7 @@ function ColorKeyEditor({
     try {
       const position = nextPositionIn(latestRows.current);
       const row = await createKey.mutateAsync({ symbol, position });
-      setEntry({ row, symbol: row.symbol, position: row.position });
+      void goTo(rowTarget(row));
       return true;
     } catch (error) {
       logger.warn('Could not add a sent symbol to the page', error);
@@ -188,7 +211,7 @@ function ColorKeyEditor({
   const onPick = (symbol: string) => {
     setPicker(null);
     if (picker === 'setup') addSetupSymbol(symbol);
-    else setEntry({ symbol, position: nextPosition });
+    else void goTo({ symbol, position: nextPosition });
   };
   /** False when adding the row failed; the sheet then offers to add it again. */
   const onSent = async (requestId: string, usePhoto: boolean) => {
@@ -240,6 +263,43 @@ function ColorKeyEditor({
     document.getElementById(`color-keys-${pageId}-${returnTo}`)?.focus();
   };
 
+  // A row that vanished mid-edit stays listed under its key, so the draft survives.
+  const listed = entry?.row && editingIndex < 0 ? [...rows, entry.row] : rows;
+  const rowButtonId = (id: string) => `color-keys-${pageId}-row-${id}`;
+  const closeEntry = () => {
+    const id = entry?.row?.id;
+    entryRequest.current++;
+    flushSync(() => setEntry(null));
+    (
+      (id && document.getElementById(rowButtonId(id))) ||
+      document.getElementById(`color-keys-${pageId}-add-symbol`) ||
+      document.getElementById(`color-keys-${pageId}`)
+    )?.focus();
+  };
+  const entryForm = liveEntry ? (
+    <ColorKeyEntry
+      pageId={pageId}
+      userId={userId}
+      target={liveEntry}
+      positionForNew={nextPosition}
+      next={next}
+      requests={requests}
+      onClose={closeEntry}
+      onLeave={(then, work) => void goTo(then === 'next' && next ? rowTarget(next) : null, work)}
+      saveRef={saveOpenEntry}
+      onRequestSymbol={request => {
+        // A send can finish after this form closed or was replaced; only place into the one that asked.
+        const asked = saveOpenEntry.current;
+        openRequest({
+          kind: 'entry',
+          request: {
+            ...request,
+            place: symbol => asked === saveOpenEntry.current && request.place(symbol),
+          },
+        });
+      }}
+    />
+  ) : null;
   return (
     <Section variant="bordered" className="space-y-3" landmark={false}>
       <div className="flex items-center gap-3">
@@ -286,21 +346,24 @@ function ColorKeyEditor({
 
       {!showSetup && !query.isPending && !query.isError ? (
         <>
-          {rows.length === 0 ? (
+          {rows.length === 0 && !entry ? (
             <p className="text-muted-foreground text-sm">
               Record the color you used for each symbol on this page.
             </p>
           ) : (
             <ul className="divide-border/60 -mx-2 divide-y">
-              {rows.map(row => {
+              {listed.map(row => {
                 const request = requestFor(row.symbol, requests);
-                return (
+                return row.id === entry?.row?.id ? (
+                  <li key={row.id}>{entryForm}</li>
+                ) : (
                   <li key={row.id}>
                     <button
+                      id={rowButtonId(row.id)}
                       type="button"
                       aria-label={colorKeyLabel(row, request)}
                       disabled={sorting}
-                      onClick={() => setEntry({ row, symbol: row.symbol, position: row.position })}
+                      onClick={() => void goTo(rowTarget(row))}
                       className="hover:bg-muted/60 flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left disabled:opacity-60"
                     >
                       <ColorKeyRowContent row={row} request={request} />
@@ -308,6 +371,7 @@ function ColorKeyEditor({
                   </li>
                 );
               })}
+              {entry && !entry.row ? <li key="new">{entryForm}</li> : null}
             </ul>
           )}
           {sortError ? (
@@ -363,19 +427,6 @@ function ColorKeyEditor({
           openRequest({ kind: picker === 'setup' ? 'setup' : 'add' });
           setPicker(null);
         }}
-      />
-      <ColorKeyEntry
-        pageId={pageId}
-        userId={userId}
-        target={liveEntry}
-        positionForNew={nextPosition}
-        next={next}
-        requests={requests}
-        onClose={() => setEntry(null)}
-        onNext={row =>
-          setEntry({ row, symbol: row.symbol, position: row.position, focusCode: true })
-        }
-        onRequestSymbol={request => openRequest({ kind: 'entry', request })}
       />
       <SymbolRequestDialog
         open={requestOpen}

@@ -6,6 +6,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type MouseEvent,
+  type MutableRefObject,
 } from 'react';
 import { flushSync } from 'react-dom';
 import { X } from 'lucide-react';
@@ -30,7 +31,6 @@ import type {
   SymbolRequestPreview,
 } from '@/services/pocketbase/colorKeys.service';
 import { createLogger } from '@/utils/logger';
-import { ColorKeySheet } from './ColorKeySheet';
 import { SymbolGlyph } from './SymbolGlyph';
 import { SymbolPicker } from './SymbolPicker';
 import { requestFor, safeSwatch, symbolDisplayName } from './symbolName';
@@ -42,25 +42,27 @@ export type EntryTarget = {
   row?: ColorKey;
   symbol: string;
   position: number;
-  /** Set when arriving from Save and next, so typing can start right away. */
-  focusCode?: boolean;
 };
 
 interface ColorKeyEntryProps {
   pageId: string;
   userId: string;
-  target: EntryTarget | null;
+  target: EntryTarget;
   positionForNew: number;
   next?: ColorKey;
   requests?: Record<string, SymbolRequestPreview>;
+  /** Closes without saving. */
   onClose: () => void;
-  onNext: (next: ColorKey) => void;
+  /** Runs `work`, then closes or opens the next color if it worked and nothing newer was asked for. */
+  onLeave: (then: 'close' | 'next', work: () => Promise<boolean>) => void;
+  /** This form's save, the same function while it stays open; false keeps it open with the error. */
+  saveRef: MutableRefObject<(() => Promise<boolean>) | null>;
   /** Opens the symbol request flow for this color. */
   onRequestSymbol?: (request: EntrySymbolRequest) => void;
 }
 
 export type EntrySymbolRequest = {
-  /** Puts the sent photo's symbol in this color's draft; false once this form has closed. */
+  /** Puts the sent photo's symbol in this color's draft. */
   place: (symbol: string) => boolean;
   /** Moves focus back to Change symbol after the request sheet closes. */
   focus: () => void;
@@ -73,60 +75,36 @@ const tidyHex = (value: string) => {
   return match ? `#${match[1].toUpperCase()}` : value;
 };
 
-export function ColorKeyEntry({ target, onClose, ...props }: ColorKeyEntryProps) {
-  const formKey = target ? `${target.row?.id ?? 'new'}:${target.symbol}` : '';
+export function ColorKeyEntry({ target, ...props }: ColorKeyEntryProps) {
+  const formKey = `${target.row?.id ?? 'new'}:${target.symbol}`;
   const [changed, setChanged] = useState<{ formKey: string; symbol: string } | null>(null);
-  // A closed entry forgets a picked symbol, so reopening the same row starts clean.
   const [goneKey, setGoneKey] = useState('');
-  if (!target && changed) setChanged(null);
-  if (!target && goneKey) setGoneKey('');
-  const gone = Boolean(target) && goneKey === formKey;
-  const symbol = changed?.formKey === formKey ? changed.symbol : target?.symbol;
-  // A request resolves after a send; it may only touch the form that asked for it.
-  const openKey = useRef(formKey);
-  useEffect(() => {
-    openKey.current = formKey;
-  }, [formKey]);
+  const gone = goneKey === formKey;
+  const symbol = changed?.formKey === formKey ? changed.symbol : target.symbol;
   const { onRequestSymbol, ...formProps } = props;
-  const request = symbol ? requestFor(symbol, props.requests) : undefined;
-  const name = symbol ? symbolDisplayName(symbol, request) : '';
+  const name = symbolDisplayName(symbol, requestFor(symbol, props.requests));
   return (
-    <ColorKeySheet
-      open={Boolean(target)}
-      onOpenChange={open => !open && onClose()}
-      title={target?.row && !gone ? `Edit color: ${name}` : `Add a color: ${name}`}
-      description="Record the color you used for this symbol."
-      onEscapeKeyDown={event => {
-        // An open suggestion list owns Escape; the combobox closes it.
-        if ((event.target as Element | null)?.getAttribute?.('aria-expanded') === 'true')
-          event.preventDefault();
-      }}
-    >
-      {target && symbol ? (
-        <EntryForm
-          key={formKey}
-          target={target}
-          symbol={symbol}
-          onSymbolChange={picked => setChanged({ formKey, symbol: picked })}
-          gone={gone}
-          onGone={() => setGoneKey(formKey)}
-          onClose={onClose}
-          onRequestSymbol={
-            onRequestSymbol &&
-            (focus =>
-              onRequestSymbol({
-                focus,
-                place: picked => {
-                  if (openKey.current !== formKey) return false;
-                  setChanged({ formKey, symbol: picked });
-                  return true;
-                },
-              }))
-          }
-          {...formProps}
-        />
-      ) : null}
-    </ColorKeySheet>
+    <EntryForm
+      key={formKey}
+      label={target.row && !gone ? `Edit color: ${name}` : `Add a color: ${name}`}
+      target={target}
+      symbol={symbol}
+      onSymbolChange={picked => setChanged({ formKey, symbol: picked })}
+      gone={gone}
+      onGone={() => setGoneKey(formKey)}
+      onRequestSymbol={
+        onRequestSymbol &&
+        (focus =>
+          onRequestSymbol({
+            focus,
+            place: picked => {
+              setChanged({ formKey, symbol: picked });
+              return true;
+            },
+          }))
+      }
+      {...formProps}
+    />
   );
 }
 
@@ -138,14 +116,17 @@ function EntryForm({
   next,
   requests,
   onClose,
-  onNext,
+  onLeave,
   onRequestSymbol,
   symbol,
   onSymbolChange,
   gone,
   onGone,
+  label,
+  saveRef,
 }: Omit<ColorKeyEntryProps, 'onRequestSymbol'> & {
   onRequestSymbol?: (focusChangeSymbol: () => void) => void;
+  label: string;
   target: EntryTarget;
   symbol: string;
   onSymbolChange: (symbol: string) => void;
@@ -171,7 +152,9 @@ function EntryForm({
   const update = useUpdateColorKey(pageId, userId);
   const remove = useDeleteColorKey(pageId, userId);
   const { confirmAction, ConfirmationDialog } = useConfirmationDialog();
-  const busy = create.isPending || update.isPending || remove.isPending;
+  // Fields stay read-only while a save runs, so what is stored is exactly what is shown.
+  const [locked, setLocked] = useState(false);
+  const busy = locked || remove.isPending;
 
   const term = code.trim().toLowerCase();
   const suggestions: ColorCodeHistoryEntry[] = term
@@ -182,6 +165,7 @@ function EntryForm({
   const showSuggestions = suggestOpen && suggestions.length > 0;
 
   const applySuggestion = (entry: ColorCodeHistoryEntry) => {
+    if (locked) return;
     setCode(entry.code);
     setColorName(entry.color_name);
     setSwatch(entry.swatch);
@@ -204,6 +188,7 @@ function EntryForm({
     }
   };
   const addTried = () => {
+    if (locked) return;
     const value = triedDraft.trim();
     if (!value || tried.length >= COLOR_KEY_LIMITS.tried) return;
     setTried(values => (values.includes(value) ? values : [...values, value]));
@@ -219,22 +204,45 @@ function EntryForm({
   };
   const tidySwatch = () => setSwatch(tidyHex);
 
-  const save = async (goNext: boolean) => {
-    if (busy) return;
+  const draft = triedDraft.trim();
+  const input = {
+    symbol,
+    position: target.position,
+    code,
+    color_name: colorName,
+    swatch: tidyHex(swatch),
+    tried:
+      draft && !tried.includes(draft) && tried.length < COLOR_KEY_LIMITS.tried
+        ? [...tried, draft]
+        : tried,
+    note,
+  };
+  const changed =
+    !row ||
+    gone ||
+    input.symbol !== row.symbol ||
+    input.code !== row.code ||
+    input.color_name !== row.color_name ||
+    input.swatch !== row.swatch ||
+    input.note !== row.note ||
+    input.tried.join('\n') !== (row.tried ?? []).join('\n');
+
+  const saving = useRef<Promise<boolean> | null>(null);
+
+  const saveDraft = () => {
+    if (saving.current) return saving.current;
+    if (remove.isPending) return Promise.resolve(false);
+    if (!changed) return Promise.resolve(true);
+    const run = store().finally(() => {
+      saving.current = null;
+      setLocked(false);
+    });
+    saving.current = run;
+    setLocked(true);
+    return run;
+  };
+  const store = async () => {
     setError(null);
-    const draft = triedDraft.trim();
-    const input = {
-      symbol,
-      position: target.position,
-      code,
-      color_name: colorName,
-      swatch: tidyHex(swatch),
-      tried:
-        draft && !tried.includes(draft) && tried.length < COLOR_KEY_LIMITS.tried
-          ? [...tried, draft]
-          : tried,
-      note,
-    };
     try {
       if (row && !gone) await update.mutateAsync({ id: row.id, input });
       else await create.mutateAsync({ ...input, position: positionForNew });
@@ -242,20 +250,31 @@ function EntryForm({
       if (row && !gone && saveError instanceof ClientResponseError && saveError.status === 404) {
         onGone();
         setError(GONE);
-        return;
+        return false;
       }
       logger.warn('Could not save a color key', saveError);
       const message = saveError instanceof Error ? saveError.message : 'Could not save. Try again.';
       setError(message);
       notifyError(message);
-      return;
+      return false;
     }
-    if (goNext && next) onNext(next);
-    else onClose();
+    return true;
   };
+  const latestSave = useRef(saveDraft);
+  useEffect(() => {
+    latestSave.current = saveDraft;
+  });
+  /** True once the draft is stored or had nothing to store. One function per form, so the section can tell forms apart. */
+  const [save] = useState(() => () => latestSave.current());
+  useEffect(() => {
+    saveRef.current = save;
+    return () => {
+      if (saveRef.current === save) saveRef.current = null;
+    };
+  }, [save, saveRef]);
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    void save(false);
+    onLeave('close', save);
   };
   const onDelete = async () => {
     if (!row || busy) return;
@@ -265,13 +284,16 @@ function EntryForm({
       true
     );
     if (!confirmed) return;
-    try {
-      await remove.mutateAsync(row.id);
-      onClose();
-    } catch (deleteError) {
-      logger.warn('Could not delete a color key', deleteError);
-      notifyError('Could not delete this color. Try again.');
-    }
+    onLeave('close', async () => {
+      try {
+        await remove.mutateAsync(row.id);
+        return true;
+      } catch (deleteError) {
+        logger.warn('Could not delete a color key', deleteError);
+        notifyError('Could not delete this color. Try again.');
+        return false;
+      }
+    });
   };
 
   const request = requestFor(symbol, requests);
@@ -281,7 +303,20 @@ function EntryForm({
   const hint = 'text-muted-foreground font-normal';
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+    // Escape closes the form the way it closes a dialog.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+    <form
+      aria-label={label}
+      onSubmit={onSubmit}
+      onKeyDown={event => {
+        // Escape inside a portaled picker or dialog still bubbles here through React.
+        if (event.key !== 'Escape' || !event.currentTarget.contains(event.target as Node)) return;
+        event.preventDefault();
+        onClose();
+      }}
+      className="border-border/70 bg-muted/30 my-1 space-y-4 rounded-lg border p-3"
+      noValidate
+    >
       <div className="flex items-center gap-3">
         <span
           aria-hidden="true"
@@ -296,6 +331,7 @@ function EntryForm({
             type="button"
             variant="link"
             className="h-auto p-0"
+            disabled={busy}
             onClick={() => setPickerOpen(true)}
           >
             Change symbol
@@ -322,9 +358,10 @@ function EntryForm({
           spellCheck={false}
           className="h-11 font-mono"
           maxLength={COLOR_KEY_LIMITS.code}
-          // Save and next remounts the form; focus Code so the next row can be typed straight away.
+          // The row button that opened this form is gone; Code is where typing starts.
           // eslint-disable-next-line jsx-a11y/no-autofocus
-          autoFocus={target.focusCode}
+          autoFocus
+          readOnly={locked}
           value={code}
           onChange={event => {
             setCode(event.target.value);
@@ -381,6 +418,7 @@ function EntryForm({
           id={`${id}-name`}
           className="h-11"
           maxLength={COLOR_KEY_LIMITS.colorName}
+          readOnly={locked}
           value={colorName}
           onChange={event => setColorName(event.target.value)}
         />
@@ -396,6 +434,7 @@ function EntryForm({
               type="color"
               aria-label="Swatch color"
               className="border-input size-11 cursor-pointer rounded-md border bg-transparent p-1"
+              disabled={locked}
               value={hasSwatch ? swatch.toLowerCase() : '#ffffff'}
               onChange={event => setSwatch(event.target.value.toUpperCase())}
             />
@@ -415,12 +454,13 @@ function EntryForm({
             spellCheck={false}
             className="h-11 font-mono"
             maxLength={7}
+            readOnly={locked}
             value={swatch}
             onChange={event => setSwatch(event.target.value.trim())}
             onBlur={tidySwatch}
           />
           {swatch ? (
-            <Button type="button" variant="ghost" onClick={() => setSwatch('')}>
+            <Button type="button" variant="ghost" disabled={locked} onClick={() => setSwatch('')}>
               Clear
             </Button>
           ) : null}
@@ -443,6 +483,7 @@ function EntryForm({
                   type="button"
                   data-close-button
                   aria-label={`Remove ${value}`}
+                  disabled={locked}
                   className="hover:bg-background/80 relative inline-flex size-6 items-center justify-center rounded-full after:absolute after:-inset-2.5 after:content-['']"
                   onClick={event => removeTried(value, event)}
                 >
@@ -464,6 +505,7 @@ function EntryForm({
             className="h-11 font-mono"
             maxLength={COLOR_KEY_LIMITS.code}
             disabled={tried.length >= COLOR_KEY_LIMITS.tried}
+            readOnly={locked}
             value={triedDraft}
             onChange={event => setTriedDraft(event.target.value)}
             onKeyDown={event => {
@@ -476,7 +518,7 @@ function EntryForm({
             type="button"
             variant="glass"
             className="h-11"
-            disabled={!triedDraft.trim() || tried.length >= COLOR_KEY_LIMITS.tried}
+            disabled={locked || !triedDraft.trim() || tried.length >= COLOR_KEY_LIMITS.tried}
             onClick={addTried}
           >
             Add
@@ -493,6 +535,7 @@ function EntryForm({
           rows={2}
           placeholder="Anything to remember"
           maxLength={COLOR_KEY_LIMITS.note}
+          readOnly={locked}
           value={note}
           onChange={event => setNote(event.target.value)}
         />
@@ -516,6 +559,9 @@ function EntryForm({
             Delete
           </Button>
         ) : null}
+        <Button type="button" variant="ghost" className="h-11" onClick={onClose}>
+          Cancel
+        </Button>
         <Button type="submit" variant="glass" className="h-11 flex-1" disabled={busy}>
           Save
         </Button>
@@ -524,7 +570,7 @@ function EntryForm({
             type="button"
             className="h-11 flex-[2]"
             disabled={busy}
-            onClick={() => void save(true)}
+            onClick={() => onLeave('next', save)}
           >
             Save and next: {symbolDisplayName(next.symbol, requestFor(next.symbol, requests))}
           </Button>
@@ -536,6 +582,10 @@ function EntryForm({
         onOpenChange={setPickerOpen}
         userId={userId}
         title="Change symbol"
+        onCloseAutoFocus={event => {
+          event.preventDefault();
+          document.getElementById(`color-keys-${pageId}-change-symbol`)?.focus();
+        }}
         onRequestSymbol={
           onRequestSymbol &&
           (() => {

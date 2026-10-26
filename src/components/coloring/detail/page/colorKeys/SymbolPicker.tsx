@@ -34,12 +34,14 @@ export interface SymbolPickerProps {
   title?: string;
   /** Opens the symbol request flow. The "Can't find your symbol?" row is hidden without it. */
   onRequestSymbol?: () => void;
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 export function SymbolPicker({
   open,
   onOpenChange,
   title = 'Add a symbol',
+  onCloseAutoFocus,
   ...props
 }: SymbolPickerProps) {
   return (
@@ -48,6 +50,7 @@ export function SymbolPicker({
       onOpenChange={onOpenChange}
       title={title}
       description="Search or browse the symbol catalog."
+      onCloseAutoFocus={onCloseAutoFocus}
       fill
     >
       {open && <PickerBody {...props} />}

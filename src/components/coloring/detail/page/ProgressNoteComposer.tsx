@@ -71,7 +71,7 @@ export function ProgressNoteComposer({ onSubmit, disabled }: ProgressNoteFormPro
             onChange={form.handleDateChange}
             disabled={form.areInputsDisabled}
             calendarLabel="Progress date"
-            className="w-36 [&_input]:min-h-11"
+            className="w-44 [&_input]:min-h-11"
           />
         </div>
         <Button

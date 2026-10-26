@@ -1,3 +1,5 @@
+import { StatusPill } from '@/components/shared/StatusPill';
+import { FILTER_STATUS_ACTIVE_FILL } from '@/utils/statusColors';
 import React, { useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { useProjectStatus } from '@/hooks/useProjectStatus';
@@ -16,7 +18,7 @@ const ProjectTableCardComponent = ({
   onNavigate,
   isRecentlyEdited = false,
 }: ProjectTableCardProps) => {
-  const { getStatusColor, getStatusLabel } = useProjectStatus();
+  const { getStatusLabel } = useProjectStatus();
 
   const openProject = useCallback(() => {
     onNavigate(project.id);
@@ -70,14 +72,7 @@ const ProjectTableCardComponent = ({
         </div>
 
         <div className="flex-shrink-0">
-          <span
-            className={cn(
-              'rounded-full px-3 py-1 text-xs font-medium shadow-md transition-all duration-200 group-hover:scale-105',
-              getStatusColor(project.status)
-            )}
-          >
-            {statusLabel}
-          </span>
+          <StatusPill label={statusLabel} className={FILTER_STATUS_ACTIVE_FILL[project.status]} />
         </div>
       </div>
     </button>

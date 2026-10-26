@@ -229,7 +229,7 @@ const ColoringBookDetail = () => {
 
   const publisherUrl = publishersQuery.data?.items.find(
     publisher => publisher.id === book.publisherId
-  )?.websiteUrl;
+  )?.website_url;
   const inProgressPages = pagesQuery.data
     ? pages.filter(page => page.status !== 'completed' && page.status !== 'not_started').length
     : undefined;

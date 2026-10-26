@@ -570,6 +570,27 @@ describe('Color key entry', () => {
     );
   });
 
+  it('unlocks a new color after a failed save so it can be retried', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    state.create
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockImplementation(async input => key('c', input.position, input.symbol, input));
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: 'Add symbol' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Search symbols' }), 'yen');
+    await user.click(screen.getByRole('option', { name: 'Yen sign' }));
+    const code = screen.getByRole('combobox', { name: 'Code' });
+    await user.type(code, 'PU');
+    await user.click(screen.getByRole('button', { name: /^Save$/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('offline');
+    await user.type(code, '306');
+    await user.click(screen.getByRole('button', { name: /^Save$/ }));
+    await waitFor(() => expect(screen.queryByRole('form')).toBeNull());
+    expect(state.create).toHaveBeenCalledTimes(2);
+    expect(state.create).toHaveBeenLastCalledWith(expect.objectContaining({ code: 'PU306' }));
+  });
+
   it('deletes a row after confirming', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031')];

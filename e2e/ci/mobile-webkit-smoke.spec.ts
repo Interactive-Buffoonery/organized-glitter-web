@@ -22,12 +22,16 @@ test.describe('mobile WebKit critical interactions', () => {
     await page.getByRole('button', { name: /open filters|filters/i }).click();
     await expect(page.locator('h2:not(.sr-only)', { hasText: 'Filters' })).toBeVisible();
     await expectNoStructuralAxeViolations(page);
-    await page.getByRole('button', { name: /Status filter/ }).click();
-    await page.getByRole('checkbox', { name: 'Wishlist', exact: true }).check();
-    await page.getByRole('checkbox', { name: 'Purchased', exact: true }).check();
-    await pressEscape(page);
-    await expect(page.getByRole('button', { name: /Status filter/ })).toContainText('2');
+    await expect(
+      page.getByRole('checkbox', { name: 'Mystery books only', exact: true })
+    ).toBeVisible();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Close filters', exact: true })
+      .last()
+      .click();
+    const chips = page.getByRole('group', { name: 'Filter by status' });
+    await expect(chips.getByRole('button', { name: /^All/ })).toBeVisible();
     await expectNoStructuralAxeViolations(page);
-    await pressEscape(page);
   });
 });

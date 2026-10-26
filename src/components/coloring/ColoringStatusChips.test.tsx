@@ -26,11 +26,11 @@ describe('coloring status chips', () => {
   it('preserves multiple selected statuses and clears with All', () => {
     render(<ColoringStatusChips userId="example-user" />);
     expect(screen.queryByRole('button', { name: /Purchased/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'In progress, 4' }));
+    fireEvent.click(screen.getByRole('button', { name: 'In progress 4' }));
     expect(updateStatuses).toHaveBeenLastCalledWith(['wishlist', 'in_progress']);
-    fireEvent.click(screen.getByRole('button', { name: 'Wishlist, 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Wishlist 2' }));
     expect(updateStatuses).toHaveBeenLastCalledWith([]);
-    fireEvent.click(screen.getByRole('button', { name: 'All, 10' }));
+    fireEvent.click(screen.getByRole('button', { name: 'All 10' }));
     expect(updateStatuses).toHaveBeenLastCalledWith([]);
   });
 });

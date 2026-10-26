@@ -29,7 +29,6 @@ export function ColoringBookCard({ book, skipImageLoading = false }: ColoringBoo
     <Link
       to={getColoringBookDetailPath(book.id, returnTo)}
       state={{ returnTo }}
-      aria-label={`Open coloring book ${book.title}`}
       className={cn(
         'glow-hover text-card-foreground focus-visible:ring-ring group bg-card hover:border-primary/20 flex w-full cursor-pointer flex-col overflow-hidden rounded-xl border text-left shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 focus-visible:ring-2 focus-visible:outline-none'
       )}

@@ -17,9 +17,9 @@ describe('library presentation', () => {
         ]}
       />
     );
-    expect(screen.getByRole('button', { name: 'All, 0' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'All 0' })).not.toHaveAttribute('aria-label');
     expect(screen.queryByRole('button', { name: /Wishlist/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'In progress, 12' }));
+    fireEvent.click(screen.getByRole('button', { name: 'In progress 12' }));
     expect(onChange).toHaveBeenCalledWith('progress');
   });
   it('formats a short date and today without shifting date-only values', () => {

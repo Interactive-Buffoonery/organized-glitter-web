@@ -30,7 +30,6 @@ function ColoringBookListRow({ book }: ColoringBookListRowProps) {
       to={getColoringBookDetailPath(book.id, returnTo)}
       state={{ returnTo }}
       role="listitem"
-      aria-label={`Open coloring book ${book.title}`}
       className="glow-hover text-card-foreground focus-visible:ring-ring group border-border bg-card hover:border-primary/20 flex w-full overflow-hidden rounded-xl border text-left shadow-sm transition-all duration-300 ease-out focus-visible:ring-2 focus-visible:outline-none"
     >
       <div className="bg-muted relative h-28 w-20 shrink-0 sm:h-32 sm:w-24">

@@ -5,7 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Section } from '@/components/shared/Section';
+import { Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   ColoringPagesStatusOptions,
@@ -36,7 +36,7 @@ export function ColoringPageStatusSection({
   const presentation = getColoringPageStatusPresentation(status);
 
   return (
-    <Section landmark={false}>
+    <div>
       <Select
         value={status}
         onValueChange={value => onStatusChange(value as ColoringPageStatus)}
@@ -45,10 +45,11 @@ export function ColoringPageStatusSection({
         <SelectTrigger
           aria-label="Change page status"
           className={cn(
-            'bg-background/70 size-auto min-w-36 rounded-full border-0 px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-offset-0',
+            'bg-primary/10 h-11 min-h-11 w-auto min-w-36 rounded-full border-0 px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-offset-0',
             presentation.textClassName
           )}
         >
+          <Circle aria-hidden="true" className="mr-1 size-3 fill-current" />
           <SelectValue />
         </SelectTrigger>
         <SelectContent align="start">
@@ -59,6 +60,6 @@ export function ColoringPageStatusSection({
           ))}
         </SelectContent>
       </Select>
-    </Section>
+    </div>
   );
 }

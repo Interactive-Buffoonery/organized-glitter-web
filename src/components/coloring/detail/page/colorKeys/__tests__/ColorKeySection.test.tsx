@@ -630,23 +630,17 @@ describe('Color key entry', () => {
     expect(state.create).toHaveBeenLastCalledWith(expect.objectContaining({ code: 'PU306' }));
   });
 
-  it('pins the first strip photo above the list while a color is open', async () => {
+  const stripPhoto = (name: string) => ({
+    filename: `${name}.jpg`,
+    thumbnail: `/thumb/${name}.jpg`,
+    strip: `/strip/${name}.jpg`,
+    original: `/${name}.jpg`,
+  });
+
+  it('pins the strip photo above the list while a color is open', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031')];
-    state.stripPhotos = [
-      {
-        filename: 'one.jpg',
-        thumbnail: '/thumb/one.jpg',
-        strip: '/strip/one.jpg',
-        original: '/one.jpg',
-      },
-      {
-        filename: 'two.jpg',
-        thumbnail: '/thumb/two.jpg',
-        strip: '/strip/two.jpg',
-        original: '/two.jpg',
-      },
-    ];
+    state.stripPhotos = [stripPhoto('one')];
     render(<ColorKeySection pageId="page-1" />);
     expect(screen.queryByRole('button', { name: 'Open color strip' })).toBeNull();
     await user.click(screen.getByRole('button', { name: /^One,/ }));
@@ -655,10 +649,34 @@ describe('Color key entry', () => {
       '/strip/one.jpg'
     );
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveFocus();
+    expect(screen.queryByRole('button', { name: 'Next strip photo' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Open color strip' }));
     expect(screen.getByRole('img', { name: 'Full color strip' })).toHaveAttribute(
       'src',
       '/one.jpg'
+    );
+  });
+
+  it('steps through strip photos and keeps the chosen one between colors', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    state.stripPhotos = [stripPhoto('one'), stripPhoto('two')];
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    expect(screen.getByRole('button', { name: 'Previous strip photo' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Next strip photo' }));
+    expect(screen.getByRole('img', { name: 'Color strip 2 of 2' })).toHaveAttribute(
+      'src',
+      '/strip/two.jpg'
+    );
+    expect(screen.getByRole('button', { name: 'Next strip photo' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    expect(screen.getByRole('img', { name: 'Color strip 2 of 2' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Previous strip photo' }));
+    expect(screen.getByRole('img', { name: 'Color strip 1 of 2' })).toHaveAttribute(
+      'src',
+      '/strip/one.jpg'
     );
   });
 

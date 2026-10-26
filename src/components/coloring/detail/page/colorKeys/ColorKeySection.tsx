@@ -113,6 +113,8 @@ function ColorKeyEditor({
     latestRows.current = rows;
   });
   const [skipped, setSkipped] = useState(false);
+  // Outlives the open form so the next color starts on the same strip photo.
+  const [stripPhoto, setStripPhoto] = useState(0);
   const [setupSymbols, setSetupSymbols] = useState<string[]>(DEFAULT_SETUP_SYMBOLS);
   const [off, setOff] = useState<Set<string>>(() => new Set());
   const [picker, setPicker] = useState<'setup' | 'add' | null>(null);
@@ -353,7 +355,14 @@ function ColorKeyEditor({
             </p>
           ) : (
             <>
-              {entry ? <PinnedStrip pageId={pageId} userId={userId} /> : null}
+              {entry ? (
+                <PinnedStrip
+                  pageId={pageId}
+                  userId={userId}
+                  photo={stripPhoto}
+                  onPhotoChange={setStripPhoto}
+                />
+              ) : null}
               <ul className="divide-border/60 -mx-2 divide-y">
                 {listed.map(row => {
                   const request = requestFor(row.symbol, requests);

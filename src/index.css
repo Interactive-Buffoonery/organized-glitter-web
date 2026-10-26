@@ -501,7 +501,8 @@
     flex-direction: column;
     min-height: 100vh; /* Fallback for older browsers */
     min-height: 100dvh; /* Modern dynamic viewport height for mobile */
-    overflow-x: hidden;
+    /* clip, not hidden: hidden makes a scroll container, which stops sticky headers. */
+    overflow-x: clip;
   }
 
   .diamond-pattern {

@@ -51,16 +51,18 @@ interface ColorKeyEntryProps {
   positionForNew: number;
   next?: ColorKey;
   requests?: Record<string, SymbolRequestPreview>;
+  /** Closes without saving. */
   onClose: () => void;
-  onNext: (next: ColorKey) => void;
-  /** Saves the open draft before another row opens; false keeps it open with the error. */
+  /** Runs `work`, then closes or opens the next color if it worked and nothing newer was asked for. */
+  onLeave: (then: 'close' | 'next', work: () => Promise<boolean>) => void;
+  /** This form's save, the same function while it stays open; false keeps it open with the error. */
   saveRef: MutableRefObject<(() => Promise<boolean>) | null>;
   /** Opens the symbol request flow for this color. */
   onRequestSymbol?: (request: EntrySymbolRequest) => void;
 }
 
 export type EntrySymbolRequest = {
-  /** Puts the sent photo's symbol in this color's draft; false once this form has closed. */
+  /** Puts the sent photo's symbol in this color's draft. */
   place: (symbol: string) => boolean;
   /** Moves focus back to Change symbol after the request sheet closes. */
   focus: () => void;
@@ -79,16 +81,7 @@ export function ColorKeyEntry({ target, ...props }: ColorKeyEntryProps) {
   const [goneKey, setGoneKey] = useState('');
   const gone = goneKey === formKey;
   const symbol = changed?.formKey === formKey ? changed.symbol : target.symbol;
-  // A request resolves after a send; it may only touch the form that asked for it.
-  const openKey = useRef(formKey);
-  useEffect(() => {
-    openKey.current = formKey;
-    return () => {
-      openKey.current = '';
-    };
-  }, [formKey]);
   const { onRequestSymbol, ...formProps } = props;
-  const rowKey = target.row?.id ?? 'new';
   const name = symbolDisplayName(symbol, requestFor(symbol, props.requests));
   return (
     <EntryForm
@@ -99,19 +92,12 @@ export function ColorKeyEntry({ target, ...props }: ColorKeyEntryProps) {
       onSymbolChange={picked => setChanged({ formKey, symbol: picked })}
       gone={gone}
       onGone={() => setGoneKey(formKey)}
-      // A save can finish after this form was replaced. It may still move on when its own
-      // saved symbol caused the replacement, but not after Cancel, a row switch or another device.
-      isCurrent={saved =>
-        openKey.current === formKey ||
-        (saved !== undefined && openKey.current === `${rowKey}:${saved}`)
-      }
       onRequestSymbol={
         onRequestSymbol &&
         (focus =>
           onRequestSymbol({
             focus,
             place: picked => {
-              if (openKey.current !== formKey) return false;
               setChanged({ formKey, symbol: picked });
               return true;
             },
@@ -130,19 +116,17 @@ function EntryForm({
   next,
   requests,
   onClose,
-  onNext,
+  onLeave,
   onRequestSymbol,
   symbol,
   onSymbolChange,
   gone,
   onGone,
   label,
-  isCurrent,
   saveRef,
 }: Omit<ColorKeyEntryProps, 'onRequestSymbol'> & {
   onRequestSymbol?: (focusChangeSymbol: () => void) => void;
   label: string;
-  isCurrent: (savedSymbol?: string) => boolean;
   target: EntryTarget;
   symbol: string;
   onSymbolChange: (symbol: string) => void;
@@ -235,6 +219,7 @@ function EntryForm({
   };
   const changed =
     !row ||
+    gone ||
     input.symbol !== row.symbol ||
     input.code !== row.code ||
     input.color_name !== row.color_name ||
@@ -244,13 +229,11 @@ function EntryForm({
 
   const saving = useRef<Promise<boolean> | null>(null);
 
-  /** True once the draft is stored; `stay` leaves the form for the caller to replace. */
-  const save = (then: 'close' | 'next' | 'stay'): Promise<boolean> => {
-    // A switch waits for the save already on its way and only moves on if it worked.
-    if (saving.current) return then === 'stay' ? saving.current : Promise.resolve(false);
+  const saveDraft = () => {
+    if (saving.current) return saving.current;
     if (remove.isPending) return Promise.resolve(false);
-    if (then === 'stay' && !changed) return Promise.resolve(true);
-    const run = store(then).finally(() => {
+    if (!changed) return Promise.resolve(true);
+    const run = store().finally(() => {
       saving.current = null;
       setLocked(false);
     });
@@ -258,7 +241,7 @@ function EntryForm({
     setLocked(true);
     return run;
   };
-  const store = async (then: 'close' | 'next' | 'stay') => {
+  const store = async () => {
     setError(null);
     try {
       if (row && !gone) await update.mutateAsync({ id: row.id, input });
@@ -275,21 +258,23 @@ function EntryForm({
       notifyError(message);
       return false;
     }
-    if (!isCurrent(symbol)) return false;
-    if (then === 'next' && next) onNext(next);
-    else if (then === 'close') onClose();
     return true;
   };
+  const latestSave = useRef(saveDraft);
   useEffect(() => {
-    const saveBeforeSwitch = () => save('stay');
-    saveRef.current = saveBeforeSwitch;
-    return () => {
-      if (saveRef.current === saveBeforeSwitch) saveRef.current = null;
-    };
+    latestSave.current = saveDraft;
   });
+  /** True once the draft is stored or had nothing to store. One function per form, so the section can tell forms apart. */
+  const [save] = useState(() => () => latestSave.current());
+  useEffect(() => {
+    saveRef.current = save;
+    return () => {
+      if (saveRef.current === save) saveRef.current = null;
+    };
+  }, [save, saveRef]);
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    void save('close');
+    onLeave('close', save);
   };
   const onDelete = async () => {
     if (!row || busy) return;
@@ -299,13 +284,16 @@ function EntryForm({
       true
     );
     if (!confirmed) return;
-    try {
-      await remove.mutateAsync(row.id);
-      if (isCurrent()) onClose();
-    } catch (deleteError) {
-      logger.warn('Could not delete a color key', deleteError);
-      notifyError('Could not delete this color. Try again.');
-    }
+    onLeave('close', async () => {
+      try {
+        await remove.mutateAsync(row.id);
+        return true;
+      } catch (deleteError) {
+        logger.warn('Could not delete a color key', deleteError);
+        notifyError('Could not delete this color. Try again.');
+        return false;
+      }
+    });
   };
 
   const request = requestFor(symbol, requests);
@@ -582,7 +570,7 @@ function EntryForm({
             type="button"
             className="h-11 flex-[2]"
             disabled={busy}
-            onClick={() => void save('next')}
+            onClick={() => onLeave('next', save)}
           >
             Save and next: {symbolDisplayName(next.symbol, requestFor(next.symbol, requests))}
           </Button>

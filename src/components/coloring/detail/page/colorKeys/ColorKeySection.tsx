@@ -118,13 +118,24 @@ function ColorKeyEditor({
   const [entry, setEntry] = useState<EntryTarget | null>(null);
   const saveOpenEntry = useRef<(() => Promise<boolean>) | null>(null);
   // Moving to another row saves the open one first, so a draft is never dropped silently.
-  // Only the latest tap, Cancel or Save and next decides what opens after a slow save.
+  // Only the latest tap, Cancel, Save, Save and next or Delete decides what opens after a slow save.
   const entryRequest = useRef(0);
-  const switchEntry = async (target: EntryTarget) => {
+  const goTo = async (target: EntryTarget | null, work = saveOpenEntry.current) => {
     const request = ++entryRequest.current;
-    if (saveOpenEntry.current && !(await saveOpenEntry.current())) return;
-    if (request === entryRequest.current) setEntry(target);
+    const opened = saveOpenEntry.current;
+    if (work && !(await work())) return;
+    // Another device can replace the open form mid-save; its draft is saved too before leaving.
+    const replaced = saveOpenEntry.current;
+    if (replaced && replaced !== opened && !(await replaced())) return;
+    if (request !== entryRequest.current) return;
+    if (target) setEntry(target);
+    else closeEntry();
   };
+  const rowTarget = (row: ColorKey): EntryTarget => ({
+    row,
+    symbol: row.symbol,
+    position: row.position,
+  });
 
   const editingIndex = entry?.row ? rows.findIndex(row => row.id === entry.row?.id) : -1;
   const liveEntry: EntryTarget | null =
@@ -184,7 +195,7 @@ function ColorKeyEditor({
     try {
       const position = nextPositionIn(latestRows.current);
       const row = await createKey.mutateAsync({ symbol, position });
-      void switchEntry({ row, symbol: row.symbol, position: row.position });
+      void goTo(rowTarget(row));
       return true;
     } catch (error) {
       logger.warn('Could not add a sent symbol to the page', error);
@@ -198,7 +209,7 @@ function ColorKeyEditor({
   const onPick = (symbol: string) => {
     setPicker(null);
     if (picker === 'setup') addSetupSymbol(symbol);
-    else void switchEntry({ symbol, position: nextPosition });
+    else void goTo({ symbol, position: nextPosition });
   };
   /** False when adding the row failed; the sheet then offers to add it again. */
   const onSent = async (requestId: string, usePhoto: boolean) => {
@@ -272,12 +283,19 @@ function ColorKeyEditor({
       next={next}
       requests={requests}
       onClose={closeEntry}
-      onNext={row => {
-        entryRequest.current++;
-        setEntry({ row, symbol: row.symbol, position: row.position });
-      }}
+      onLeave={(then, work) => void goTo(then === 'next' && next ? rowTarget(next) : null, work)}
       saveRef={saveOpenEntry}
-      onRequestSymbol={request => openRequest({ kind: 'entry', request })}
+      onRequestSymbol={request => {
+        // A send can finish after this form closed or was replaced; only place into the one that asked.
+        const asked = saveOpenEntry.current;
+        openRequest({
+          kind: 'entry',
+          request: {
+            ...request,
+            place: symbol => asked === saveOpenEntry.current && request.place(symbol),
+          },
+        });
+      }}
     />
   ) : null;
   return (
@@ -343,9 +361,7 @@ function ColorKeyEditor({
                       type="button"
                       aria-label={colorKeyLabel(row, request)}
                       disabled={sorting}
-                      onClick={() =>
-                        void switchEntry({ row, symbol: row.symbol, position: row.position })
-                      }
+                      onClick={() => void goTo(rowTarget(row))}
                       className="hover:bg-muted/60 flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left disabled:opacity-60"
                     >
                       <ColorKeyRowContent row={row} request={request} />

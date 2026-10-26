@@ -447,6 +447,7 @@ describe('Color key entry', () => {
     state.update.mockReturnValueOnce(new Promise(done => (resolve = done)));
     render(<ColorKeySection pageId="page-1" />);
     await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
     await user.click(screen.getByRole('button', { name: /^Save$/ }));
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await user.click(screen.getByRole('button', { name: /^Two,/ }));
@@ -458,21 +459,24 @@ describe('Color key entry', () => {
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('700');
   });
 
-  it('keeps a replacement form open when the symbol changed during a save', async () => {
+  it('saves a replacement form too when the symbol changed during a save', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
     let resolve: (value: unknown) => void = () => {};
     state.update.mockReturnValueOnce(new Promise(done => (resolve = done)));
     const { rerender } = render(<ColorKeySection pageId="page-1" />);
     await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
     await user.click(screen.getByRole('button', { name: 'Save and next: Two' }));
     state.rows = [key('a', 0, 'u:00A5'), key('b', 1, 'u:0032')];
     rerender(<ColorKeySection pageId="page-1" />);
     await user.type(screen.getByRole('combobox', { name: 'Code' }), '800');
     resolve(key('a', 0, 'u:00A5'));
-    await new Promise(done => setTimeout(done, 0));
-    expect(screen.getByRole('form', { name: 'Edit color: Yen sign' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('800');
+    expect(await screen.findByRole('form', { name: 'Edit color: Two' })).toBeInTheDocument();
+    expect(state.update).toHaveBeenLastCalledWith({
+      id: 'a',
+      input: expect.objectContaining({ symbol: 'u:00A5', code: '800' }),
+    });
   });
 
   it.each([
@@ -620,6 +624,50 @@ describe('Color key entry', () => {
     });
   });
 
+  it('stays on the draft with the gone message when a switch finds the row deleted', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    state.update.mockRejectedValue(new ClientResponseError({ status: 404 }));
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This color is no longer on this page. Save again to add it back.'
+    );
+    expect(screen.getByRole('form', { name: 'Add a color: One' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('654');
+  });
+
+  it('opens the row tapped while a Save was still finishing', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032'), key('c', 2, 'u:0033')];
+    let resolve: (value: unknown) => void = () => {};
+    state.update.mockReturnValueOnce(new Promise(done => (resolve = done)));
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    await user.click(screen.getByRole('button', { name: /^Save and next/ }));
+    await user.click(screen.getByRole('button', { name: /^Three,/ }));
+    resolve(key('a', 0, 'u:0031', { code: '654' }));
+    expect(await screen.findByRole('form', { name: 'Edit color: Three' })).toBeInTheDocument();
+    expect(state.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes only the symbol picker on Escape, keeping the draft open', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    await user.click(screen.getByRole('button', { name: 'Change symbol' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Search symbols' }), 'yen');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('searchbox')).toBeNull());
+    expect(screen.getByRole('form', { name: 'Edit color: One' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('654');
+  });
+
   it('keeps the draft when the row is gone and adds it back on the next save', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 3, 'u:0031')];
@@ -695,6 +743,7 @@ describe('Color key entry', () => {
 
     await user.click(screen.getByRole('button', { name: /^One,/ }));
     expect(screen.getByRole('form', { name: 'Edit color: One' })).toBeInTheDocument();
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
     await user.click(screen.getByRole('button', { name: /^Save$/ }));
     expect(state.update).toHaveBeenCalledWith({
       id: 'a',

@@ -371,7 +371,7 @@ const ProjectDetailView = ({
   return (
     <div className="text-foreground">
       {/* Top bar: back link + edit + overflow */}
-      <div className="bg-background/85 sticky top-0 z-20 backdrop-blur-md">
+      <div className="bg-background/85 sticky top-[var(--site-header-total-height)] z-20 backdrop-blur-md">
         <div
           className={cn(
             'mx-auto flex items-center justify-between gap-4 py-3',

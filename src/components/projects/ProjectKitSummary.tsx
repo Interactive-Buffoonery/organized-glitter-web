@@ -152,11 +152,12 @@ export function ProjectKitAbout({ project }: { project: ProjectType }) {
                   variant="ghost"
                   className="h-auto min-h-11 max-w-full px-0 text-right whitespace-normal"
                   onClick={() => setField(row.field)}
-                  aria-label={`${row.value ? 'Edit' : 'Add'} ${row.label.toLowerCase()}`}
                 >
+                  {row.value && <span className="sr-only">Edit </span>}
                   <span className={row.value ? 'text-foreground' : 'text-primary'}>
                     {row.value || 'Add'}
                   </span>
+                  <span className="sr-only"> {row.label.toLowerCase()}</span>
                 </Button>
               )}
             </dd>

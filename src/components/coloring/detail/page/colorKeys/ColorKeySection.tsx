@@ -116,6 +116,12 @@ function ColorKeyEditor({
   const [off, setOff] = useState<Set<string>>(() => new Set());
   const [picker, setPicker] = useState<'setup' | 'add' | null>(null);
   const [entry, setEntry] = useState<EntryTarget | null>(null);
+  const saveOpenEntry = useRef<(() => Promise<boolean>) | null>(null);
+  // Moving to another row saves the open one first, so a draft is never dropped silently.
+  const switchEntry = async (target: EntryTarget) => {
+    if (saveOpenEntry.current && !(await saveOpenEntry.current())) return;
+    setEntry(target);
+  };
 
   const editingIndex = entry?.row ? rows.findIndex(row => row.id === entry.row?.id) : -1;
   const liveEntry: EntryTarget | null =
@@ -175,7 +181,7 @@ function ColorKeyEditor({
     try {
       const position = nextPositionIn(latestRows.current);
       const row = await createKey.mutateAsync({ symbol, position });
-      setEntry({ row, symbol: row.symbol, position: row.position });
+      void switchEntry({ row, symbol: row.symbol, position: row.position });
       return true;
     } catch (error) {
       logger.warn('Could not add a sent symbol to the page', error);
@@ -189,7 +195,7 @@ function ColorKeyEditor({
   const onPick = (symbol: string) => {
     setPicker(null);
     if (picker === 'setup') addSetupSymbol(symbol);
-    else setEntry({ symbol, position: nextPosition });
+    else void switchEntry({ symbol, position: nextPosition });
   };
   /** False when adding the row failed; the sheet then offers to add it again. */
   const onSent = async (requestId: string, usePhoto: boolean) => {
@@ -263,6 +269,7 @@ function ColorKeyEditor({
       requests={requests}
       onClose={closeEntry}
       onNext={row => setEntry({ row, symbol: row.symbol, position: row.position })}
+      saveRef={saveOpenEntry}
       onRequestSymbol={request => openRequest({ kind: 'entry', request })}
     />
   ) : null;
@@ -329,7 +336,9 @@ function ColorKeyEditor({
                       type="button"
                       aria-label={colorKeyLabel(row, request)}
                       disabled={sorting}
-                      onClick={() => setEntry({ row, symbol: row.symbol, position: row.position })}
+                      onClick={() =>
+                        void switchEntry({ row, symbol: row.symbol, position: row.position })
+                      }
                       className="hover:bg-muted/60 flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left disabled:opacity-60"
                     >
                       <ColorKeyRowContent row={row} request={request} />

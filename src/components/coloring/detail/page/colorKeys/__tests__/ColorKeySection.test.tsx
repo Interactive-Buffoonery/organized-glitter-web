@@ -310,6 +310,73 @@ describe('Color key entry', () => {
     expect(screen.getByRole('button', { name: /^Two,/ })).toHaveFocus();
   });
 
+  it('saves the open draft before opening another row', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    state.update.mockImplementation(async ({ id, input }) => key(id, 0, 'u:0031', input));
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    expect(await screen.findByRole('form', { name: 'Edit color: Two' })).toBeInTheDocument();
+    expect(state.update).toHaveBeenCalledWith({
+      id: 'a',
+      input: expect.objectContaining({ code: '654' }),
+    });
+  });
+
+  it('opens another row without saving when nothing changed', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031', { tried: ['650'] }), key('b', 1, 'u:0032')];
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    expect(await screen.findByRole('form', { name: 'Edit color: Two' })).toBeInTheDocument();
+    expect(state.update).not.toHaveBeenCalled();
+  });
+
+  it('stays on the draft when saving it before a switch fails', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    state.update.mockRejectedValue(new Error('Swatch must be a color like #A1B2C3.'));
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('textbox', { name: 'Swatch hex' }), 'red');
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Swatch must be a color');
+    expect(screen.getByRole('form', { name: 'Edit color: One' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Swatch hex' })).toHaveValue('red');
+  });
+
+  it('saves the open draft before adding a symbol', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    state.update.mockImplementation(async ({ id, input }) => key(id, 0, 'u:0031', input));
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    await user.click(screen.getByRole('button', { name: 'Add symbol' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Search symbols' }), 'yen');
+    await user.click(screen.getByRole('option', { name: 'Yen sign' }));
+    expect(await screen.findByRole('form', { name: 'Add a color: Yen sign' })).toBeInTheDocument();
+    expect(state.update).toHaveBeenCalledWith({
+      id: 'a',
+      input: expect.objectContaining({ code: '654' }),
+    });
+  });
+
+  it('does not add back an unchanged row that was removed elsewhere when switching', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    const { rerender } = render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    state.rows = [key('b', 1, 'u:0032')];
+    rerender(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    expect(await screen.findByRole('form', { name: 'Edit color: Two' })).toBeInTheDocument();
+    expect(state.create).not.toHaveBeenCalled();
+  });
+
   it('keeps the draft when another device removes the last row', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031')];

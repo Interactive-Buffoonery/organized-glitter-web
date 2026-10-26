@@ -6,6 +6,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type MouseEvent,
+  type MutableRefObject,
 } from 'react';
 import { flushSync } from 'react-dom';
 import { X } from 'lucide-react';
@@ -52,6 +53,8 @@ interface ColorKeyEntryProps {
   requests?: Record<string, SymbolRequestPreview>;
   onClose: () => void;
   onNext: (next: ColorKey) => void;
+  /** Saves the open draft before another row opens; false keeps it open with the error. */
+  saveRef: MutableRefObject<(() => Promise<boolean>) | null>;
   /** Opens the symbol request flow for this color. */
   onRequestSymbol?: (request: EntrySymbolRequest) => void;
 }
@@ -135,6 +138,7 @@ function EntryForm({
   onGone,
   label,
   isCurrent,
+  saveRef,
 }: Omit<ColorKeyEntryProps, 'onRequestSymbol'> & {
   onRequestSymbol?: (focusChangeSymbol: () => void) => void;
   label: string;
@@ -212,22 +216,34 @@ function EntryForm({
   };
   const tidySwatch = () => setSwatch(tidyHex);
 
-  const save = async (goNext: boolean) => {
-    if (busy) return;
+  const draft = triedDraft.trim();
+  const input = {
+    symbol,
+    position: target.position,
+    code,
+    color_name: colorName,
+    swatch: tidyHex(swatch),
+    tried:
+      draft && !tried.includes(draft) && tried.length < COLOR_KEY_LIMITS.tried
+        ? [...tried, draft]
+        : tried,
+    note,
+  };
+  const changed =
+    !row ||
+    input.symbol !== row.symbol ||
+    input.code !== row.code ||
+    input.color_name !== row.color_name ||
+    input.swatch !== row.swatch ||
+    input.note !== row.note ||
+    input.tried.join('\n') !== (row.tried ?? []).join('\n');
+
+  /** True once the draft is stored; `stay` leaves the form for the caller to replace. */
+  const save = async (then: 'close' | 'next' | 'stay'): Promise<boolean> => {
+    // A save already on its way carries the draft.
+    if (busy) return then === 'stay';
+    if (then === 'stay' && !changed) return true;
     setError(null);
-    const draft = triedDraft.trim();
-    const input = {
-      symbol,
-      position: target.position,
-      code,
-      color_name: colorName,
-      swatch: tidyHex(swatch),
-      tried:
-        draft && !tried.includes(draft) && tried.length < COLOR_KEY_LIMITS.tried
-          ? [...tried, draft]
-          : tried,
-      note,
-    };
     try {
       if (row && !gone) await update.mutateAsync({ id: row.id, input });
       else await create.mutateAsync({ ...input, position: positionForNew });
@@ -235,21 +251,29 @@ function EntryForm({
       if (row && !gone && saveError instanceof ClientResponseError && saveError.status === 404) {
         onGone();
         setError(GONE);
-        return;
+        return false;
       }
       logger.warn('Could not save a color key', saveError);
       const message = saveError instanceof Error ? saveError.message : 'Could not save. Try again.';
       setError(message);
       notifyError(message);
-      return;
+      return false;
     }
-    if (!isCurrent(symbol)) return;
-    if (goNext && next) onNext(next);
-    else onClose();
+    if (!isCurrent(symbol)) return false;
+    if (then === 'next' && next) onNext(next);
+    else if (then === 'close') onClose();
+    return true;
   };
+  useEffect(() => {
+    const saveBeforeSwitch = () => save('stay');
+    saveRef.current = saveBeforeSwitch;
+    return () => {
+      if (saveRef.current === saveBeforeSwitch) saveRef.current = null;
+    };
+  });
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    void save(false);
+    void save('close');
   };
   const onDelete = async () => {
     if (!row || busy) return;
@@ -534,7 +558,7 @@ function EntryForm({
             type="button"
             className="h-11 flex-[2]"
             disabled={busy}
-            onClick={() => void save(true)}
+            onClick={() => void save('next')}
           >
             Save and next: {symbolDisplayName(next.symbol, requestFor(next.symbol, requests))}
           </Button>

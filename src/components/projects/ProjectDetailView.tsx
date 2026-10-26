@@ -11,7 +11,7 @@
  */
 
 import { sessionDraftKeys } from '@/services/auth/sessionDraftKeys';
-import { useState, useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,9 @@ import { ProjectType, ProjectStatus, ProgressNote } from '@/types/project';
 import type { DashboardFilterContext } from '@/hooks/mutations/useSaveNavigationContext';
 import ImageGallery from '@/components/projects/ImageGallery';
 import ProjectCoverImageEditor from '@/components/projects/ProjectCoverImageEditor';
-import ProjectDetails from '@/components/projects/ProjectDetails';
+import { ProjectByline } from './ProjectDetailFacts';
+import { ProjectStatusSummary, ProjectKitAbout, ProjectKitTags } from './ProjectKitSummary';
+import { SectionHeading } from '@/components/shared/Section';
 import ProjectNotes from '@/components/projects/form/ProjectNotes';
 import ProjectProgressNotes from '@/components/projects/ProjectProgressNotes';
 import {
@@ -39,11 +41,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PocketBaseUser } from '@/contexts/AuthContext';
-import { formatProjectDate } from '@/utils/date/formatProjectDate';
-import TimelineDateEditor, {
-  type TimelineDateEditorState,
-} from '@/components/projects/timeline/TimelineDateEditor';
-import type { DateFieldKey } from '@/hooks/mutations/projectCommands';
 import { cn } from '@/lib/utils';
 
 interface ProjectDetailViewProps {
@@ -69,51 +66,6 @@ interface ProjectDetailViewProps {
   user: PocketBaseUser | null;
 }
 
-type TimelineStep = {
-  key: string;
-  dateKey: DateFieldKey;
-  label: string;
-  raw: string | null | undefined;
-  value: string;
-  isSet: boolean;
-};
-
-const buildTimeline = (project: ProjectType): TimelineStep[] => {
-  const make = (
-    key: string,
-    dateKey: DateFieldKey,
-    label: string,
-    raw: string | null | undefined
-  ): TimelineStep => {
-    const value = formatProjectDate(raw);
-    return { key, dateKey, label, raw, value, isSet: Boolean(raw) && value !== 'Not specified' };
-  };
-  return [
-    make('purchased', 'datePurchased', 'Purchased', project.datePurchased),
-    make('received', 'dateReceived', 'Received', project.dateReceived),
-    make('started', 'dateStarted', 'Started', project.dateStarted),
-    make('completed', 'dateCompleted', 'Completed', project.dateCompleted),
-  ];
-};
-
-const SectionLabel = ({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) => (
-  <h2
-    className={cn(
-      'text-foreground mb-3 inline-flex items-center gap-2.5 text-sm font-semibold tracking-tight',
-      className
-    )}
-  >
-    <span aria-hidden="true" className="bg-primary inline-block h-[2px] w-[22px] rounded-sm" />
-    {children}
-  </h2>
-);
-
 const ProjectActionsMenu = ({
   open,
   onOpenChange,
@@ -135,7 +87,7 @@ const ProjectActionsMenu = ({
         size="icon-sm"
         aria-label="More project actions"
         disabled={isSubmitting}
-        className="text-muted-foreground/75 hover:text-foreground"
+        className="text-muted-foreground hover:text-foreground min-h-11 min-w-11"
       >
         <MoreHorizontal className="size-[18px]" />
       </Button>
@@ -183,11 +135,16 @@ const ProjectDeleteDialog = ({
 );
 
 const ProjectHeroImage = ({ project }: { project: ProjectType }) => (
-  <div className="relative mx-auto max-w-[400px]">
+  <div className="relative w-full">
     {project.imageUrl ? (
       <>
-        <div className="overflow-hidden rounded-2xl shadow-sm">
-          <ImageGallery imageUrl={project.imageUrl} alt={project.title} previewFit="contain" />
+        <div className="overflow-hidden sm:rounded-2xl">
+          <ImageGallery
+            imageUrl={project.imageUrl}
+            alt={project.title}
+            previewFit="cover"
+            size="full"
+          />
         </div>
         <div className="absolute top-3 right-3">
           <ProjectCoverImageEditor project={project} />
@@ -207,109 +164,6 @@ const ProjectHeroImage = ({ project }: { project: ProjectType }) => (
   </div>
 );
 
-const HorizontalTimeline = ({
-  timeline,
-  projectId,
-  status,
-  editorState,
-  onEditorStateChange,
-}: {
-  timeline: TimelineStep[];
-  projectId: string;
-  status: ProjectStatus;
-  editorState: TimelineDateEditorState | null;
-  onEditorStateChange: Dispatch<SetStateAction<TimelineDateEditorState | null>>;
-}) => (
-  <div className="grid grid-cols-4">
-    {timeline.map((step, i) => {
-      const isFirst = i === 0;
-      const isLast = i === timeline.length - 1;
-      return (
-        <div key={step.key} className="relative flex flex-col items-start">
-          {!isLast && (
-            <span
-              aria-hidden="true"
-              className="bg-border absolute top-[5px] left-[12px] -z-0 h-px"
-              style={{ right: 0 }}
-            />
-          )}
-          <span
-            className={cn(
-              'relative z-10 size-3 rounded-full border-2',
-              step.isSet
-                ? 'border-primary bg-primary shadow-[0_0_0_4px_hsl(var(--primary)/0.18)]'
-                : 'border-border bg-background'
-            )}
-          />
-          <p
-            className={cn(
-              'text-muted-foreground/80 mt-4 text-xs font-medium',
-              isFirst ? '-ml-px' : ''
-            )}
-          >
-            {step.label}
-          </p>
-          <TimelineDateEditor
-            dateKey={step.dateKey}
-            label={step.label}
-            value={step.raw}
-            projectId={projectId}
-            currentStatus={status}
-            isSet={step.isSet}
-            formattedDisplay={step.value}
-            className="mt-1 text-sm"
-            editorState={editorState}
-            onEditorStateChange={onEditorStateChange}
-          />
-        </div>
-      );
-    })}
-  </div>
-);
-
-const VerticalTimeline = ({
-  timeline,
-  projectId,
-  status,
-  editorState,
-  onEditorStateChange,
-}: {
-  timeline: TimelineStep[];
-  projectId: string;
-  status: ProjectStatus;
-  editorState: TimelineDateEditorState | null;
-  onEditorStateChange: Dispatch<SetStateAction<TimelineDateEditorState | null>>;
-}) => (
-  <div className="relative pl-[22px]">
-    <div className="bg-border absolute top-2 bottom-2 left-[6px] w-px" aria-hidden="true" />
-    {timeline.map(step => (
-      <div key={step.key} className="relative flex items-baseline justify-between gap-4 pb-[18px]">
-        <div
-          className={cn(
-            'absolute top-[5px] -left-[22px] size-[13px] rounded-full border-2',
-            step.isSet
-              ? 'border-primary bg-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]'
-              : 'border-border bg-background'
-          )}
-        />
-        <span className="text-muted-foreground text-xs font-medium">{step.label}</span>
-        <TimelineDateEditor
-          dateKey={step.dateKey}
-          label={step.label}
-          value={step.raw}
-          projectId={projectId}
-          currentStatus={status}
-          isSet={step.isSet}
-          formattedDisplay={step.value}
-          className="text-sm"
-          editorState={editorState}
-          onEditorStateChange={onEditorStateChange}
-        />
-      </div>
-    ))}
-  </div>
-);
-
 const ProjectTitleBlock = ({ project }: { project: ProjectType }) => (
   <div className="min-w-0 flex-1">
     <h1
@@ -323,9 +177,7 @@ const ProjectTitleBlock = ({ project }: { project: ProjectType }) => (
     {!project.title && (
       <p className="text-destructive-text mt-1 text-xs">Warning: Project title is missing</p>
     )}
-    {project.company && (
-      <div className="text-muted-foreground mt-2 text-base font-medium">{project.company}</div>
-    )}
+    <ProjectByline project={project} />
   </div>
 );
 
@@ -343,7 +195,6 @@ const ProjectDetailView = ({
 }: ProjectDetailViewProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
-  const [dateEditorState, setDateEditorState] = useState<TimelineDateEditorState | null>(null);
   const navigate = useNavigate();
 
   const handleDeleteActionSelect = useCallback((event: Event) => {
@@ -366,7 +217,20 @@ const ProjectDetailView = ({
     });
   }, [navigate, dashboardContext]);
 
-  const timeline = buildTimeline(project);
+  const note = (
+    <section className="group/notes border-border/60 border-t pt-6">
+      <SectionHeading className="mb-3">Note</SectionHeading>
+      <ProjectNotes
+        notes={project.generalNotes || ''}
+        sessionDraftKey={sessionDraftKeys.projectNotes(project.id)}
+        accountId={user?.id}
+        onSave={onUpdateNotes}
+        readOnly={isSubmitting}
+        variant="pinned"
+        emptyPlaceholder="Keep a note about this kit."
+      />
+    </section>
+  );
 
   return (
     <div className="text-foreground">
@@ -391,7 +255,7 @@ const ProjectDetailView = ({
               onClick={handleBackToDashboard}
               variant="ghost"
               size="sm"
-              className="gap-1.5"
+              className="min-h-11 gap-1.5"
             >
               <ChevronLeft className="size-4" />
               {backLabel}
@@ -405,7 +269,7 @@ const ProjectDetailView = ({
               onClick={navigateToEdit}
               disabled={isSubmitting}
               aria-label="Edit project"
-              className="text-primary hover:bg-primary/10 hover:text-primary px-2.5 font-medium"
+              className="text-primary hover:bg-primary/10 hover:text-primary min-h-11 px-2.5 font-medium"
             >
               Edit
             </Button>
@@ -421,98 +285,44 @@ const ProjectDetailView = ({
       </div>
 
       {isMobile ? (
-        // ─────── Mobile: single column, hero leads, inset details list
         <div className="pb-16">
-          <div className="px-4 pt-5">
-            <ProjectHeroImage project={project} />
-          </div>
-
-          <div className="px-5 pt-6">
+          <ProjectHeroImage project={project} />
+          <div className="space-y-6 px-5 pt-6">
             <ProjectTitleBlock project={project} />
-          </div>
-
-          <section className="px-5 pt-6">
-            <SectionLabel>Details</SectionLabel>
-            <ProjectDetails project={project} layout="list" onStatusChange={onStatusChange} />
-          </section>
-
-          <section className="px-5 pt-8">
-            <SectionLabel>Timeline</SectionLabel>
-            <VerticalTimeline
-              timeline={timeline}
-              projectId={project.id}
-              status={project.status}
-              editorState={dateEditorState}
-              onEditorStateChange={setDateEditorState}
+            <ProjectStatusSummary
+              key={project.id}
+              project={project}
+              onStatusChange={onStatusChange}
+              disabled={isSubmitting}
             />
-          </section>
-
-          <section className="group/notes px-5 pt-8">
-            <div className="mb-2 flex items-center justify-between">
-              <SectionLabel className="m-0">Notes</SectionLabel>
-            </div>
-            <ProjectNotes
-              notes={project.generalNotes || ''}
-              sessionDraftKey={sessionDraftKeys.projectNotes(project.id)}
-              accountId={user?.id}
-              onSave={onUpdateNotes}
-              readOnly={isSubmitting}
-              variant="inline"
-            />
-          </section>
-
-          <section className="px-5 pt-9">
+            <ProjectKitTags project={project} />
+            <ProjectKitAbout project={project} />
+            {note}
             <ProjectProgressNotes project={project} key={project.id} />
-          </section>
+          </div>
         </div>
       ) : (
-        // ─────── Desktop: two-column with sticky sidebar
         <div className="mx-auto max-w-[1200px] px-7 pt-9 pb-20">
-          <div className="mb-8 flex flex-wrap items-start justify-between gap-8">
+          <header className="border-border/60 mb-6 border-b pb-6">
             <ProjectTitleBlock project={project} />
-          </div>
-
+          </header>
           <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-14">
-            {/* Main column */}
             <div className="min-w-0">
-              <div className="mb-10">
+              <div className="mb-8">
                 <ProjectHeroImage project={project} />
               </div>
-
-              <section className="mb-[72px]">
-                <SectionLabel>Timeline</SectionLabel>
-                <HorizontalTimeline
-                  timeline={timeline}
-                  projectId={project.id}
-                  status={project.status}
-                  editorState={dateEditorState}
-                  onEditorStateChange={setDateEditorState}
-                />
-              </section>
-
-              <section className="group/notes mb-[72px]">
-                <div className="mb-3 flex items-center justify-between">
-                  <SectionLabel className="m-0">Notes</SectionLabel>
-                </div>
-                <ProjectNotes
-                  notes={project.generalNotes || ''}
-                  sessionDraftKey={sessionDraftKeys.projectNotes(project.id)}
-                  accountId={user?.id}
-                  onSave={onUpdateNotes}
-                  readOnly={isSubmitting}
-                  variant="inline"
-                />
-              </section>
-
-              <section>
-                <ProjectProgressNotes project={project} key={project.id} />
-              </section>
+              <ProjectProgressNotes project={project} key={project.id} />
             </div>
-
-            {/* Sticky sidebar, meta only */}
-            <aside className="sticky top-[80px] self-start">
-              <SectionLabel>Details</SectionLabel>
-              <ProjectDetails project={project} layout="dl" onStatusChange={onStatusChange} />
+            <aside className="sticky top-[80px] space-y-6 self-start">
+              <ProjectStatusSummary
+                key={project.id}
+                project={project}
+                onStatusChange={onStatusChange}
+                disabled={isSubmitting}
+              />
+              {note}
+              <ProjectKitAbout project={project} />
+              <ProjectKitTags project={project} />
             </aside>
           </div>
         </div>

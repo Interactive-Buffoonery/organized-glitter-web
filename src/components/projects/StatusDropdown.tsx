@@ -19,6 +19,7 @@ interface StatusDropdownProps {
    *   project detail title row. Still opens the same status menu on click.
    */
   variant?: 'default' | 'pill';
+  disabled?: boolean;
 }
 
 // Map the color classes to match the dropdown's design
@@ -42,19 +43,24 @@ const StatusDropdown = ({
   currentStatus,
   onStatusChange,
   variant = 'default',
+  disabled = false,
 }: StatusDropdownProps) => {
   const { getStatusLabel } = useProjectStatus();
   const colorClass = getDropdownStatusColor(currentStatus);
 
   if (variant === 'pill') {
     return (
-      <Select value={currentStatus} onValueChange={value => onStatusChange(value as ProjectStatus)}>
+      <Select
+        disabled={disabled}
+        value={currentStatus}
+        onValueChange={value => onStatusChange(value as ProjectStatus)}
+      >
         <SelectTrigger
           className={cn(
             // Compact pill: tinted background, colored dot leading, no border chrome
-            'inline-flex size-auto min-w-0 items-center gap-2 rounded-full border-0 bg-current/10 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] shadow-none focus:ring-0 focus:ring-offset-0',
+            'inline-flex size-auto min-h-11 min-w-0 items-center gap-2 rounded-full border-0 bg-current/10 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] shadow-none focus:ring-0 focus:ring-offset-0',
             // Hide the default chevron so the pill stays minimal; it's clear-on-hover
-            '[&>svg]:hidden',
+            '[&>svg]:size-3',
             colorClass
           )}
           aria-label="Change project status"
@@ -83,7 +89,11 @@ const StatusDropdown = ({
 
   return (
     <div className="w-full">
-      <Select value={currentStatus} onValueChange={value => onStatusChange(value as ProjectStatus)}>
+      <Select
+        disabled={disabled}
+        value={currentStatus}
+        onValueChange={value => onStatusChange(value as ProjectStatus)}
+      >
         <SelectTrigger className={`${colorClass} font-medium`} aria-label="Change project status">
           <SelectValue placeholder={getStatusLabel(currentStatus)} />
         </SelectTrigger>

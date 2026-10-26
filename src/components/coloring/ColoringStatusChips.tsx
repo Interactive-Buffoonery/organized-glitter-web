@@ -54,7 +54,15 @@ export function ColoringStatusChips({ userId }: { userId: string }) {
         label: status === 'all' ? 'All' : COLORING_BOOK_STATUS_LABEL[status],
         count: counts[index].data?.totalItems,
       }))}
-      onChange={status => updateStatuses(status === 'all' ? [] : [status])}
+      onChange={status =>
+        updateStatuses(
+          status === 'all'
+            ? []
+            : filters.selectedStatuses.includes(status)
+              ? filters.selectedStatuses.filter(selected => selected !== status)
+              : [...filters.selectedStatuses, status]
+        )
+      }
     />
   );
 }

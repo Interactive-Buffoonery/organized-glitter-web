@@ -20,6 +20,7 @@ import { ColorKeyRowContent } from './ColorKeyRowContent';
 import { ColorKeySetup } from './ColorKeySetup';
 import { copyColorKeys } from './copyColorKeys';
 import { loadSortPanel } from './loadSortPanel';
+import { PinnedStrip } from './PinnedStrip';
 import { SymbolPicker } from './SymbolPicker';
 import { SymbolRequestDialog } from './SymbolRequestDialog';
 import { colorKeyLabel, requestFor } from './symbolName';
@@ -351,28 +352,31 @@ function ColorKeyEditor({
               Record the color you used for each symbol on this page.
             </p>
           ) : (
-            <ul className="divide-border/60 -mx-2 divide-y">
-              {listed.map(row => {
-                const request = requestFor(row.symbol, requests);
-                return row.id === entry?.row?.id ? (
-                  <li key={row.id}>{entryForm}</li>
-                ) : (
-                  <li key={row.id}>
-                    <button
-                      id={rowButtonId(row.id)}
-                      type="button"
-                      aria-label={colorKeyLabel(row, request)}
-                      disabled={sorting}
-                      onClick={() => void goTo(rowTarget(row))}
-                      className="hover:bg-muted/60 flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left disabled:opacity-60"
-                    >
-                      <ColorKeyRowContent row={row} request={request} />
-                    </button>
-                  </li>
-                );
-              })}
-              {entry && !entry.row ? <li key="new">{entryForm}</li> : null}
-            </ul>
+            <>
+              {entry ? <PinnedStrip pageId={pageId} userId={userId} /> : null}
+              <ul className="divide-border/60 -mx-2 divide-y">
+                {listed.map(row => {
+                  const request = requestFor(row.symbol, requests);
+                  return row.id === entry?.row?.id ? (
+                    <li key={row.id}>{entryForm}</li>
+                  ) : (
+                    <li key={row.id}>
+                      <button
+                        id={rowButtonId(row.id)}
+                        type="button"
+                        aria-label={colorKeyLabel(row, request)}
+                        disabled={sorting}
+                        onClick={() => void goTo(rowTarget(row))}
+                        className="hover:bg-muted/60 flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left disabled:opacity-60"
+                      >
+                        <ColorKeyRowContent row={row} request={request} />
+                      </button>
+                    </li>
+                  );
+                })}
+                {entry && !entry.row ? <li key="new">{entryForm}</li> : null}
+              </ul>
+            </>
           )}
           {sortError ? (
             <p role="alert" className="text-destructive text-sm">

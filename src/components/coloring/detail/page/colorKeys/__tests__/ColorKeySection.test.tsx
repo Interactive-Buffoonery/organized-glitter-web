@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   rows: [] as unknown[],
   history: [] as unknown[],
   requests: {} as Record<string, unknown>,
+  stripPhotos: [] as { filename: string; thumbnail: string; original: string }[],
   setup: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
@@ -33,6 +34,10 @@ vi.mock('@/hooks/queries/coloring/useColorKeys', () => ({
   }),
   useColorKeyHistory: () => ({ data: state.history }),
   useSymbolRequests: () => ({ data: state.requests }),
+}));
+vi.mock('@/hooks/queries/coloring/useColorReference', () => ({
+  useColorReference: () => ({ data: { photos: state.stripPhotos.map(p => p.filename) } }),
+  useColorReferenceImages: () => ({ data: state.stripPhotos }),
 }));
 vi.mock('@/hooks/mutations/coloring/useColorKeyMutations', () => ({
   useSetupColorKeys: () => ({ mutateAsync: state.setup, isPending: false }),
@@ -92,6 +97,7 @@ beforeEach(() => {
   state.rows = [];
   state.history = [];
   state.requests = {};
+  state.stripPhotos = [];
   for (const mock of [
     state.setup,
     state.create,
@@ -622,6 +628,33 @@ describe('Color key entry', () => {
     await waitFor(() => expect(screen.queryByRole('form')).toBeNull());
     expect(state.create).toHaveBeenCalledTimes(2);
     expect(state.create).toHaveBeenLastCalledWith(expect.objectContaining({ code: 'PU306' }));
+  });
+
+  it('pins the first strip photo above the list while a color is open', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    state.stripPhotos = [
+      { filename: 'one.jpg', thumbnail: '/thumb/one.jpg', original: '/one.jpg' },
+      { filename: 'two.jpg', thumbnail: '/thumb/two.jpg', original: '/two.jpg' },
+    ];
+    render(<ColorKeySection pageId="page-1" />);
+    expect(screen.queryByRole('button', { name: 'Open color strip' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    expect(screen.getByRole('img', { name: 'Color strip' })).toHaveAttribute('src', '/one.jpg');
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Open color strip' }));
+    expect(screen.getByRole('img', { name: 'Full color strip' })).toHaveAttribute(
+      'src',
+      '/one.jpg'
+    );
+  });
+
+  it('pins nothing while a color is open when the page has no strip photo', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    expect(screen.queryByRole('button', { name: 'Open color strip' })).toBeNull();
   });
 
   it('deletes a row after confirming', async () => {

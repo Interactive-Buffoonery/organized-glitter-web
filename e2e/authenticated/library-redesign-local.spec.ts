@@ -35,6 +35,7 @@ for (const width of [1440, 390]) {
             .getByRole('button', { name: 'Close filters', exact: true })
             .last()
             .click();
+          await expect(page.getByRole('dialog')).toBeHidden();
         }
         const available = chips.getByRole('button').filter({ hasNotText: /^All/ });
         if (await available.count()) {
@@ -44,11 +45,18 @@ for (const width of [1440, 390]) {
           await expect(page).toHaveURL(/status=/);
           await chips.getByRole('button', { name: /^All/ }).click();
         }
+        await expect(
+          page.getByRole('heading', {
+            name: craft === 'diamond' ? 'Local Active Kit' : 'Local Garden Coloring Book',
+            exact: true,
+          })
+        ).toBeVisible();
         const screenshotDir = process.env.E2E_LIBRARY_SCREENSHOTS;
         if (screenshotDir)
           await page.screenshot({
             path: `${screenshotDir}/${craft}-${width}-${theme}.png`,
             fullPage: true,
+            animations: 'disabled',
           });
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)

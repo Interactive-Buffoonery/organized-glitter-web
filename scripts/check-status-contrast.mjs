@@ -15,7 +15,10 @@ const base = execFileSync('git', ['show', 'origin/dev:src/utils/statusColors.ts'
   encoding: 'utf8',
 });
 const oldFills = Object.fromEntries(
-  [...base.matchAll(/^  (\w+): '([^']+)'/gm)].map(([, status, fill]) => [status, fill])
+  [...base.matchAll(/^  (\w+): '([^']*text-white[^']*)'/gm)].map(([, status, fill]) => [
+    status,
+    fill,
+  ])
 );
 const browser = await chromium.launch();
 try {

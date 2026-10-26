@@ -313,18 +313,7 @@ const ColoringBookDetail = () => {
           </div>
         </header>
         <div className="grid items-start gap-y-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-x-14">
-          <div className="lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1">
-            <ColoringBookHero
-              book={book}
-              coverUrl={coverUrl}
-              safeCompletedPages={safeCompletedPages}
-              safeCompletionPct={safeCompletionPct}
-              inProgressPages={inProgressPages}
-              updatePending={updateBook.isPending}
-              onStatusChange={handleStatusChange}
-            />
-          </div>
-          <div className="min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+          <div className="order-2 min-w-0 lg:order-1 lg:col-start-1 lg:row-start-1">
             {photosQuery.isError && (
               <ColoringDetailRefreshNotice
                 kind="book"
@@ -350,42 +339,55 @@ const ColoringBookDetail = () => {
               returnTo={dashboardPath}
             />
           </div>
-          <aside className="divide-border/60 divide-y lg:col-start-2 lg:row-start-2 lg:space-y-6 [&>div]:lg:pt-6">
-            <ColoringBookDisclosure
-              title="About this book"
-              summary={
-                [publisherName, illustratorName].filter(Boolean).join(' · ') || 'Add details'
-              }
-            >
-              <ColoringBookDetailsSection
-                items={detailItems}
-                onEdit={() => setEditDrawerOpen(true)}
+          <aside className="contents lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:block lg:space-y-6">
+            <div className="order-1">
+              <ColoringBookHero
+                book={book}
+                coverUrl={coverUrl}
+                safeCompletedPages={safeCompletedPages}
+                safeCompletionPct={safeCompletionPct}
+                inProgressPages={inProgressPages}
+                updatePending={updateBook.isPending}
+                onStatusChange={handleStatusChange}
               />
-            </ColoringBookDisclosure>
-            <ColoringBookDisclosure
-              title="Tags"
-              summary={tags.map(tag => tag.name).join(', ') || 'No tags yet'}
-            >
-              <section className="space-y-3">
-                <SectionHeading>Tags</SectionHeading>
-                <ColoringBookTagManager
-                  selectedTags={tags}
-                  disabled={updateBook.isPending || syncBookTags.isPending}
-                  onTagsChange={handleTagsChange}
-                  withSection={false}
-                  emptyText="No tags yet."
+            </div>
+            <div className="divide-border/60 lg:border-border/60 order-3 divide-y lg:space-y-6 lg:border-t lg:pt-6 [&>section+section]:lg:pt-6">
+              <ColoringBookDisclosure
+                title="About this book"
+                summary={
+                  [publisherName, illustratorName].filter(Boolean).join(' · ') || 'Add details'
+                }
+              >
+                <ColoringBookDetailsSection
+                  items={detailItems}
+                  onEdit={() => setEditDrawerOpen(true)}
                 />
-              </section>
-            </ColoringBookDisclosure>
-            <ColoringBookDisclosure title="Notes" summary={book.notes || 'No notes yet'}>
-              <ColoringBookNotesSection
-                bookId={book.id}
-                accountId={user?.id}
-                notes={book.notes || ''}
-                onSave={handleNotesSave}
-                readOnly={updateBook.isPending}
-              />
-            </ColoringBookDisclosure>
+              </ColoringBookDisclosure>
+              <ColoringBookDisclosure
+                title="Tags"
+                summary={tags.map(tag => tag.name).join(', ') || 'No tags yet'}
+              >
+                <section className="space-y-3">
+                  <SectionHeading>Tags</SectionHeading>
+                  <ColoringBookTagManager
+                    selectedTags={tags}
+                    disabled={updateBook.isPending || syncBookTags.isPending}
+                    onTagsChange={handleTagsChange}
+                    withSection={false}
+                    emptyText="No tags yet."
+                  />
+                </section>
+              </ColoringBookDisclosure>
+              <ColoringBookDisclosure title="Notes" summary={book.notes || 'No notes yet'}>
+                <ColoringBookNotesSection
+                  bookId={book.id}
+                  accountId={user?.id}
+                  notes={book.notes || ''}
+                  onSave={handleNotesSave}
+                  readOnly={updateBook.isPending}
+                />
+              </ColoringBookDisclosure>
+            </div>
           </aside>
         </div>
         {editDrawerOpen ? (

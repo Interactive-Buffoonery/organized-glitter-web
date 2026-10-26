@@ -19,7 +19,7 @@ for (const width of [1440, 390]) {
         await expect(chips.getByRole('button', { name: /^All \d+/ })).toBeVisible();
         await expect(chips.getByRole('button', { name: /Archived|Destashed/ })).toHaveCount(0);
         await expect(
-          chips.getByRole('button', { name: /, 0$/ }).filter({ hasNotText: 'All' })
+          chips.getByRole('button', { name: / 0$/ }).filter({ hasNotText: 'All' })
         ).toHaveCount(0);
         const createAction = page.getByRole('link', {
           name: craft === 'diamond' ? 'New kit' : 'New book',

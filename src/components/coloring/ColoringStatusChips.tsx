@@ -29,7 +29,7 @@ export function ColoringStatusChips({ userId }: { userId: string }) {
           ...filters,
           selectedStatuses: status === 'all' ? [] : [status],
         }),
-        { field: filters.sortField, direction: filters.sortDirection }
+        { field: 'date_added', direction: 'desc' }
       );
       const options = {
         userId,
@@ -37,7 +37,6 @@ export function ColoringStatusChips({ userId }: { userId: string }) {
         perPage: 1,
         filter: config.filter,
         sort: config.sort,
-        expand: config.expand,
       };
       return {
         queryKey: queryKeys.coloring.books.list(options),

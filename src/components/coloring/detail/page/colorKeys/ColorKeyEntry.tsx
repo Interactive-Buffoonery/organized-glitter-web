@@ -168,7 +168,9 @@ function EntryForm({
   const update = useUpdateColorKey(pageId, userId);
   const remove = useDeleteColorKey(pageId, userId);
   const { confirmAction, ConfirmationDialog } = useConfirmationDialog();
-  const busy = create.isPending || update.isPending || remove.isPending;
+  // Fields stay read-only while a save runs, so what is stored is exactly what is shown.
+  const [locked, setLocked] = useState(false);
+  const busy = locked || remove.isPending;
 
   const term = code.trim().toLowerCase();
   const suggestions: ColorCodeHistoryEntry[] = term
@@ -179,6 +181,7 @@ function EntryForm({
   const showSuggestions = suggestOpen && suggestions.length > 0;
 
   const applySuggestion = (entry: ColorCodeHistoryEntry) => {
+    if (locked) return;
     setCode(entry.code);
     setColorName(entry.color_name);
     setSwatch(entry.swatch);
@@ -201,6 +204,7 @@ function EntryForm({
     }
   };
   const addTried = () => {
+    if (locked) return;
     const value = triedDraft.trim();
     if (!value || tried.length >= COLOR_KEY_LIMITS.tried) return;
     setTried(values => (values.includes(value) ? values : [...values, value]));
@@ -239,10 +243,6 @@ function EntryForm({
     input.tried.join('\n') !== (row.tried ?? []).join('\n');
 
   const saving = useRef<Promise<boolean> | null>(null);
-  const latestDraft = useRef('');
-  useEffect(() => {
-    latestDraft.current = JSON.stringify(input);
-  });
 
   /** True once the draft is stored; `stay` leaves the form for the caller to replace. */
   const save = (then: 'close' | 'next' | 'stay'): Promise<boolean> => {
@@ -252,12 +252,13 @@ function EntryForm({
     if (then === 'stay' && !changed) return Promise.resolve(true);
     const run = store(then).finally(() => {
       saving.current = null;
+      setLocked(false);
     });
     saving.current = run;
+    setLocked(true);
     return run;
   };
   const store = async (then: 'close' | 'next' | 'stay') => {
-    const submitted = JSON.stringify(input);
     setError(null);
     try {
       if (row && !gone) await update.mutateAsync({ id: row.id, input });
@@ -274,8 +275,7 @@ function EntryForm({
       notifyError(message);
       return false;
     }
-    // Typing during the save is newer than what was stored; keep the form open for it.
-    if (!isCurrent(symbol) || latestDraft.current !== submitted) return false;
+    if (!isCurrent(symbol)) return false;
     if (then === 'next' && next) onNext(next);
     else if (then === 'close') onClose();
     return true;
@@ -343,6 +343,7 @@ function EntryForm({
             type="button"
             variant="link"
             className="h-auto p-0"
+            disabled={busy}
             onClick={() => setPickerOpen(true)}
           >
             Change symbol
@@ -372,6 +373,7 @@ function EntryForm({
           // The row button that opened this form is gone; Code is where typing starts.
           // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
+          readOnly={locked}
           value={code}
           onChange={event => {
             setCode(event.target.value);
@@ -428,6 +430,7 @@ function EntryForm({
           id={`${id}-name`}
           className="h-11"
           maxLength={COLOR_KEY_LIMITS.colorName}
+          readOnly={locked}
           value={colorName}
           onChange={event => setColorName(event.target.value)}
         />
@@ -443,6 +446,7 @@ function EntryForm({
               type="color"
               aria-label="Swatch color"
               className="border-input size-11 cursor-pointer rounded-md border bg-transparent p-1"
+              disabled={locked}
               value={hasSwatch ? swatch.toLowerCase() : '#ffffff'}
               onChange={event => setSwatch(event.target.value.toUpperCase())}
             />
@@ -462,12 +466,13 @@ function EntryForm({
             spellCheck={false}
             className="h-11 font-mono"
             maxLength={7}
+            readOnly={locked}
             value={swatch}
             onChange={event => setSwatch(event.target.value.trim())}
             onBlur={tidySwatch}
           />
           {swatch ? (
-            <Button type="button" variant="ghost" onClick={() => setSwatch('')}>
+            <Button type="button" variant="ghost" disabled={locked} onClick={() => setSwatch('')}>
               Clear
             </Button>
           ) : null}
@@ -490,6 +495,7 @@ function EntryForm({
                   type="button"
                   data-close-button
                   aria-label={`Remove ${value}`}
+                  disabled={locked}
                   className="hover:bg-background/80 relative inline-flex size-6 items-center justify-center rounded-full after:absolute after:-inset-2.5 after:content-['']"
                   onClick={event => removeTried(value, event)}
                 >
@@ -511,6 +517,7 @@ function EntryForm({
             className="h-11 font-mono"
             maxLength={COLOR_KEY_LIMITS.code}
             disabled={tried.length >= COLOR_KEY_LIMITS.tried}
+            readOnly={locked}
             value={triedDraft}
             onChange={event => setTriedDraft(event.target.value)}
             onKeyDown={event => {
@@ -523,7 +530,7 @@ function EntryForm({
             type="button"
             variant="glass"
             className="h-11"
-            disabled={!triedDraft.trim() || tried.length >= COLOR_KEY_LIMITS.tried}
+            disabled={locked || !triedDraft.trim() || tried.length >= COLOR_KEY_LIMITS.tried}
             onClick={addTried}
           >
             Add
@@ -540,6 +547,7 @@ function EntryForm({
           rows={2}
           placeholder="Anything to remember"
           maxLength={COLOR_KEY_LIMITS.note}
+          readOnly={locked}
           value={note}
           onChange={event => setNote(event.target.value)}
         />

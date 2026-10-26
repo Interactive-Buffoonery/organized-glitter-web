@@ -379,20 +379,24 @@ describe('Color key entry', () => {
     expect(await screen.findByRole('form', { name: 'Edit color: Three' })).toBeInTheDocument();
   });
 
-  it('stays on the draft when it changed while saving before a switch', async () => {
+  it('locks the draft while it saves, keeping focus where it was', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
     let resolve: (value: unknown) => void = () => {};
     state.update.mockReturnValueOnce(new Promise(done => (resolve = done)));
     render(<ColorKeySection pageId="page-1" />);
     await user.click(screen.getByRole('button', { name: /^One,/ }));
-    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
-    await user.click(screen.getByRole('button', { name: /^Two,/ }));
-    await user.type(screen.getByRole('combobox', { name: 'Code' }), '7');
+    const code = screen.getByRole('combobox', { name: 'Code' });
+    await user.type(code, '654');
+    await user.click(screen.getByRole('button', { name: /^Save$/ }));
+    await user.click(code);
+    await user.keyboard('7');
+    expect(code).toHaveValue('654');
+    expect(code).toHaveFocus();
+    for (const name of ['Change symbol', 'Save', 'Delete'])
+      expect(screen.getByRole('button', { name })).toBeDisabled();
     resolve(key('a', 0, 'u:0031', { code: '654' }));
-    await new Promise(done => setTimeout(done, 0));
-    expect(screen.getByRole('form', { name: 'Edit color: One' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('6547');
+    await waitFor(() => expect(screen.queryByRole('form')).toBeNull());
   });
 
   it('saves the open draft before adding a symbol', async () => {

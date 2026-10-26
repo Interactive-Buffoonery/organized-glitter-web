@@ -126,6 +126,8 @@
       var(--bottom-nav-content-height) + var(--bottom-nav-border-width) +
         var(--bottom-nav-safe-area)
     );
+    /* SiteHeader: 44px tap row, 16px padding each side, 1px border, then the top safe area. */
+    --site-header-total-height: calc(77px + env(safe-area-inset-top, 0px));
   }
 
   /* Berry Cream */

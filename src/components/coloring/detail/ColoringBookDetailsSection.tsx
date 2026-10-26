@@ -25,7 +25,7 @@ export const ColoringBookDetailsSection = ({
                   href={item.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-link inline-flex min-h-11 items-center underline underline-offset-4"
+                  className="text-link inline-block min-h-11 max-w-full break-all underline underline-offset-4"
                 >
                   {item.value}
                 </a>

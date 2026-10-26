@@ -14,6 +14,7 @@ import { useAppReady } from '@/hooks/useAppReady';
 import LibraryPagination from '@/components/ui/LibraryPagination';
 import { Button } from '@/components/ui/button';
 
+import { ColoringStatusChips } from './ColoringStatusChips';
 import { ColoringBookGrid } from './ColoringBookGrid';
 import { ColoringControlsRow, ColoringFilterPanel } from './ColoringFilterStrip';
 
@@ -73,8 +74,6 @@ export function ColoringDashboardPane({ userId }: ColoringDashboardPaneProps) {
 
   return (
     <>
-      <ColoringControlsRow showFilterTrigger={isMobile} />
-
       <div
         className={`grid grid-cols-1 gap-8 ${
           !isMobile ? 'lg:[grid-template-columns:260px_minmax(0,1fr)]' : ''
@@ -85,7 +84,9 @@ export function ColoringDashboardPane({ userId }: ColoringDashboardPaneProps) {
             <ColoringFilterPanel />
           </div>
         )}
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-4">
+          <ColoringControlsRow showFilterTrigger={isMobile} />
+          <ColoringStatusChips userId={userId} />
           {isError && books.length === 0 ? (
             <div
               className="border-border/60 border-y px-6 py-12 text-center"

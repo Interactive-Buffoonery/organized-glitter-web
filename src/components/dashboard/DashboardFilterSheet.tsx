@@ -49,8 +49,8 @@ const DashboardFilterSheet = ({
   return (
     <>
       <Button
+        type="button"
         variant="outline"
-        size="icon-touch"
         className={cn(
           'relative shrink-0',
           filterPanelSummary.count > 0 && 'border-primary text-primary'
@@ -59,6 +59,7 @@ const DashboardFilterSheet = ({
         aria-label={triggerLabel}
       >
         <SlidersHorizontal className="size-5" />
+        Filters
         {filterPanelSummary.count > 0 && (
           <span
             aria-hidden="true"
@@ -92,8 +93,8 @@ const DashboardFilterSheet = ({
                 </p>
               </div>
               <Button
+                type="button"
                 variant="ghost"
-                size="icon-touch"
                 className="shrink-0"
                 onClick={() => setOpen(false)}
                 aria-label="Close filters"
@@ -112,6 +113,7 @@ const DashboardFilterSheet = ({
                 Showing <span className="text-foreground font-medium">{countLabel}</span>
               </span>
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => resetDashboardFilterPanel()}
@@ -119,7 +121,7 @@ const DashboardFilterSheet = ({
               >
                 Reset
               </Button>
-              <Button variant="glass" size="sm" onClick={() => setOpen(false)}>
+              <Button type="button" variant="glass" size="sm" onClick={() => setOpen(false)}>
                 Close filters
               </Button>
             </footer>

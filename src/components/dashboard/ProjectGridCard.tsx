@@ -3,7 +3,9 @@ import { cn } from '@/lib/utils';
 import { useProjectStatus } from '@/hooks/useProjectStatus';
 import { ProjectType } from '@/types/project';
 import type { DashboardValidSortField } from '@/features/dashboard/dashboard.constants';
-import { getGridMetadataLine } from './projectsTableUtils';
+import { formatKitMetadata, formatLibraryDate } from '@/components/shared/libraryPresentation';
+import { StatusPill } from '@/components/shared/StatusPill';
+import { FILTER_STATUS_ACTIVE_FILL } from '@/utils/statusColors';
 import ProjectThumbnail from './ProjectThumbnail';
 
 interface ProjectGridCardProps {
@@ -21,9 +23,8 @@ const ProjectGridCardComponent = ({
   onNavigate,
   skipImageLoading = false,
   isRecentlyEdited = false,
-  sortField = 'last_updated',
 }: ProjectGridCardProps) => {
-  const { getStatusColor, getStatusLabel } = useProjectStatus();
+  const { getStatusLabel } = useProjectStatus();
 
   const handleClick = useCallback(() => {
     if (onNavigate) {
@@ -38,10 +39,12 @@ const ProjectGridCardComponent = ({
     project.status === 'purchased'
       ? 'Purchased'
       : project.status === 'kitted'
-        ? 'Kitted Up'
+        ? 'Kitted'
         : getStatusLabel(project.status);
 
-  const metadata = getGridMetadataLine(project, sortField);
+  const metadata = formatKitMetadata(project);
+  const date = project.updatedAt || project.createdAt;
+  const shortDate = date ? formatLibraryDate(date) : '';
 
   return (
     <button
@@ -55,7 +58,7 @@ const ProjectGridCardComponent = ({
       )}
     >
       <span className="sr-only">Open project </span>
-      <div className="bg-muted relative h-48 w-full sm:h-52">
+      <div className="bg-muted relative aspect-[4/3] w-full">
         <ProjectThumbnail
           imageUrl={project.imageUrl}
           title={project.title}
@@ -63,9 +66,9 @@ const ProjectGridCardComponent = ({
         />
       </div>
 
-      <div className="p-4">
+      <div className="w-full min-w-0 p-3">
         <div className="space-y-2">
-          <div className="flex h-10 items-start">
+          <div className="flex min-h-9 items-start">
             <h3 className="group-hover:text-link line-clamp-2 text-sm leading-tight font-semibold transition-colors duration-200">
               {project.title}
             </h3>
@@ -73,35 +76,15 @@ const ProjectGridCardComponent = ({
 
           <p
             data-testid="grid-metadata-line"
-            className={cn(
-              'text-muted-foreground flex h-5 items-center truncate text-xs',
-              metadata.tabularNums && 'tabular-nums'
-            )}
+            className="text-muted-foreground h-5 truncate text-xs"
           >
-            {metadata.text}
+            {metadata}
           </p>
 
-          <div className="flex h-6 items-center justify-between gap-2">
-            <div className="flex items-center">
-              {(project.kitCategory || project.drillShape) && (
-                <span className="bg-muted/50 text-muted-foreground group-hover:bg-muted/70 rounded-md px-2 py-1 text-xs transition-colors duration-200">
-                  {project.kitCategory && (
-                    <span className="font-medium">
-                      {project.kitCategory === 'mini' ? 'Mini' : 'Full'}
-                    </span>
-                  )}
-                  {project.kitCategory && project.drillShape && <span className="mx-1">•</span>}
-                  {project.drillShape && <span className="capitalize">{project.drillShape}</span>}
-                </span>
-              )}
-            </div>
-            <span
-              className={cn(
-                'flex-shrink-0 rounded-full px-3 py-1 text-xs font-medium shadow-md transition-all duration-200 group-hover:scale-105',
-                getStatusColor(project.status)
-              )}
-            >
-              {statusLabel}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <StatusPill label={statusLabel} className={FILTER_STATUS_ACTIVE_FILL[project.status]} />
+            <span className="text-muted-foreground text-xs" title="Last updated">
+              {shortDate}
             </span>
           </div>
         </div>

@@ -23,10 +23,10 @@ const SKELETON_KEYS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'] as const;
 
 function GridSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
       {SKELETON_KEYS.map(k => (
         <div key={k} className="border-border bg-card overflow-hidden rounded-xl border shadow-sm">
-          <div className="bg-muted/30 border-border/50 aspect-[3/4] w-full animate-pulse border-b" />
+          <div className="bg-muted/30 border-border/50 aspect-[4/3] w-full animate-pulse border-b" />
           <div className="space-y-3 p-4">
             <div className="bg-muted/40 h-4 w-3/4 animate-pulse rounded" />
             <div className="bg-muted/30 h-3 w-1/2 animate-pulse rounded" />
@@ -112,7 +112,7 @@ export function ColoringBookGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
       {books.map(book => (
         <ColoringBookCard key={book.id} book={book} />
       ))}

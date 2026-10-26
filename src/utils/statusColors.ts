@@ -6,15 +6,15 @@ import type {
 
 export const FILTER_STATUS_ACTIVE_FILL: Record<ProjectFilterStatus, string> = {
   everything: 'bg-primary text-primary-foreground',
-  wishlist: 'bg-rose-500 text-white dark:bg-rose-600',
-  purchased: 'bg-sky-500 text-white dark:bg-sky-600',
-  stash: 'bg-orange-500 text-white dark:bg-orange-600',
-  kitted: 'bg-teal-500 text-white dark:bg-teal-600',
-  progress: 'bg-diamond-500 text-white dark:bg-diamond-600',
-  onhold: 'bg-amber-500 text-white dark:bg-amber-600',
-  completed: 'bg-emerald-500 text-white dark:bg-emerald-600',
-  archived: 'bg-muted-foreground text-background',
-  destashed: 'bg-rose-500 text-white dark:bg-rose-600',
+  wishlist: 'bg-rose-700 text-white dark:bg-rose-700',
+  purchased: 'bg-sky-700 text-white dark:bg-sky-700',
+  stash: 'bg-orange-700 text-white dark:bg-orange-700',
+  kitted: 'bg-teal-700 text-white dark:bg-teal-700',
+  progress: 'bg-diamond-700 text-white dark:bg-diamond-700',
+  onhold: 'bg-amber-800 text-white dark:bg-amber-800',
+  completed: 'bg-emerald-700 text-white dark:bg-emerald-700',
+  archived: 'bg-slate-600 text-white dark:bg-slate-600',
+  destashed: 'bg-rose-700 text-white dark:bg-rose-700',
 };
 
 export const FILTER_STATUS_DOT: Record<ProjectFilterStatus, string> = {
@@ -42,14 +42,14 @@ export const PROJECT_STATUS_DOT: Record<ProjectStatus, string> = {
   destashed: FILTER_STATUS_DOT.destashed,
 };
 
-const COLORING_BOOK_STATUS_FILL: Record<ColoringBooksStatusOptions, string> = {
-  wishlist: 'bg-rose-500 text-white dark:bg-rose-600',
-  purchased: 'bg-sky-500 text-white dark:bg-sky-600',
-  in_stash: 'bg-orange-500 text-white dark:bg-orange-600',
-  in_progress: 'bg-diamond-500 text-white dark:bg-diamond-600',
-  completed: 'bg-emerald-500 text-white dark:bg-emerald-600',
-  archived: 'bg-muted-foreground text-background',
-  destashed: 'bg-rose-500 text-white dark:bg-rose-600',
+export const COLORING_BOOK_STATUS_FILL: Record<ColoringBooksStatusOptions, string> = {
+  wishlist: 'bg-rose-700 text-white dark:bg-rose-700',
+  purchased: 'bg-sky-700 text-white dark:bg-sky-700',
+  in_stash: 'bg-orange-700 text-white dark:bg-orange-700',
+  in_progress: 'bg-diamond-700 text-white dark:bg-diamond-700',
+  completed: 'bg-emerald-700 text-white dark:bg-emerald-700',
+  archived: 'bg-slate-600 text-white dark:bg-slate-600',
+  destashed: 'bg-rose-700 text-white dark:bg-rose-700',
 };
 
 export const COLORING_BOOK_STATUS_LABEL: Record<ColoringBooksStatusOptions, string> = {

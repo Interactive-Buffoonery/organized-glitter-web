@@ -231,7 +231,7 @@ or form submission; use the shared date-field helpers or existing date-only help
 
 ## Current product surfaces
 
-- Library (`/dashboard`): shared project collection shell with craft segmented control, one primary New project action, glass filter sidebars on desktop, and flat result grids/lists.
+- Library (`/dashboard`): shared project collection shell with craft segmented control, one craft-specific primary action on desktop, glass filter sidebars on desktop, and flat result grids/lists.
 - Project edit: opens as a drawer over the detail page rather than a route navigation. Desktop uses a right-side Radix `Sheet`; phones use a vaul `Drawer` at full viewport height. The `/projects/:id/edit` route remains as a direct-link fallback. See `glass.md` for the layout contract.
 - Coloring book edit: follows the same drawer-first pattern from `/coloring/:id`, with `/coloring/:id/edit` preserved as the direct-link fallback. Archive and Delete sit in the drawer footer alongside Cancel and Save changes.
 - Randomizer: wheel-first two-column layout. On phones the numbered wheel and result lead; on desktop the selection list sits on the left with the wheel on the right. Craft mode and status eligibility checkboxes sit above the target list. The wheel uses numbered segments with a text key mapping numbers to target names; it is the only full-palette data-visualization exception and must keep its pattern/key/reduced-motion support. Spin history lives in a collapsible accordion below the wheel.

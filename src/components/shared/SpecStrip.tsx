@@ -21,7 +21,7 @@ export function SpecStrip({ items }: { items: SpecStripItem[] }) {
           onClick={item.onEdit}
           className="border-border/60 h-auto min-h-16 min-w-0 flex-col gap-1 rounded-none border-l px-1 py-3 first:border-l-0"
         >
-          {item.value && <span className="sr-only">Edit </span>}
+          {item.value && <span className="sr-only">Edit</span>}{' '}
           <span
             className={cn(
               'max-w-full text-sm break-words whitespace-normal',

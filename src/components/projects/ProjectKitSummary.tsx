@@ -153,7 +153,7 @@ export function ProjectKitAbout({ project }: { project: ProjectType }) {
                   className="h-auto min-h-11 max-w-full px-0 text-right whitespace-normal"
                   onClick={() => setField(row.field)}
                 >
-                  {row.value && <span className="sr-only">Edit </span>}
+                  {row.value && <span className="sr-only">Edit</span>}{' '}
                   <span className={row.value ? 'text-foreground' : 'text-primary'}>
                     {row.value || 'Add'}
                   </span>

@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({
   rows: [] as unknown[],
   history: [] as unknown[],
   requests: {} as Record<string, unknown>,
-  stripPhotos: [] as { filename: string; thumbnail: string; original: string }[],
+  stripPhotos: [] as { filename: string; thumbnail: string; strip: string; original: string }[],
   setup: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
@@ -634,13 +634,26 @@ describe('Color key entry', () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031')];
     state.stripPhotos = [
-      { filename: 'one.jpg', thumbnail: '/thumb/one.jpg', original: '/one.jpg' },
-      { filename: 'two.jpg', thumbnail: '/thumb/two.jpg', original: '/two.jpg' },
+      {
+        filename: 'one.jpg',
+        thumbnail: '/thumb/one.jpg',
+        strip: '/strip/one.jpg',
+        original: '/one.jpg',
+      },
+      {
+        filename: 'two.jpg',
+        thumbnail: '/thumb/two.jpg',
+        strip: '/strip/two.jpg',
+        original: '/two.jpg',
+      },
     ];
     render(<ColorKeySection pageId="page-1" />);
     expect(screen.queryByRole('button', { name: 'Open color strip' })).toBeNull();
     await user.click(screen.getByRole('button', { name: /^One,/ }));
-    expect(screen.getByRole('img', { name: 'Color strip' })).toHaveAttribute('src', '/one.jpg');
+    expect(screen.getByRole('img', { name: 'Color strip' })).toHaveAttribute(
+      'src',
+      '/strip/one.jpg'
+    );
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Open color strip' }));
     expect(screen.getByRole('img', { name: 'Full color strip' })).toHaveAttribute(

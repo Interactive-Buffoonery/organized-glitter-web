@@ -11,11 +11,10 @@ export function PinnedStrip({ pageId, userId }: { pageId: string; userId: string
   if (!first) return null;
   return (
     // Sits just below the sticky site header.
-    <div className="bg-background/90 sticky top-[calc(80px+env(safe-area-inset-top))] z-10 -mx-2 px-2 py-2 backdrop-blur-md">
+    <div className="bg-background/90 sticky top-[var(--site-header-total-height)] z-10 -mx-2 px-2 py-2 backdrop-blur-md">
       <ColorReferenceViewer
         {...first}
-        // The strip spans the page; the 320px thumbnail would blur.
-        thumbnail={first.original}
+        thumbnail={first.strip}
         index={1}
         label="Color strip"
         className="bg-muted/30 h-16 sm:h-28 [&_img]:object-contain"

@@ -27,7 +27,7 @@ export function ColoringSortControl({
   const label = `${options.find(option => option.value === field)?.label} (${direction === 'asc' ? 'ascending' : 'descending'})`;
   const choices = (
     <div
-      role="radiogroup"
+      role="group"
       aria-label="Sort coloring books"
       className="min-h-0 flex-1 overflow-y-auto p-4"
     >
@@ -38,8 +38,7 @@ export function ColoringSortControl({
             {(['asc', 'desc'] as const).map(nextDirection => (
               <button
                 type="button"
-                role="radio"
-                aria-checked={field === option.value && direction === nextDirection}
+                aria-pressed={field === option.value && direction === nextDirection}
                 key={nextDirection}
                 className="hover:bg-muted focus-visible:ring-ring flex min-h-11 w-full items-center gap-3 border-b px-4 py-3 text-left text-sm last:border-b-0 focus-visible:ring-2"
                 onClick={() => {

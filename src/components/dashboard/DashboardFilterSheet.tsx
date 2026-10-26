@@ -52,7 +52,7 @@ const DashboardFilterSheet = ({
         type="button"
         variant="outline"
         className={cn(
-          'relative shrink-0',
+          'relative min-h-11 shrink-0',
           filterPanelSummary.count > 0 && 'border-primary text-primary'
         )}
         onClick={() => setOpen(true)}

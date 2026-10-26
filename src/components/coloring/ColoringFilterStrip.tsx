@@ -29,7 +29,6 @@ interface ColoringFilterPanelProps {
    */
   hideHeader?: boolean;
   hideResetButton?: boolean;
-  hideViewToggle?: boolean;
 }
 
 function FilterSection({
@@ -52,7 +51,6 @@ function FilterSection({
 export function ColoringFilterPanel({
   hideHeader = false,
   hideResetButton = false,
-  hideViewToggle = false,
 }: ColoringFilterPanelProps = {}) {
   const posthog = usePostHog();
   const { filters, publishers, illustrators, tags, viewType, setViewType, activeFilterCount } =
@@ -209,11 +207,9 @@ export function ColoringFilterPanel({
           </div>
         </FilterSection>
 
-        {!hideViewToggle && (
-          <FilterSection label="View">
-            <LibraryViewToggle activeView={viewType} onViewChange={handleViewChange} />
-          </FilterSection>
-        )}
+        <FilterSection label="View">
+          <LibraryViewToggle activeView={viewType} onViewChange={handleViewChange} />
+        </FilterSection>
 
         {!hideResetButton && (
           <Button
@@ -361,7 +357,10 @@ function ColoringFilterSheetTrigger() {
       <Button
         type="button"
         variant="outline"
-        className={cn('relative shrink-0', panelCount > 0 && 'border-primary text-primary')}
+        className={cn(
+          'relative min-h-11 shrink-0',
+          panelCount > 0 && 'border-primary text-primary'
+        )}
         onClick={() => {
           posthog.capture(AnalyticsEvent.COLORING_BOOKS_FILTER_DRAWER_OPENED, {
             craft: 'coloring',
@@ -416,7 +415,7 @@ function ColoringFilterSheetTrigger() {
               </Button>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-              <ColoringFilterPanel hideHeader hideResetButton hideViewToggle />
+              <ColoringFilterPanel hideHeader hideResetButton />
             </div>
             <footer className="bg-background flex items-center justify-end gap-3 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               <Button

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
@@ -8,14 +8,13 @@ import { ColoringDetailUnavailable } from '@/components/coloring/detail/Coloring
 import { ColoringDetailRefreshNotice } from '@/components/coloring/detail/ColoringDetailRefreshNotice';
 import { ColoringDetailRetryAnnouncements } from '@/components/coloring/detail/ColoringDetailRetryAnnouncements';
 import { ColoringBookDetailsSection } from '@/components/coloring/detail/ColoringBookDetailsSection';
-import {
-  visibleItems,
-  type ColoringBookMetadataItem,
-} from '@/components/coloring/detail/coloringBookDetailData';
+import type { ColoringBookMetadataItem } from '@/components/coloring/detail/coloringBookDetailData';
 import { ColoringBookHero } from '@/components/coloring/detail/ColoringBookHero';
 import { ColoringBookNotesSection } from '@/components/coloring/detail/ColoringBookNotesSection';
 import { ColoringBookPagesSection } from '@/components/coloring/detail/ColoringBookPagesSection';
-import { cn } from '@/lib/utils';
+import { ColoringBookTagManager } from '@/components/coloring/ColoringBookTagManager';
+import { ColoringBookDisclosure } from '@/components/coloring/detail/ColoringBookDisclosure';
+import { SectionHeading } from '@/components/shared/Section';
 import { notify } from '@/lib/notifications';
 import { useAuth } from '@/hooks/useAuth';
 import { hasSessionDraft } from '@/services/auth/sessionRecovery';
@@ -24,7 +23,10 @@ import { useBookIllustrators } from '@/hooks/queries/coloring/useBookIllustrator
 import { useBookPublishers } from '@/hooks/queries/coloring/useBookPublishers';
 import { useColoringBook } from '@/hooks/queries/coloring/useColoringBook';
 import { useColoringBookTags } from '@/hooks/queries/coloring/useColoringBookTags';
-import { useColoringPages } from '@/hooks/queries/coloring/useColoringPages';
+import {
+  useColoringBookPages,
+  useColoringBookPagePhotos,
+} from '@/hooks/queries/coloring/useColoringBookPages';
 import { useDeleteColoringBook } from '@/hooks/mutations/coloring/useDeleteColoringBook';
 import { useSyncColoringBookTags } from '@/hooks/mutations/coloring/useSyncColoringBookTags';
 import { useUpdateColoringBook } from '@/hooks/mutations/coloring/useUpdateColoringBook';
@@ -43,8 +45,6 @@ import {
 import type { Tag } from '@/types/tag';
 import { getColoringDashboardReturnPath } from './coloringBookNavigation';
 
-const COLORING_PAGE_BATCH_SIZE = 500;
-
 const ColoringBookDetail = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
@@ -59,22 +59,8 @@ const ColoringBookDetail = () => {
   const displayedBookError = bookQuery.error ?? (bookRetry.isRetrying ? retryError : null);
   const bookFailure = displayedBookError ? ErrorHandler.handleError(displayedBookError) : null;
   const bookAccessFailed = ErrorHandler.isAccessFailure(bookFailure?.type);
-  const [pagesPagination, setPagesPagination] = useState({ bookId: id, page: 1 });
-  const selectedPage = pagesPagination.bookId === id ? pagesPagination.page : 1;
-  const lastPagesPage = book
-    ? Math.max(1, Math.ceil(book.totalPages / COLORING_PAGE_BATCH_SIZE))
-    : selectedPage;
-  const pagesPage = Math.min(selectedPage, lastPagesPage);
-  const pagesQuery = useColoringPages(
-    id
-      ? {
-          bookId: id,
-          sort: 'page_number',
-          page: pagesPage,
-          perPage: COLORING_PAGE_BATCH_SIZE,
-        }
-      : undefined
-  );
+  const pagesQuery = useColoringBookPages(id);
+  const photosQuery = useColoringBookPagePhotos(id, user?.id);
   const retryBook = () => {
     setRetryError(bookQuery.error);
     void bookRetry.retry(async () => !(await bookQuery.refetch()).isError);
@@ -100,10 +86,6 @@ const ColoringBookDetail = () => {
   // Dismiss splash on mount; book detail still uses in-app loading UI.
   useAppReady();
 
-  useEffect(() => {
-    setPagesPagination(current => (current.bookId === id ? current : { bookId: id, page: 1 }));
-  }, [id]);
-
   usePageMetadata({
     title:
       book && !bookAccessFailed
@@ -114,21 +96,13 @@ const ColoringBookDetail = () => {
             ? 'Coloring book unavailable | Organized Glitter'
             : 'Coloring book not found | Organized Glitter',
   });
-  const pages = useMemo(() => pagesQuery.data?.items ?? [], [pagesQuery.data?.items]);
+  const pages = useMemo(() => pagesQuery.data ?? [], [pagesQuery.data]);
   const tags = book?.tags?.length ? book.tags : (tagsQuery.data ?? []);
 
   const completedPages = book?.completedPages ?? 0;
   const completionPct = book?.completionPercentage ?? 0;
   const safeCompletedPages = book ? Math.max(0, Math.min(completedPages, book.totalPages)) : 0;
   const safeCompletionPct = Math.max(0, Math.min(completionPct, 100));
-
-  const handlePagesPageChange = (nextPage: number) => {
-    if (!book) return;
-    setPagesPagination({
-      bookId: book.id,
-      page: Math.max(1, Math.min(nextPage, lastPagesPage)),
-    });
-  };
 
   const publisherName = useMemo(() => {
     if (!book?.publisherId) return book?.publisherName ?? '';
@@ -253,14 +227,12 @@ const ColoringBookDetail = () => {
     );
   }
 
-  const metadataLine = [
-    publisherName,
-    illustratorName ? `Illustrated by ${illustratorName}` : '',
-    book.series,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-
+  const publisherUrl = publishersQuery.data?.items.find(
+    publisher => publisher.id === book.publisherId
+  )?.websiteUrl;
+  const inProgressPages = pagesQuery.data
+    ? pages.filter(page => page.status !== 'completed' && page.status !== 'not_started').length
+    : undefined;
   const detailItems: ColoringBookMetadataItem[] = [
     { label: 'Publisher', value: publisherName },
     { label: 'Illustrator', value: illustratorName },
@@ -280,7 +252,6 @@ const ColoringBookDetail = () => {
     { label: 'Started', value: formatColoringBookDate(book.dateStarted) },
     { label: 'Completed', value: formatColoringBookDate(book.dateCompleted) },
   ];
-  const hasDetails = visibleItems(detailItems).length > 0;
 
   return (
     <MainLayout>
@@ -288,7 +259,7 @@ const ColoringBookDetail = () => {
         primary={bookRetry.announcement}
         secondary={pagesRetry.announcement}
       />
-      <section className="container mx-auto max-w-6xl space-y-8 px-4 py-6 lg:py-8">
+      <section className="container mx-auto space-y-6 px-4 py-6 lg:py-8">
         <ColoringBookDetailActions
           dashboardPath={dashboardPath}
           updatePending={updateBook.isPending}
@@ -305,45 +276,117 @@ const ColoringBookDetail = () => {
           />
         )}
 
-        <ColoringBookHero
-          book={book}
-          coverUrl={coverUrl}
-          metadataLine={metadataLine}
-          safeCompletedPages={safeCompletedPages}
-          safeCompletionPct={safeCompletionPct}
-          tags={tags}
-          updatePending={updateBook.isPending}
-          isSavingTags={syncBookTags.isPending}
-          onStatusChange={handleStatusChange}
-          onTagsChange={handleTagsChange}
-        />
-
-        <ColoringBookPagesSection
-          book={book}
-          pages={pages}
-          isLoading={pagesQuery.isLoading}
-          error={pagesQuery.error}
-          hasLoadedData={Boolean(pagesQuery.data)}
-          isFetching={pagesQuery.isFetching}
-          isRetrying={pagesRetry.isRetrying}
-          onRetry={retryPages}
-          page={pagesPage}
-          perPage={COLORING_PAGE_BATCH_SIZE}
-          totalItems={book.totalPages}
-          returnTo={dashboardPath}
-          onPageChange={handlePagesPageChange}
-        />
-
-        <div className={cn('grid gap-8', hasDetails && 'lg:grid-cols-2 lg:items-start lg:gap-10')}>
-          {hasDetails ? <ColoringBookDetailsSection items={detailItems} /> : null}
-
-          <ColoringBookNotesSection
-            bookId={book.id}
-            accountId={user?.id}
-            notes={book.notes || ''}
-            onSave={handleNotesSave}
-            readOnly={updateBook.isPending}
-          />
+        <header className="lg:border-border/60 space-y-2 lg:border-b lg:pb-6">
+          <h1 className="font-handwritten text-4xl leading-tight tracking-tight md:text-5xl">
+            {book.title}
+          </h1>
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-sm">
+            {publisherName &&
+              (publisherUrl ? (
+                <a
+                  href={publisherUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-foreground decoration-primary/50 inline-flex min-h-11 items-center underline decoration-2 underline-offset-4"
+                >
+                  {publisherName}
+                </a>
+              ) : (
+                <span>{publisherName}</span>
+              ))}
+            {illustratorName && (
+              <span>
+                {publisherName ? '· ' : ''}Illustrated by {illustratorName}
+              </span>
+            )}
+            {book.series && (
+              <span>
+                {publisherName || illustratorName ? '· ' : ''}
+                {book.series}
+              </span>
+            )}
+            {book.isMystery && (
+              <span className="bg-primary/10 text-primary rounded-lg px-2 py-1 text-xs">
+                Mystery
+              </span>
+            )}
+          </div>
+        </header>
+        <div className="grid items-start gap-y-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-x-14">
+          <div className="lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1">
+            <ColoringBookHero
+              book={book}
+              coverUrl={coverUrl}
+              safeCompletedPages={safeCompletedPages}
+              safeCompletionPct={safeCompletionPct}
+              inProgressPages={inProgressPages}
+              updatePending={updateBook.isPending}
+              onStatusChange={handleStatusChange}
+            />
+          </div>
+          <div className="min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+            {photosQuery.isError && (
+              <ColoringDetailRefreshNotice
+                kind="book"
+                message="Could not load page progress photos. Page numbers are still available."
+                retryable={ErrorHandler.handleError(photosQuery.error).retryable}
+                onRetry={() => {
+                  void photosQuery.refetch();
+                }}
+                isRetrying={photosQuery.isFetching}
+              />
+            )}
+            <ColoringBookPagesSection
+              key={book.id}
+              book={book}
+              pages={pages}
+              latestPhotos={photosQuery.isError ? {} : photosQuery.data}
+              isLoading={pagesQuery.isLoading}
+              error={pagesQuery.error}
+              hasLoadedData={Boolean(pagesQuery.data)}
+              isFetching={pagesQuery.isFetching}
+              isRetrying={pagesRetry.isRetrying}
+              onRetry={retryPages}
+              returnTo={dashboardPath}
+            />
+          </div>
+          <aside className="divide-border/60 divide-y lg:col-start-2 lg:row-start-2 lg:space-y-6 [&>div]:lg:pt-6">
+            <ColoringBookDisclosure
+              title="About this book"
+              summary={
+                [publisherName, illustratorName].filter(Boolean).join(' · ') || 'Add details'
+              }
+            >
+              <ColoringBookDetailsSection
+                items={detailItems}
+                onEdit={() => setEditDrawerOpen(true)}
+              />
+            </ColoringBookDisclosure>
+            <ColoringBookDisclosure
+              title="Tags"
+              summary={tags.map(tag => tag.name).join(', ') || 'No tags yet'}
+            >
+              <section className="space-y-3">
+                <SectionHeading>Tags</SectionHeading>
+                <ColoringBookTagManager
+                  selectedTags={tags}
+                  disabled={updateBook.isPending || syncBookTags.isPending}
+                  onTagsChange={handleTagsChange}
+                  withSection={false}
+                  emptyText="No tags yet."
+                />
+              </section>
+            </ColoringBookDisclosure>
+            <ColoringBookDisclosure title="Notes" summary={book.notes || 'No notes yet'}>
+              <ColoringBookNotesSection
+                bookId={book.id}
+                accountId={user?.id}
+                notes={book.notes || ''}
+                onSave={handleNotesSave}
+                readOnly={updateBook.isPending}
+              />
+            </ColoringBookDisclosure>
+          </aside>
         </div>
         {editDrawerOpen ? (
           <ColoringBookEditDrawer

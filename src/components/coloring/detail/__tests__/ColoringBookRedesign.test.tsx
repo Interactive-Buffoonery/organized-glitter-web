@@ -11,17 +11,47 @@ vi.mock('@/components/image/PrivateFileImage', () => ({
   PrivateFileImage: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
 }));
 
-const book = { id: 'book', title: 'Garden', totalPages: 24, status: 'in_progress' } as ColoringBookDTO;
+const book = {
+  id: 'book',
+  title: 'Garden',
+  totalPages: 24,
+  status: 'in_progress',
+} as ColoringBookDTO;
 const pages = Array.from({ length: 24 }, (_, index) => ({
-  id: `page-${index + 1}`, bookId: 'book', pageNumber: index + 1,
-  status: index === 0 ? 'completed' : index === 1 ? 'palette_chosen' : index === 2 ? 'on_hold' : index === 3 ? 'in_progress' : 'not_started',
-  photos: [], revealedSubject: '',
+  id: `page-${index + 1}`,
+  bookId: 'book',
+  pageNumber: index + 1,
+  status:
+    index === 0
+      ? 'completed'
+      : index === 1
+        ? 'palette_chosen'
+        : index === 2
+          ? 'on_hold'
+          : index === 3
+            ? 'in_progress'
+            : 'not_started',
+  photos: [],
+  revealedSubject: '',
 })) as ColoringPageDTO[];
-const renderPages = (overrides = {}) => render(<MemoryRouter><ColoringBookPagesSection
-  book={book} pages={pages} latestPhotos={{}} isLoading={false} error={null}
-  hasLoadedData isFetching={false} isRetrying={false} onRetry={vi.fn()}
-  returnTo="/dashboard?craft=coloring" {...overrides}
-/></MemoryRouter>);
+const renderPages = (overrides = {}) =>
+  render(
+    <MemoryRouter>
+      <ColoringBookPagesSection
+        book={book}
+        pages={pages}
+        latestPhotos={{}}
+        isLoading={false}
+        error={null}
+        hasLoadedData
+        isFetching={false}
+        isRetrying={false}
+        onRetry={vi.fn()}
+        returnTo="/dashboard?craft=coloring"
+        {...overrides}
+      />
+    </MemoryRouter>
+  );
 
 // These checks isolate grid transitions and mystery privacy that broad browser
 // smoke journeys do not cover across all page-status and photo combinations.
@@ -60,15 +90,33 @@ describe('Coloring book pages', () => {
   });
 
   it('keeps mystery photos hidden until revealed and includes known subjects', () => {
-    renderPages({ book: { ...book, isMystery: true }, latestPhotos: { 'page-1': '/hidden.jpg', 'page-2': '/revealed.jpg' }, pages: [pages[0], { ...pages[1], revealedSubject: 'Fox' }] });
-    expect(screen.getByRole('link', { name: /page 1.*Mystery unrevealed/i }).querySelector('img')).toBeNull();
-    expect(screen.getByRole('link', { name: /page 2.*Fox.*Palette chosen/i }).querySelector('img')).toHaveAttribute('src', '/revealed.jpg');
+    renderPages({
+      book: { ...book, isMystery: true },
+      latestPhotos: { 'page-1': '/hidden.jpg', 'page-2': '/revealed.jpg' },
+      pages: [pages[0], { ...pages[1], revealedSubject: 'Fox' }],
+    });
+    expect(
+      screen.getByRole('link', { name: /page 1.*Mystery unrevealed/i }).querySelector('img')
+    ).toBeNull();
+    expect(
+      screen.getByRole('link', { name: /page 2.*Fox.*Palette chosen/i }).querySelector('img')
+    ).toHaveAttribute('src', '/revealed.jpg');
   });
 });
 
 describe('Coloring book sidebar', () => {
   it('renders no cover box for a book without a cover', () => {
-    render(<ColoringBookHero book={book} coverUrl="" safeCompletedPages={1} safeCompletionPct={4} inProgressPages={3} updatePending={false} onStatusChange={vi.fn()} />);
+    render(
+      <ColoringBookHero
+        book={book}
+        coverUrl=""
+        safeCompletedPages={1}
+        safeCompletionPct={4}
+        inProgressPages={3}
+        updatePending={false}
+        onStatusChange={vi.fn()}
+      />
+    );
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(screen.queryByText('No cover')).not.toBeInTheDocument();
     expect(screen.getByText('1 of 24 done')).toBeInTheDocument();
@@ -76,7 +124,16 @@ describe('Coloring book sidebar', () => {
 
   it('offers an Add action for each empty value and opens the existing edit flow', async () => {
     const onEdit = vi.fn();
-    render(<ColoringBookDetailsSection items={[{ label: 'Publisher', value: 'Books' }, { label: 'Language', value: '' }, { label: 'Series' }]} onEdit={onEdit} />);
+    render(
+      <ColoringBookDetailsSection
+        items={[
+          { label: 'Publisher', value: 'Books' },
+          { label: 'Language', value: '' },
+          { label: 'Series' },
+        ]}
+        onEdit={onEdit}
+      />
+    );
     expect(screen.getAllByRole('button', { name: /^Add / })).toHaveLength(2);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Add Language' }));
     expect(onEdit).toHaveBeenCalledOnce();

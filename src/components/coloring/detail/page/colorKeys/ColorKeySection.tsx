@@ -122,11 +122,13 @@ function ColorKeyEditor({
   const entryRequest = useRef(0);
   const goTo = async (target: EntryTarget | null, work = saveOpenEntry.current) => {
     const request = ++entryRequest.current;
-    const opened = saveOpenEntry.current;
+    let saved = saveOpenEntry.current;
     if (work && !(await work())) return;
-    // Another device can replace the open form mid-save; its draft is saved too before leaving.
-    const replaced = saveOpenEntry.current;
-    if (replaced && replaced !== opened && !(await replaced())) return;
+    // Another device can replace the open form mid-save; each replacement is saved before leaving.
+    while (request === entryRequest.current && saveOpenEntry.current !== saved) {
+      saved = saveOpenEntry.current;
+      if (saved && !(await saved())) return;
+    }
     if (request !== entryRequest.current) return;
     if (target) setEntry(target);
     else closeEntry();

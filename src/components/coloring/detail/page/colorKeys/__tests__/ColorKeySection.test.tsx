@@ -457,6 +457,7 @@ describe('Color key entry', () => {
     await new Promise(done => setTimeout(done, 0));
     expect(screen.getByRole('form', { name: 'Edit color: Two' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('700');
+    expect(state.update).toHaveBeenCalledTimes(1);
   });
 
   it('saves a replacement form too when the symbol changed during a save', async () => {
@@ -476,6 +477,34 @@ describe('Color key entry', () => {
     expect(state.update).toHaveBeenLastCalledWith({
       id: 'a',
       input: expect.objectContaining({ symbol: 'u:00A5', code: '800' }),
+    });
+  });
+
+  it('saves every form replaced while a save runs before moving on', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    let resolveFirst: (value: unknown) => void = () => {};
+    let resolveSecond: (value: unknown) => void = () => {};
+    state.update
+      .mockReturnValueOnce(new Promise(done => (resolveFirst = done)))
+      .mockReturnValueOnce(new Promise(done => (resolveSecond = done)));
+    const { rerender } = render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    await user.click(screen.getByRole('button', { name: 'Save and next: Two' }));
+    state.rows = [key('a', 0, 'u:00A5'), key('b', 1, 'u:0032')];
+    rerender(<ColorKeySection pageId="page-1" />);
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '800');
+    resolveFirst(key('a', 0, 'u:00A5'));
+    await waitFor(() => expect(state.update).toHaveBeenCalledTimes(2));
+    state.rows = [key('a', 0, 'u:0033'), key('b', 1, 'u:0032')];
+    rerender(<ColorKeySection pageId="page-1" />);
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '900');
+    resolveSecond(key('a', 0, 'u:0033'));
+    expect(await screen.findByRole('form', { name: 'Edit color: Two' })).toBeInTheDocument();
+    expect(state.update).toHaveBeenLastCalledWith({
+      id: 'a',
+      input: expect.objectContaining({ symbol: 'u:0033', code: '900' }),
     });
   });
 

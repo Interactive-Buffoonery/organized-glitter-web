@@ -238,11 +238,26 @@ function EntryForm({
     input.note !== row.note ||
     input.tried.join('\n') !== (row.tried ?? []).join('\n');
 
+  const saving = useRef<Promise<boolean> | null>(null);
+  const latestDraft = useRef('');
+  useEffect(() => {
+    latestDraft.current = JSON.stringify(input);
+  });
+
   /** True once the draft is stored; `stay` leaves the form for the caller to replace. */
-  const save = async (then: 'close' | 'next' | 'stay'): Promise<boolean> => {
-    // A save already on its way carries the draft.
-    if (busy) return then === 'stay';
-    if (then === 'stay' && !changed) return true;
+  const save = (then: 'close' | 'next' | 'stay'): Promise<boolean> => {
+    // A switch waits for the save already on its way and only moves on if it worked.
+    if (saving.current) return then === 'stay' ? saving.current : Promise.resolve(false);
+    if (remove.isPending) return Promise.resolve(false);
+    if (then === 'stay' && !changed) return Promise.resolve(true);
+    const run = store(then).finally(() => {
+      saving.current = null;
+    });
+    saving.current = run;
+    return run;
+  };
+  const store = async (then: 'close' | 'next' | 'stay') => {
+    const submitted = JSON.stringify(input);
     setError(null);
     try {
       if (row && !gone) await update.mutateAsync({ id: row.id, input });
@@ -259,7 +274,8 @@ function EntryForm({
       notifyError(message);
       return false;
     }
-    if (!isCurrent(symbol)) return false;
+    // Typing during the save is newer than what was stored; keep the form open for it.
+    if (!isCurrent(symbol) || latestDraft.current !== submitted) return false;
     if (then === 'next' && next) onNext(next);
     else if (then === 'close') onClose();
     return true;

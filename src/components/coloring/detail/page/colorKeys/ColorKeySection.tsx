@@ -118,9 +118,12 @@ function ColorKeyEditor({
   const [entry, setEntry] = useState<EntryTarget | null>(null);
   const saveOpenEntry = useRef<(() => Promise<boolean>) | null>(null);
   // Moving to another row saves the open one first, so a draft is never dropped silently.
+  // Only the latest tap, Cancel or Save and next decides what opens after a slow save.
+  const entryRequest = useRef(0);
   const switchEntry = async (target: EntryTarget) => {
+    const request = ++entryRequest.current;
     if (saveOpenEntry.current && !(await saveOpenEntry.current())) return;
-    setEntry(target);
+    if (request === entryRequest.current) setEntry(target);
   };
 
   const editingIndex = entry?.row ? rows.findIndex(row => row.id === entry.row?.id) : -1;
@@ -252,6 +255,7 @@ function ColorKeyEditor({
   const rowButtonId = (id: string) => `color-keys-${pageId}-row-${id}`;
   const closeEntry = () => {
     const id = entry?.row?.id;
+    entryRequest.current++;
     flushSync(() => setEntry(null));
     (
       (id && document.getElementById(rowButtonId(id))) ||
@@ -268,7 +272,10 @@ function ColorKeyEditor({
       next={next}
       requests={requests}
       onClose={closeEntry}
-      onNext={row => setEntry({ row, symbol: row.symbol, position: row.position })}
+      onNext={row => {
+        entryRequest.current++;
+        setEntry({ row, symbol: row.symbol, position: row.position });
+      }}
       saveRef={saveOpenEntry}
       onRequestSymbol={request => openRequest({ kind: 'entry', request })}
     />

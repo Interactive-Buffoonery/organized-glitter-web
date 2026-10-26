@@ -348,6 +348,53 @@ describe('Color key entry', () => {
     expect(screen.getByRole('textbox', { name: 'Swatch hex' })).toHaveValue('red');
   });
 
+  it('keeps the draft when a second tap lands during a save that fails', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032'), key('c', 2, 'u:0033')];
+    let reject: (error: Error) => void = () => {};
+    state.update.mockReturnValueOnce(new Promise((_, fail) => (reject = fail)));
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    await user.click(screen.getByRole('button', { name: /^Three,/ }));
+    reject(new Error('Could not save. Try again.'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save');
+    expect(screen.getByRole('form', { name: 'Edit color: One' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('654');
+    expect(state.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the last row tapped once a slow save finishes', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032'), key('c', 2, 'u:0033')];
+    let resolve: (value: unknown) => void = () => {};
+    state.update.mockReturnValueOnce(new Promise(done => (resolve = done)));
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    await user.click(screen.getByRole('button', { name: /^Three,/ }));
+    resolve(key('a', 0, 'u:0031', { code: '654' }));
+    expect(await screen.findByRole('form', { name: 'Edit color: Three' })).toBeInTheDocument();
+  });
+
+  it('stays on the draft when it changed while saving before a switch', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    let resolve: (value: unknown) => void = () => {};
+    state.update.mockReturnValueOnce(new Promise(done => (resolve = done)));
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '654');
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    await user.type(screen.getByRole('combobox', { name: 'Code' }), '7');
+    resolve(key('a', 0, 'u:0031', { code: '654' }));
+    await new Promise(done => setTimeout(done, 0));
+    expect(screen.getByRole('form', { name: 'Edit color: One' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveValue('6547');
+  });
+
   it('saves the open draft before adding a symbol', async () => {
     const user = userEvent.setup();
     state.rows = [key('a', 0, 'u:0031')];
@@ -397,6 +444,7 @@ describe('Color key entry', () => {
     render(<ColorKeySection pageId="page-1" />);
     await user.click(screen.getByRole('button', { name: /^One,/ }));
     await user.click(screen.getByRole('button', { name: /^Save$/ }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await user.click(screen.getByRole('button', { name: /^Two,/ }));
     await user.type(screen.getByRole('combobox', { name: 'Code' }), '700');
     resolve(key('a', 0, 'u:0031'));

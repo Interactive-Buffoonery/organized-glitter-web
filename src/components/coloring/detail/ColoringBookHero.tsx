@@ -1,5 +1,5 @@
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
-import { ChevronDown, Circle } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Progress } from '@/components/ui/progress';
@@ -48,10 +48,10 @@ export const ColoringBookHero = ({
                 disabled={updatePending}
                 variant="ghost"
                 className={cn(
-                  'text-accent bg-accent/10 min-h-11 rounded-full px-3 text-xs font-semibold'
+                  'min-h-11 rounded-full px-3 text-xs font-semibold',
+                  getColoringBookStatusColor(book.status)
                 )}
               >
-                <Circle className="mr-1.5 size-3 fill-current" aria-hidden />
                 {getColoringBookStatusLabel(book.status)}
                 <ChevronDown className="ml-1 size-3" aria-hidden="true" />
               </Button>

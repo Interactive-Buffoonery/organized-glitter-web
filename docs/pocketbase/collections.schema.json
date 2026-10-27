@@ -4157,7 +4157,7 @@
         "protected": true,
         "required": false,
         "system": false,
-        "thumbs": ["320x320f"],
+        "thumbs": ["320x320f", "0x240"],
         "type": "file"
       },
       {

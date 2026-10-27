@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -36,6 +36,22 @@ export function SiteHeader({ currentPage = '' }: SiteHeaderProps) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Bars that stick below the header read its live height, including the top safe area.
+  const headerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header || typeof ResizeObserver === 'undefined') return;
+    const root = document.documentElement.style;
+    const observer = new ResizeObserver(() =>
+      root.setProperty('--site-header-total-height', `${header.offsetHeight}px`)
+    );
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      root.removeProperty('--site-header-total-height');
+    };
+  }, []);
+
   const isAuthPage = currentPage === 'Login' || currentPage === 'Register';
   const shouldShowMobileBrandTitle = isLoggedIn || isAuthPage || logoFailed;
 
@@ -50,6 +66,7 @@ export function SiteHeader({ currentPage = '' }: SiteHeaderProps) {
 
   return (
     <header
+      ref={headerRef}
       className={cn(
         'site-header-safe-area sticky top-0 z-40 transition-colors duration-200',
         scrolled

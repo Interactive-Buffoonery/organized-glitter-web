@@ -192,7 +192,7 @@ const Profile = () => {
             }}
             className="w-full"
           >
-            <div className="border-border/50 bg-background sticky top-16 z-10 -mx-4 border-b px-4 pt-2 pb-4 md:top-0 md:mx-0 md:px-0">
+            <div className="border-border/50 bg-background sticky top-[var(--site-header-total-height)] z-10 -mx-4 border-b px-4 pt-2 pb-4 md:mx-0 md:px-0">
               <div className="overflow-x-auto">
                 <TabsList className="flex w-max min-w-full">
                   <TabsTrigger

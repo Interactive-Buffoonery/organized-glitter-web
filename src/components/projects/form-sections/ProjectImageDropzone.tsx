@@ -86,7 +86,7 @@ export const ProjectImageDropzone: React.FC<ProjectImageDropzoneProps> = ({
               size="icon-sm"
               disabled={isUploading}
               aria-label="Replace image"
-              className="relative size-9 overflow-hidden sm:size-8"
+              className="relative size-11 overflow-hidden"
             >
               <RefreshCw />
               <input
@@ -106,7 +106,7 @@ export const ProjectImageDropzone: React.FC<ProjectImageDropzoneProps> = ({
                 disabled={isUploading}
                 onClick={onCropImage}
                 aria-label="Crop image"
-                className="size-9 sm:size-8"
+                className="size-11"
               >
                 <Scissors />
               </Button>
@@ -118,7 +118,7 @@ export const ProjectImageDropzone: React.FC<ProjectImageDropzoneProps> = ({
               disabled={isUploading}
               onClick={onImageRemove}
               aria-label="Remove image"
-              className="size-9 sm:size-8"
+              className="size-11"
             >
               <X />
             </Button>

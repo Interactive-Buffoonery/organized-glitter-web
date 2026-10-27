@@ -33,7 +33,7 @@ export const ProjectCoverImageSection = ({
   onCropComplete,
   onUseOriginalImage,
 }: ProjectCoverImageSectionProps) => (
-  <Section label="Cover Image" flush="lg">
+  <Section label="Cover" flush="lg">
     <ProjectImageDropzone
       imageUrl={imageUrl}
       isUploading={isUploading}

@@ -197,7 +197,7 @@ describe('EditColoringBook page', () => {
 
     await user.clear(form.getByLabelText(/Title/));
     await pasteIntoField(user, form.getByLabelText(/Title/), 'Updated Worlds');
-    await user.click(form.getByRole('button', { name: 'Update book' }));
+    await user.click(form.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(updateBookMutateAsync).toHaveBeenCalledTimes(1));
     expect(updateBookMutateAsync.mock.calls[0][0].patch).not.toHaveProperty('total_pages');
@@ -216,7 +216,7 @@ describe('EditColoringBook page', () => {
     const form = within(view.container);
 
     await user.click(form.getByRole('button', { name: 'Remove cover image' }));
-    await user.click(form.getByRole('button', { name: 'Update book' }));
+    await user.click(form.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(updateBookMutateAsync).toHaveBeenCalledWith(
@@ -292,7 +292,7 @@ describe('EditColoringBook page', () => {
       for (const label of labels) {
         await user.clear(form.getByLabelText(label));
       }
-      await user.click(form.getByRole('button', { name: 'Update book' }));
+      await user.click(form.getByRole('button', { name: 'Save changes' }));
     }
 
     it('submits empty text fields', async () => {
@@ -346,7 +346,7 @@ describe('EditColoringBook page', () => {
         const options = await openControlledPopup(user, form.getByLabelText(label));
         await user.click(options.getByRole('option', { name: option }));
       }
-      await user.click(form.getByRole('button', { name: 'Update book' }));
+      await user.click(form.getByRole('button', { name: 'Save changes' }));
 
       await expectSingleUpdate({
         ...unchangedPatch,
@@ -370,7 +370,7 @@ describe('EditColoringBook page', () => {
     const view = renderWithProviders(<EditColoringBook />);
     const form = within(view.container);
 
-    await user.click(form.getByRole('button', { name: 'Update book' }));
+    await user.click(form.getByRole('button', { name: 'Save changes' }));
     await user.click(form.getByRole('button', { name: 'Keep my edits for a new save' }));
     useParamsMock.mockReturnValue({ id: 'book-456' });
     bookState.data = { ...bookState.data, id: 'book-456', title: 'Second book', revision: 0 };
@@ -378,7 +378,7 @@ describe('EditColoringBook page', () => {
     releaseRefetch({ isError: false, data: { id: 'book-123', userId: 'user-123', revision: 7 } });
 
     await waitFor(() => expect(form.getByLabelText(/Title/)).toHaveValue('Second book'));
-    await user.click(form.getByRole('button', { name: 'Update book' }));
+    await user.click(form.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(updateBookMutateAsync).toHaveBeenCalledTimes(2));
     expect(updateBookMutateAsync.mock.calls[1][0]).toMatchObject({
       bookId: 'book-456',
@@ -395,7 +395,7 @@ describe('EditColoringBook page', () => {
     const view = renderWithProviders(<EditColoringBook />, { queryClient });
     const form = within(view.container);
 
-    await user.click(form.getByRole('button', { name: 'Update book' }));
+    await user.click(form.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(updateBookMutateAsync).toHaveBeenCalledTimes(1);
@@ -426,7 +426,7 @@ describe('EditColoringBook page', () => {
     const view = renderWithProviders(<EditColoringBook />);
     const form = within(view.container);
 
-    await user.click(form.getByRole('button', { name: 'Update book' }));
+    await user.click(form.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(updateBookMutateAsync).toHaveBeenCalledTimes(1);

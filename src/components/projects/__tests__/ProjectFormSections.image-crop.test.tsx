@@ -241,7 +241,7 @@ describe('ProjectFormSections project image cropping', () => {
       />
     );
 
-    fireEvent.change(screen.getByLabelText('Date completed'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Completed'), { target: { value: '' } });
     expect(onChangeMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ dateCompleted: '', status: 'progress' })
     );
@@ -305,7 +305,7 @@ describe('ProjectFormSections project image cropping', () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
     fireEvent.change(input, { target: { files: [selectedFile] } });
-    fireEvent.change(screen.getByLabelText('Project title'), { target: { value: 'After' } });
+    fireEvent.change(screen.getByLabelText('Title *'), { target: { value: 'After' } });
 
     await act(async () => {
       imageProcessing.resolve(selectedFile);

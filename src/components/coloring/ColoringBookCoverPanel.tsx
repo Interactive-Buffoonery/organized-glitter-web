@@ -22,7 +22,7 @@ export function ColoringBookCoverPanel({
   onRemoveImage,
 }: ColoringBookCoverPanelProps) {
   return (
-    <Section label="Cover image" flush="lg">
+    <Section label="Cover" flush="lg">
       <div className="space-y-2">
         <Label htmlFor="coloring-cover" className="sr-only">
           Cover image
@@ -39,7 +39,7 @@ export function ColoringBookCoverPanel({
                 type="button"
                 variant="glass-destructive"
                 size="icon-sm"
-                className="absolute top-2 right-2"
+                className="absolute top-2 right-2 size-11"
                 onClick={onRemoveImage}
                 disabled={isSubmitting}
                 aria-label="Remove cover image"
@@ -52,7 +52,7 @@ export function ColoringBookCoverPanel({
               aria-disabled={isSubmitting}
               className={cn(
                 buttonVariants({ variant: 'glass', size: 'sm' }),
-                'w-full cursor-pointer justify-center',
+                'min-h-11 w-full cursor-pointer justify-center',
                 isSubmitting && 'pointer-events-none opacity-60'
               )}
             >

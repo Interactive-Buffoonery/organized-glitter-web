@@ -1,7 +1,6 @@
 import React, { memo } from 'react';
 import { SiteHeader } from './SiteHeader';
 import { SiteFooter } from './SiteFooter';
-import { HostingNotice } from './HostingNotice';
 import BottomNavigation from './BottomNavigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useMobileDevice } from '@/hooks/use-mobile';
@@ -50,7 +49,6 @@ const MainLayout = memo(
         <div className={rootLayoutClassName}>
           {skipLink}
           {!hideNav && <SiteHeader currentPage={currentPage} />}
-          <HostingNotice />
           <main id="main-content" tabIndex={-1} className="flex-grow">
             <LoadingState />
           </main>
@@ -62,7 +60,6 @@ const MainLayout = memo(
       <div className={rootLayoutClassName}>
         {skipLink}
         {!hideNav && <SiteHeader currentPage={currentPage} />}
-        <HostingNotice />
         <main
           id="main-content"
           tabIndex={-1}

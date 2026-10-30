@@ -83,7 +83,6 @@ export function ColoringPagePhotoSection({
         open={isPhotoCropDialogOpen}
         file={photoCropFile}
         title="Crop your photo"
-        description="Drag to move it, zoom to get closer."
         aspect={3 / 4}
         outputWidth={900}
         outputHeight={1200}

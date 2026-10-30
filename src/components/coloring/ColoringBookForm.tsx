@@ -496,8 +496,8 @@ export function ColoringBookForm({
       <ImageCropDialog
         open={isCropDialogOpen}
         file={cropFile}
-        title="Frame coloring book cover"
-        description="Choose a book cover crop, square crop, or fit the whole cover."
+        title="Crop your cover"
+        description="Drag to move it, zoom to get closer."
         aspect={3 / 4}
         outputWidth={900}
         outputHeight={1200}

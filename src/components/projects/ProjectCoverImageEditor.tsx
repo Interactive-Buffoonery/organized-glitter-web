@@ -141,7 +141,7 @@ const ProjectCoverImageEditor = ({ project }: ProjectCoverImageEditorProps) => {
         open={isCropDialogOpen}
         file={cropFile}
         title="Crop project image"
-        description="Choose a rectangle, portrait, or square crop, then drag and zoom until the cover looks right."
+        description="Drag to move it, zoom to get closer."
         aspect={4 / 3}
         outputWidth={1200}
         outputHeight={900}

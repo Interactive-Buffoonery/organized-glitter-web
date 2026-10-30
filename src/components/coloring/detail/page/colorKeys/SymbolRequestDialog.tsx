@@ -319,7 +319,7 @@ function RequestForm({
         open={cropping}
         file={photo?.original ?? null}
         title="Crop the symbol"
-        description="Frame the one symbol you need."
+        description="Zoom in until only the symbol shows."
         aspect={1}
         outputWidth={800}
         outputHeight={800}

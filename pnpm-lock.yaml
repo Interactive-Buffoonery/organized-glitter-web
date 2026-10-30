@@ -341,8 +341,8 @@ importers:
         specifier: ^3.9.10
         version: 3.9.10
       prettier-plugin-tailwindcss:
-        specifier: ^0.6.12
-        version: 0.6.14(prettier@3.9.10)
+        specifier: ^0.8.1
+        version: 0.8.1(prettier@3.9.10)
       tailwindcss:
         specifier: ^4.2.4
         version: 4.3.0
@@ -2928,8 +2928,8 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/plugin-terser@1.0.0':
-    resolution: {integrity: sha512-FnCxhTBx6bMOYQrar6C8h3scPt8/JwIzw3+AJ2K++6guogH5fYaIFia+zZuhqv0eo1RN7W1Pz630SyvLbDjhtQ==}
+  '@rollup/plugin-terser@1.0.2':
+    resolution: {integrity: sha512-+UihHnuLnQDQ/9wog7ym+7oawCXkjTIo0WwkK7s//0mkktTN0VhYk6fGVxH+NtGzW064w5RCGgreMDxRVhHCzw==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       rollup: ^2.0.0||^3.0.0||^4.0.0
@@ -2937,8 +2937,8 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/pluginutils@5.4.0':
-    resolution: {integrity: sha512-MfPp06CjRLfXQ3wY0R8vJDYBy/MvVcc9OulEfR0B8Iv9ko+GCNaRZ+EpJYFl27LhKsZK0o420sYCRHCjfCgeUg==}
+  '@rollup/pluginutils@5.5.1':
+    resolution: {integrity: sha512-P9ZvnfouRu4MSC+ilERaw6FmZs8zqKhpHxEs4aGDGWQAMzQGXnhvCSvoNwokfNvdt7t3Y5Y4p6gStQgezeIqug==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       rollup: ^1.20.0||^2.0.0||^3.0.0||^4.0.0
@@ -2946,8 +2946,8 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/wasm-node@4.64.12':
-    resolution: {integrity: sha512-gq6IiOofp+QHpoLzP1OK1LRqzQiWEnpyHB32K6CH3MIWOg5Cy+qs3XgOt0i6s2PgEsms9gx72yxJ/HNzsmbSkA==}
+  '@rollup/wasm-node@4.65.1':
+    resolution: {integrity: sha512-Be9x0pnFS91wtAslz0fx3HnLbqQuV4EF2XLemwjz8BGqLjMrw9tCzu7vIuWgpjCEsMQgMtZ1FIWHJxX95ZwBkw==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
@@ -5632,9 +5632,9 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
 
-  prettier-plugin-tailwindcss@0.6.14:
-    resolution: {integrity: sha512-pi2e/+ZygeIqntN+vC573BcW5Cve8zUB0SSAGxqpB4f96boZF4M3phPVoOFCeypwkpRYdi7+jQ5YJJUwrkGUAg==}
-    engines: {node: '>=14.21.3'}
+  prettier-plugin-tailwindcss@0.8.1:
+    resolution: {integrity: sha512-iaFMYqDsE4ffdDkn5qup0j5f2aCEBFZrdrZnvu9QKTlWx/iGPeQ4HHu7b7fCPMxeo9nwQBiOAh2nSypdFYWJkw==}
+    engines: {node: '>=20.19'}
     peerDependencies:
       '@ianvs/prettier-plugin-sort-imports': '*'
       '@prettier/plugin-hermes': '*'
@@ -5646,14 +5646,12 @@ packages:
       prettier: ^3.0
       prettier-plugin-astro: '*'
       prettier-plugin-css-order: '*'
-      prettier-plugin-import-sort: '*'
       prettier-plugin-jsdoc: '*'
       prettier-plugin-marko: '*'
       prettier-plugin-multiline-arrays: '*'
       prettier-plugin-organize-attributes: '*'
       prettier-plugin-organize-imports: '*'
       prettier-plugin-sort-imports: '*'
-      prettier-plugin-style-order: '*'
       prettier-plugin-svelte: '*'
     peerDependenciesMeta:
       '@ianvs/prettier-plugin-sort-imports':
@@ -5674,8 +5672,6 @@ packages:
         optional: true
       prettier-plugin-css-order:
         optional: true
-      prettier-plugin-import-sort:
-        optional: true
       prettier-plugin-jsdoc:
         optional: true
       prettier-plugin-marko:
@@ -5687,8 +5683,6 @@ packages:
       prettier-plugin-organize-imports:
         optional: true
       prettier-plugin-sort-imports:
-        optional: true
-      prettier-plugin-style-order:
         optional: true
       prettier-plugin-svelte:
         optional: true
@@ -6042,8 +6036,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  serialize-javascript@7.1.2:
-    resolution: {integrity: sha512-GL2BWwVa6JydKO6l/ljVgjAZF4QJ3S7dWDWi53s5GZT8PJzD2fNxi67HANQGKAqPrwEpL5ba7gUBGi0Ls/sEoQ==}
+  serialize-javascript@7.1.4:
+    resolution: {integrity: sha512-FqlEuoTq/zRmA4Lg6aOqyH3lCHbUtCB0bmHCeFniX2GBdDqMJM3FwdvEhlE5Pim1dlt2FfBdVPmUNNiGhhKqpw==}
     engines: {node: '>=20.0.0'}
 
   set-cookie-parser@2.7.2:
@@ -9333,51 +9327,51 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@rollup/plugin-babel@6.1.0(@babel/core@7.29.7)(@rollup/wasm-node@4.64.12)(@types/babel__core@7.20.5)':
+  '@rollup/plugin-babel@6.1.0(@babel/core@7.29.7)(@rollup/wasm-node@4.65.1)(@types/babel__core@7.20.5)':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/helper-module-imports': 7.29.7
-      '@rollup/pluginutils': 5.4.0(@rollup/wasm-node@4.64.12)
+      '@rollup/pluginutils': 5.5.1(@rollup/wasm-node@4.65.1)
     optionalDependencies:
       '@types/babel__core': 7.20.5
-      rollup: '@rollup/wasm-node@4.64.12'
+      rollup: '@rollup/wasm-node@4.65.1'
     transitivePeerDependencies:
       - supports-color
 
-  '@rollup/plugin-node-resolve@16.0.3(@rollup/wasm-node@4.64.12)':
+  '@rollup/plugin-node-resolve@16.0.3(@rollup/wasm-node@4.65.1)':
     dependencies:
-      '@rollup/pluginutils': 5.4.0(@rollup/wasm-node@4.64.12)
+      '@rollup/pluginutils': 5.5.1(@rollup/wasm-node@4.65.1)
       '@types/resolve': 1.20.2
       deepmerge: 4.3.1
       is-module: 1.0.0
       resolve: 1.22.13
     optionalDependencies:
-      rollup: '@rollup/wasm-node@4.64.12'
+      rollup: '@rollup/wasm-node@4.65.1'
 
-  '@rollup/plugin-replace@6.0.3(@rollup/wasm-node@4.64.12)':
+  '@rollup/plugin-replace@6.0.3(@rollup/wasm-node@4.65.1)':
     dependencies:
-      '@rollup/pluginutils': 5.4.0(@rollup/wasm-node@4.64.12)
+      '@rollup/pluginutils': 5.5.1(@rollup/wasm-node@4.65.1)
       magic-string: 0.30.21
     optionalDependencies:
-      rollup: '@rollup/wasm-node@4.64.12'
+      rollup: '@rollup/wasm-node@4.65.1'
 
-  '@rollup/plugin-terser@1.0.0(@rollup/wasm-node@4.64.12)':
+  '@rollup/plugin-terser@1.0.2(@rollup/wasm-node@4.65.1)':
     dependencies:
-      serialize-javascript: 7.1.2
+      serialize-javascript: 7.1.4
       smob: 1.6.2
       terser: 5.51.2
     optionalDependencies:
-      rollup: '@rollup/wasm-node@4.64.12'
+      rollup: '@rollup/wasm-node@4.65.1'
 
-  '@rollup/pluginutils@5.4.0(@rollup/wasm-node@4.64.12)':
+  '@rollup/pluginutils@5.5.1(@rollup/wasm-node@4.65.1)':
     dependencies:
       '@types/estree': 1.0.9
       estree-walker: 2.0.2
       picomatch: 4.0.7
     optionalDependencies:
-      rollup: '@rollup/wasm-node@4.64.12'
+      rollup: '@rollup/wasm-node@4.65.1'
 
-  '@rollup/wasm-node@4.64.12':
+  '@rollup/wasm-node@4.65.1':
     dependencies:
       '@types/estree': 1.0.9
     optionalDependencies:
@@ -12466,7 +12460,7 @@ snapshots:
 
   prelude-ls@1.2.1: {}
 
-  prettier-plugin-tailwindcss@0.6.14(prettier@3.9.10):
+  prettier-plugin-tailwindcss@0.8.1(prettier@3.9.10):
     dependencies:
       prettier: 3.9.10
 
@@ -12940,7 +12934,7 @@ snapshots:
 
   semver@7.8.5: {}
 
-  serialize-javascript@7.1.2: {}
+  serialize-javascript@7.1.4: {}
 
   set-cookie-parser@2.7.2: {}
 
@@ -13567,7 +13561,7 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
       postcss: 8.5.27
-      rollup: '@rollup/wasm-node@4.64.12'
+      rollup: '@rollup/wasm-node@4.65.1'
       tinyglobby: 0.2.16
     optionalDependencies:
       '@types/node': 22.19.19
@@ -13727,10 +13721,10 @@ snapshots:
       '@babel/core': 7.29.7
       '@babel/preset-env': 7.29.7(@babel/core@7.29.7)
       '@babel/runtime': 7.29.10
-      '@rollup/plugin-babel': 6.1.0(@babel/core@7.29.7)(@rollup/wasm-node@4.64.12)(@types/babel__core@7.20.5)
-      '@rollup/plugin-node-resolve': 16.0.3(@rollup/wasm-node@4.64.12)
-      '@rollup/plugin-replace': 6.0.3(@rollup/wasm-node@4.64.12)
-      '@rollup/plugin-terser': 1.0.0(@rollup/wasm-node@4.64.12)
+      '@rollup/plugin-babel': 6.1.0(@babel/core@7.29.7)(@rollup/wasm-node@4.65.1)(@types/babel__core@7.20.5)
+      '@rollup/plugin-node-resolve': 16.0.3(@rollup/wasm-node@4.65.1)
+      '@rollup/plugin-replace': 6.0.3(@rollup/wasm-node@4.65.1)
+      '@rollup/plugin-terser': 1.0.2(@rollup/wasm-node@4.65.1)
       '@trickfilm400/rollup-plugin-off-main-thread': 4.0.0
       ajv: 8.20.0
       common-tags: 1.8.2
@@ -13739,7 +13733,7 @@ snapshots:
       fs-extra: 9.1.0
       glob: 11.1.0
       pretty-bytes: 5.6.0
-      rollup: '@rollup/wasm-node@4.64.12'
+      rollup: '@rollup/wasm-node@4.65.1'
       source-map: 0.8.0
       stringify-object: 3.3.0
       strip-comments: 2.0.1

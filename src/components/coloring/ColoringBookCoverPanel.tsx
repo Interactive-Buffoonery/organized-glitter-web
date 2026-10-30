@@ -1,6 +1,7 @@
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
-import type { ChangeEvent } from 'react';
-import { BookOpen, X } from 'lucide-react';
+import { useState, type ChangeEvent, type DragEvent } from 'react';
+import { Upload, X } from 'lucide-react';
+import { dispatchSyntheticChange } from '@/components/projects/form-sections/dispatchSyntheticChange';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +22,26 @@ export function ColoringBookCoverPanel({
   onFileChange,
   onRemoveImage,
 }: ColoringBookCoverPanelProps) {
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (event: DragEvent) => {
+    event.preventDefault();
+    if (!isSubmitting) setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: DragEvent) => {
+    event.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (event: DragEvent) => {
+    event.preventDefault();
+    setIsDragging(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file || isSubmitting) return;
+    dispatchSyntheticChange(file, onFileChange);
+  };
+
   return (
     <Section label="Cover" flush="lg">
       <div className="space-y-2">
@@ -63,15 +84,27 @@ export function ColoringBookCoverPanel({
           <label
             htmlFor="coloring-cover"
             aria-disabled={isSubmitting}
-            className={
-              isSubmitting
-                ? 'bg-muted/20 flex aspect-[3/4] cursor-not-allowed flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 text-center opacity-60'
-                : 'bg-muted/20 hover:border-primary/60 flex aspect-[3/4] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 text-center'
-            }
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={cn(
+              'group bg-muted/20 flex aspect-[3/4] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 text-center transition-all',
+              'border-border/60 hover:border-primary/60 hover:bg-muted/30',
+              'focus-within:border-primary focus-within:ring-ring/50 focus-within:ring-2',
+              isDragging && 'border-primary bg-primary/5 ring-primary/30 ring-2 ring-offset-2',
+              isSubmitting ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+            )}
           >
-            <BookOpen className="text-muted-foreground size-10" />
-            <span className="text-sm font-medium">Choose cover image</span>
-            <span className="text-muted-foreground text-xs">JPG, PNG, WebP, GIF or HEIC</span>
+            <div className="bg-background/60 mb-1 rounded-full p-3 shadow-sm backdrop-blur-md transition-transform group-hover:-translate-y-0.5">
+              <Upload className="text-muted-foreground group-hover:text-primary size-6" />
+            </div>
+            <span className="text-foreground text-sm font-medium">
+              Drag & drop, or{' '}
+              <span className="text-primary underline-offset-4 group-hover:underline">
+                choose a file
+              </span>
+            </span>
+            <span className="text-muted-foreground text-xs">JPG, PNG, GIF, WebP or HEIC</span>
           </label>
         )}
         <Input

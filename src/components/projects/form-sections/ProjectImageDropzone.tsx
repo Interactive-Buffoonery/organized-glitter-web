@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Scissors, X, Upload, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { dispatchSyntheticChange } from './dispatchSyntheticChange';
 
 interface ProjectImageDropzoneProps {
   imageUrl?: string;
@@ -13,21 +14,6 @@ interface ProjectImageDropzoneProps {
   onImageRemove: () => void;
   onCropImage?: () => void;
 }
-
-const dispatchSyntheticChange = (
-  file: File,
-  onImageChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-) => {
-  const dt = new DataTransfer();
-  dt.items.add(file);
-  const fakeInput = document.createElement('input');
-  fakeInput.type = 'file';
-  fakeInput.files = dt.files;
-  onImageChange({
-    target: fakeInput,
-    currentTarget: fakeInput,
-  } as unknown as React.ChangeEvent<HTMLInputElement>);
-};
 
 export const ProjectImageDropzone: React.FC<ProjectImageDropzoneProps> = ({
   imageUrl,

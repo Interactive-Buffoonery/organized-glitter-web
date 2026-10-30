@@ -256,7 +256,7 @@ describe('ColoringBookForm', () => {
     await user.click(await form.findByRole('button', { name: 'Restore draft' }));
 
     expect(form.queryByRole('button', { name: 'Remove cover image' })).not.toBeInTheDocument();
-    expect(form.getByText('Choose cover image')).toBeInTheDocument();
+    expect(form.getByText('choose a file')).toBeInTheDocument();
   });
 
   it('keeps the original server timestamp when the edit query refreshes', async () => {

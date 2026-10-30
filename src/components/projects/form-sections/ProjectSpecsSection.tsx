@@ -77,7 +77,7 @@ export const ProjectSpecsSection = ({
           min="0"
           value={formData.totalDiamonds || ''}
           {...totalDiamondsProps}
-          placeholder="Enter total diamonds"
+          placeholder="e.g. 12000"
           disabled={isSubmitting}
           aria-invalid={fieldErrors.totalDiamonds ? 'true' : 'false'}
           aria-describedby={fieldErrors.totalDiamonds ? getErrorId('totalDiamonds') : undefined}

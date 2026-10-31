@@ -10,7 +10,7 @@ import type { ColoringBookCardData } from './coloringBookCardTypes';
 export const formatColoringCompletionPercent = (book: ColoringBookCardData): string =>
   `${Math.round(book.completionPercentage ?? 0)}%`;
 
-const getColoringCompletedPages = (book: ColoringBookCardData): number =>
+export const getColoringCompletedPages = (book: ColoringBookCardData): number =>
   Math.max(0, Math.min(book.completedPages ?? 0, book.totalPages));
 
 export const getColoringProgressLabel = (book: ColoringBookCardData): string =>

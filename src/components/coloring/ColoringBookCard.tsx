@@ -9,6 +9,7 @@ import { ColoringService } from '@/services/pocketbase/coloring.service';
 import { getColoringBookDetailPath } from '@/pages/coloringBookNavigation';
 import type { ColoringBookCardData } from './coloringBookCardTypes';
 import { StatusPill } from '@/components/shared/StatusPill';
+import { getColoringCompletedPages } from './coloringBookPresentation';
 
 export type { ColoringBookCardData } from './coloringBookCardTypes';
 
@@ -79,7 +80,7 @@ export function ColoringBookCard({ book, skipImageLoading = false }: ColoringBoo
           <div className="flex flex-wrap items-center justify-between gap-2">
             <StatusPill label={statusLabel} className={statusColor} />
             <span className="text-muted-foreground text-xs tabular-nums">
-              {book.completedPages ?? 0} of {book.totalPages}
+              {getColoringCompletedPages(book)} of {book.totalPages}
             </span>
           </div>
         </div>

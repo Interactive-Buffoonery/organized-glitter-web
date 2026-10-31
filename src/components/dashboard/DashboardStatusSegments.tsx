@@ -3,6 +3,7 @@ import { StatusChips } from '@/components/shared/StatusChips';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import type { DashboardDisplayedStatusCounts } from '@/hooks/queries/useDashboardStatusCounts';
 import type { ProjectFilterStatus } from '@/types/project';
+import { PROJECT_FILTER_STATUS_LABEL } from '@/utils/statusColors';
 
 interface DashboardStatusSegmentsProps {
   activeStatus: ProjectFilterStatus;
@@ -11,15 +12,15 @@ interface DashboardStatusSegmentsProps {
   hasCountError: boolean;
   onStatusChange: (status: ProjectFilterStatus) => void;
 }
-const STATUS_SEGMENTS: Array<{ status: ProjectFilterStatus; label: string }> = [
-  { status: 'everything', label: 'All' },
-  { status: 'wishlist', label: 'Wishlist' },
-  { status: 'purchased', label: 'Purchased' },
-  { status: 'stash', label: 'In stash' },
-  { status: 'kitted', label: 'Kitted' },
-  { status: 'progress', label: 'In progress' },
-  { status: 'onhold', label: 'On hold' },
-  { status: 'completed', label: 'Completed' },
+const STATUS_SEGMENTS: ProjectFilterStatus[] = [
+  'everything',
+  'wishlist',
+  'purchased',
+  'stash',
+  'kitted',
+  'progress',
+  'onhold',
+  'completed',
 ];
 
 export default function DashboardStatusSegments({
@@ -33,9 +34,9 @@ export default function DashboardStatusSegments({
   return (
     <StatusChips
       value={activeStatus}
-      options={STATUS_SEGMENTS.map(({ status, label }) => ({
+      options={STATUS_SEGMENTS.map(status => ({
         value: status,
-        label,
+        label: PROJECT_FILTER_STATUS_LABEL[status],
         count: !isLoadingCounts && !hasCountError ? displayedCounts?.[status] : undefined,
       }))}
       onChange={status => {

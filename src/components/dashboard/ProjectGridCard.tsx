@@ -1,11 +1,10 @@
 import React, { useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { useProjectStatus } from '@/hooks/useProjectStatus';
 import { ProjectType } from '@/types/project';
 import type { DashboardValidSortField } from '@/features/dashboard/dashboard.constants';
 import { formatKitMetadata, formatLibraryDate } from '@/components/shared/libraryPresentation';
 import { StatusPill } from '@/components/shared/StatusPill';
-import { FILTER_STATUS_ACTIVE_FILL } from '@/utils/statusColors';
+import { FILTER_STATUS_ACTIVE_FILL, PROJECT_FILTER_STATUS_LABEL } from '@/utils/statusColors';
 import ProjectThumbnail from './ProjectThumbnail';
 
 interface ProjectGridCardProps {
@@ -24,8 +23,6 @@ const ProjectGridCardComponent = ({
   skipImageLoading = false,
   isRecentlyEdited = false,
 }: ProjectGridCardProps) => {
-  const { getStatusLabel } = useProjectStatus();
-
   const handleClick = useCallback(() => {
     if (onNavigate) {
       onNavigate(project.id);
@@ -34,13 +31,6 @@ const ProjectGridCardComponent = ({
 
     onClick?.();
   }, [onClick, onNavigate, project.id]);
-
-  const statusLabel =
-    project.status === 'purchased'
-      ? 'Purchased'
-      : project.status === 'kitted'
-        ? 'Kitted'
-        : getStatusLabel(project.status);
 
   const metadata = formatKitMetadata(project);
   const date = project.updatedAt || project.createdAt;
@@ -82,7 +72,10 @@ const ProjectGridCardComponent = ({
           </p>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <StatusPill label={statusLabel} className={FILTER_STATUS_ACTIVE_FILL[project.status]} />
+            <StatusPill
+              label={PROJECT_FILTER_STATUS_LABEL[project.status]}
+              className={FILTER_STATUS_ACTIVE_FILL[project.status]}
+            />
             <span className="text-muted-foreground text-xs" title="Last updated">
               {shortDate}
             </span>

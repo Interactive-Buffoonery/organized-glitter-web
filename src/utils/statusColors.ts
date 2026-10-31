@@ -17,6 +17,19 @@ export const FILTER_STATUS_ACTIVE_FILL: Record<ProjectFilterStatus, string> = {
   destashed: 'bg-rose-700 text-white dark:bg-rose-700',
 };
 
+export const PROJECT_FILTER_STATUS_LABEL: Record<ProjectFilterStatus, string> = {
+  everything: 'All',
+  wishlist: 'Wishlist',
+  purchased: 'Purchased',
+  stash: 'In stash',
+  kitted: 'Kitted',
+  progress: 'In progress',
+  onhold: 'On hold',
+  completed: 'Completed',
+  archived: 'Archived',
+  destashed: 'Destashed',
+};
+
 export const FILTER_STATUS_DOT: Record<ProjectFilterStatus, string> = {
   everything: 'bg-primary',
   wishlist: 'bg-rose-500',

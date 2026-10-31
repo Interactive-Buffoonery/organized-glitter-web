@@ -22,6 +22,21 @@ describe('library presentation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'In progress 12' }));
     expect(onChange).toHaveBeenCalledWith('progress');
   });
+  it('keeps a selected zero-count chip so it can be deselected', () => {
+    const onChange = vi.fn();
+    render(
+      <StatusChips
+        value={['wishlist']}
+        onChange={onChange}
+        options={[
+          { value: 'all', label: 'All', count: 3 },
+          { value: 'wishlist', label: 'Wishlist', count: 0 },
+        ]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Wishlist 0' }));
+    expect(onChange).toHaveBeenCalledWith('wishlist');
+  });
   it('formats a short date and today without shifting date-only values', () => {
     expect(formatLibraryDate('2026-10-18', new Date(2026, 9, 20))).toBe('Oct 18');
     expect(formatLibraryDate('2026-10-20', new Date(2026, 9, 20))).toBe('Today');

@@ -236,7 +236,7 @@ or form submission; use the shared date-field helpers or existing date-only help
 - Coloring book edit: follows the same drawer-first pattern from `/coloring/:id`, with `/coloring/:id/edit` preserved as the direct-link fallback. Archive and Delete sit in the drawer footer alongside Cancel and Save changes.
 - Randomizer: wheel-first two-column layout. On phones the numbered wheel and result lead; on desktop the selection list sits on the left with the wheel on the right. Craft mode and status eligibility checkboxes sit above the target list. The wheel uses numbered segments with a text key mapping numbers to target names; it is the only full-palette data-visualization exception and must keep its pattern/key/reduced-motion support. Spin history lives in a collapsible accordion below the wheel.
 - Coloring books: cover-led detail pages with quiet chrome, dense page grids, mystery chips, and inline notes/tags. Publisher and illustrator taxonomy belongs to the coloring vertical, but the page still follows the shared library model.
-- Coloring pages: large flat artwork/photo canvas plus one right-rail glass panel for status, dates, mediums, and mystery reveal. Page photos preserve the whole artwork by default.
+- Coloring pages: a flat artwork canvas and progress journal, with a sticky 320px sidebar on desktop. Mobile leads with the photo, then the title, status, three-box medium/colors/photos strip, dates, colors and mystery reveal, then the journal. The sidebar uses hairlines and dash-headed sections. The approved journal uses Caveat dates alongside the single Caveat H1. Page photos preserve the whole artwork by default.
 
 ## Maintenance rules
 
@@ -248,9 +248,9 @@ or form submission; use the shared date-field helpers or existing date-only help
 
 The app icon uses Sarah's hand-drawn pink and lilac pieces with a raspberry diamond on a navy tile, without an added outer border. See [App icon](./app-icon.md) for the approved colors, editable source, and export command.
 
-Coloring page Color Codes & Swatches uses the existing control panel below
-Mediums, with the usual section heading and divider. Thumbnails and plain-text
-notes remain flat within that region. No additional panel or navigation is added.
+Coloring page Colors follows the summary strip and dates, with a two-column
+symbol, code and swatch key. Copy and Edit colors lead to the existing color
+workflow. Empty codes use a dashed swatch and Add code. No extra panel is added.
 
 ## Page-not-found recovery
 

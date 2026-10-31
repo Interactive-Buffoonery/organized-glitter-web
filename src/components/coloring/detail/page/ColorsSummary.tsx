@@ -58,7 +58,26 @@ function ColorsSummaryContent({
 
   return (
     <Section variant="bordered" className="space-y-3" landmark={false}>
-      <SectionHeading>Colors</SectionHeading>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <SectionHeading>Colors</SectionHeading>
+        {!isEmpty && (
+          <div className="flex gap-3">
+            {rows.length > 0 && (
+              <Button
+                type="button"
+                variant="link"
+                className="min-h-11 px-0"
+                onClick={() => void copyColorKeys(rows, requests)}
+              >
+                Copy
+              </Button>
+            )}
+            <Button asChild variant="link" className="min-h-11 px-0">
+              <Link to={colorsPath}>Edit colors</Link>
+            </Button>
+          </div>
+        )}
+      </div>
       {hasError ? (
         <div role="alert" className="text-sm">
           Could not load the colors for this page.{' '}
@@ -79,7 +98,7 @@ function ColorsSummaryContent({
           Loading colors…
         </p>
       ) : isEmpty ? (
-        <Button asChild>
+        <Button asChild variant="link" className="min-h-11 px-0">
           <Link to={colorsPath}>Track the colors used for this page</Link>
         </Button>
       ) : (
@@ -131,10 +150,26 @@ function ColorsSummaryContent({
                   <li
                     key={row.id}
                     title={row.code.trim() || row.color_name.trim() || undefined}
-                    className="flex min-w-0 items-center gap-2"
+                    className="min-w-0"
                   >
                     <span className="sr-only">{colorKeyLabel(row, request)}</span>
-                    <ColorKeyRowContent row={row} request={request} compact />
+                    <Link
+                      to={colorsPath}
+                      className="hover:bg-muted/60 focus-visible:ring-ring/50 flex min-h-11 items-center gap-2 rounded-md px-1 focus-visible:ring-2"
+                      aria-label={`Edit ${colorKeyLabel(row, request)}`}
+                    >
+                      <ColorKeyRowContent
+                        row={{ ...row, color_name: row.code.trim() ? row.color_name : 'Add code' }}
+                        request={request}
+                        compact
+                      />
+                      {!row.swatch && (
+                        <span
+                          aria-hidden="true"
+                          className="border-border size-4 shrink-0 rounded border border-dashed"
+                        />
+                      )}
+                    </Link>
                   </li>
                 );
               })}
@@ -145,19 +180,6 @@ function ColorsSummaryContent({
               <span className="text-muted-foreground text-sm">
                 {filled} of {rows.length} filled in
               </span>
-            ) : null}
-            <Button asChild variant="link" className="px-0">
-              <Link to={colorsPath}>Edit colors</Link>
-            </Button>
-            {rows.length ? (
-              <Button
-                type="button"
-                variant="link"
-                className="ml-auto px-0"
-                onClick={() => void copyColorKeys(rows, requests)}
-              >
-                Copy
-              </Button>
             ) : null}
           </div>
         </>

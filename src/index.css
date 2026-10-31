@@ -126,6 +126,8 @@
       var(--bottom-nav-content-height) + var(--bottom-nav-border-width) +
         var(--bottom-nav-safe-area)
     );
+    /* First-paint estimate; SiteHeader replaces it with its measured height. */
+    --site-header-total-height: calc(77px + env(safe-area-inset-top, 0px));
   }
 
   /* Berry Cream */
@@ -501,7 +503,8 @@
     flex-direction: column;
     min-height: 100vh; /* Fallback for older browsers */
     min-height: 100dvh; /* Modern dynamic viewport height for mobile */
-    overflow-x: hidden;
+    /* clip, not hidden: hidden makes a scroll container, which stops sticky headers. */
+    overflow-x: clip;
   }
 
   .diamond-pattern {

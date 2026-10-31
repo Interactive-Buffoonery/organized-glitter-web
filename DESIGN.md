@@ -435,9 +435,12 @@ The template for pages with a primary action at the bottom (forms, multi-step fl
 - **Don't** introduce public profiles, leaderboards, or "trending in your network" surfaces. Per-user data isolation is a felt feature, not just a backend property.
 - **Don't** rely on a single hue to communicate status. If a screenshot in greyscale is ambiguous, the design has failed.
 
-Coloring page Color Codes & Swatches uses the existing control panel below
-Mediums, with the usual section heading and divider. Thumbnails and plain-text
-notes remain flat within that region. No additional panel or navigation is added.
+Coloring page detail uses a flat photo and journal beside a sticky 320px sidebar
+with a 56px gap on desktop. Mobile leads with the photo before its Caveat H1,
+byline and controls. The three-box strip summarizes medium, colors and photos;
+the date line shows set dates and the next missing date. Colors uses a two-column
+key with Copy and Edit colors. The approved journal uses Caveat dates on a dashed
+thread as a scoped exception to the single handwritten moment rule.
 
 ## Destructive colors in Dark mode
 

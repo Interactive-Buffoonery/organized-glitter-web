@@ -183,6 +183,7 @@ test.describe('coloring book UI creation', () => {
     );
     await expect(page.getByRole('heading', { name: 'Page 1', exact: true })).toBeVisible();
 
+    await page.getByRole('button', { name: 'add start date', exact: true }).click();
     const startedInput = page.locator('#coloring-page-started-at');
     await startedInput.fill('2026-04-03');
     const saveStarted = startedField(page).getByRole('button', { name: 'Save' });

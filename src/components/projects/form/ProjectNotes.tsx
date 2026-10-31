@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { logger } from '@/utils/logger';
+import { createLogger } from '@/utils/logger';
 import FormField from './FormField';
 import { Pencil } from 'lucide-react';
 import RichTextEditor from '@/components/notes/RichTextEditor.lazy';
 import MarkdownContent from '@/components/notes/MarkdownContent';
 import type { MarkdownString } from '@/types/markdown';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
+
+const logger = createLogger('ProjectNotes');
 
 interface ProjectNotesProps {
   notes: MarkdownString;
@@ -21,14 +23,14 @@ interface ProjectNotesProps {
    *   pencil in the top-right corner. Parent must apply `group/notes` to
    *   scope the hover.
    */
-  variant?: 'default' | 'inline';
+  variant?: 'default' | 'inline' | 'pinned';
   formLabel?: string;
   placeholder?: string;
   ariaLabel?: string;
   emptyPlaceholder?: string;
 }
 
-const getEmptyPlaceholder = (variant: 'default' | 'inline', emptyPlaceholder?: string) =>
+const getEmptyPlaceholder = (variant: 'default' | 'inline' | 'pinned', emptyPlaceholder?: string) =>
   emptyPlaceholder ??
   (variant === 'inline'
     ? 'No notes yet. Click the pencil to add some thoughts.'
@@ -144,6 +146,28 @@ const ProjectNotes = ({
             {isSaving ? 'Saving...' : 'Save'}
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (variant === 'pinned') {
+    return (
+      <div className="relative text-sm">
+        <button
+          type="button"
+          onClick={handleEdit}
+          aria-label="Edit notes"
+          className={`${TEXT_LINK_CLASSES} absolute -top-12 right-0 min-h-11 px-2`}
+        >
+          Edit
+        </button>
+        {notes ? (
+          <MarkdownContent content={notes} />
+        ) : (
+          <p className="text-muted-foreground">
+            {emptyPlaceholder || 'Add a note about this kit.'}
+          </p>
+        )}
       </div>
     );
   }

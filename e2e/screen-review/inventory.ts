@@ -42,7 +42,7 @@ const isReachable = async (page: Page, path: string, ready: Locator) => {
 
 const getDiamondProjectPath = async (page: Page) => {
   const fixturePath = `/projects/${FIXTURE_PROJECT_ID}`;
-  if (await isReachable(page, fixturePath, page.getByRole('heading', { name: 'Details' }))) {
+  if (await isReachable(page, fixturePath, page.getByRole('heading', { name: 'About this kit' }))) {
     return fixturePath;
   }
 
@@ -151,7 +151,7 @@ export const screenInventory: ScreenDefinition[] = [
     id: 'project-detail',
     title: 'Project detail',
     path: getDiamondProjectPath,
-    ready: page => page.getByRole('heading', { name: 'Details' }),
+    ready: page => page.getByRole('heading', { name: 'About this kit' }),
     review: 'authenticated',
     notes: 'Skipped when the E2E account has no diamond project fixture.',
   },

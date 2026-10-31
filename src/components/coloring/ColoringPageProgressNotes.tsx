@@ -1,12 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { useMemo } from 'react';
 import { SectionHeading } from '@/components/shared/Section';
 
-import {
-  ProgressNoteDialog,
-  type ProgressNoteDialogTarget,
-} from '@/components/projects/ProgressNoteDialog';
-import ProgressNotesList from '@/components/projects/timeline/ProgressNotesList';
+import DetailJournalThread from './detail/page/DetailJournalThread';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useAddColoringPageProgressNoteMutation,
@@ -15,7 +10,7 @@ import {
   useUpdateColoringPageProgressNoteMutation,
 } from '@/hooks/mutations/coloring/useColoringPageProgressNotes';
 import { useColoringPageProgressNotes } from '@/hooks/queries/coloring/useColoringPageProgressNotes';
-import { cn } from '@/lib/utils';
+import { ProgressNoteComposer } from './detail/page/ProgressNoteComposer';
 import type { MarkdownString } from '@/types/markdown';
 import type { ProgressNote } from '@/types/project';
 import { createLogger } from '@/utils/logger';
@@ -25,16 +20,14 @@ const COLORING_PROGRESS_NOTE_SKELETON_KEYS = ['first', 'second', 'third'];
 
 interface ColoringPageProgressNotesProps {
   pageId: string;
-  target?: ProgressNoteDialogTarget;
 }
 
-export function ColoringPageProgressNotes({ pageId, target }: ColoringPageProgressNotesProps) {
+export function ColoringPageProgressNotes({ pageId }: ColoringPageProgressNotesProps) {
   const { data: pageNotes = [], isLoading, error } = useColoringPageProgressNotes(pageId);
   const addNote = useAddColoringPageProgressNoteMutation();
   const updateNote = useUpdateColoringPageProgressNoteMutation();
   const deleteNote = useDeleteColoringPageProgressNoteMutation();
   const deleteNoteImage = useDeleteColoringPageProgressNoteImageMutation();
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const progressNotes = useMemo<ProgressNote[]>(
     () =>
@@ -57,7 +50,6 @@ export function ColoringPageProgressNotes({ pageId, target }: ColoringPageProgre
   }) => {
     try {
       await addNote.mutateAsync({ pageId, noteData });
-      setAddDialogOpen(false);
       return true;
     } catch (error) {
       logger.error('Error adding coloring page progress note:', error);
@@ -70,6 +62,7 @@ export function ColoringPageProgressNotes({ pageId, target }: ColoringPageProgre
       await updateNote.mutateAsync({ noteId, pageId, content });
     } catch (error) {
       logger.error('Error updating coloring page progress note:', error);
+      throw error;
     }
   };
 
@@ -89,13 +82,15 @@ export function ColoringPageProgressNotes({ pageId, target }: ColoringPageProgre
     }
   };
 
-  const isEmpty = !isLoading && !error && progressNotes.length === 0;
-  const addRowLabel = isEmpty ? 'Add your first progress note.' : 'Add a progress note.';
-
   return (
     <section>
       <div className="mb-4">
-        <SectionHeading>Progress</SectionHeading>
+        <SectionHeading>
+          Progress{' '}
+          <span className="text-muted-foreground font-normal">
+            · {progressNotes.length} {progressNotes.length === 1 ? 'entry' : 'entries'}
+          </span>
+        </SectionHeading>
       </div>
 
       {isLoading ? (
@@ -117,36 +112,14 @@ export function ColoringPageProgressNotes({ pageId, target }: ColoringPageProgre
         </div>
       ) : (
         <div>
-          <button
-            type="button"
-            onClick={() => setAddDialogOpen(true)}
-            className={cn(
-              'group/add w-full text-left',
-              'rounded-md py-6 first:pt-0 sm:py-8',
-              'sm:grid sm:grid-cols-[88px_minmax(0,1fr)] sm:items-start sm:gap-6',
-              'focus-visible:ring-primary/40 focus-visible:ring-2 focus-visible:outline-none'
-            )}
-          >
-            <span
-              aria-hidden="true"
-              className="border-border/70 text-muted-foreground/60 group-hover/add:border-primary/60 group-hover/add:text-primary hidden size-12 items-center justify-center rounded-full border border-dashed transition-colors sm:flex"
-            >
-              <Plus className="size-5" />
-            </span>
-            <span
-              className={cn(
-                'flex items-center gap-2 rounded-lg border border-dashed px-4 py-3 text-sm',
-                'border-border/70 text-muted-foreground transition-colors',
-                'group-hover/add:border-primary/50 group-hover/add:text-foreground group-hover/add:bg-primary/5'
-              )}
-            >
-              <Plus className="size-4 sm:hidden" />
-              {addRowLabel}
-            </span>
-          </button>
-
-          {!isEmpty && (
-            <ProgressNotesList
+          <ProgressNoteComposer onSubmit={handleAddNote} disabled={addNote.isPending} />
+          {progressNotes.length === 0 && (
+            <p className="text-muted-foreground mt-6 text-sm">
+              Photos and notes you log will show up here.
+            </p>
+          )}
+          {progressNotes.length > 0 && (
+            <DetailJournalThread
               progressNotes={progressNotes}
               onUpdateProgressNote={handleUpdateNote}
               onDeleteProgressNote={handleDeleteNote}
@@ -156,14 +129,6 @@ export function ColoringPageProgressNotes({ pageId, target }: ColoringPageProgre
           )}
         </div>
       )}
-
-      <ProgressNoteDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-        onSubmit={handleAddNote}
-        disabled={addNote.isPending}
-        target={target}
-      />
     </section>
   );
 }

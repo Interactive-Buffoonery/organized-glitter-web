@@ -21,7 +21,6 @@ test('mobile navigation and coloring page load in one paced session', async ({ p
     `/coloring/${bookId}/pages/${pageId}`,
     page.getByRole('heading', { name: /^Page \d+$/ })
   );
-  await page.getByRole('button', { name: /Add (your first |a )progress note\./ }).click();
-  await expect(page.getByRole('dialog', { name: /Add progress note to Page/ })).toBeVisible();
-  await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('textbox', { name: 'Progress note', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });

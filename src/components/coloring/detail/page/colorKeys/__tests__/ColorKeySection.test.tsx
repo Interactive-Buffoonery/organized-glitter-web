@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   rows: [] as unknown[],
   history: [] as unknown[],
   requests: {} as Record<string, unknown>,
+  stripPhotos: [] as { filename: string; thumbnail: string; strip: string; original: string }[],
   setup: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
@@ -33,6 +34,10 @@ vi.mock('@/hooks/queries/coloring/useColorKeys', () => ({
   }),
   useColorKeyHistory: () => ({ data: state.history }),
   useSymbolRequests: () => ({ data: state.requests }),
+}));
+vi.mock('@/hooks/queries/coloring/useColorReference', () => ({
+  useColorReference: () => ({ data: { photos: state.stripPhotos.map(p => p.filename) } }),
+  useColorReferenceImages: () => ({ data: state.stripPhotos }),
 }));
 vi.mock('@/hooks/mutations/coloring/useColorKeyMutations', () => ({
   useSetupColorKeys: () => ({ mutateAsync: state.setup, isPending: false }),
@@ -92,6 +97,7 @@ beforeEach(() => {
   state.rows = [];
   state.history = [];
   state.requests = {};
+  state.stripPhotos = [];
   for (const mock of [
     state.setup,
     state.create,
@@ -622,6 +628,64 @@ describe('Color key entry', () => {
     await waitFor(() => expect(screen.queryByRole('form')).toBeNull());
     expect(state.create).toHaveBeenCalledTimes(2);
     expect(state.create).toHaveBeenLastCalledWith(expect.objectContaining({ code: 'PU306' }));
+  });
+
+  const stripPhoto = (name: string) => ({
+    filename: `${name}.jpg`,
+    thumbnail: `/thumb/${name}.jpg`,
+    strip: `/strip/${name}.jpg`,
+    original: `/${name}.jpg`,
+  });
+
+  it('pins the strip photo above the list while a color is open', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    state.stripPhotos = [stripPhoto('one')];
+    render(<ColorKeySection pageId="page-1" />);
+    expect(screen.queryByRole('button', { name: 'Open color strip' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    expect(screen.getByRole('img', { name: 'Color strip' })).toHaveAttribute(
+      'src',
+      '/strip/one.jpg'
+    );
+    expect(screen.getByRole('combobox', { name: 'Code' })).toHaveFocus();
+    expect(screen.queryByRole('button', { name: 'Next strip photo' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Open color strip' }));
+    expect(screen.getByRole('img', { name: 'Full color strip' })).toHaveAttribute(
+      'src',
+      '/one.jpg'
+    );
+  });
+
+  it('steps through strip photos and keeps the chosen one between colors', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031'), key('b', 1, 'u:0032')];
+    state.stripPhotos = [stripPhoto('one'), stripPhoto('two')];
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    expect(screen.getByRole('button', { name: 'Previous strip photo' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Next strip photo' }));
+    expect(screen.getByRole('img', { name: 'Color strip 2 of 2' })).toHaveAttribute(
+      'src',
+      '/strip/two.jpg'
+    );
+    expect(screen.getByRole('button', { name: 'Next strip photo' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: /^Two,/ }));
+    expect(screen.getByRole('img', { name: 'Color strip 2 of 2' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Previous strip photo' }));
+    expect(screen.getByRole('img', { name: 'Color strip 1 of 2' })).toHaveAttribute(
+      'src',
+      '/strip/one.jpg'
+    );
+  });
+
+  it('pins nothing while a color is open when the page has no strip photo', async () => {
+    const user = userEvent.setup();
+    state.rows = [key('a', 0, 'u:0031')];
+    render(<ColorKeySection pageId="page-1" />);
+    await user.click(screen.getByRole('button', { name: /^One,/ }));
+    expect(screen.queryByRole('button', { name: 'Open color strip' })).toBeNull();
   });
 
   it('deletes a row after confirming', async () => {

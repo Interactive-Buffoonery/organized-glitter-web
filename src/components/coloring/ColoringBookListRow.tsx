@@ -1,8 +1,8 @@
+import { StatusPill } from '@/components/shared/StatusPill';
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Circle } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
 import { ColoringService } from '@/services/pocketbase/coloring.service';
 import { getColoringBookStatusColor, getColoringBookStatusLabel } from '@/utils/statusColors';
 import { getColoringBookDetailPath } from '@/pages/coloringBookNavigation';
@@ -30,7 +30,6 @@ function ColoringBookListRow({ book }: ColoringBookListRowProps) {
       to={getColoringBookDetailPath(book.id, returnTo)}
       state={{ returnTo }}
       role="listitem"
-      aria-label={`Open coloring book ${book.title}`}
       className="glow-hover text-card-foreground focus-visible:ring-ring group border-border bg-card hover:border-primary/20 flex w-full overflow-hidden rounded-xl border text-left shadow-sm transition-all duration-300 ease-out focus-visible:ring-2 focus-visible:outline-none"
     >
       <div className="bg-muted relative h-28 w-20 shrink-0 sm:h-32 sm:w-24">
@@ -75,15 +74,7 @@ function ColoringBookListRow({ book }: ColoringBookListRowProps) {
             {getColoringProgressLabel(book)} · {getColoringActivityLabel(book)}
           </p>
           <div className="flex shrink-0 items-center gap-2">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
-                getColoringBookStatusColor(book.status)
-              )}
-            >
-              <Circle className="size-2.5 fill-current" aria-hidden />
-              {statusLabel}
-            </span>
+            <StatusPill label={statusLabel} className={getColoringBookStatusColor(book.status)} />
           </div>
         </div>
       </div>

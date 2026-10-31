@@ -231,7 +231,7 @@ or form submission; use the shared date-field helpers or existing date-only help
 
 ## Current product surfaces
 
-- Library (`/dashboard`): shared project collection shell with craft segmented control, one primary New project action, glass filter sidebars on desktop, and flat result grids/lists.
+- Library (`/dashboard`): shared project collection shell with craft segmented control, one craft-specific primary action on desktop, glass filter sidebars on desktop, and flat result grids/lists.
 - Diamond painting detail: photo-led on mobile; title above a main photo/journal column and 320px sticky metadata sidebar on desktop. Specs always retain four editable boxes. Journal dates use Caveat as a scoped exception alongside the single Caveat H1; section headings remain Karla.
 - Project edit: opens as a drawer over the detail page rather than a route navigation. Desktop uses a right-side Radix `Sheet`; phones use a vaul `Drawer` at full viewport height. The `/projects/:id/edit` route remains as a direct-link fallback. See `glass.md` for the layout contract.
 - Coloring book edit: follows the same drawer-first pattern from `/coloring/:id`, with `/coloring/:id/edit` preserved as the direct-link fallback. Archive and Delete sit in the drawer footer alongside Cancel and Save changes.

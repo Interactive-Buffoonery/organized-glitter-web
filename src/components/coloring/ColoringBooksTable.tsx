@@ -1,3 +1,4 @@
+import { StatusPill } from '@/components/shared/StatusPill';
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -162,14 +163,10 @@ function ColoringBooksTableComponent({
                     </Link>
                   </TableCell>
                   <TableCell className="text-center">
-                    <span
-                      className={cn(
-                        'inline-flex rounded-full px-3 py-1 text-xs font-medium',
-                        getColoringBookStatusColor(book.status)
-                      )}
-                    >
-                      {getColoringBookStatusLabel(book.status)}
-                    </span>
+                    <StatusPill
+                      label={getColoringBookStatusLabel(book.status)}
+                      className={getColoringBookStatusColor(book.status)}
+                    />
                   </TableCell>
                   <TableCell>{getColoringBookFormatLabel(book)}</TableCell>
                   <TableCell>{getColoringPublisherLabel(book)}</TableCell>

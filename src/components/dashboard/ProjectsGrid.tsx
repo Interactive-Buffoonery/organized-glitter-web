@@ -348,7 +348,6 @@ const ProjectsGridComponent: React.FC<ProjectsGridProps> = ({
             project={project}
             onNavigate={handleProjectNavigate}
             isRecentlyEdited={project.id === recentlyEditedProjectId}
-            sortField={sortField}
           />
         )}
       />

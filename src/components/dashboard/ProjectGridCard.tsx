@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { ProjectType } from '@/types/project';
-import type { DashboardValidSortField } from '@/features/dashboard/dashboard.constants';
 import { formatKitMetadata, formatLibraryDate } from '@/components/shared/libraryPresentation';
 import { StatusPill } from '@/components/shared/StatusPill';
 import { FILTER_STATUS_ACTIVE_FILL, PROJECT_FILTER_STATUS_LABEL } from '@/utils/statusColors';
@@ -13,7 +12,6 @@ interface ProjectGridCardProps {
   onNavigate?: (projectId: string) => void;
   skipImageLoading?: boolean;
   isRecentlyEdited?: boolean;
-  sortField?: DashboardValidSortField;
 }
 
 const ProjectGridCardComponent = ({

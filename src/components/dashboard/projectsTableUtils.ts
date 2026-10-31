@@ -1,5 +1,4 @@
 import type { ProjectType } from '@/types/project';
-import type { DashboardValidSortField } from '@/features/dashboard/dashboard.constants';
 import { formatDateOnlyForDisplay } from '@/utils/date/timezoneUtils';
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -70,49 +69,5 @@ export const getLifecycleDate = (project: ProjectType): LifecycleDate | null => 
       return firstAvailable([finished, started, received, purchased, added]);
     default:
       return firstAvailable([purchased, added]);
-  }
-};
-
-export interface GridMetadataLine {
-  text: string;
-  tabularNums: boolean;
-}
-
-const EMPTY_METADATA: GridMetadataLine = { text: '', tabularNums: false };
-
-const lifecycleAsMetadata = (project: ProjectType): GridMetadataLine => {
-  const lifecycle = getLifecycleDate(project);
-  if (!lifecycle) return EMPTY_METADATA;
-  return { text: `${lifecycle.label} ${lifecycle.value}`, tabularNums: true };
-};
-
-export const getGridMetadataLine = (
-  project: ProjectType,
-  sortField: DashboardValidSortField
-): GridMetadataLine => {
-  switch (sortField) {
-    case 'company':
-      return project.company ? { text: project.company, tabularNums: false } : EMPTY_METADATA;
-    case 'artist': {
-      const artist = project.artist && project.artist !== '-' ? project.artist : null;
-      return artist ? { text: artist, tabularNums: false } : EMPTY_METADATA;
-    }
-    case 'width':
-      return typeof project.width === 'number' && typeof project.height === 'number'
-        ? { text: `${project.width}×${project.height}`, tabularNums: true }
-        : EMPTY_METADATA;
-    case 'last_updated':
-    case 'date_purchased':
-    case 'date_finished':
-    case 'date_started':
-    case 'date_received':
-    case 'kit_name':
-    case 'status':
-      return lifecycleAsMetadata(project);
-    default: {
-      const exhaustiveCheck: never = sortField;
-      void exhaustiveCheck;
-      return lifecycleAsMetadata(project);
-    }
   }
 };

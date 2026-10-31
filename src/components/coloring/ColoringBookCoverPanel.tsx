@@ -1,6 +1,7 @@
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
-import { useState, type ChangeEvent, type DragEvent } from 'react';
-import { Upload, X } from 'lucide-react';
+import type { ChangeEvent } from 'react';
+import { X } from 'lucide-react';
+import { CoverDropzone } from '@/components/image/CoverDropzone';
 import { dispatchSyntheticChange } from '@/components/projects/form-sections/dispatchSyntheticChange';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,26 +23,6 @@ export function ColoringBookCoverPanel({
   onFileChange,
   onRemoveImage,
 }: ColoringBookCoverPanelProps) {
-  const [isDragging, setIsDragging] = useState(false);
-
-  const handleDragOver = (event: DragEvent) => {
-    event.preventDefault();
-    if (!isSubmitting) setIsDragging(true);
-  };
-
-  const handleDragLeave = (event: DragEvent) => {
-    event.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (event: DragEvent) => {
-    event.preventDefault();
-    setIsDragging(false);
-    const file = event.dataTransfer.files?.[0];
-    if (!file || isSubmitting) return;
-    dispatchSyntheticChange(file, onFileChange);
-  };
-
   return (
     <Section label="Cover" flush="lg">
       <div className="space-y-2">
@@ -81,31 +62,12 @@ export function ColoringBookCoverPanel({
             </Label>
           </div>
         ) : (
-          <label
+          <CoverDropzone
             htmlFor="coloring-cover"
-            aria-disabled={isSubmitting}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={cn(
-              'group bg-muted/20 flex aspect-[3/4] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 text-center transition-all',
-              'border-border/60 hover:border-primary/60 hover:bg-muted/30',
-              'focus-within:border-primary focus-within:ring-ring/50 focus-within:ring-2',
-              isDragging && 'border-primary bg-primary/5 ring-primary/30 ring-2 ring-offset-2',
-              isSubmitting ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
-            )}
-          >
-            <div className="bg-background/60 mb-1 rounded-full p-3 shadow-sm backdrop-blur-md transition-transform group-hover:-translate-y-0.5">
-              <Upload className="text-muted-foreground group-hover:text-primary size-6" />
-            </div>
-            <span className="text-foreground text-sm font-medium">
-              Drag & drop, or{' '}
-              <span className="text-primary underline-offset-4 group-hover:underline">
-                choose a file
-              </span>
-            </span>
-            <span className="text-muted-foreground text-xs">JPG, PNG, GIF, WebP or HEIC</span>
-          </label>
+            onFile={file => dispatchSyntheticChange(file, onFileChange)}
+            disabled={isSubmitting}
+            className="aspect-[3/4] px-4"
+          />
         )}
         <Input
           id="coloring-cover"

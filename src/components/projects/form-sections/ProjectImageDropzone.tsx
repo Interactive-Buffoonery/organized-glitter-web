@@ -1,8 +1,8 @@
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Scissors, X, Upload, RefreshCw } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Scissors, X, RefreshCw } from 'lucide-react';
+import { CoverDropzone } from '@/components/image/CoverDropzone';
 import { dispatchSyntheticChange } from './dispatchSyntheticChange';
 
 interface ProjectImageDropzoneProps {
@@ -24,24 +24,12 @@ export const ProjectImageDropzone: React.FC<ProjectImageDropzoneProps> = ({
   onImageRemove,
   onCropImage,
 }) => {
-  const [isDragging, setIsDragging] = useState(false);
+  const handleFile = (file: File) => dispatchSyntheticChange(file, onImageChange);
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDropReplace = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!isDragging) setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-    dispatchSyntheticChange(file, onImageChange);
+    if (file && !isUploading) handleFile(file);
   };
 
   return (
@@ -49,9 +37,8 @@ export const ProjectImageDropzone: React.FC<ProjectImageDropzoneProps> = ({
       {imageUrl ? (
         <div
           className="bg-muted/40 relative aspect-[4/3] w-full overflow-hidden rounded-xl shadow-lg ring-1 ring-black/5 dark:ring-white/10"
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+          onDragOver={e => e.preventDefault()}
+          onDrop={handleDropReplace}
         >
           <PrivateFileImage
             src={imageUrl}
@@ -126,30 +113,12 @@ export const ProjectImageDropzone: React.FC<ProjectImageDropzoneProps> = ({
           )}
         </div>
       ) : (
-        <label
+        <CoverDropzone
           htmlFor="project-image-input"
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className={cn(
-            'group bg-muted/20 relative flex aspect-[4/3] w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 text-center transition-all',
-            'border-border/60 hover:border-primary/60 hover:bg-muted/30',
-            'focus-within:border-primary focus-within:ring-ring/50 focus-within:ring-2',
-            isDragging && 'border-primary bg-primary/5 ring-primary/30 ring-2 ring-offset-2'
-          )}
+          onFile={handleFile}
+          disabled={isUploading}
+          className="aspect-[4/3]"
         >
-          <div className="bg-background/60 mb-1 rounded-full p-3 shadow-sm backdrop-blur-md transition-transform group-hover:-translate-y-0.5">
-            <Upload className="text-muted-foreground group-hover:text-primary size-6" />
-          </div>
-          <div className="text-foreground text-sm font-medium">
-            Drag & drop, or{' '}
-            <span className="text-primary underline-offset-4 group-hover:underline">
-              choose a file
-            </span>
-          </div>
-          <div className="text-muted-foreground text-xs">
-            JPG, PNG, GIF, WebP or HEIC · up to 10MB
-          </div>
           <input
             id="project-image-input"
             type="file"
@@ -167,7 +136,7 @@ export const ProjectImageDropzone: React.FC<ProjectImageDropzoneProps> = ({
               </div>
             </div>
           )}
-        </label>
+        </CoverDropzone>
       )}
 
       {uploadError && (

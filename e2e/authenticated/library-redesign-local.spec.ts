@@ -17,7 +17,6 @@ for (const width of [1440, 390]) {
         ).toBeVisible();
         const chips = page.getByRole('group', { name: 'Filter by status' });
         await expect(chips.getByRole('button', { name: /^All \d+/ })).toBeVisible();
-        await expect(chips.getByRole('button', { name: /Archived|Destashed/ })).toHaveCount(0);
         await expect(
           chips.getByRole('button', { name: / 0$/ }).filter({ hasNotText: 'All' })
         ).toHaveCount(0);

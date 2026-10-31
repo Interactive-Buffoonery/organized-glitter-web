@@ -21,6 +21,8 @@ const STATUS_SEGMENTS: ProjectFilterStatus[] = [
   'progress',
   'onhold',
   'completed',
+  'archived',
+  'destashed',
 ];
 
 export default function DashboardStatusSegments({

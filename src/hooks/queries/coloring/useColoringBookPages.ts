@@ -16,18 +16,11 @@ export function useColoringBookPages(bookId?: string) {
 export function useColoringBookPagePhotos(bookId?: string, userId?: string) {
   return useQuery({
     queryKey: [...queryKeys.coloring.pages.lists(), 'book-photos', bookId, userId],
-    queryFn: async () => {
-      const notes = await ColoringPageProgressNotesService.listAllForUser({
+    queryFn: () =>
+      ColoringPageProgressNotesService.listLatestImagesForBook({
         userId: userId!,
-        sourceId: bookId!,
-        hasImage: true,
-      });
-      const photos: Record<string, string> = {};
-      for (const note of notes) {
-        if (note.imageUrl && !photos[note.pageId]) photos[note.pageId] = note.imageUrl;
-      }
-      return photos;
-    },
+        bookId: bookId!,
+      }),
     enabled: Boolean(bookId && userId),
     ...queryFreshness('frequent'),
   });

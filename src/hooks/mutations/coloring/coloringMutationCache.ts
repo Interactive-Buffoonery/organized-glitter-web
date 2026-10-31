@@ -88,9 +88,14 @@ export const clearDeletedColoringBook = async (
     {
       queryKey: queryKeys.coloring.pages.all,
       predicate: query => {
-        if (query.queryKey[1] === 'list' && typeof query.queryKey[2] === 'string') {
-          const filters = JSON.parse(query.queryKey[2]) as ColoringPagesListOptions;
-          return filters.bookId === bookId;
+        const [, scope, scopeId] = query.queryKey;
+        if (scope === 'book' || scope === 'book-photos') return scopeId === bookId;
+        if (scope === 'list' && typeof scopeId === 'string') {
+          try {
+            return (JSON.parse(scopeId) as ColoringPagesListOptions).bookId === bookId;
+          } catch {
+            return false;
+          }
         }
         return (query.state.data as ColoringPageDTO | undefined)?.bookId === bookId;
       },
@@ -108,6 +113,10 @@ export const clearDeletedColoringBook = async (
         })) {
           if (key[1] === 'list' && data) {
             queryClient.setQueryData(key, { ...data, items: [], totalItems: 0, totalPages: 0 });
+          } else if (key[1] === 'book') {
+            queryClient.setQueryData(key, []);
+          } else if (key[1] === 'book-photos') {
+            queryClient.setQueryData(key, {});
           } else if (key[1] === 'detail') {
             queryClient.setQueryData(key, null);
           }

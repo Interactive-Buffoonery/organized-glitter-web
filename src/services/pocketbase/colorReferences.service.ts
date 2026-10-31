@@ -85,6 +85,7 @@ export const ColorReferencesService = {
     return reference.photos.map(filename => ({
       filename,
       thumbnail: pb.files.getURL(reference, filename, { thumb: '320x320f' }),
+      strip: pb.files.getURL(reference, filename, { thumb: '0x240' }),
       original: pb.files.getURL(reference, filename),
     }));
   },

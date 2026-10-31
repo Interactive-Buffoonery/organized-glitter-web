@@ -70,6 +70,14 @@ export function getColoringBookStatusLabel(status: ColoringBooksStatusOptions): 
   return COLORING_BOOK_STATUS_LABEL[status];
 }
 
+export const COLORING_PAGE_STATUS_FILL: Record<ColoringPagesStatusOptions, string> = {
+  not_started: 'bg-muted-foreground text-background',
+  palette_chosen: 'bg-sky-500 text-white dark:bg-sky-600',
+  in_progress: 'bg-diamond-500 text-white dark:bg-diamond-600',
+  on_hold: 'bg-amber-500 text-white dark:bg-amber-600',
+  completed: 'bg-emerald-500 text-white dark:bg-emerald-600',
+};
+
 export const COLORING_PAGE_STATUS_LABEL: Record<ColoringPagesStatusOptions, string> = {
   not_started: 'Not started',
   palette_chosen: 'Palette chosen',

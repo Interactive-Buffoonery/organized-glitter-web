@@ -360,7 +360,7 @@ these collections.
 Required owner `user` and page `page` relations both cascade on parent deletion.
 The unique `idx_color_reference_page` index enforces one record per page. Optional
 plain-text `notes` permits 100,000 characters. `photos` permits 100 JPEG, PNG, WebP,
-or GIF files, each up to 50 MB, with `320x320f` thumbnails. This new file field is
+or GIF files, each up to 50 MB, with `320x320f` and `0x240` (pinned strip) thumbnails. This new file field is
 **protected**, including originals and thumbnails; the older file-field policy
 above does not apply to it.
 

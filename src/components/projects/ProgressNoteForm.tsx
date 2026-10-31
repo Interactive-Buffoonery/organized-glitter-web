@@ -1,4 +1,11 @@
-import { useId } from 'react';
+import { useId, useRef } from 'react';
+import { Camera, CalendarDays } from 'lucide-react';
+
+import { Textarea } from '@/components/ui/textarea';
+import { DateField } from '@/components/ui/date-field';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { formatDateInUserTimezone } from '@/utils/date/timezoneUtils';
 
 import { Button } from '@/components/ui/button';
 import { ImageCropDialog } from '@/components/image/ImageCropDialog';
@@ -42,9 +49,29 @@ const ProgressNoteForm = ({
     areInputsDisabled,
   } = useProgressNoteForm({ onSubmit, onSuccess, disabled });
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const timezone = useUserTimezone();
+  const today = formatDateInUserTimezone(new Date(), timezone, 'yyyy-MM-dd');
   const captionEditorId = useId();
   const captionErrorId = `${captionEditorId}-error`;
   const isDialogSheet = variant === 'dialog-sheet';
+
+  const cropDialog = (
+    <ImageCropDialog
+      open={isCropDialogOpen}
+      file={cropFile}
+      title="Crop progress photo"
+      aspect={4 / 3}
+      outputWidth={1200}
+      outputHeight={900}
+      presets={PROGRESS_NOTE_CROP_PRESETS}
+      defaultPresetId="fit-4-3"
+      onOpenChange={setIsCropDialogOpen}
+      onCropComplete={handleCropComplete}
+      onUseOriginal={handleUseOriginalImage}
+      onAfterClose={handleCropDialogClosed}
+    />
+  );
 
   const formFields = (
     <>
@@ -67,20 +94,7 @@ const ProgressNoteForm = ({
         onCropImage={handleOpenCropDialog}
       />
 
-      <ImageCropDialog
-        open={isCropDialogOpen}
-        file={cropFile}
-        title="Crop progress photo"
-        aspect={4 / 3}
-        outputWidth={1200}
-        outputHeight={900}
-        presets={PROGRESS_NOTE_CROP_PRESETS}
-        defaultPresetId="fit-4-3"
-        onOpenChange={setIsCropDialogOpen}
-        onCropComplete={handleCropComplete}
-        onUseOriginal={handleUseOriginalImage}
-        onAfterClose={handleCropDialogClosed}
-      />
+      {cropDialog}
 
       <div className="space-y-2">
         <Label htmlFor={captionEditorId}>Caption (optional)</Label>
@@ -118,6 +132,91 @@ const ProgressNoteForm = ({
       {isCompressing ? 'Compressing Image...' : isSubmitting ? 'Adding...' : 'Add Note'}
     </Button>
   );
+
+  if (variant === 'composer') {
+    return (
+      <form onSubmit={handleSubmit} className="border-border/60 bg-card rounded-xl border p-3">
+        {cropDialog}
+        <Textarea
+          value={content}
+          onChange={event => handleContentChange(event.target.value)}
+          disabled={areInputsDisabled}
+          placeholder="Add a progress note"
+          aria-label="Add a progress note"
+          className="min-h-20 resize-y border-0 bg-transparent p-1 shadow-none"
+        />
+        {imageFile && (
+          <ImageUpload
+            imageFile={imageFile}
+            statusText={imageAnnouncement}
+            onChange={handleImageChange}
+            onClearImage={handleClearImage}
+            onCropImage={handleOpenCropDialog}
+            isCompressing={isCompressing}
+            compressionProgress={compressionProgress}
+            disabled={areInputsDisabled}
+            error={errors.image}
+          />
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={handleImageChange}
+          disabled={areInputsDisabled}
+        />
+        <div className="border-border/60 mt-3 flex flex-wrap items-center gap-2 border-t pt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-muted-foreground min-h-11 px-2"
+            disabled={areInputsDisabled}
+            onClick={() => {
+              if (!fileInputRef.current) return;
+              fileInputRef.current.value = '';
+              fileInputRef.current.click();
+            }}
+          >
+            <Camera className="size-4" />
+            Photo
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-muted-foreground min-h-11 px-2"
+                disabled={areInputsDisabled}
+              >
+                <span className="sr-only">Choose progress date: </span>
+                <CalendarDays className="size-4" />
+                {date === today ? 'Today' : date}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72">
+              <DateField
+                aria-label="Progress date"
+                value={date}
+                onChange={handleDateChange}
+                calendarLabel="progress date"
+                calendarPlacement="inline"
+                disabled={areInputsDisabled}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button type="submit" className="ml-auto min-h-11" disabled={isFormDisabled}>
+            {isCompressing ? 'Preparing photo...' : isSubmitting ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+        {[errors.date, errors.image, errors.content, errors.form].filter(Boolean).map(error => (
+          <p key={error} role="alert" className="text-destructive-text mt-2 text-sm">
+            {error}
+          </p>
+        ))}
+      </form>
+    );
+  }
 
   if (isDialogSheet) {
     return (

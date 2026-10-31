@@ -109,12 +109,10 @@ export function ColoringPageMysteryRevealSection({
   }
 
   return (
-    <Section landmark={false}>
+    <Section landmark={false} className="flex items-center justify-between gap-3">
+      <p className="text-sm font-medium">What did the mystery turn out to be?</p>
       <div>
-        <SectionHeading>What did the mystery turn out to be?</SectionHeading>
-      </div>
-      <div className="flex justify-end">
-        <Button type="button" variant="default" onClick={onStartEditing}>
+        <Button type="button" variant="link" className="min-h-11 px-0" onClick={onStartEditing}>
           Reveal
         </Button>
       </div>

@@ -195,7 +195,7 @@ try {
       );
       const ownToken = await owner.files.getToken();
       const otherToken = await other.files.getToken();
-      for (const thumb of ['', '320x320f']) {
+      for (const thumb of ['', '320x320f', '0x240']) {
         assert.equal(
           (
             await fetch(

@@ -22,7 +22,6 @@
     "scripts/static-pages.mjs",
     "scripts/bootstrap-build.mjs",
     "scripts/pwa-module-preloads.mjs",
-    "scripts/static-notice.mjs",
     "server/local-build-server.js",
     "api/send-feedback.js",
     "server/app-route-policy.js",

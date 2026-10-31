@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -14,33 +15,51 @@ export function ColorReferenceViewer({
   thumbnail,
   original,
   index,
+  label,
+  className,
 }: {
   thumbnail: string;
   original: string;
   index: number;
+  /** Names the photo instead of its number, like "Color strip". */
+  label?: string;
+  className?: string;
 }) {
   const [zoom, setZoom] = useState(1);
+  const names = label
+    ? {
+        open: `Open ${label.toLowerCase()}`,
+        thumbnail: label,
+        title: label,
+        full: `Full ${label.toLowerCase()}`,
+      }
+    : {
+        open: `Open swatch photo ${index}`,
+        thumbnail: `Swatch sheet ${index}`,
+        title: `Swatch photo ${index}`,
+        full: `Full swatch sheet ${index}`,
+      };
   return (
     <Dialog onOpenChange={() => setZoom(1)}>
       <DialogTrigger asChild>
         <Button
           type="button"
           variant="ghost"
-          className="h-24 w-full overflow-hidden rounded-md border p-0"
-          aria-label={`Open swatch photo ${index}`}
+          className={cn('h-24 w-full overflow-hidden rounded-md border p-0', className)}
+          aria-label={names.open}
         >
           <PrivateFileImage
             src={thumbnail}
             loading="lazy"
             decoding="async"
-            alt={`Swatch sheet ${index}`}
+            alt={names.thumbnail}
             className="size-full object-cover"
           />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90dvh] max-w-4xl overflow-y-auto [&>button:last-child]:size-11">
         <DialogHeader className="pr-12">
-          <DialogTitle>Swatch photo {index}</DialogTitle>
+          <DialogTitle>{names.title}</DialogTitle>
           <DialogDescription>
             Zoom in to read the sheet. Scroll or swipe to move around.
           </DialogDescription>
@@ -90,7 +109,7 @@ export function ColorReferenceViewer({
         >
           <PrivateFileImage
             src={original}
-            alt={`Full swatch sheet ${index}`}
+            alt={names.full}
             className="max-w-none object-contain"
             style={{ height: `${60 * zoom}dvh`, width: zoom === 1 ? '100%' : 'auto' }}
           />

@@ -102,6 +102,16 @@ describe('Coloring book pages', () => {
       screen.getByRole('link', { name: /page 2.*Fox.*Palette chosen/i }).querySelector('img')
     ).toHaveAttribute('src', '/revealed.jpg');
   });
+
+  it('hides the page photo of an unrevealed mystery page', () => {
+    renderPages({
+      book: { ...book, isMystery: true },
+      pages: [{ ...pages[0], photos: ['x.jpg'] }],
+    });
+    expect(
+      screen.getByRole('link', { name: /page 1.*Mystery unrevealed/i }).querySelector('img')
+    ).toBeNull();
+  });
 });
 
 describe('Coloring book sidebar', () => {

@@ -61,7 +61,6 @@ const ProgressNoteForm = ({
       open={isCropDialogOpen}
       file={cropFile}
       title="Crop progress photo"
-      description="Choose a rectangle or square crop, then drag and zoom until the progress photo looks right."
       aspect={4 / 3}
       outputWidth={1200}
       outputHeight={900}

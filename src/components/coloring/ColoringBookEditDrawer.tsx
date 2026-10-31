@@ -295,11 +295,19 @@ const ColoringBookEditDrawer = ({
         </Button>
 
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" type="reset" form={FORM_ID} disabled={submitting}>
+          <Button
+            className="min-h-11"
+            variant="ghost"
+            type="reset"
+            form={FORM_ID}
+            disabled={submitting}
+          >
             Cancel
           </Button>
           <Button
             id="coloring-drawer-save"
+            className="min-h-11"
+            variant="default"
             type="submit"
             form={FORM_ID}
             disabled={submitting || !book || draftBlocked}

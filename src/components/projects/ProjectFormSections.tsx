@@ -14,9 +14,12 @@ import { ProjectStatusSection } from '@/components/projects/form-sections/Projec
 import { ProjectTitleSection } from '@/components/projects/form-sections/ProjectTitleSection';
 import type { ProjectFormFieldErrors } from '@/schemas/project.schema';
 import type { ProjectFormValues } from '@/types/project';
+import { InlineTagManager } from '@/components/tags/InlineTagManager';
 import type { Tag } from '@/types/tag';
 import type { CreateCompanyData } from '@/hooks/mutations/useCompanyMutations';
 import type { CreateArtistData } from '@/hooks/mutations/useArtistMutations';
+
+import { Section } from './form-sections/ProjectFormSectionPrimitives';
 
 const EMPTY_FIELD_ERRORS: ProjectFormFieldErrors = {};
 
@@ -45,7 +48,6 @@ const ProjectFormSections = ({
   statusBeforeDateChange,
   onStatusBeforeDateChange,
   fieldErrors = EMPTY_FIELD_ERRORS,
-  layout = 'page',
   onDraftCompany,
   onDraftArtist,
 }: ProjectFormSectionsProps) => {
@@ -225,7 +227,6 @@ const ProjectFormSections = ({
   const colorCountProps = useNumberInput(value => handleInputChange('colorCount', value));
   const widthProps = useNumberInput(value => handleInputChange('width', value));
   const heightProps = useNumberInput(value => handleInputChange('height', value));
-  const isDrawerLayout = layout === 'drawer';
 
   const statusSection = (
     <ProjectStatusSection
@@ -241,10 +242,8 @@ const ProjectFormSections = ({
       companies={companies}
       artists={artists}
       isSubmitting={isSubmitting}
-      projectTags={projectTags}
       fieldErrors={fieldErrors}
       onFieldChange={handleInputChange}
-      onTagsChange={handleTagsChange}
       onDraftCompany={onDraftCompany}
       onDraftArtist={onDraftArtist}
     />
@@ -253,21 +252,42 @@ const ProjectFormSections = ({
   return (
     <>
       <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-        <ProjectTitleSection
-          formData={formData}
-          isSubmitting={isSubmitting}
-          fieldErrors={fieldErrors}
-          onFieldChange={handleInputChange}
-        />
+        <Section label="Basics" flush="always">
+          <ProjectTitleSection
+            formData={formData}
+            isSubmitting={isSubmitting}
+            fieldErrors={fieldErrors}
+            onFieldChange={handleInputChange}
+          />
+          {kitInfoSection}
+        </Section>
       </div>
 
-      {isDrawerLayout ? (
-        <>
-          {statusSection}
-          {kitInfoSection}
-        </>
-      ) : null}
+      <aside className="order-2 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1">
+        <ProjectCoverImageSection
+          imageUrl={imageUploadHook.preview || formData.imageUrl || ''}
+          isUploading={imageUploadHook.uploading}
+          uploadError={fieldErrors.imageFile || imageUploadHook.error}
+          selectedFileName={imageUploadHook.file?.name}
+          cropFile={cropFile}
+          isCropDialogOpen={isCropDialogOpen}
+          onImageChange={handleImageChange}
+          onImageRemove={handleImageRemove}
+          onCropImage={handleOpenCropDialog}
+          onCropDialogOpenChange={setIsCropDialogOpen}
+          onCropComplete={handleCropComplete}
+          onUseOriginalImage={handleUseOriginalImage}
+        />
 
+        {statusSection}
+        <Section label="Tags">
+          <InlineTagManager
+            initialTags={projectTags}
+            onTagsChange={handleTagsChange}
+            className={`[&_button]:min-h-11 ${isSubmitting ? 'pointer-events-none opacity-50' : ''}`}
+          />
+        </Section>
+      </aside>
       <div className="order-3 min-w-0 lg:order-none lg:col-start-1 lg:row-start-2">
         <ProjectSpecsSection
           formData={formData}
@@ -294,27 +314,6 @@ const ProjectFormSections = ({
           onFieldChange={handleInputChange}
         />
       </div>
-
-      <aside className="order-2 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1">
-        <ProjectCoverImageSection
-          imageUrl={imageUploadHook.preview || formData.imageUrl || ''}
-          isUploading={imageUploadHook.uploading}
-          uploadError={fieldErrors.imageFile || imageUploadHook.error}
-          selectedFileName={imageUploadHook.file?.name}
-          cropFile={cropFile}
-          isCropDialogOpen={isCropDialogOpen}
-          onImageChange={handleImageChange}
-          onImageRemove={handleImageRemove}
-          onCropImage={handleOpenCropDialog}
-          onCropDialogOpenChange={setIsCropDialogOpen}
-          onCropComplete={handleCropComplete}
-          onUseOriginalImage={handleUseOriginalImage}
-        />
-
-        {isDrawerLayout ? null : statusSection}
-
-        {isDrawerLayout ? null : kitInfoSection}
-      </aside>
     </>
   );
 };

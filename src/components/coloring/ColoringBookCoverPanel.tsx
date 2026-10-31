@@ -1,6 +1,8 @@
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
 import type { ChangeEvent } from 'react';
-import { BookOpen, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { CoverDropzone } from '@/components/image/CoverDropzone';
+import { dispatchSyntheticChange } from '@/components/projects/form-sections/dispatchSyntheticChange';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,7 +24,7 @@ export function ColoringBookCoverPanel({
   onRemoveImage,
 }: ColoringBookCoverPanelProps) {
   return (
-    <Section label="Cover image" flush="lg">
+    <Section label="Cover" flush="lg">
       <div className="space-y-2">
         <Label htmlFor="coloring-cover" className="sr-only">
           Cover image
@@ -39,7 +41,7 @@ export function ColoringBookCoverPanel({
                 type="button"
                 variant="glass-destructive"
                 size="icon-sm"
-                className="absolute top-2 right-2"
+                className="absolute top-2 right-2 size-11"
                 onClick={onRemoveImage}
                 disabled={isSubmitting}
                 aria-label="Remove cover image"
@@ -52,7 +54,7 @@ export function ColoringBookCoverPanel({
               aria-disabled={isSubmitting}
               className={cn(
                 buttonVariants({ variant: 'glass', size: 'sm' }),
-                'w-full cursor-pointer justify-center',
+                'min-h-11 w-full cursor-pointer justify-center',
                 isSubmitting && 'pointer-events-none opacity-60'
               )}
             >
@@ -60,19 +62,12 @@ export function ColoringBookCoverPanel({
             </Label>
           </div>
         ) : (
-          <label
+          <CoverDropzone
             htmlFor="coloring-cover"
-            aria-disabled={isSubmitting}
-            className={
-              isSubmitting
-                ? 'bg-muted/20 flex aspect-[3/4] cursor-not-allowed flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 text-center opacity-60'
-                : 'bg-muted/20 hover:border-primary/60 flex aspect-[3/4] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 text-center'
-            }
-          >
-            <BookOpen className="text-muted-foreground size-10" />
-            <span className="text-sm font-medium">Choose cover image</span>
-            <span className="text-muted-foreground text-xs">JPG, PNG, WebP, GIF or HEIC</span>
-          </label>
+            onFile={file => dispatchSyntheticChange(file, onFileChange)}
+            disabled={isSubmitting}
+            className="aspect-[3/4] px-4"
+          />
         )}
         <Input
           id="coloring-cover"

@@ -1,3 +1,4 @@
+import { FILTER_STATUS_ACTIVE_FILL } from '@/utils/statusColors';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -44,8 +45,14 @@ export const ProjectStatusSection = ({
       onValueChange={value => onFieldChange('status', value as ProjectStatus)}
       disabled={isSubmitting}
     >
-      <SelectTrigger id="status" aria-label="Status">
-        <SelectValue placeholder="Select status..." />
+      <SelectTrigger className="min-h-11" id="status" aria-label="Status">
+        <SelectValue placeholder="Select status...">
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${FILTER_STATUS_ACTIVE_FILL[formData.status || 'wishlist']}`}
+          >
+            {STATUS_OPTIONS[formData.status || 'wishlist']}
+          </span>
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {Object.entries(STATUS_OPTIONS).map(([value, label]) => (

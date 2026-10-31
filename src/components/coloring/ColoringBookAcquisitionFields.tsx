@@ -14,10 +14,11 @@ export function ColoringBookAcquisitionFields({
 }: ColoringBookFieldSectionProps) {
   return (
     <Section label="Dates">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="space-y-2">
           <Label htmlFor="coloring-date-purchased">Purchased</Label>
           <DateField
+            inputClassName="min-h-11"
             id="coloring-date-purchased"
             value={values.datePurchased ?? ''}
             onChange={value => setField('datePurchased', value)}
@@ -30,6 +31,7 @@ export function ColoringBookAcquisitionFields({
         <div className="space-y-2">
           <Label htmlFor="coloring-date-received">Received</Label>
           <DateField
+            inputClassName="min-h-11"
             id="coloring-date-received"
             value={values.dateReceived ?? ''}
             onChange={value => setField('dateReceived', value)}
@@ -47,6 +49,7 @@ export function ColoringBookAcquisitionFields({
         <div className="space-y-2">
           <Label htmlFor="coloring-date-started">Started</Label>
           <DateField
+            inputClassName="min-h-11"
             id="coloring-date-started"
             value={values.dateStarted ?? ''}
             onChange={value => setField('dateStarted', value)}
@@ -64,6 +67,7 @@ export function ColoringBookAcquisitionFields({
         <div className="space-y-2">
           <Label htmlFor="coloring-date-completed">Completed</Label>
           <DateField
+            inputClassName="min-h-11"
             id="coloring-date-completed"
             value={values.dateCompleted ?? ''}
             onChange={value => setField('dateCompleted', value)}

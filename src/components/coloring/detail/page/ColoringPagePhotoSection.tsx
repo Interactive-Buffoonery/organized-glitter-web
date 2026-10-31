@@ -78,8 +78,7 @@ export function ColoringPagePhotoSection({
       <ImageCropDialog
         open={isPhotoCropDialogOpen}
         file={photoCropFile}
-        title="Frame coloring page photo"
-        description="Fit the whole page by default, or choose a crop for detail photos."
+        title="Crop your photo"
         aspect={3 / 4}
         outputWidth={900}
         outputHeight={1200}

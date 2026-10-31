@@ -1,6 +1,6 @@
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { FieldError, Section } from './ColoringBookFormPrimitives';
+import { FieldError } from './ColoringBookFormPrimitives';
 import {
   getColoringBookErrorId,
   type ColoringBookFieldSectionProps,
@@ -13,9 +13,9 @@ export function ColoringBookNotesFields({
   setField,
 }: ColoringBookFieldSectionProps) {
   return (
-    <Section label="Notes">
+    <div className="space-y-2">
       <div className="space-y-2">
-        <Label htmlFor="coloring-notes" className="sr-only">
+        <Label htmlFor="coloring-notes" className="text-sm font-medium">
           Notes
         </Label>
         <Textarea
@@ -30,6 +30,6 @@ export function ColoringBookNotesFields({
         />
         <FieldError field="notes" fieldErrors={fieldErrors} />
       </div>
-    </Section>
+    </div>
   );
 }

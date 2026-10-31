@@ -32,12 +32,13 @@ export const ProjectSpecsSection = ({
   heightProps,
   onFieldChange,
 }: ProjectSpecsSectionProps) => (
-  <Section label="Specs">
-    <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-      <div className="space-y-2">
+  <Section label="Details">
+    <div className="grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
+      <div className="col-span-2 space-y-2">
         <Label className="text-foreground text-sm font-medium">Type of kit</Label>
         <SegmentedControl
           variant="glass"
+          buttonClassName="min-h-11"
           value={formData.kitCategory || 'full'}
           onValueChange={value => onFieldChange('kitCategory', value)}
           options={[
@@ -49,10 +50,11 @@ export const ProjectSpecsSection = ({
         <FieldError field="kitCategory" message={fieldErrors.kitCategory} />
       </div>
 
-      <div className="space-y-2">
+      <div className="col-span-2 space-y-2">
         <Label className="text-foreground text-sm font-medium">Drill shape</Label>
         <SegmentedControl
           variant="glass"
+          buttonClassName="min-h-11"
           value={(formData.drillShape as 'round' | 'square' | undefined) || 'round'}
           onValueChange={value => onFieldChange('drillShape', value)}
           options={[
@@ -69,12 +71,13 @@ export const ProjectSpecsSection = ({
           Total diamonds
         </Label>
         <Input
+          className="min-h-11"
           id="totalDiamonds"
           type="number"
           min="0"
           value={formData.totalDiamonds || ''}
           {...totalDiamondsProps}
-          placeholder="Enter total diamonds"
+          placeholder="e.g. 12000"
           disabled={isSubmitting}
           aria-invalid={fieldErrors.totalDiamonds ? 'true' : 'false'}
           aria-describedby={fieldErrors.totalDiamonds ? getErrorId('totalDiamonds') : undefined}
@@ -87,6 +90,7 @@ export const ProjectSpecsSection = ({
           # of colors
         </Label>
         <Input
+          className="min-h-11"
           id="colorCount"
           type="number"
           min="1"
@@ -106,6 +110,7 @@ export const ProjectSpecsSection = ({
           Width (cm)
         </Label>
         <Input
+          className="min-h-11"
           id="width"
           type="number"
           min="0"
@@ -125,6 +130,7 @@ export const ProjectSpecsSection = ({
           Height (cm)
         </Label>
         <Input
+          className="min-h-11"
           id="height"
           type="number"
           min="0"

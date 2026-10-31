@@ -132,7 +132,7 @@ test.describe('Full project edit field clearing', () => {
     expect(projectId).toBeTruthy();
     await page.goto(`/projects/${projectId}/edit`);
 
-    await expect(page.getByLabel('Project title')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel('Title *')).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole('combobox', { name: 'Company' }).click();
     await page.getByRole('option', { name: 'No company' }).click();
@@ -149,7 +149,7 @@ test.describe('Full project edit field clearing', () => {
 
     await page.getByLabel('Source URL').fill('');
     await page.getByLabel('Project notes').fill('');
-    await page.getByRole('button', { name: 'Update project' }).click();
+    await page.getByRole('button', { name: 'Save changes' }).click();
 
     await expect
       .poll(

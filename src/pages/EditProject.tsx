@@ -149,7 +149,7 @@ const EditProjectSession = () => {
               {formData?.title?.trim() || project.title || 'Untitled project'}
             </h1>
             <p className="text-muted-foreground mt-1.5 text-sm">
-              Make changes below. Nothing saves until you hit Update.
+              Make changes below. Nothing saves until you hit Save changes.
             </p>
           </div>
 
@@ -219,7 +219,7 @@ const EditProjectSession = () => {
           disabled={!formData || draft.pending || photoChoicePending}
           onCancel={handleDiscardAndLeave}
           onSubmit={handleManualSave}
-          submitLabel="Update project"
+          submitLabel="Save changes"
           submittingLabel="Saving..."
         />
 

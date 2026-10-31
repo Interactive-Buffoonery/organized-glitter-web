@@ -86,7 +86,7 @@ test.describe('coloring book UI creation', () => {
     });
 
     await page.getByRole('textbox', { name: 'Title *', exact: true }).fill(title);
-    await page.getByRole('spinbutton', { name: 'Number of pages' }).fill('2');
+    await page.getByRole('spinbutton', { name: 'Pages *' }).fill('2');
     await expect.poll(() => hasColoringBookDraft(page, title)).toBe(true);
     await page.getByRole('button', { name: 'Add book', exact: true }).click();
 

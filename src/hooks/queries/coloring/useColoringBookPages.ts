@@ -6,7 +6,7 @@ import { ColoringPageProgressNotesService } from '@/services/pocketbase/coloring
 
 export function useColoringBookPages(bookId?: string) {
   return useQuery({
-    queryKey: [...queryKeys.coloring.pages.lists(), 'book', bookId],
+    queryKey: queryKeys.coloring.pages.book(bookId ?? ''),
     queryFn: () => ColoringService.listAllPages({ bookId: bookId! }),
     enabled: Boolean(bookId),
     ...queryFreshness('frequent'),
@@ -15,7 +15,7 @@ export function useColoringBookPages(bookId?: string) {
 
 export function useColoringBookPagePhotos(bookId?: string, userId?: string) {
   return useQuery({
-    queryKey: [...queryKeys.coloring.pages.lists(), 'book-photos', bookId, userId],
+    queryKey: queryKeys.coloring.pages.bookPhotos(bookId ?? '', userId ?? ''),
     queryFn: () =>
       ColoringPageProgressNotesService.listLatestImagesForBook({
         userId: userId!,

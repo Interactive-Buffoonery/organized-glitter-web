@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { ContactSheetCell } from '@/components/coloring/ContactSheetCell';
 import { ColoringDetailRefreshNotice } from '@/components/coloring/detail/ColoringDetailRefreshNotice';
@@ -16,11 +17,8 @@ interface ColoringBookPagesSectionProps {
   isFetching: boolean;
   isRetrying: boolean;
   onRetry: () => void;
-  page: number;
-  perPage: number;
-  totalItems: number;
+  latestPhotos?: Record<string, string>;
   returnTo: string;
-  onPageChange: (page: number) => void;
 }
 
 export const ColoringBookPagesSection = ({
@@ -32,33 +30,31 @@ export const ColoringBookPagesSection = ({
   isFetching,
   isRetrying,
   onRetry,
-  page,
-  perPage,
-  totalItems,
+  latestPhotos = {},
   returnTo,
-  onPageChange,
 }: ColoringBookPagesSectionProps) => {
   const failure = error ? ErrorHandler.handleError(error) : null;
   const accessFailed = ErrorHandler.isAccessFailure(failure?.type);
   const showPages = !accessFailed && (!error || hasLoadedData);
-  const hasPagination = totalItems > perPage;
-  const showPagination = hasPagination && showPages;
-  const canReturnToPrevious = !accessFailed && !hasLoadedData && failure?.retryable && page > 1;
-  const lastPage = Math.max(1, Math.ceil(totalItems / perPage));
-  const rangeStart = (page - 1) * perPage + 1;
-  const rangeEnd = Math.min(page * perPage, totalItems);
-  const pageCountLabel = hasPagination
-    ? `${rangeStart}-${rangeEnd} of ${totalItems} ${countUnit(totalItems, 'page')}`
-    : `${pages.length} ${countUnit(pages.length, 'page')}`;
+  const [filter, setFilter] = useState('All');
+  const [expanded, setExpanded] = useState(false);
+  const filters = ['All', 'In progress', 'Done', 'Not started'];
+  const matches = (page: ColoringPageDTO, selected: string) =>
+    selected === 'All' ||
+    (selected === 'Done'
+      ? page.status === 'completed'
+      : selected === 'Not started'
+        ? page.status === 'not_started'
+        : page.status !== 'completed' && page.status !== 'not_started');
+  const filtered = pages.filter(page => matches(page, filter));
+  const displayed = filter === 'All' && !expanded ? filtered.slice(0, 18) : filtered;
+  const pageCountLabel = `${pages.length} ${countUnit(pages.length, 'page')}`;
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div>
           <SectionHeading>Pages</SectionHeading>
-          <p className="text-muted-foreground mt-2 text-sm">
-            Track status, photos, notes, and reveals.
-          </p>
         </div>
         {showPages && (
           <p
@@ -91,34 +87,26 @@ export const ColoringBookPagesSection = ({
         />
       )}
 
-      {showPagination || canReturnToPrevious ? (
-        <nav className="flex items-center justify-between gap-3" aria-label="Coloring book pages">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="min-h-11"
-            onClick={() => onPageChange(page - 1)}
-            disabled={isLoading || page <= 1}
-            aria-label={`Previous ${perPage} pages`}
-          >
-            Previous
-          </Button>
-          {showPagination && (
+      {showPages && !isLoading && (
+        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Filter pages">
+          {filters.map(label => (
             <Button
+              key={label}
               type="button"
-              variant="outline"
-              size="sm"
-              className="min-h-11"
-              onClick={() => onPageChange(page + 1)}
-              disabled={isLoading || page >= lastPage}
-              aria-label={`Next ${perPage} pages`}
+              variant="ghost"
+              aria-pressed={filter === label}
+              onClick={() => setFilter(label)}
+              className={
+                filter === label
+                  ? 'bg-foreground text-background hover:bg-foreground hover:text-background min-h-11 shrink-0 rounded-full border px-3 text-xs'
+                  : 'border-border text-muted-foreground min-h-11 shrink-0 rounded-full border px-3 text-xs'
+              }
             >
-              Next
+              {label} {pages.filter(page => matches(page, label)).length}
             </Button>
-          )}
-        </nav>
-      ) : null}
+          ))}
+        </div>
+      )}
 
       {!showPages ? null : isLoading ? (
         <div className="flex justify-center py-12" role="status">
@@ -126,17 +114,31 @@ export const ColoringBookPagesSection = ({
           <span className="sr-only">Loading pages</span>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 xl:grid-cols-10">
-          {pages.map(page => (
+        <div className="grid grid-cols-4 gap-2 lg:grid-cols-6 lg:gap-2.5">
+          {displayed.map(page => (
             <ContactSheetCell
               key={page.id}
               bookId={book.id}
               page={page}
+              latestPhoto={latestPhotos[page.id]}
               returnTo={returnTo}
               isMysteryBook={book.isMystery}
             />
           ))}
         </div>
+      )}
+      {showPages && !isLoading && filter === 'All' && !expanded && pages.length > 18 && (
+        <Button
+          type="button"
+          variant="link"
+          className="text-foreground decoration-primary/50 min-h-11 px-0 underline decoration-2 underline-offset-4"
+          onClick={() => setExpanded(true)}
+        >
+          Show all {pages.length} pages
+        </Button>
+      )}
+      {showPages && !isLoading && filtered.length === 0 && (
+        <p className="text-muted-foreground text-sm">No pages here yet.</p>
       )}
     </section>
   );

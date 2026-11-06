@@ -17,7 +17,7 @@ createRoot(document.getElementById('root')!).render(
     <DialogTrigger asChild>
       <button type="button">Edit test page</button>
     </DialogTrigger>
-    <DialogContent layout={layout} motion={params.get('motion') === 'fade' ? 'fade' : 'default'}>
+    <DialogContent layout={layout}>
       <DialogTitle>Edit test page</DialogTitle>
       <DialogDescription>Shared dialog motion and keyboard verification.</DialogDescription>
       <label>

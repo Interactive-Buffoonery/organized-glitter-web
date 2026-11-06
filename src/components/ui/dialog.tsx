@@ -30,10 +30,8 @@ function DialogOverlay({
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 type DialogContentLayout = 'centered' | 'keyboard-safe' | 'keyboard-safe-sheet';
-type DialogMotion = 'default' | 'fade';
 
 interface DialogContentProps extends React.ComponentPropsWithRef<typeof DialogPrimitive.Content> {
-  motion?: DialogMotion;
   layout?: DialogContentLayout;
   /**
    * When true (default), injects the standard glass icon close button.
@@ -67,7 +65,6 @@ const getLayoutClasses = (layout: DialogContentLayout) => {
 function DialogContent({
   className,
   children,
-  motion: _motion = 'default',
   layout = 'centered',
   showCloseButton = true,
   ref,

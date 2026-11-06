@@ -49,6 +49,9 @@ for (const width of [1071, 390]) {
           expect(await scroller.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
           if (width === 390) {
             await page.setViewportSize({ width, height: 500 });
+            if (layout === 'keyboard-safe-sheet') {
+              await expect.poll(async () => (await dialog.boundingBox())?.height).toBe(500);
+            }
             await expect(page.getByRole('textbox', { name: 'Title' })).toBeVisible();
             await expect(
               dialog.getByRole('button', { name: 'Close', exact: true })

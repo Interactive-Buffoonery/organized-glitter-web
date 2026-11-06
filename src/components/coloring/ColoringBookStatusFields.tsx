@@ -16,7 +16,8 @@ export function ColoringBookStatusFields({
   values,
   isSubmitting,
   setField,
-}: ColoringBookFieldSectionProps) {
+  completionDateHint,
+}: ColoringBookFieldSectionProps & { completionDateHint?: boolean }) {
   return (
     <Section label="Status">
       <div className="space-y-4">
@@ -37,6 +38,12 @@ export function ColoringBookStatusFields({
           </SelectContent>
         </Select>
 
+        {completionDateHint && (
+          <p className="text-muted-foreground text-sm">
+            Set to Completed because you added a completion date. Clear the date to choose another
+            status.
+          </p>
+        )}
         <div className="flex h-10 items-center gap-3">
           <Checkbox
             id="coloring-is-mystery"

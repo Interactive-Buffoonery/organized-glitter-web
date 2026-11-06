@@ -4,7 +4,11 @@ import { notifyError } from '@/lib/notifications';
 import { usePrivateFileUrl } from '@/hooks/usePrivateFileUrl';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useNumberInput } from '@/hooks/useNumberInput';
-import { useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
+import {
+  useCompletionStatusConfirmation,
+  needsCompletionStatusConfirmation,
+} from '@/hooks/useCompletionStatusConfirmation';
+import { hasNewCompletionDate, useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
 import { ProjectCoverImageSection } from '@/components/projects/form-sections/ProjectCoverImageSection';
 import { ProjectDatesSection } from '@/components/projects/form-sections/ProjectDatesSection';
 import { ProjectKitInfoSection } from '@/components/projects/form-sections/ProjectKitInfoSection';
@@ -27,6 +31,7 @@ interface ProjectFormSectionsProps {
   isSubmitting: boolean;
   onChange: (data: ProjectFormValues) => void;
   savedDateCompleted?: string | null;
+  savedStatus?: ProjectFormValues['status'];
   statusBeforeDateChange?: ProjectFormValues['status'] | null;
   onStatusBeforeDateChange?: (status: ProjectFormValues['status'] | null) => void;
   fieldErrors?: ProjectFormFieldErrors;
@@ -42,6 +47,7 @@ const ProjectFormSections = ({
   isSubmitting,
   onChange,
   savedDateCompleted,
+  savedStatus,
   statusBeforeDateChange,
   onStatusBeforeDateChange,
   fieldErrors = EMPTY_FIELD_ERRORS,
@@ -49,6 +55,7 @@ const ProjectFormSections = ({
   onDraftCompany,
   onDraftArtist,
 }: ProjectFormSectionsProps) => {
+  const { confirm, dialog } = useCompletionStatusConfirmation();
   const imageUploadHook = useImageUpload('project-images', 'project-image');
   const { preview, applyProcessedImage } = imageUploadHook;
   const cropSourceUrl = usePrivateFileUrl(preview || formData.imageUrl);
@@ -87,21 +94,28 @@ const ProjectFormSections = ({
   }, [formData.tags]);
 
   const handleInputChange = useCallback(
-    (field: keyof ProjectFormValues, value: ProjectFormValues[keyof ProjectFormValues]) => {
+    async (field: keyof ProjectFormValues, value: ProjectFormValues[keyof ProjectFormValues]) => {
       if (field === 'status') {
+        const next = statusForStatusChange(
+          value as ProjectFormValues['status'],
+          formData.dateCompleted,
+          savedDateCompleted
+        );
+        if (
+          savedStatus === 'completed' &&
+          needsCompletionStatusConfirmation(formData.status, next, formData.dateCompleted) &&
+          !(await confirm())
+        )
+          return;
         onChange({
-          ...formData,
-          status: statusForStatusChange(
-            value as ProjectFormValues['status'],
-            formData.dateCompleted,
-            savedDateCompleted
-          ),
+          ...formDataRef.current,
+          status: next,
         });
         return;
       }
       onChange({ ...formData, [field]: value });
     },
-    [formData, onChange, savedDateCompleted, statusForStatusChange]
+    [formData, onChange, savedDateCompleted, statusForStatusChange, confirm, savedStatus]
   );
 
   const handleImageChange = useCallback(
@@ -232,6 +246,10 @@ const ProjectFormSections = ({
       formData={formData}
       isSubmitting={isSubmitting}
       fieldErrors={fieldErrors}
+      completionDateHint={Boolean(
+        hasNewCompletionDate(formData.dateCompleted, savedDateCompleted) &&
+        formData.status === 'completed'
+      )}
       onFieldChange={handleInputChange}
     />
   );
@@ -252,6 +270,7 @@ const ProjectFormSections = ({
 
   return (
     <>
+      {dialog}
       <div className="min-w-0 lg:col-start-1 lg:row-start-1">
         <ProjectTitleSection
           formData={formData}

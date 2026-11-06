@@ -247,6 +247,63 @@ describe('ProjectFormSections project image cropping', () => {
     );
   });
 
+  describe('leaving a saved Completed status', () => {
+    const renderSavedCompleted = (dateCompleted: string) =>
+      render(
+        <ProjectFormSections
+          formData={{ ...baseFormData, status: 'completed', dateCompleted }}
+          companies={[]}
+          artists={[]}
+          isSubmitting={false}
+          onChange={onChangeMock}
+          savedDateCompleted="2026-09-20"
+          savedStatus="completed"
+        />
+      );
+    const pickOnHold = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(screen.getByRole('combobox', { name: 'Status' }));
+      await user.click(screen.getByRole('option', { name: 'On Hold' }));
+    };
+
+    it('asks first, and changes nothing when kept', async () => {
+      const user = userEvent.setup();
+      renderSavedCompleted('2026-09-20');
+      await pickOnHold(user);
+      expect(await screen.findByRole('alertdialog')).toHaveTextContent('still counts as finished');
+      await user.click(screen.getByRole('button', { name: 'Keep Completed' }));
+      expect(onChangeMock).not.toHaveBeenCalled();
+    });
+
+    it('returns focus to Status after Escape', async () => {
+      const user = userEvent.setup();
+      renderSavedCompleted('2026-09-20');
+      await pickOnHold(user);
+      await screen.findByRole('alertdialog');
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.getByRole('combobox', { name: 'Status' })).toHaveFocus());
+    });
+
+    it('applies the status and keeps the date when confirmed', async () => {
+      const user = userEvent.setup();
+      renderSavedCompleted('2026-09-20');
+      await pickOnHold(user);
+      await user.click(await screen.findByRole('button', { name: 'Change status' }));
+      expect(onChangeMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'onhold', dateCompleted: '2026-09-20' })
+      );
+    });
+
+    it('does not prompt once the date has been cleared in the form', async () => {
+      const user = userEvent.setup();
+      renderSavedCompleted('');
+      await pickOnHold(user);
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(onChangeMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'onhold', dateCompleted: '' })
+      );
+    });
+  });
+
   it('sends real full-form clear controls through the update mapper and adapter', async () => {
     let submittedFormData: FormData | undefined;
 

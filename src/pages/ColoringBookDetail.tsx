@@ -1,6 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import {
+  useCompletionStatusConfirmation,
+  needsCompletionStatusConfirmation,
+} from '@/hooks/useCompletionStatusConfirmation';
 import MainLayout from '@/components/layout/MainLayout';
 import ColoringBookEditDrawer from '@/components/coloring/ColoringBookEditDrawer';
 import { ColoringBookDetailActions } from '@/components/coloring/detail/ColoringBookDetailActions';
@@ -71,6 +75,7 @@ const ColoringBookDetail = () => {
   const tagsQuery = useColoringBookTags(id);
   const publishersQuery = useBookPublishers(user?.id);
   const illustratorsQuery = useBookIllustrators(user?.id);
+  const { confirm, dialog } = useCompletionStatusConfirmation({ countsAsFinished: false });
   const updateBook = useUpdateColoringBook();
   const deleteBook = useDeleteColoringBook();
   const syncBookTags = useSyncColoringBookTags();
@@ -127,6 +132,11 @@ const ColoringBookDetail = () => {
 
   const handleStatusChange = async (status: ColoringBookStatus) => {
     if (!book || status === book.status) return;
+    if (
+      needsCompletionStatusConfirmation(book.status, status, book.dateCompleted) &&
+      !(await confirm())
+    )
+      return;
     try {
       await updateBook.mutateAsync({ bookId: book.id, patch: { status } });
     } catch (error) {
@@ -255,6 +265,7 @@ const ColoringBookDetail = () => {
 
   return (
     <MainLayout>
+      {dialog}
       <ColoringDetailRetryAnnouncements
         primary={bookRetry.announcement}
         secondary={pagesRetry.announcement}

@@ -30,6 +30,10 @@
  * @version 1.0.0 - Simplified navigation integration
  */
 
+import {
+  useCompletionStatusConfirmation,
+  needsCompletionStatusConfirmation,
+} from '@/hooks/useCompletionStatusConfirmation';
 import { sessionDraftKeys } from '@/services/auth/sessionDraftKeys';
 import { useState } from 'react';
 import { usePostHog } from '@posthog/react';
@@ -118,6 +122,7 @@ const ProjectDetail = () => {
     isAuthenticated,
     initialCheckComplete
   );
+  const { confirm, dialog } = useCompletionStatusConfirmation();
   const updateStatusMutation = useUpdateProjectStatus();
   const updateNotesMutation = useUpdateProjectNotesSectionMutation();
   const archiveProjectMutation = useArchiveProjectMutation();
@@ -131,6 +136,11 @@ const ProjectDetail = () => {
 
   const handleUpdateStatus = async (newStatus: ProjectStatus): Promise<boolean> => {
     if (!projectId || !project) return false;
+    if (
+      needsCompletionStatusConfirmation(project.status, newStatus, project.dateCompleted) &&
+      !(await confirm())
+    )
+      return false;
 
     try {
       await updateStatusMutation.mutateAsync({
@@ -256,6 +266,7 @@ const ProjectDetail = () => {
 
   return (
     <MainLayout>
+      {dialog}
       <div className="text-foreground">
         <ProjectContentErrorBoundary projectId={projectId}>
           <ProjectDetailView

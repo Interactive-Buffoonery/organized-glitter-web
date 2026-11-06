@@ -44,7 +44,9 @@ export function useCompletionStatusConfirmation({ countsAsFinished = true } = {}
     const openSelect = document.querySelector<HTMLElement>(
       '[role="combobox"][aria-expanded="true"]'
     );
-    returnFocusTo.current = openSelect;
+    returnFocusTo.current =
+      openSelect ??
+      document.querySelector<HTMLElement>('[aria-haspopup="dialog"][aria-expanded="true"]');
     const listboxId = openSelect?.getAttribute('aria-controls');
     // Select and AlertDialog resolve different Radix layer versions. Opening while the Select is
     // still mounted makes the dialog restore the Select's pointer-events lock when it closes.

@@ -197,10 +197,11 @@ const ProjectDetailView = ({
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const progressRegionRef = useRef<HTMLDivElement>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement>(null);
   const canLogProgress = ['progress', 'onhold', 'completed'].includes(project.status);
   const focusProgressComposer = () => {
     const region = progressRegionRef.current;
-    const field = region?.querySelector('textarea');
+    const field = composerInputRef.current;
     field?.focus({ preventScroll: true });
     (field ?? region)?.scrollIntoView({ block: 'center', behavior: 'instant' });
   };
@@ -312,7 +313,11 @@ const ProjectDetailView = ({
             <ProjectKitAbout project={project} />
             {note}
             <div ref={progressRegionRef}>
-              <ProjectProgressNotes project={project} key={project.id} />
+              <ProjectProgressNotes
+                project={project}
+                key={project.id}
+                composerInputRef={composerInputRef}
+              />
             </div>
           </div>
         </div>
@@ -327,7 +332,11 @@ const ProjectDetailView = ({
                 <ProjectHeroImage project={project} />
               </div>
               <div ref={progressRegionRef}>
-                <ProjectProgressNotes project={project} key={project.id} />
+                <ProjectProgressNotes
+                  project={project}
+                  key={project.id}
+                  composerInputRef={composerInputRef}
+                />
               </div>
             </div>
             <aside className="sticky top-[80px] space-y-6 self-start">

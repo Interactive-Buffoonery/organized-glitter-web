@@ -22,11 +22,15 @@ const logger = createLogger('ProjectProgressNotes');
 
 interface ProjectProgressNotesProps {
   project: ProjectType;
+  composerInputRef?: React.Ref<HTMLTextAreaElement>;
 }
 
 const PROGRESS_NOTE_SKELETON_KEYS = ['first', 'second', 'third'];
 
-const ProjectProgressNotes: React.FC<ProjectProgressNotesProps> = ({ project }) => {
+const ProjectProgressNotes: React.FC<ProjectProgressNotesProps> = ({
+  project,
+  composerInputRef,
+}) => {
   const { data: progressNotes = [], isLoading, error } = useProgressNotesQuery(project?.id || null);
   const addProgressNoteMutation = useAddProgressNoteMutation();
   const updateProgressNoteMutation = useUpdateProgressNoteMutation();
@@ -138,6 +142,7 @@ const ProjectProgressNotes: React.FC<ProjectProgressNotesProps> = ({ project }) 
               onSubmit={handleAddNote}
               disabled={addProgressNoteMutation.isPending}
               variant="composer"
+              composerInputRef={composerInputRef}
             />
           ) : (
             <Button

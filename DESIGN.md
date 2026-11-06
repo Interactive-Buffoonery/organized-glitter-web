@@ -153,7 +153,7 @@ The product app is berry-led but not berry-drenched. Berry Cream Light uses a be
 
 ### Current Product Surfaces
 
-- **Library:** The app-level collection surface at `/dashboard`. `DashboardShell` owns the Caveat H1, the craft segmented control, and the single New project action. Diamond, coloring book, and coloring page panes share the same sidebar/content structure: filters in one glass sidebar on desktop, flat result lists or grids on the content surface, and mobile filters in a drawer.
+- **Library:** The app-level collection surface at `/dashboard`. `DashboardShell` owns the Caveat H1, the craft segmented control, and the craft-specific New kit or New book action on desktop. Diamond, coloring book, and coloring page panes share the same sidebar/content structure: filters in one glass sidebar on desktop, flat result lists or grids on the content surface, and mobile filters in a drawer.
   - The user-facing name is Library. The `/dashboard` route and Dashboard-prefixed code, saved keys, and analytics events retain their existing names for compatibility.
 - **Randomizer:** A focused decision surface, not a dashboard. One main `<GlassPanel>` contains craft choice, eligibility filters, wheel, and result. Desktop target selection and spin history sit as flat adjacent regions with hairline dividers; mobile folds target selection into the main panel below the wheel. The wheel is a deliberate full-palette data-visualization exception, with pattern overlays and a key so color is never the only signal.
 - **Coloring books:** A library branch inside the same project tracker, not a separate app. Book detail pages use a cover-led flat header, quiet ghost chrome, `SectionHeading` region markers, a dense page grid, and inline notes/tags. Mystery status is a small primary chip, never a hidden-card gimmick.
@@ -435,9 +435,12 @@ The template for pages with a primary action at the bottom (forms, multi-step fl
 - **Don't** introduce public profiles, leaderboards, or "trending in your network" surfaces. Per-user data isolation is a felt feature, not just a backend property.
 - **Don't** rely on a single hue to communicate status. If a screenshot in greyscale is ambiguous, the design has failed.
 
-Coloring page Color Codes & Swatches uses the existing control panel below
-Mediums, with the usual section heading and divider. Thumbnails and plain-text
-notes remain flat within that region. No additional panel or navigation is added.
+Coloring page detail uses a flat photo and journal beside a sticky 320px sidebar
+with a 56px gap on desktop. Mobile leads with the photo before its Caveat H1,
+byline and controls. The three-box strip summarizes medium, colors and photos;
+the date line shows set dates and the next missing date. Colors uses a two-column
+key with Copy and Edit colors. The approved journal uses Caveat dates on a dashed
+thread as a scoped exception to the single handwritten moment rule.
 
 ## Destructive colors in Dark mode
 

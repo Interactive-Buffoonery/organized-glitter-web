@@ -139,15 +139,6 @@ const DiamondDashboardPane: React.FC = () => {
 
   return (
     <>
-      <DashboardHeader
-        isFetchingProjects={dashboardData.isFetchingProjects}
-        totalItems={dashboardData.totalItems}
-        totalItemsIsEstimate={dashboardData.totalItemsIsEstimate}
-        isLoadingProjects={dashboardData.isLoadingProjects}
-        showPageTitle={false}
-        showCreateButton={false}
-      />
-
       <div
         className={`grid grid-cols-1 gap-8 ${
           !isMobile ? 'lg:[grid-template-columns:260px_minmax(0,1fr)]' : ''
@@ -158,7 +149,15 @@ const DiamondDashboardPane: React.FC = () => {
             <DashboardFilters />
           </div>
         )}
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-4">
+          <DashboardHeader
+            isFetchingProjects={dashboardData.isFetchingProjects}
+            totalItems={dashboardData.totalItems}
+            totalItemsIsEstimate={dashboardData.totalItemsIsEstimate}
+            isLoadingProjects={dashboardData.isLoadingProjects}
+            showPageTitle={false}
+            showCreateButton={false}
+          />
           <ProjectsSection dashboardData={dashboardData} isCorrectingPage={isCorrectingPage} />
         </div>
       </div>

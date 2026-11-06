@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProjectsSection from '../ProjectsSection';
 import { getDefaultFilters } from '@/contexts/FilterContext/types';
 
@@ -43,6 +43,10 @@ const data = {
 };
 
 describe('Library load failure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('keeps status and clear-filter actions available when a filtered query fails', async () => {
     render(<ProjectsSection dashboardData={data} />);
     const user = userEvent.setup();

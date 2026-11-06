@@ -168,4 +168,29 @@ describe('ColoringPageProgressNotesService', () => {
     expect(pbMock.collectionMethods.delete).toHaveBeenCalledWith('note-2');
     expect(pbMock.collectionMethods.delete).toHaveBeenCalledWith('note-3');
   });
+
+  it('maps each book page to its newest note image with a lean query', async () => {
+    pbMock.collectionMethods.getFullList.mockResolvedValue([
+      { id: 'note-new', page: 'page-1', image: 'new.jpg' },
+      { id: 'note-old', page: 'page-1', image: 'old.jpg' },
+      { id: 'note-2', page: 'page-2', image: 'two.jpg' },
+    ]);
+
+    await expect(
+      ColoringPageProgressNotesService.listLatestImagesForBook({
+        userId: 'user-1',
+        bookId: 'book-1',
+      })
+    ).resolves.toEqual({
+      'page-1': 'https://files.test/note-new/new.jpg',
+      'page-2': 'https://files.test/note-2/two.jpg',
+    });
+
+    const [options] = pbMock.collectionMethods.getFullList.mock.calls[0];
+    expect(options).toEqual({
+      filter: "user = user-1 && page.book = book-1 && image != ''",
+      sort: '-date,-created,-id',
+      fields: 'id,page,image',
+    });
+  });
 });

@@ -5,14 +5,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Section } from '@/components/shared/Section';
 import { cn } from '@/lib/utils';
 import {
   ColoringPagesStatusOptions,
   type ColoringPagesStatusOptions as ColoringPageStatus,
 } from '@/types/pocketbase.types';
-import { getColoringPageStatusLabel } from '@/utils/statusColors';
-import { getColoringPageStatusPresentation } from '@/components/coloring/coloringPagePresentation';
+import { COLORING_PAGE_STATUS_FILL, getColoringPageStatusLabel } from '@/utils/statusColors';
 
 const STATUS_OPTIONS: ColoringPageStatus[] = [
   ColoringPagesStatusOptions.not_started,
@@ -33,10 +31,8 @@ export function ColoringPageStatusSection({
   disabled = false,
   onStatusChange,
 }: ColoringPageStatusSectionProps) {
-  const presentation = getColoringPageStatusPresentation(status);
-
   return (
-    <Section landmark={false}>
+    <div>
       <Select
         value={status}
         onValueChange={value => onStatusChange(value as ColoringPageStatus)}
@@ -45,8 +41,8 @@ export function ColoringPageStatusSection({
         <SelectTrigger
           aria-label="Change page status"
           className={cn(
-            'bg-background/70 size-auto min-w-36 rounded-full border-0 px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-offset-0',
-            presentation.textClassName
+            'h-11 min-h-11 w-auto min-w-36 rounded-full border-0 px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-offset-0',
+            COLORING_PAGE_STATUS_FILL[status]
           )}
         >
           <SelectValue />
@@ -59,6 +55,6 @@ export function ColoringPageStatusSection({
           ))}
         </SelectContent>
       </Select>
-    </Section>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { logger, createLogger } from '@/utils/logger';
+import { createLogger } from '@/utils/logger';
 import { ProgressNote } from '@/types/project';
 import { formatLocalDate, parseTimestamp } from '@/utils/date/timezoneUtils';
 import ImageGallery from './ImageGallery';
@@ -33,6 +33,7 @@ interface ProgressNoteItemProps {
   onDeleteNote?: (noteId: string) => Promise<void>;
   onDeleteImage?: (noteId: string) => Promise<void>;
   disabled?: boolean;
+  journal?: boolean;
 }
 
 const ProgressNoteItem = React.memo(
@@ -42,6 +43,7 @@ const ProgressNoteItem = React.memo(
     onDeleteNote,
     onDeleteImage,
     disabled = false,
+    journal = false,
   }: ProgressNoteItemProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editableContent, setEditableContent] = useState(note.content);
@@ -51,7 +53,7 @@ const ProgressNoteItem = React.memo(
     const formattedDate = React.useMemo(() => {
       if (!note.date) return '';
 
-      displayLogger.debug('🗓️ Progress note date display formatting', {
+      displayLogger.debug('Progress note date display formatting', {
         noteId: note.id,
         originalDate: note.date,
         dateType: typeof note.date,
@@ -102,7 +104,7 @@ const ProgressNoteItem = React.memo(
         await onUpdateNote(note.id, editableContent);
         setIsEditing(false);
       } catch (error) {
-        logger.error('Failed to update note:', error);
+        displayLogger.error('Failed to update note:', error);
       } finally {
         setIsSaving(false);
       }
@@ -150,36 +152,52 @@ const ProgressNoteItem = React.memo(
       <MarkdownContent content={note.content} />
     );
 
-    const dateGutter = dateParts && (
-      <>
-        {/* Mobile: handwritten "Month Day" + small year + uppercase label, two-line */}
-        <div className="mb-4 flex items-baseline gap-3 sm:hidden">
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-handwritten text-foreground text-3xl leading-none font-semibold">
-              {dateParts.month} {dateParts.day}
-            </span>
-            <span className="text-muted-foreground/70 text-xs">{dateParts.year}</span>
+    const dateGutter = journal ? (
+      <time
+        dateTime={note.date.slice(0, 10)}
+        className="font-handwritten text-foreground mb-3 block text-[30px] leading-none font-semibold sm:mb-0"
+        title={formattedDate}
+      >
+        {dateParts ? `${dateParts.month.slice(0, 3)} ${dateParts.day}` : formattedDate}
+      </time>
+    ) : (
+      dateParts && (
+        <>
+          {/* Mobile: handwritten "Month Day" + small year + uppercase label, two-line */}
+          <div className="mb-4 flex items-baseline gap-3 sm:hidden">
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-handwritten text-foreground text-3xl leading-none font-semibold">
+                {dateParts.month} {dateParts.day}
+              </span>
+              <span className="text-muted-foreground/70 text-xs">{dateParts.year}</span>
+            </div>
           </div>
-        </div>
-        {/* Desktop: 88px gutter on the left */}
-        <div className="hidden pt-1 sm:block">
-          <div className="font-handwritten text-foreground/90 text-[40px] leading-none font-bold">
-            {dateParts.day}
+          {/* Desktop: 88px gutter on the left */}
+          <div className="hidden pt-1 sm:block">
+            <div className="font-handwritten text-foreground/90 text-[40px] leading-none font-bold">
+              {dateParts.day}
+            </div>
+            <div className="text-muted-foreground mt-1.5 text-xs font-semibold tracking-[0.08em] uppercase">
+              {dateParts.month}
+            </div>
+            <div className="text-muted-foreground/60 mt-0.5 text-xs">{dateParts.year}</div>
           </div>
-          <div className="text-muted-foreground mt-1.5 text-xs font-semibold tracking-[0.08em] uppercase">
-            {dateParts.month}
-          </div>
-          <div className="text-muted-foreground/60 mt-0.5 text-xs">{dateParts.year}</div>
-        </div>
-      </>
+        </>
+      )
     );
 
     const imageBlock = imageUrl && (
-      <div className="group/image relative mb-3.5 overflow-hidden rounded-xl">
+      <div
+        className={cn(
+          'group/image relative mb-3.5 overflow-hidden rounded-xl',
+          journal && 'w-full shrink-0 lg:mb-0 lg:w-[min(240px,45%)]'
+        )}
+      >
         <ImageGallery
           imageUrl={imageUrl}
           alt={`Progress update from ${formattedDate}`}
-          instagramStyle={true}
+          instagramStyle={!journal}
+          previewFit={journal ? 'contain' : 'cover'}
           size="large"
         />
         {onDeleteImage && (
@@ -187,6 +205,7 @@ const ProgressNoteItem = React.memo(
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
+                  type="button"
                   variant="glass-destructive"
                   size="sm"
                   disabled={disabled}
@@ -227,7 +246,10 @@ const ProgressNoteItem = React.memo(
             onClick={handleEdit}
             disabled={disabled}
             aria-label="Edit progress note"
-            className="text-muted-foreground hover:bg-muted/60 hover:text-foreground grid size-7 place-items-center rounded-md transition-colors"
+            className={cn(
+              'text-muted-foreground hover:bg-muted/60 hover:text-foreground grid place-items-center rounded-md transition-colors',
+              journal ? 'size-11' : 'size-7'
+            )}
           >
             <Pencil className="size-3.5" />
           </button>
@@ -239,7 +261,10 @@ const ProgressNoteItem = React.memo(
                 type="button"
                 disabled={disabled}
                 aria-label="Delete progress note"
-                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive-text grid size-7 place-items-center rounded-md transition-colors"
+                className={cn(
+                  'text-muted-foreground hover:bg-destructive/10 hover:text-destructive-text grid place-items-center rounded-md transition-colors',
+                  journal ? 'size-11' : 'size-7'
+                )}
               >
                 <Trash2 className="size-3.5" />
               </button>
@@ -274,17 +299,32 @@ const ProgressNoteItem = React.memo(
     return (
       <article
         className={cn(
-          'group/entry py-8 first:pt-0 last:pb-0 sm:py-10',
-          'sm:grid sm:grid-cols-[88px_minmax(0,1fr)] sm:items-start sm:gap-6'
+          'group/entry',
+          journal
+            ? 'relative pb-8 last:pb-0 sm:grid sm:grid-cols-[96px_minmax(0,1fr)] sm:items-start sm:gap-4'
+            : 'py-8 first:pt-0 last:pb-0 sm:grid sm:grid-cols-[88px_minmax(0,1fr)] sm:items-start sm:gap-6 sm:py-10'
         )}
       >
+        {journal && (
+          <span
+            aria-hidden="true"
+            className="border-primary bg-background absolute top-2 -left-[31px] size-3 rounded-full border-2"
+          />
+        )}
         {dateGutter}
-        <div className="min-w-0">
+        <div className={cn('min-w-0', journal && 'lg:flex lg:items-start lg:gap-4')}>
           {imageBlock}
-          <div className="text-foreground text-[15px] leading-[1.55] sm:text-base sm:leading-[1.6]">
-            {editorBody}
+          <div className="min-w-0 flex-1">
+            <div
+              className={cn(
+                'text-foreground text-[15px]',
+                journal ? 'leading-relaxed' : 'leading-[1.55] sm:text-base sm:leading-[1.6]'
+              )}
+            >
+              {editorBody}
+            </div>
+            {noteActions}
           </div>
-          {noteActions}
         </div>
       </article>
     );

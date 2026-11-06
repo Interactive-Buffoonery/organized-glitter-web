@@ -1,3 +1,5 @@
+import { StatusPill } from '@/components/shared/StatusPill';
+import { FILTER_STATUS_ACTIVE_FILL } from '@/utils/statusColors';
 import React from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -43,7 +45,7 @@ const ProjectsTable = ({
   recentlyEditedProjectId,
   dividers = EMPTY_DIVIDERS,
 }: ProjectsTableProps) => {
-  const { getStatusColor, getStatusLabel } = useProjectStatus();
+  const { getStatusLabel } = useProjectStatus();
   const dividerByIndex = React.useMemo(
     () => new Map(dividers.map(d => [d.insertBeforeIndex, d])),
     [dividers]
@@ -187,14 +189,10 @@ const ProjectsTable = ({
                     </TableCell>
 
                     <TableCell className="text-center">
-                      <span
-                        className={cn(
-                          'inline-flex rounded-full px-3 py-1 text-xs font-medium shadow-md',
-                          getStatusColor(project.status)
-                        )}
-                      >
-                        {statusLabel}
-                      </span>
+                      <StatusPill
+                        label={statusLabel}
+                        className={FILTER_STATUS_ACTIVE_FILL[project.status]}
+                      />
                     </TableCell>
 
                     <TableCell>

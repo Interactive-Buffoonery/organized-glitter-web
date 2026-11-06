@@ -368,3 +368,72 @@ test.describe('on a phone', () => {
     }
   });
 });
+
+test('coloring detail: edit dates, reveal the subject and log progress', async ({
+  page,
+  baseURL,
+}, testInfo) => {
+  test.setTimeout(90000);
+  const { pb, book, pageId, cleanup } = await seededPage(page, baseURL, testInfo);
+  try {
+    await pb.collection('coloring_books').update(book.id, { is_mystery: true });
+    await page.goto(`/coloring/${book.id}/pages/${pageId}`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Page 1');
+    await expect(page.getByRole('button', { name: 'Add medium', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add photos', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'add finish date', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'add start date', exact: true }).click();
+    const dates = page.getByRole('dialog', { name: 'Page dates' });
+    await dates.locator('#coloring-page-started-at').fill('2026-04-03');
+    await dates
+      .locator('div.space-y-2:has(#coloring-page-started-at)')
+      .getByRole('button', { name: 'Save', exact: true })
+      .click();
+    await expect
+      .poll(async () => (await pb.collection('coloring_pages').getOne(pageId)).started_at)
+      .toContain('2026-04-03');
+    await dates.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'add finish date', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'add start date', exact: true })).toHaveCount(0);
+
+    await page.getByRole('combobox', { name: 'Change page status' }).click();
+    await page.getByRole('option', { name: 'Completed', exact: true }).click();
+    await expect(page.getByText('Did you finish it today?')).toBeVisible();
+    await page.getByRole('button', { name: 'Pick a date', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Page dates' })
+      .getByRole('button', { name: 'Close', exact: true })
+      .click();
+    await page.getByRole('button', { name: 'Not now', exact: true }).click();
+    await expect(page.getByText('Did you finish it today?')).toHaveCount(0);
+    await page.reload();
+    await page.getByRole('button', { name: 'Yes, today', exact: true }).click();
+    await expect(page.getByText('Did you finish it today?')).toHaveCount(0);
+    await expect
+      .poll(async () => (await pb.collection('coloring_pages').getOne(pageId)).completed_at)
+      .not.toBe('');
+
+    await page.getByRole('button', { name: 'Reveal', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Revealed subject' }).fill('A sleeping owl');
+    await page.getByRole('button', { name: 'Save reveal', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('A sleeping owl');
+    const composer = page.getByRole('form', { name: 'Add a progress note', exact: true });
+    await composer
+      .getByRole('textbox', { name: 'Progress note', exact: true })
+      .fill('Finished the leaves with two greens.');
+    await composer.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(
+      page.getByText('Finished the leaves with two greens.', { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Progress · 1 entry', exact: true })
+    ).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('A sleeping owl');
+    await expect(
+      page.getByText('Finished the leaves with two greens.', { exact: true })
+    ).toBeVisible();
+  } finally {
+    await cleanup();
+  }
+});

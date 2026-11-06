@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePostHog } from '@posthog/react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,8 +9,6 @@ import DashboardFilterSheet from '@/components/dashboard/DashboardFilterSheet';
 import DashboardQuickViews from '@/components/dashboard/DashboardQuickViews';
 import LibraryViewToggle from '@/components/shared/LibraryViewToggle';
 import { useFilters, useFilterHelpers } from '@/contexts/FilterContext';
-import { Checkbox } from '@/components/ui/checkbox';
-import { useMobileDevice } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import { findSortOption } from '@/features/dashboard/sort-options';
@@ -33,13 +31,10 @@ const DashboardHeader = ({
   showCreateButton = true,
 }: DashboardHeaderProps) => {
   const { filters, searchDraftResetVersion } = useFilters();
-  const { updateSearch, updateSearchAllFields, updateViewType } = useFilterHelpers();
-  const { isTablet } = useMobileDevice();
+  const { updateSearch, updateViewType } = useFilterHelpers();
   const posthog = usePostHog();
   const previousSearchRef = useRef(filters.searchTerm);
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
-  const searchAllFieldsMobileId = useId();
-  const searchAllFieldsDesktopId = useId();
 
   const isSearchPending = isFetchingProjects && filters.searchTerm.length > 0;
 
@@ -113,19 +108,6 @@ const DashboardHeader = ({
           />
           <DashboardQuickViews compact />
         </div>
-        {isTablet && (
-          <label
-            htmlFor={searchAllFieldsMobileId}
-            className="text-muted-foreground flex cursor-pointer items-center gap-2 text-sm select-none"
-          >
-            <Checkbox
-              id={searchAllFieldsMobileId}
-              checked={filters.searchAllFields}
-              onCheckedChange={v => updateSearchAllFields(Boolean(v))}
-            />
-            <span>Also search notes + source URLs (slower)</span>
-          </label>
-        )}
       </div>
 
       <div className="hidden lg:block">
@@ -146,17 +128,7 @@ const DashboardHeader = ({
               isPending={isSearchPending}
             />
           </div>
-          <label
-            htmlFor={searchAllFieldsDesktopId}
-            className="text-muted-foreground order-last flex w-full cursor-pointer items-center gap-2 pl-4 text-sm select-none xl:order-none xl:w-auto xl:pl-0"
-          >
-            <Checkbox
-              id={searchAllFieldsDesktopId}
-              checked={filters.searchAllFields}
-              onCheckedChange={v => updateSearchAllFields(Boolean(v))}
-            />
-            <span>Also search notes + source URLs (slower)</span>
-          </label>
+
           <Button
             variant="outline"
             size="sm"

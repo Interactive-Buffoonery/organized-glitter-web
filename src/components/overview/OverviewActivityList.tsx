@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OverviewActivityRow } from './OverviewActivityRow';
@@ -57,17 +58,19 @@ export function OverviewActivityList({
     return (
       <div className="border-border/60 border-y py-10 text-center">
         <p className="text-muted-foreground">{EMPTY_COPY[activeCraftFilter]}</p>
+        <Button asChild variant="glass" className="mt-4">
+          <Link to="/dashboard">Browse your library</Link>
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="@container/activity">
-      <div className="text-muted-foreground border-border/60 hidden grid-cols-[minmax(16rem,1fr)_8rem] gap-4 border-b px-2 pb-3 text-xs font-semibold tracking-tight @min-[28rem]/activity:grid @min-[42rem]/activity:grid-cols-[minmax(16rem,1fr)_8rem_9rem] @min-[52rem]/activity:grid-cols-[minmax(16rem,1fr)_8rem_9rem_4rem]">
+      <div className="text-muted-foreground border-border/60 hidden grid-cols-[minmax(0,1fr)_11rem_1rem] gap-3 border-b px-2 pb-3 text-xs font-semibold @min-[36rem]/activity:grid">
         <span>Project</span>
-        <span>Status</span>
-        <span className="hidden @min-[42rem]/activity:block">Activity</span>
-        <span className="sr-only">Action</span>
+        <span>Last activity</span>
+        <span className="sr-only">Open project</span>
       </div>
       <ul className="border-border/60 border-b">
         {items.map(item => (

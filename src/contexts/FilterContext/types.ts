@@ -128,13 +128,12 @@ export const getActiveFilterSummary = (filters: FilterState) => {
 
 /**
  * Count only the controls rendered inside the dashboard filter panel/sheet.
- * Search and "Search All Fields" live in the header, so including them here
- * produces misleading badges and reset affordances.
+ * Search text stays in the header; broader search belongs to this panel.
  */
 const getDashboardFilterPanelCount = (filters: FilterState): number =>
   countFilters(filters, {
     includeSearchTerm: false,
-    includeSearchAllFields: false,
+    includeSearchAllFields: true,
   });
 
 export const getDashboardFilterPanelSummary = (filters: FilterState) => {
@@ -181,13 +180,10 @@ const DASHBOARD_FILTER_PANEL_KEYS: Array<keyof FilterState> = [
   'includeDestashed',
   'includeArchived',
   'selectedTags',
-];
-
-const ACTIVE_FILTER_KEYS: Array<keyof FilterState> = [
-  ...DASHBOARD_FILTER_PANEL_KEYS,
-  'searchTerm',
   'searchAllFields',
 ];
+
+const ACTIVE_FILTER_KEYS: Array<keyof FilterState> = [...DASHBOARD_FILTER_PANEL_KEYS, 'searchTerm'];
 
 /**
  * Reset only the fields owned by the dashboard filter panel. Header-owned

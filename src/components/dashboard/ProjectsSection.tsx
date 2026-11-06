@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import ProjectsGrid from '@/components/dashboard/ProjectsGrid';
 import DashboardStatusSegments from '@/components/dashboard/DashboardStatusSegments';
 import ResultsSummaryBar from '@/components/dashboard/ResultsSummaryBar';
@@ -41,9 +42,14 @@ const ProjectsSectionComponent = ({ dashboardData, isCorrectingPage }: ProjectsS
     <div className="space-y-6 lg:col-span-3">
       {dashboardData.errorProjects &&
         !ErrorHandler.isCancelledError(dashboardData.errorProjects) && (
-          <div className="rounded-md border border-red-500 p-4 text-red-500">
-            <p>Error loading projects: {dashboardData.errorProjects.message}</p>
-            <p>Please try refreshing the page or contact support if the issue persists.</p>
+          <div role="alert" className="border-border space-y-3 rounded-xl border p-5">
+            <p className="text-foreground font-medium">Could not load your projects</p>
+            <p className="text-muted-foreground text-sm">
+              Please try again. Your library is still here.
+            </p>
+            <Button type="button" variant="glass" onClick={() => dashboardData.refetchProjects()}>
+              Try again
+            </Button>
           </div>
         )}
 

@@ -39,7 +39,7 @@ const ProjectGridCardComponent = ({
       type="button"
       onClick={handleClick}
       className={cn(
-        'glow-hover text-card-foreground focus-visible:ring-ring group flex w-full cursor-pointer flex-col overflow-hidden rounded-xl border text-left shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 focus-visible:ring-2 focus-visible:outline-none',
+        'text-card-foreground focus-visible:ring-ring group flex w-full cursor-pointer flex-col overflow-hidden rounded-xl border text-left transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none',
         isRecentlyEdited
           ? 'border-accent bg-accent/10 ring-accent ring-opacity-50 ring-2'
           : 'border-border bg-card hover:border-primary/20'

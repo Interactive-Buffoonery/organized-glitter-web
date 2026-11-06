@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 const TEXT_LINK_CLASSES =
@@ -28,11 +27,7 @@ const ResultsSummaryBar = ({
   activeFilterLabel,
   onClearAll,
 }: ResultsSummaryBarProps) => {
-  const sortOption = useMemo(
-    () => findSortOption(sortField, sortDirection),
-    [sortField, sortDirection]
-  );
-
+  const sortOption = findSortOption(sortField, sortDirection);
   const countLabel = isLoading
     ? 'Loading projects…'
     : `${totalItems.toLocaleString()}${totalItemsIsEstimate ? '+' : ''} ${totalItems === 1 ? 'project' : 'projects'}`;
@@ -47,10 +42,7 @@ const ResultsSummaryBar = ({
     >
       <div className="flex items-center gap-x-3">
         <span className="text-foreground font-medium">{countLabel}</span>
-        <span aria-hidden="true">·</span>
-        <span>
-          Sorted by <span className="text-foreground">{sortOption.label}</span>
-        </span>
+        <span className="lg:hidden">Sorted by {sortOption.label}</span>
       </div>
       <div className="flex items-center justify-between gap-2 sm:contents">
         {activeFilterLabel && (
@@ -67,7 +59,7 @@ const ResultsSummaryBar = ({
             onClick={onClearAll}
             className={cn(TEXT_LINK_CLASSES, 'sm:ml-auto')}
           >
-            Clear All
+            Clear filters
           </button>
         )}
       </div>

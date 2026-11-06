@@ -40,6 +40,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
     const isMobile = useIsMobile();
     const { filters, companies, artists, tags: allTags, setFilters } = useFilters();
     const {
+      updateSearchAllFields,
       updateCompany,
       updateArtist,
       updateDrillShape,
@@ -105,6 +106,22 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
         )}
 
         <div className="space-y-4 md:space-y-5">
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="search-all-fields"
+              checked={filters.searchAllFields}
+              onCheckedChange={value => updateSearchAllFields(Boolean(value))}
+              aria-describedby="search-all-fields-help"
+            />
+            <div>
+              <Label htmlFor="search-all-fields" className="text-sm font-normal">
+                Search notes and kit links
+              </Label>
+              <p id="search-all-fields-help" className="text-muted-foreground mt-1 text-xs">
+                Includes more fields. Searches may take longer.
+              </p>
+            </div>
+          </div>
           <FilterDropdown
             label="Company"
             options={companiesOptions}
@@ -163,6 +180,11 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
                 </Label>
               </div>
 
+              {activeStatus !== 'everything' && (
+                <p className="text-muted-foreground text-xs">
+                  Choose Everything to include archived or destashed kits.
+                </p>
+              )}
               <div className="flex items-center gap-x-3">
                 <Checkbox
                   id="include-destashed-kits"

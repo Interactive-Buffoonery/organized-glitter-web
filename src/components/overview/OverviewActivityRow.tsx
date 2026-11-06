@@ -2,26 +2,18 @@ import { PrivateFileImage } from '@/components/image/PrivateFileImage';
 import { ChevronRight, Image as ImageIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { cn } from '@/lib/utils';
-import type { OverviewFeedItem, OverviewStatusTone } from '@/services/pocketbase/overview.service';
+import type { OverviewFeedItem } from '@/services/pocketbase/overview.service';
 
 interface OverviewActivityRowProps {
   item: OverviewFeedItem;
 }
-
-const STATUS_DOT_CLASS: Record<OverviewStatusTone, string> = {
-  progress: 'bg-diamond-500',
-  kitted: 'bg-teal-500',
-  started: 'bg-diamond-500',
-  muted: 'bg-muted-foreground',
-};
 
 export function OverviewActivityRow({ item }: OverviewActivityRowProps) {
   return (
     <li className="border-border/60 border-b last:border-b-0">
       <Link
         to={item.href}
-        className="group hover:bg-background/35 focus-visible:ring-ring/50 grid gap-3 py-4 transition-colors duration-300 focus-visible:ring-[3px] focus-visible:outline-none @min-[28rem]/activity:grid-cols-[minmax(16rem,1fr)_8rem] @min-[28rem]/activity:items-center @min-[28rem]/activity:gap-4 @min-[28rem]/activity:px-2 @min-[42rem]/activity:grid-cols-[minmax(16rem,1fr)_8rem_9rem] @min-[52rem]/activity:grid-cols-[minmax(16rem,1fr)_8rem_9rem_4rem]"
+        className="group hover:bg-background/35 focus-visible:ring-ring/50 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-4 transition-colors focus-visible:ring-[3px] focus-visible:outline-none @min-[36rem]/activity:grid-cols-[minmax(0,1fr)_11rem_auto]"
       >
         <span className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-3 @min-[28rem]/activity:grid-cols-[4rem_minmax(0,1fr)] @min-[28rem]/activity:gap-4">
           <span className="bg-muted relative block aspect-square overflow-hidden rounded-lg">
@@ -50,25 +42,13 @@ export function OverviewActivityRow({ item }: OverviewActivityRowProps) {
           </span>
         </span>
 
-        <span className="text-foreground flex items-center gap-2 text-sm font-medium @min-[28rem]/activity:justify-start">
-          <span
-            aria-hidden="true"
-            className={cn(
-              'block size-2.5 shrink-0 rounded-full',
-              STATUS_DOT_CLASS[item.statusTone]
-            )}
-          />
-          {item.statusLabel}
-        </span>
-
-        <span className="text-muted-foreground hidden text-sm @min-[42rem]/activity:block">
+        <span className="text-muted-foreground col-start-1 row-start-2 pl-[4.25rem] text-xs @min-[36rem]/activity:col-start-2 @min-[36rem]/activity:row-start-1 @min-[36rem]/activity:pl-0 @min-[36rem]/activity:text-sm">
           {item.activityLabel}
         </span>
-
-        <span className="text-foreground hidden items-center gap-1 text-sm font-semibold @min-[52rem]/activity:flex @min-[52rem]/activity:justify-end">
-          Open
-          <ChevronRight aria-hidden="true" className="size-4" />
-        </span>
+        <ChevronRight
+          aria-hidden="true"
+          className="text-muted-foreground col-start-2 row-start-1 size-4 @min-[36rem]/activity:col-start-3"
+        />
       </Link>
     </li>
   );

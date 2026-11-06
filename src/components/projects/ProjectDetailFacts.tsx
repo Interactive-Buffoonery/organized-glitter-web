@@ -103,6 +103,7 @@ export function StatusDatePrompt({
       <div className="mt-2 flex flex-wrap items-center gap-1">
         <Button
           type="button"
+          variant="secondary"
           size="sm"
           className="min-h-11"
           disabled={disabled || updateDates.isPending}

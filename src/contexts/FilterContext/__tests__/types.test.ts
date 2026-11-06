@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getActiveFilterResetPatch, getDefaultFilters } from '../types';
+import {
+  getActiveFilterResetPatch,
+  getDefaultFilters,
+  getDashboardFilterPanelSummary,
+  getDashboardFilterPanelResetPatch,
+} from '../types';
 
 describe('getActiveFilterResetPatch', () => {
   it('clears active filters while preserving dashboard presentation settings', () => {
@@ -44,5 +49,29 @@ describe('getActiveFilterResetPatch', () => {
     expect(next.sortDirection).toBe('asc');
     expect(next.pageSize).toBe(50);
     expect(next.viewType).toBe('table');
+  });
+});
+
+describe('dashboard filter panel search scope', () => {
+  it('counts broader search but excludes the search text', () => {
+    const summary = getDashboardFilterPanelSummary({
+      ...getDefaultFilters(),
+      searchTerm: 'garden',
+      searchAllFields: true,
+    });
+    expect(summary.count).toBe(1);
+    expect(summary.triggerLabel).toBe('Open filters. 1 filter active');
+  });
+  it('resets broader search while preserving search text and ordering', () => {
+    const filters = {
+      ...getDefaultFilters(),
+      searchTerm: 'garden',
+      searchAllFields: true,
+      sortField: 'title' as const,
+    };
+    const next = { ...filters, ...getDashboardFilterPanelResetPatch() };
+    expect(next.searchAllFields).toBe(false);
+    expect(next.searchTerm).toBe('garden');
+    expect(next.sortField).toBe('title');
   });
 });

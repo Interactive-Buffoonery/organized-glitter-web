@@ -306,6 +306,20 @@ afterEach(() => {
 });
 
 describe('ProjectDetail behavior', () => {
+  it('moves keyboard focus from Log progress to the inline composer', async () => {
+    const user = userEvent.setup();
+    const scroll = vi.fn();
+    const { default: ProjectDetail } = await import('../ProjectDetail');
+    renderWithProviders(<ProjectDetail />);
+    const composer = await screen.findByRole('textbox', { name: 'Add a progress note' });
+    composer.scrollIntoView = scroll;
+    const shortcut = screen.getByRole('button', { name: 'Log progress' });
+    shortcut.focus();
+    await user.keyboard('{Enter}');
+    expect(composer).toHaveFocus();
+    expect(scroll).toHaveBeenCalled();
+  });
+
   it('does not display navigation data belonging to another account', async () => {
     projectQueryState.available = false;
     useLocationMock.mockReturnValue({

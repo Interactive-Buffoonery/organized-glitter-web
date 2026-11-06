@@ -11,7 +11,7 @@
  */
 
 import { sessionDraftKeys } from '@/services/auth/sessionDraftKeys';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -135,14 +135,14 @@ const ProjectDeleteDialog = ({
 );
 
 const ProjectHeroImage = ({ project }: { project: ProjectType }) => (
-  <div className="relative w-full">
+  <div className="relative mx-auto w-full sm:max-w-[480px]">
     {project.imageUrl ? (
       <>
         <div className="overflow-hidden sm:rounded-2xl">
           <ImageGallery
             imageUrl={project.imageUrl}
             alt={project.title}
-            previewFit="cover"
+            previewFit="contain"
             size="full"
           />
         </div>
@@ -168,7 +168,7 @@ const ProjectTitleBlock = ({ project }: { project: ProjectType }) => (
   <div className="min-w-0 flex-1">
     <h1
       className={cn(
-        'font-handwritten text-foreground m-0 leading-[1.05] tracking-tight',
+        'font-handwritten text-foreground m-0 leading-[1.05] tracking-tight break-words',
         'text-[40px] sm:text-[clamp(40px,5.5vw,64px)]'
       )}
     >
@@ -196,6 +196,14 @@ const ProjectDetailView = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const progressRegionRef = useRef<HTMLDivElement>(null);
+  const canLogProgress = ['progress', 'onhold', 'completed'].includes(project.status);
+  const focusProgressComposer = () => {
+    const field = progressRegionRef.current?.querySelector('textarea');
+    if (!field) return;
+    field.focus({ preventScroll: true });
+    field.scrollIntoView({ block: 'center', behavior: 'instant' });
+  };
 
   const handleDeleteActionSelect = useCallback((event: Event) => {
     event.preventDefault();
@@ -262,6 +270,11 @@ const ProjectDetailView = ({
             </Button>
           )}
           <div className="flex items-center gap-1.5">
+            {canLogProgress && (
+              <Button type="button" size="sm" className="min-h-11" onClick={focusProgressComposer}>
+                Log progress
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -298,20 +311,24 @@ const ProjectDetailView = ({
             <ProjectKitTags project={project} />
             <ProjectKitAbout project={project} />
             {note}
-            <ProjectProgressNotes project={project} key={project.id} />
+            <div ref={progressRegionRef}>
+              <ProjectProgressNotes project={project} key={project.id} />
+            </div>
           </div>
         </div>
       ) : (
-        <div className="mx-auto max-w-[1200px] px-7 pt-9 pb-20">
-          <header className="border-border/60 mb-6 border-b pb-6">
+        <div className="mx-auto max-w-[1200px] px-7 pt-4 pb-20">
+          <header className="border-border/60 mb-5 border-b pb-4">
             <ProjectTitleBlock project={project} />
           </header>
           <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-14">
             <div className="min-w-0">
-              <div className="mb-8">
+              <div className="mb-6">
                 <ProjectHeroImage project={project} />
               </div>
-              <ProjectProgressNotes project={project} key={project.id} />
+              <div ref={progressRegionRef}>
+                <ProjectProgressNotes project={project} key={project.id} />
+              </div>
             </div>
             <aside className="sticky top-[80px] space-y-6 self-start">
               <ProjectStatusSummary

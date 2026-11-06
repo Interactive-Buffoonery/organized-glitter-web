@@ -10,6 +10,7 @@ interface ResultsSummaryBarProps {
   /** When true, totalItems is a lower bound (PocketBase's skipTotal path). Render a "+" suffix. */
   totalItemsIsEstimate?: boolean;
   isLoading: boolean;
+  showCount?: boolean;
   sortField: DashboardValidSortField;
   sortDirection: SortDirection;
   activeFilterCount: number;
@@ -21,6 +22,7 @@ const ResultsSummaryBar = ({
   totalItems,
   totalItemsIsEstimate = false,
   isLoading,
+  showCount = true,
   sortField,
   sortDirection,
   activeFilterCount,
@@ -41,7 +43,7 @@ const ResultsSummaryBar = ({
       aria-live="polite"
     >
       <div className="flex items-center gap-x-3">
-        <span className="text-foreground font-medium">{countLabel}</span>
+        {showCount && <span className="text-foreground font-medium">{countLabel}</span>}
         <span className="lg:hidden">Sorted by {sortOption.label}</span>
       </div>
       <div className="flex items-center justify-between gap-2 sm:contents">

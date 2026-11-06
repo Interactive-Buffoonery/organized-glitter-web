@@ -50,9 +50,7 @@ const ProjectsSectionComponent = ({ dashboardData, isCorrectingPage }: ProjectsS
     </div>
   ) : null;
 
-  if (hasLoadError && dashboardData.projects.length === 0) {
-    return <div className="lg:col-span-3">{errorNotice}</div>;
-  }
+  const hasUnavailableResults = !!hasLoadError && dashboardData.projects.length === 0;
 
   return (
     <div className="space-y-6 lg:col-span-3">
@@ -70,6 +68,7 @@ const ProjectsSectionComponent = ({ dashboardData, isCorrectingPage }: ProjectsS
         totalItems={dashboardData.totalItems}
         totalItemsIsEstimate={dashboardData.totalItemsIsEstimate}
         isLoading={dashboardData.isLoadingProjects}
+        showCount={!hasUnavailableResults}
         sortField={filters.sortField}
         sortDirection={filters.sortDirection}
         activeFilterCount={activeFilterCount}
@@ -77,7 +76,9 @@ const ProjectsSectionComponent = ({ dashboardData, isCorrectingPage }: ProjectsS
         onClearAll={clearActiveFilters}
       />
 
-      <ProjectsGrid dashboardData={dashboardData} isCorrectingPage={isCorrectingPage} />
+      {!hasUnavailableResults && (
+        <ProjectsGrid dashboardData={dashboardData} isCorrectingPage={isCorrectingPage} />
+      )}
     </div>
   );
 };

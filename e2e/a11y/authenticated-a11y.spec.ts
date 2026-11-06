@@ -41,7 +41,7 @@ test.describe('authenticated accessibility structural axe scans', () => {
     await page.goto(`/projects/${FIXTURE_PROJECT_ID}`);
 
     const notFoundHeading = page.getByRole('heading', { name: /project not found/i });
-    const loadedIndicator = page.getByRole('heading', { name: 'Details' });
+    const loadedIndicator = page.getByRole('heading', { name: 'About this kit' });
     await waitForAnyVisible([notFoundHeading, loadedIndicator], 15_000);
 
     if (await notFoundHeading.isVisible()) {

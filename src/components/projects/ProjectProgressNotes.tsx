@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { SectionHeading } from '@/components/shared/Section';
-import { logger } from '@/utils/logger';
+import { createLogger } from '@/utils/logger';
 import {
   useAddProgressNoteMutation,
   useDeleteProgressNoteImageMutation,
@@ -12,9 +12,13 @@ import { ProjectType } from '@/types/project';
 import ProgressNotesList from './timeline/ProgressNotesList';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import ProgressNoteForm from './ProgressNoteForm';
+
 import type { MarkdownString } from '@/types/markdown';
 import { ProgressNoteDialog, type ProgressNoteDialogTarget } from './ProgressNoteDialog';
+
+const logger = createLogger('ProjectProgressNotes');
 
 interface ProjectProgressNotesProps {
   project: ProjectType;
@@ -72,6 +76,7 @@ const ProjectProgressNotes: React.FC<ProjectProgressNotesProps> = ({ project }) 
       });
     } catch (error) {
       logger.error('Error updating progress note:', error);
+      throw error;
     }
   };
 
@@ -96,12 +101,17 @@ const ProjectProgressNotes: React.FC<ProjectProgressNotesProps> = ({ project }) 
   };
 
   const isEmpty = !isLoading && !error && progressNotes.length === 0;
-  const addRowLabel = isEmpty ? 'Add your first progress note.' : 'Add a progress note.';
+  const showComposer = ['progress', 'onhold', 'completed'].includes(project.status);
 
   return (
     <section>
       <div className="mb-4">
-        <SectionHeading>Progress</SectionHeading>
+        <SectionHeading>
+          Progress{' '}
+          <span className="text-muted-foreground font-normal">
+            · {progressNotes.length} {progressNotes.length === 1 ? 'entry' : 'entries'}
+          </span>
+        </SectionHeading>
       </div>
 
       {isLoading ? (
@@ -123,36 +133,32 @@ const ProjectProgressNotes: React.FC<ProjectProgressNotesProps> = ({ project }) 
         </div>
       ) : (
         <div>
-          <button
-            type="button"
-            onClick={() => setAddDialogOpen(true)}
-            className={cn(
-              'group/add w-full text-left',
-              'rounded-md py-6 first:pt-0 sm:py-8',
-              'sm:grid sm:grid-cols-[88px_minmax(0,1fr)] sm:items-start sm:gap-6',
-              'focus-visible:ring-primary/40 focus-visible:ring-2 focus-visible:outline-none'
-            )}
-          >
-            <span
-              aria-hidden="true"
-              className="border-border/70 text-muted-foreground/60 group-hover/add:border-primary/60 group-hover/add:text-primary hidden size-12 items-center justify-center rounded-full border border-dashed transition-colors sm:flex"
+          {showComposer ? (
+            <ProgressNoteForm
+              onSubmit={handleAddNote}
+              disabled={addProgressNoteMutation.isPending}
+              variant="composer"
+            />
+          ) : (
+            <Button
+              type="button"
+              variant="link"
+              className="min-h-11 px-0"
+              onClick={() => setAddDialogOpen(true)}
             >
-              <Plus className="size-5" />
-            </span>
-            <span
-              className={cn(
-                'flex items-center gap-2 rounded-lg border border-dashed px-4 py-3 text-sm',
-                'border-border/70 text-muted-foreground transition-colors',
-                'group-hover/add:border-primary/50 group-hover/add:text-foreground group-hover/add:bg-primary/5'
-              )}
-            >
-              <Plus className="size-4 sm:hidden" />
-              {addRowLabel}
-            </span>
-          </button>
+              <Plus className="size-4" />
+              Log progress
+            </Button>
+          )}
+          {isEmpty && (
+            <p className="text-muted-foreground mt-4 text-sm">
+              Photos and notes you log will show up here.
+            </p>
+          )}
 
           {!isEmpty && (
             <ProgressNotesList
+              journal
               progressNotes={progressNotes}
               onUpdateProgressNote={handleUpdateNote}
               onDeleteProgressNote={handleDeleteNote}

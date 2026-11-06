@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
 import { getColoringPageCommandEffects } from '@/features/coloring-progress/coloringProgressCommands';
@@ -8,6 +8,7 @@ import type { ColoringPageDTO } from '@/services/pocketbase/coloring.service';
 import {
   beginColoringPageMutation,
   cacheUpdatedColoringPage,
+  clearDeletedColoringBook,
   restoreColoringPage,
 } from '../coloringMutationCache';
 
@@ -68,5 +69,29 @@ describe('coloring mutation cache', () => {
       queryKey: queryKeys.coloring.books.detail(page.bookId),
     });
     expect(invalidate).not.toHaveBeenCalledWith({ queryKey: queryKeys.coloring.books.lists() });
+  });
+
+  it('clears the deleted book pages and photo maps without touching other books', async () => {
+    const client = makeClient();
+    const detailKey = queryKeys.coloring.pages.detail(page.id);
+    const pagesKey = queryKeys.coloring.pages.book('book-1');
+    const photosKey = queryKeys.coloring.pages.bookPhotos('book-1', 'user-1');
+    const otherPhotosKey = queryKeys.coloring.pages.bookPhotos('book-2', 'user-1');
+    client.setQueryData(detailKey, page);
+    client.setQueryData(pagesKey, [page]);
+    client.setQueryData(photosKey, { [page.id]: 'photo.jpg' });
+    client.setQueryData(otherPhotosKey, { 'page-2': 'other.jpg' });
+    const unsubscribe = new QueryObserver(client, {
+      queryKey: photosKey,
+      queryFn: () => ({}),
+    }).subscribe(() => undefined);
+
+    await clearDeletedColoringBook(client, 'book-1');
+
+    expect(client.getQueryData(detailKey)).toBeUndefined();
+    expect(client.getQueryData(pagesKey)).toBeUndefined();
+    expect(client.getQueryData(photosKey)).toEqual({});
+    expect(client.getQueryData(otherPhotosKey)).toEqual({ 'page-2': 'other.jpg' });
+    unsubscribe();
   });
 });

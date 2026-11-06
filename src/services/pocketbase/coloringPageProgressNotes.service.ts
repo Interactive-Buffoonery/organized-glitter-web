@@ -238,6 +238,32 @@ export class ColoringPageProgressNotesService {
     }, 'ColoringPageProgressNotes.listAllForUser');
   }
 
+  static async listLatestImagesForBook(options: {
+    userId: string;
+    bookId: string;
+  }): Promise<Record<string, string>> {
+    return ErrorHandler.handleAsync(async () => {
+      // ponytail: uncapped so no page loses its thumbnail; rows are id/page/image only.
+      // Switch to a per-page latest-image query if books carry thousands of photo notes.
+      const notes = await pb
+        .collection(Collections.ColoringPageProgressNotes)
+        .getFullList<Pick<ColoringPageProgressNoteRecord, 'id' | 'page' | 'image'>>({
+          filter: pb.filter("user = {:userId} && page.book = {:bookId} && image != ''", options),
+          sort: '-date,-created,-id',
+          fields: 'id,page,image',
+        });
+
+      const images: Record<string, string> = {};
+      for (const note of notes) {
+        images[note.page] ??= getFileUrl(
+          { id: note.id, collectionName: Collections.ColoringPageProgressNotes },
+          note.image
+        );
+      }
+      return images;
+    }, 'ColoringPageProgressNotes.listLatestImagesForBook');
+  }
+
   static async listByPage(pageId: string): Promise<ColoringPageProgressNoteDTO[]> {
     return ErrorHandler.handleAsync(async () => {
       const filter = pb.filter('page = {:pageId}', { pageId });

@@ -15,6 +15,8 @@ import {
 } from '@/utils/image/imagePolicy';
 import type { ProjectType } from '@/types/project';
 
+import { initialProjectImageState, transitionProjectImage } from './projectImageState';
+
 interface ProjectCoverImageEditorProps {
   project: ProjectType;
 }
@@ -41,8 +43,9 @@ const buildPassThroughInput = (project: ProjectType, croppedFile: File) => ({
 const ProjectCoverImageEditor = ({ project }: ProjectCoverImageEditorProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const isProcessingRef = useRef(false);
-  const [cropFile, setCropFile] = useState<File | null>(null);
-  const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
+  const [imageState, setImageState] = useState(initialProjectImageState);
+  const cropFile = imageState.crop.phase === 'open' ? imageState.crop.file : null;
+  const isCropDialogOpen = imageState.crop.phase === 'open';
   const [isProcessing, setIsProcessing] = useState(false);
   const updateProject = useProjectUpdateUnified();
   const { compressImage } = useProjectImageCompression();
@@ -70,8 +73,9 @@ const ProjectCoverImageEditor = ({ project }: ProjectCoverImageEditorProps) => {
       return;
     }
 
-    setCropFile(normalizeImageFile(picked));
-    setIsCropDialogOpen(true);
+    setImageState(state =>
+      transitionProjectImage(state, { type: 'open-crop', file: normalizeImageFile(picked) })
+    );
   }, []);
 
   const submitImage = useCallback(
@@ -84,7 +88,7 @@ const ProjectCoverImageEditor = ({ project }: ProjectCoverImageEditorProps) => {
         const compressed = await compressImage(file);
         await updateProject.mutateAsync(buildPassThroughInput(project, compressed));
         notifySuccess('Cover image updated');
-        setCropFile(null);
+        setImageState(state => transitionProjectImage(state, { type: 'close-crop' }));
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Please try again.';
         notifyError('Failed to update cover image', message);
@@ -148,7 +152,9 @@ const ProjectCoverImageEditor = ({ project }: ProjectCoverImageEditorProps) => {
         outputType={CROP_OUTPUT_TYPE}
         presets={PROJECT_IMAGE_CROP_PRESETS}
         defaultPresetId="rectangle-4-3"
-        onOpenChange={setIsCropDialogOpen}
+        onOpenChange={open => {
+          if (!open) setImageState(state => transitionProjectImage(state, { type: 'close-crop' }));
+        }}
         onCropComplete={handleCropComplete}
         onUseOriginal={handleUseOriginal}
       />

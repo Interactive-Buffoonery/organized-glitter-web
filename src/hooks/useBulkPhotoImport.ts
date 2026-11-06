@@ -1,3 +1,4 @@
+import type { SetStateAction } from 'react';
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import JSZip from 'jszip';
@@ -22,7 +23,6 @@ import {
 } from '@/features/import-export/bulk-photos/photoImportManifest';
 import type {
   BulkPhotoFileInput,
-  BulkPhotoImportResult,
   BulkPhotoLibrary,
   BulkPhotoManifestEntry,
   BulkPhotoReviewRow,
@@ -44,6 +44,8 @@ import {
 } from '@/features/import-export/archive/archiveZipRead';
 import { IMAGE_MAX_FILE_SIZE_BYTES } from '@/utils/image/imagePolicy';
 import { createLogger } from '@/utils/logger';
+
+import { initialBulkPhotoState, transitionBulkPhoto } from './bulkPhotoState';
 
 const logger = createLogger('useBulkPhotoImport');
 
@@ -155,24 +157,28 @@ async function loadBulkPhotoLibrary(): Promise<BulkPhotoLibrary> {
 
 export function useBulkPhotoImport() {
   const queryClient = useQueryClient();
-  const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState<BulkPhotoReviewRow[]>([]);
-  const [lastResult, setLastResult] = useState<BulkPhotoImportResult | null>(null);
-  const [library, setLibrary] = useState<BulkPhotoLibrary | null>(null);
-  const analysisIdRef = useRef(0);
-  const readyAnalysisIdRef = useRef<number | null>(null);
-  const [readyAnalysisId, setReadyAnalysisId] = useState<number | null>(null);
-
-  const beginAnalysis = useCallback(() => {
-    const analysisId = ++analysisIdRef.current;
-    readyAnalysisIdRef.current = null;
-    setReadyAnalysisId(null);
-    setRows([]);
-    setLibrary(null);
-    setLastResult(null);
-    setLoading(true);
-    return analysisId;
+  const [state, setState] = useState(initialBulkPhotoState);
+  const stateRef = useRef(state);
+  const transition = useCallback((event: Parameters<typeof transitionBulkPhoto>[1]) => {
+    const next = transitionBulkPhoto(stateRef.current, event);
+    stateRef.current = next;
+    setState(next);
+    return next;
   }, []);
+  const { rows } = state;
+  const library = 'library' in state ? state.library : null;
+  const lastResult = 'lastResult' in state ? state.lastResult : null;
+  const loading = state.phase === 'analyzing' || state.phase === 'importing';
+  const setRows = useCallback(
+    (update: SetStateAction<BulkPhotoReviewRow[]>) => {
+      transition({
+        type: 'rows',
+        rows: typeof update === 'function' ? update(stateRef.current.rows) : update,
+      });
+    },
+    [transition]
+  );
+  const beginAnalysis = useCallback(() => transition({ type: 'analyze' }).id, [transition]);
 
   const analyzeInputs = useCallback(
     async (
@@ -187,12 +193,8 @@ export function useBulkPhotoImport() {
           ...embeddedManifests,
           ...manifests,
         ]);
-        if (analysisIdRef.current !== analysisId) return [];
-        setLibrary(loadedLibrary);
-        setRows(reviewRows);
-        setLastResult(null);
-        readyAnalysisIdRef.current = analysisId;
-        setReadyAnalysisId(analysisId);
+        if (stateRef.current.id !== analysisId) return [];
+        transition({ type: 'ready', id: analysisId, rows: reviewRows, library: loadedLibrary });
         notify({
           kind: 'info',
           title: 'Photo matches ready',
@@ -200,7 +202,7 @@ export function useBulkPhotoImport() {
         });
         return reviewRows;
       } catch (error) {
-        if (analysisIdRef.current !== analysisId) return [];
+        if (stateRef.current.id !== analysisId) return [];
         const message = error instanceof Error ? error.message : 'Could not analyze photos';
         logger.error('Bulk photo analysis failed', error);
         captureImportExportException(error, {
@@ -212,10 +214,10 @@ export function useBulkPhotoImport() {
         notify({ kind: 'error', title: 'Photo analysis failed', description: message });
         return [];
       } finally {
-        if (analysisIdRef.current === analysisId) setLoading(false);
+        transition({ type: 'analysis-finished', id: analysisId });
       }
     },
-    []
+    [transition]
   );
 
   const analyzeFileList = useCallback(
@@ -231,10 +233,10 @@ export function useBulkPhotoImport() {
       const analysisId = beginAnalysis();
       try {
         const { files, manifests } = await unzipPhotoInputs(file);
-        if (analysisIdRef.current !== analysisId) return [];
+        if (stateRef.current.id !== analysisId) return [];
         return await analyzeInputs(files, analysisId, manifests);
       } catch (error) {
-        if (analysisIdRef.current !== analysisId) return [];
+        if (stateRef.current.id !== analysisId) return [];
         const message = error instanceof Error ? error.message : 'Could not read ZIP file';
         logger.error('Bulk photo ZIP analysis failed', error);
         captureImportExportException(error, {
@@ -246,21 +248,26 @@ export function useBulkPhotoImport() {
         notify({ kind: 'error', title: 'ZIP import failed', description: message });
         return [];
       } finally {
-        if (analysisIdRef.current === analysisId) setLoading(false);
+        transition({ type: 'analysis-finished', id: analysisId });
       }
     },
-    [analyzeInputs, beginAnalysis]
+    [analyzeInputs, beginAnalysis, transition]
   );
 
-  const updateRow = useCallback((rowId: string, patch: Partial<BulkPhotoReviewRow>) => {
-    setRows(currentRows => currentRows.map(row => (row.id === rowId ? { ...row, ...patch } : row)));
-  }, []);
+  const updateRow = useCallback(
+    (rowId: string, patch: Partial<BulkPhotoReviewRow>) => {
+      setRows(currentRows =>
+        currentRows.map(row => (row.id === rowId ? { ...row, ...patch } : row))
+      );
+    },
+    [setRows]
+  );
 
   const importConfirmed = useCallback(async () => {
-    if (!library || readyAnalysisId === null || readyAnalysisIdRef.current !== readyAnalysisId) {
-      return null;
-    }
-    setLoading(true);
+    const current = stateRef.current;
+    if (!library || current.phase !== 'review' || current.id !== state.id) return null;
+    const readyAnalysisId = current.id;
+    transition({ type: 'import' });
     const startedAt = Date.now();
     const selectedCount = rows.filter(isImportableBulkRow).length;
     captureImportExportEvent(AnalyticsEvent.BULK_PHOTO_IMPORT_STARTED, {
@@ -269,7 +276,7 @@ export function useBulkPhotoImport() {
     });
     try {
       const result = await importBulkPhotos(rows, library);
-      if (analysisIdRef.current === readyAnalysisId) setLastResult(result);
+      transition({ type: 'result', id: readyAnalysisId, result });
       await refreshImportExportQueriesBestEffort(
         () =>
           invalidateImportExportQueries(queryClient, [], {
@@ -316,9 +323,9 @@ export function useBulkPhotoImport() {
       notify({ kind: 'error', title: 'Photo import failed', description: message });
       return null;
     } finally {
-      if (analysisIdRef.current === readyAnalysisId) setLoading(false);
+      transition({ type: 'import-finished', id: readyAnalysisId });
     }
-  }, [library, queryClient, readyAnalysisId, rows]);
+  }, [library, queryClient, state.id, rows, transition]);
 
   return {
     analyzeFileList,

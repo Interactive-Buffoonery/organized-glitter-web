@@ -199,10 +199,10 @@ const ProjectDetailView = ({
   const progressRegionRef = useRef<HTMLDivElement>(null);
   const canLogProgress = ['progress', 'onhold', 'completed'].includes(project.status);
   const focusProgressComposer = () => {
-    const field = progressRegionRef.current?.querySelector('textarea');
-    if (!field) return;
-    field.focus({ preventScroll: true });
-    field.scrollIntoView({ block: 'center', behavior: 'instant' });
+    const region = progressRegionRef.current;
+    const field = region?.querySelector('textarea');
+    field?.focus({ preventScroll: true });
+    (field ?? region)?.scrollIntoView({ block: 'center', behavior: 'instant' });
   };
 
   const handleDeleteActionSelect = useCallback((event: Event) => {

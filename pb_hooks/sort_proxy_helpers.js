@@ -13,7 +13,7 @@ function ownedTaxonomyName(app, record, field, collection) {
   }
 }
 
-function syncProject(e, isUpdate) {
+function syncProject(e) {
   try {
     const stripLeading = function (s) {
       if (!s) return '';
@@ -23,17 +23,6 @@ function syncProject(e, isUpdate) {
     };
 
     const record = e.record;
-    const completionDate = record.getString('date_completed');
-    const incomingStatus = record.getString('status');
-    if (
-      e.context.value('organized_glitter_archive_restore') !== true &&
-      completionDate &&
-      (!isUpdate || completionDate !== record.original().getString('date_completed')) &&
-      incomingStatus !== 'archived' &&
-      incomingStatus !== 'destashed'
-    ) {
-      record.set('status', 'completed');
-    }
     const title = record.get('title') || '';
     const status = record.get('status') || '';
     const datePurchased = record.get('date_purchased') || '';

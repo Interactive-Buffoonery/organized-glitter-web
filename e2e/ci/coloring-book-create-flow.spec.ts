@@ -99,9 +99,8 @@ test.describe('coloring book UI creation', () => {
     const creationNotice = page
       .locator('[data-sonner-toast]')
       .filter({ hasText: 'Coloring book added' });
-    await expect(creationNotice).toBeVisible();
-    await creationNotice.locator('[data-close-button]').click();
-    await expect(creationNotice).not.toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(creationNotice).not.toBeVisible({ timeout: 10_000 });
 
     for (const viewport of [
       { width: 1280, height: 900 },

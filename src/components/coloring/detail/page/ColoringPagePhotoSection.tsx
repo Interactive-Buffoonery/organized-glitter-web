@@ -2,9 +2,7 @@ import { PrivateFileImage } from '@/components/image/PrivateFileImage';
 import { useRef } from 'react';
 import type { ChangeEvent, Ref } from 'react';
 import { ImagePlus, Trash2 } from 'lucide-react';
-import { ColoringPageProgressNotes } from '@/components/coloring/ColoringPageProgressNotes';
 import { ImageCropDialog } from '@/components/image/ImageCropDialog';
-import type { ProgressNoteDialogTarget } from '@/components/projects/ProgressNoteDialog';
 import { Section, SectionHeading } from '@/components/shared/Section';
 import {
   AlertDialog,
@@ -26,7 +24,6 @@ interface ColoringPagePhotoSectionProps {
   page: ColoringPageDTO;
   pagePhotoUrls: string[];
   leadPhotoUrl: string | undefined;
-  progressNoteTarget?: ProgressNoteDialogTarget;
   disabled: boolean;
   photoCropFile: File | null;
   isPhotoCropDialogOpen: boolean;
@@ -63,7 +60,6 @@ export function ColoringPagePhotoSection({
   page,
   pagePhotoUrls,
   leadPhotoUrl,
-  progressNoteTarget,
   disabled,
   photoCropFile,
   isPhotoCropDialogOpen,
@@ -95,15 +91,15 @@ export function ColoringPagePhotoSection({
       />
 
       <Section landmark={false}>
-        <div className="bg-muted/30 overflow-hidden rounded-2xl border shadow-[inset_0_1px_0_hsl(var(--glass-highlight))]">
+        <div className="bg-muted/30 overflow-hidden lg:rounded-xl">
           {leadPhotoUrl ? (
             <PrivateFileImage
               src={leadPhotoUrl}
               alt={`Page ${page.pageNumber} lead artwork`}
-              className="mx-auto aspect-[3/4] max-h-[72vh] w-full max-w-3xl object-contain"
+              className="mx-auto h-72 w-full object-contain lg:aspect-[3/2] lg:h-auto lg:max-h-[70vh] lg:min-h-64"
             />
           ) : (
-            <div className="feat-paper flex aspect-[3/4] max-h-[72vh] min-h-[24rem] w-full flex-col items-center justify-center gap-4 text-center">
+            <div className="flex aspect-[3/2] min-h-64 w-full flex-col items-center justify-center gap-4 text-center">
               <p className="text-muted-foreground text-sm">No photo yet</p>
               <Button
                 type="button"
@@ -138,105 +134,108 @@ export function ColoringPagePhotoSection({
       </Section>
 
       {pagePhotoUrls.length > 0 ? (
-        <Section className="space-y-4" landmark={false}>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <SectionHeading>Manage photos</SectionHeading>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => manageUploadInputRef.current?.click()}
-              disabled={disabled}
-            >
-              <ImagePlus className="mr-2 size-4" aria-hidden="true" />
-              Add photos
-            </Button>
-            <PagePhotoUploadInput
-              ref={manageUploadInputRef}
-              onChange={onPhotoUpload}
-              disabled={disabled}
-            />
-          </div>
+        <details id="page-photo-manager" className="scroll-mt-24 px-4 lg:px-0">
+          <summary className="decoration-primary/50 flex min-h-11 cursor-pointer items-center text-sm underline decoration-2 underline-offset-4">
+            Manage {page.photos.length} photos
+          </summary>
+          <Section className="space-y-4" landmark={false}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <SectionHeading>Manage photos</SectionHeading>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => manageUploadInputRef.current?.click()}
+                disabled={disabled}
+              >
+                <ImagePlus className="mr-2 size-4" aria-hidden="true" />
+                Add photos
+              </Button>
+              <PagePhotoUploadInput
+                ref={manageUploadInputRef}
+                onChange={onPhotoUpload}
+                disabled={disabled}
+              />
+            </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {pagePhotoUrls.map((url, index) => {
-              const filename = page.photos[index];
-              const isMainImage = index === 0;
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {pagePhotoUrls.map((url, index) => {
+                const filename = page.photos[index];
+                const isMainImage = index === 0;
 
-              return (
-                <div
-                  key={filename}
-                  className="border-border/60 bg-background/40 space-y-3 rounded-lg border p-2"
-                >
-                  <div className="relative overflow-hidden rounded-md">
-                    <PrivateFileImage
-                      src={url}
-                      alt={`Page ${page.pageNumber} attachment ${index + 1}`}
-                      className="aspect-[4/3] w-full object-cover"
-                      loading="lazy"
-                    />
-                    {isMainImage ? (
-                      <span className="bg-background/85 text-foreground absolute top-2 left-2 rounded-md px-2 py-1 text-xs font-medium shadow-sm">
-                        Main image
-                      </span>
-                    ) : null}
-                  </div>
+                return (
+                  <div
+                    key={filename}
+                    className="border-border/60 bg-background/40 space-y-3 rounded-lg border p-2"
+                  >
+                    <div className="relative overflow-hidden rounded-md">
+                      <PrivateFileImage
+                        src={url}
+                        alt={`Page ${page.pageNumber} attachment ${index + 1}`}
+                        className="aspect-[4/3] w-full object-cover"
+                        loading="lazy"
+                      />
+                      {isMainImage ? (
+                        <span className="bg-background/85 text-foreground absolute top-2 left-2 rounded-md px-2 py-1 text-xs font-medium shadow-sm">
+                          Main image
+                        </span>
+                      ) : null}
+                    </div>
 
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    {isMainImage ? (
-                      <span className="text-muted-foreground text-sm">Shown above</span>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onSetMainPhoto(filename)}
-                        disabled={disabled}
-                        aria-label={`Set photo ${index + 1} as main image`}
-                      >
-                        Set as main
-                      </Button>
-                    )}
-
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      {isMainImage ? (
+                        <span className="text-muted-foreground text-sm">Shown above</span>
+                      ) : (
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="text-destructive-text sm:ml-auto"
-                          aria-label={`Delete photo ${index + 1}`}
+                          onClick={() => onSetMainPhoto(filename)}
+                          disabled={disabled}
+                          aria-label={`Set photo ${index + 1} as main image`}
                         >
-                          <Trash2 className="mr-2 size-4" aria-hidden="true" />
-                          Delete photo
+                          Set as main
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete this photo?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This removes the photo from this coloring page.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            className={buttonVariants({ variant: 'destructive' })}
-                            onClick={() => onPhotoDelete(filename)}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Section>
-      ) : null}
+                      )}
 
-      <ColoringPageProgressNotes pageId={page.id} target={progressNoteTarget} />
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive-text sm:ml-auto"
+                            aria-label={`Delete photo ${index + 1}`}
+                          >
+                            <Trash2 className="mr-2 size-4" aria-hidden="true" />
+                            Delete photo
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete this photo?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This removes the photo from this coloring page.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className={buttonVariants({ variant: 'destructive' })}
+                              onClick={() => onPhotoDelete(filename)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+        </details>
+      ) : null}
     </div>
   );
 }

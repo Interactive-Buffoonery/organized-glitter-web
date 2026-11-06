@@ -4,7 +4,7 @@ export interface ProgressNoteFormProps {
   onSubmit: (note: { date: string; content: MarkdownString; imageFile?: File }) => Promise<boolean>;
   onSuccess?: () => void;
   disabled?: boolean;
-  variant?: 'default' | 'dialog-sheet';
+  variant?: 'default' | 'dialog-sheet' | 'composer';
 }
 
 export interface ProgressNoteFormErrors {

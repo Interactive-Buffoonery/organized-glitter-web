@@ -330,6 +330,14 @@ export const queryKeys = {
         [...queryKeys.coloring.pages.lists(), createStableKey(filters)] as const,
       details: () => [...queryKeys.coloring.pages.all, 'detail'] as const,
       detail: (pageId: string) => [...queryKeys.coloring.pages.details(), pageId] as const,
+      book: (bookId: string) => [...queryKeys.coloring.pages.all, 'book', bookId] as const,
+      bookPhotos: (bookId: string, userId: string) =>
+        [
+          ...queryKeys.coloring.pages.all,
+          'book-photos',
+          bookId,
+          createUserKeyHash(userId),
+        ] as const,
     },
     pageProgressNotes: {
       all: ['coloring-page-progress-notes'] as const,

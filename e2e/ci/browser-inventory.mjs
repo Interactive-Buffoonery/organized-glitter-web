@@ -15,6 +15,7 @@ export const browserSpecInventory = {
   ],
   affectedOrRelease: [
     'authenticated/color-keys-local.spec.ts',
+    'authenticated/library-redesign-local.spec.ts',
     'authenticated/protected-file-rotation-local.spec.ts',
     'blog.spec.ts',
     'cold-load.spec.ts',

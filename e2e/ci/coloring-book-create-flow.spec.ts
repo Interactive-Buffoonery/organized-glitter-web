@@ -96,6 +96,13 @@ test.describe('coloring book UI creation', () => {
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
     await expect(page.getByText('2 pages', { exact: true })).toBeVisible();
 
+    const creationNotice = page
+      .locator('[data-sonner-toast]')
+      .filter({ hasText: 'Coloring book added' });
+    await expect(creationNotice).toBeVisible();
+    await creationNotice.locator('[data-close-button]').click();
+    await expect(creationNotice).not.toBeVisible();
+
     for (const viewport of [
       { width: 1280, height: 900 },
       { width: 390, height: 844 },

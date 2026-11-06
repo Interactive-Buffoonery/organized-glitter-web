@@ -22,7 +22,7 @@ export const browserSpecInventory = {
     'not-found.spec.ts',
     'pwa-navigation.spec.ts',
   ],
-  manualVisual: ['screen-review/screen-review.spec.ts'],
+  manualVisual: ['overview-layout.spec.ts', 'screen-review/screen-review.spec.ts'],
   hostedDeployment: [
     'hosted/authenticated.spec.ts',
     'hosted/mobile.spec.ts',

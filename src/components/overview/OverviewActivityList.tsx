@@ -67,7 +67,7 @@ export function OverviewActivityList({
 
   return (
     <div className="@container/activity">
-      <div className="text-muted-foreground border-border/60 hidden grid-cols-[minmax(0,1fr)_11rem_1rem] gap-3 border-b px-2 pb-3 text-xs font-semibold @min-[36rem]/activity:grid">
+      <div className="text-muted-foreground border-border/60 hidden grid-cols-[minmax(0,1fr)_11rem_1rem] gap-3 border-b pb-3 text-xs font-semibold @min-[36rem]/activity:grid">
         <span>Project</span>
         <span>Last activity</span>
         <span className="sr-only">Open project</span>

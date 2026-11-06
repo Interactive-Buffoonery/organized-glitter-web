@@ -49,7 +49,7 @@ export const ColoringBookDetailActions = ({
         onClick={onEdit}
         disabled={updatePending}
         aria-label="Edit coloring book"
-        className="text-primary hover:bg-primary/10 hover:text-primary px-2.5 font-medium pointer-coarse:min-h-11"
+        className="text-foreground px-2.5 font-medium pointer-coarse:min-h-11"
       >
         Edit
       </Button>

@@ -109,6 +109,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
           <div className="flex items-start gap-3">
             <Checkbox
               id="search-all-fields"
+              className="mt-0.5"
               checked={filters.searchAllFields}
               onCheckedChange={value => updateSearchAllFields(Boolean(value))}
               aria-describedby="search-all-fields-help"
@@ -182,7 +183,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
 
               {activeStatus !== 'everything' && (
                 <p className="text-muted-foreground text-xs">
-                  Choose Everything to include archived or destashed kits.
+                  Choose All to include archived or destashed kits.
                 </p>
               )}
               <div className="flex items-center gap-x-3">

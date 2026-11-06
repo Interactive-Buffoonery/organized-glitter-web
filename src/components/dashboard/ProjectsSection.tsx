@@ -38,20 +38,25 @@ const ProjectsSectionComponent = ({ dashboardData, isCorrectingPage }: ProjectsS
   // Dismiss splash on mount; projects still use in-app loading UI.
   useAppReady();
 
+  const hasLoadError =
+    dashboardData.errorProjects && !ErrorHandler.isCancelledError(dashboardData.errorProjects);
+  const errorNotice = hasLoadError ? (
+    <div role="alert" className="border-border space-y-3 rounded-xl border p-5">
+      <p className="text-foreground font-medium">Could not load your projects</p>
+      <p className="text-muted-foreground text-sm">Please try again. Your library is still here.</p>
+      <Button type="button" variant="glass" onClick={() => dashboardData.refetchProjects()}>
+        Try again
+      </Button>
+    </div>
+  ) : null;
+
+  if (hasLoadError && dashboardData.projects.length === 0) {
+    return <div className="lg:col-span-3">{errorNotice}</div>;
+  }
+
   return (
     <div className="space-y-6 lg:col-span-3">
-      {dashboardData.errorProjects &&
-        !ErrorHandler.isCancelledError(dashboardData.errorProjects) && (
-          <div role="alert" className="border-border space-y-3 rounded-xl border p-5">
-            <p className="text-foreground font-medium">Could not load your projects</p>
-            <p className="text-muted-foreground text-sm">
-              Please try again. Your library is still here.
-            </p>
-            <Button type="button" variant="glass" onClick={() => dashboardData.refetchProjects()}>
-              Try again
-            </Button>
-          </div>
-        )}
+      {errorNotice}
 
       <DashboardStatusSegments
         activeStatus={filters.activeStatus}

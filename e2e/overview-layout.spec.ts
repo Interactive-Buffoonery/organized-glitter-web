@@ -6,6 +6,9 @@ for (const [width, height] of [
   [1024, 800],
   [768, 800],
   [390, 844],
+  [480, 844],
+  [540, 844],
+  [600, 844],
   [1536, 900],
 ]) {
   test(`overview project identity at ${width}px`, async ({ page }) => {
@@ -31,6 +34,14 @@ for (const [width, height] of [
         activityBox!.x >= identityBox!.x + identityBox!.width ||
           activityBox!.y >= identityBox!.y + identityBox!.height
       ).toBe(true);
+      if (activityBox!.y >= identityBox!.y + identityBox!.height) {
+        const activityTextX = await activity.evaluate(element => {
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          return range.getBoundingClientRect().x;
+        });
+        expect(Math.abs(activityTextX - titleBox!.x)).toBeLessThan(1);
+      }
       await expect(activity).toBeVisible();
       await expect(activity).toHaveText('Updated today');
       await expect(link).toHaveAccessibleName(/NASA|Smithsonian|Summer Garden/);

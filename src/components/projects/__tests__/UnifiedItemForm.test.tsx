@@ -94,7 +94,7 @@ describe('unified item form layout', () => {
     }
     expect(
       form.getByRole('combobox', { name: 'Status' }).querySelector('span.rounded-full')
-    ).toHaveClass(kind === 'project' ? 'bg-rose-500' : 'bg-sky-500');
+    ).toHaveClass(kind === 'project' ? 'bg-rose-700' : 'bg-sky-700', 'text-white');
     const dates = form.getByRole('heading', { name: 'Dates' }).closest('section')!;
     for (const label of ['Purchased', 'Received', 'Started', 'Completed']) {
       expect(within(dates).getByLabelText(label)).toBeInTheDocument();

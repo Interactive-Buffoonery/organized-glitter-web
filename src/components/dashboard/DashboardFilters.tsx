@@ -29,7 +29,7 @@ interface DashboardFiltersProps {
    */
   hideViewToggle?: boolean;
   /**
-   * Skip the in-panel "Reset All Filters" button. Used when the surrounding
+   * Skip the in-panel "Reset all filters" button. Used when the surrounding
    * container provides its own reset control (e.g. the mobile drawer footer).
    */
   hideResetButton?: boolean;
@@ -122,7 +122,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
           />
 
           <FilterDropdown
-            label="Drill Shape"
+            label="Drill shape"
             options={drillShapesOptions}
             value={selectedDrillShape}
             onChange={updateDrillShape}
@@ -139,7 +139,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
           />
 
           <FilterDropdown
-            label="Year Finished"
+            label="Year finished"
             options={yearFinishedOptions}
             value={selectedYearFinished}
             onChange={updateYearFinished}
@@ -159,7 +159,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
                   data-testid="include-mini-kits-checkbox"
                 />
                 <Label htmlFor="include-mini-kits" className="text-sm font-normal">
-                  Mini Kits
+                  Mini kits
                 </Label>
               </div>
 
@@ -175,7 +175,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
                   htmlFor="include-destashed-kits"
                   className={`text-sm font-normal ${activeStatus !== 'everything' ? 'text-muted-foreground' : ''}`}
                 >
-                  Destashed Kits
+                  Destashed kits
                 </Label>
               </div>
 
@@ -191,7 +191,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
                   htmlFor="include-archived-kits"
                   className={`text-sm font-normal ${activeStatus !== 'everything' ? 'text-muted-foreground' : ''}`}
                 >
-                  Archived Kits
+                  Archived kits
                 </Label>
               </div>
             </div>
@@ -212,12 +212,13 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
 
           {!hideResetButton && (
             <Button
+              type="button"
               variant="outline"
               onClick={() => resetDashboardFilterPanel()}
               className="w-full"
               data-testid="reset-filters-button"
             >
-              Reset All Filters
+              Reset all filters
             </Button>
           )}
         </div>

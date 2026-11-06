@@ -26,6 +26,7 @@ interface TimelineDateEditorProps {
   isSet: boolean;
   formattedDisplay: string;
   className?: string;
+  emptyDisplay?: string;
   editorState: TimelineDateEditorState | null;
   onEditorStateChange: Dispatch<SetStateAction<TimelineDateEditorState | null>>;
 }
@@ -45,6 +46,7 @@ const TimelineDateEditor = ({
   isSet,
   formattedDisplay,
   className,
+  emptyDisplay = 'Not set',
   editorState,
   onEditorStateChange,
 }: TimelineDateEditorProps) => {
@@ -106,18 +108,18 @@ const TimelineDateEditor = ({
   const trigger = (
     <button
       type="button"
-      aria-label={`Edit ${label} date: ${isSet ? formattedDisplay : 'Not set'}`}
+      aria-label={`Edit ${label} date: ${isSet ? formattedDisplay : emptyDisplay}`}
       className={cn(
         'cursor-pointer rounded-sm text-left transition-colors',
         'decoration-border underline-offset-4 hover:underline',
         'focus-visible:ring-primary/40 focus-visible:ring-2 focus-visible:outline-none',
         isSet
           ? 'text-foreground hover:text-foreground font-medium'
-          : 'text-muted-foreground/55 hover:text-muted-foreground font-normal italic',
+          : 'text-primary font-normal underline underline-offset-4',
         className
       )}
     >
-      {isSet ? formattedDisplay : 'Not set'}
+      {isSet ? formattedDisplay : emptyDisplay}
     </button>
   );
 
@@ -125,13 +127,11 @@ const TimelineDateEditor = ({
     <>
       <div className="min-h-0 overflow-y-auto overscroll-contain p-4">
         {isDesktop ? (
-          <DialogTitle className="text-muted-foreground mb-3 flex min-h-9 items-center pr-10 text-[11px] font-semibold tracking-[0.12em] uppercase">
+          <DialogTitle className="text-muted-foreground mb-3 flex min-h-9 items-center pr-10 text-sm font-semibold">
             {label}
           </DialogTitle>
         ) : (
-          <h3 className="text-muted-foreground mb-3 text-[11px] font-semibold tracking-[0.12em] uppercase">
-            {label}
-          </h3>
+          <h3 className="text-muted-foreground mb-3 text-sm font-semibold">{label}</h3>
         )}
         <DateField
           ref={inputRef}

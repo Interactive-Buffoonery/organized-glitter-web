@@ -9,16 +9,18 @@ import {
 } from '@/components/ui/select';
 import { useProjectStatus } from '@/hooks/useProjectStatus';
 import { cn } from '@/lib/utils';
+import { FILTER_STATUS_ACTIVE_FILL } from '@/utils/statusColors';
 
 interface StatusDropdownProps {
   currentStatus: ProjectStatus;
   onStatusChange: (status: ProjectStatus) => void;
   /**
    * `default`: full-width Select trigger (form control look).
-   * `pill`: compact rounded pill with a leading colored dot, suited for the
+   * `pill`: compact rounded pill with a solid status fill, suited for the
    *   project detail title row. Still opens the same status menu on click.
    */
   variant?: 'default' | 'pill';
+  disabled?: boolean;
 }
 
 // Map the color classes to match the dropdown's design
@@ -42,28 +44,27 @@ const StatusDropdown = ({
   currentStatus,
   onStatusChange,
   variant = 'default',
+  disabled = false,
 }: StatusDropdownProps) => {
   const { getStatusLabel } = useProjectStatus();
   const colorClass = getDropdownStatusColor(currentStatus);
 
   if (variant === 'pill') {
     return (
-      <Select value={currentStatus} onValueChange={value => onStatusChange(value as ProjectStatus)}>
+      <Select
+        disabled={disabled}
+        value={currentStatus}
+        onValueChange={value => onStatusChange(value as ProjectStatus)}
+      >
         <SelectTrigger
           className={cn(
-            // Compact pill: tinted background, colored dot leading, no border chrome
-            'inline-flex size-auto min-w-0 items-center gap-2 rounded-full border-0 bg-current/10 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] shadow-none focus:ring-0 focus:ring-offset-0',
+            'inline-flex size-auto min-h-11 min-w-0 items-center gap-2 rounded-full border-0 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] shadow-none focus:ring-0 focus:ring-offset-0',
             // Hide the default chevron so the pill stays minimal; it's clear-on-hover
-            '[&>svg]:hidden',
-            colorClass
+            '[&>svg]:size-3',
+            FILTER_STATUS_ACTIVE_FILL[currentStatus]
           )}
           aria-label="Change project status"
         >
-          <span
-            className="size-1.5 shrink-0 rounded-full bg-current opacity-100 shadow-[0_0_0_3px_currentColor]"
-            style={{ boxShadow: '0 0 0 3px color-mix(in srgb, currentColor 18%, transparent)' }}
-            aria-hidden="true"
-          />
           <SelectValue placeholder={getStatusLabel(currentStatus)} />
         </SelectTrigger>
         <SelectContent className="bg-popover text-popover-foreground">
@@ -83,7 +84,11 @@ const StatusDropdown = ({
 
   return (
     <div className="w-full">
-      <Select value={currentStatus} onValueChange={value => onStatusChange(value as ProjectStatus)}>
+      <Select
+        disabled={disabled}
+        value={currentStatus}
+        onValueChange={value => onStatusChange(value as ProjectStatus)}
+      >
         <SelectTrigger className={`${colorClass} font-medium`} aria-label="Change project status">
           <SelectValue placeholder={getStatusLabel(currentStatus)} />
         </SelectTrigger>

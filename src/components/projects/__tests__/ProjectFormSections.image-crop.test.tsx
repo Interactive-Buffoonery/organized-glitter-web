@@ -154,9 +154,14 @@ const renderProjectForm = (
   const ProjectFormHarness = () => {
     const [currentFormData, setCurrentFormData] = useState(formData);
 
-    const handleChange = (nextFormData: ProjectFormValues) => {
-      onChangeMock(nextFormData);
-      setCurrentFormData(nextFormData);
+    const handleChange = (
+      update: ProjectFormValues | ((previous: ProjectFormValues) => ProjectFormValues)
+    ) => {
+      setCurrentFormData(previous => {
+        const next = typeof update === 'function' ? update(previous) : update;
+        onChangeMock(next);
+        return next;
+      });
     };
 
     return (
@@ -184,6 +189,24 @@ const deferred = <T,>() => {
 };
 
 describe('ProjectFormSections project image cropping', () => {
+  it('passes field updates as functions that preserve concurrent edits', async () => {
+    render(
+      <ProjectFormSections
+        formData={baseFormData}
+        companies={[]}
+        artists={[]}
+        isSubmitting={false}
+        onChange={onChangeMock}
+      />
+    );
+    fireEvent.change(screen.getByLabelText(/title/i), { target: { value: 'New title' } });
+    const update = onChangeMock.mock.calls.at(-1)?.[0];
+    expect(update).toBeTypeOf('function');
+    expect(update({ ...baseFormData, generalNotes: 'Concurrent notes' })).toEqual(
+      expect.objectContaining({ title: 'New title', generalNotes: 'Concurrent notes' })
+    );
+  });
+
   beforeEach(() => {
     Element.prototype.hasPointerCapture ??= vi.fn(() => false);
     Element.prototype.setPointerCapture ??= vi.fn();
@@ -193,6 +216,7 @@ describe('ProjectFormSections project image cropping', () => {
     handleImageRemoveMock.mockReset();
     applyProcessedImageMock.mockReset();
     onChangeMock.mockReset();
+    onChangeMock.mockImplementation(() => {});
     imageUploadState.preview = null;
     imageUploadState.file = null;
     imageUploadState.processedFile = null;
@@ -253,9 +277,13 @@ describe('ProjectFormSections project image cropping', () => {
     );
 
     fireEvent.change(screen.getByLabelText('Date completed'), { target: { value: '' } });
-    expect(onChangeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ dateCompleted: '', status: 'progress' })
-    );
+    expect(
+      onChangeMock.mock.calls.at(-1)?.[0]({
+        ...baseFormData,
+        status: 'completed',
+        dateCompleted: '2026-09-20',
+      })
+    ).toEqual(expect.objectContaining({ dateCompleted: '', status: 'progress' }));
   });
 
   describe('leaving a saved Completed status', () => {
@@ -299,9 +327,9 @@ describe('ProjectFormSections project image cropping', () => {
       renderSavedCompleted('2026-09-20');
       await pickOnHold(user);
       await user.click(await screen.findByRole('button', { name: 'Change status' }));
-      expect(onChangeMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({ status: 'onhold', dateCompleted: '2026-09-20' })
-      );
+      expect(
+        onChangeMock.mock.calls.at(-1)?.[0]({ ...baseFormData, dateCompleted: '2026-09-20' })
+      ).toEqual(expect.objectContaining({ status: 'onhold', dateCompleted: '2026-09-20' }));
     });
 
     it('keeps edits that arrive while the prompt is open', async () => {
@@ -320,7 +348,7 @@ describe('ProjectFormSections project image cropping', () => {
       await screen.findByRole('alertdialog');
       rerender(<ProjectFormSections formData={{ ...saved, title: 'Newer title' }} {...props} />);
       await user.click(screen.getByRole('button', { name: 'Change status' }));
-      expect(onChangeMock).toHaveBeenLastCalledWith(
+      expect(onChangeMock.mock.calls.at(-1)?.[0]({ ...saved, title: 'Newer title' })).toEqual(
         expect.objectContaining({ status: 'onhold', title: 'Newer title' })
       );
     });
@@ -330,7 +358,7 @@ describe('ProjectFormSections project image cropping', () => {
       renderSavedCompleted('');
       await pickOnHold(user);
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-      expect(onChangeMock).toHaveBeenLastCalledWith(
+      expect(onChangeMock.mock.calls.at(-1)?.[0]({ ...baseFormData, dateCompleted: '' })).toEqual(
         expect.objectContaining({ status: 'onhold', dateCompleted: '' })
       );
     });

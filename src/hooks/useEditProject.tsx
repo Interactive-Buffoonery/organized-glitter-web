@@ -1,3 +1,4 @@
+import { useProjectFormState, type ProjectFormUpdate } from '@/hooks/useProjectFormState';
 /**
  * @fileoverview React Query-based project editing hook with proper authentication dependencies
  *
@@ -41,11 +42,7 @@ import {
   isUncertainProjectSaveError,
 } from '@/utils/project/projectSaveError';
 import { hasErrorStatus, isImageMimeRejection, normalizeError } from '@/services/errors';
-import {
-  mapProjectServerFieldErrors,
-  validateProjectFormValues,
-  type ProjectFormFieldErrors,
-} from '@/schemas/project.schema';
+import { mapProjectServerFieldErrors, validateProjectFormValues } from '@/schemas/project.schema';
 import type { IncompatibleImageDetails } from '@/components/projects/IncompatibleImageDialog';
 import { useRecoverableDraft } from '@/hooks/drafts/useRecoverableDraft';
 import {
@@ -62,29 +59,6 @@ type EditProjectSessionDraft = {
 };
 
 const logger = createLogger('useEditProject');
-
-const clearChangedFieldErrors = (
-  errors: ProjectFormFieldErrors,
-  previous: ProjectFormValues,
-  next: ProjectFormValues
-): ProjectFormFieldErrors => {
-  const nextErrors = { ...errors };
-
-  for (const field of Object.keys(nextErrors) as Array<keyof ProjectFormValues>) {
-    const previousValue = previous[field];
-    const nextValue = next[field];
-    const changed =
-      Array.isArray(previousValue) || Array.isArray(nextValue)
-        ? JSON.stringify(previousValue) !== JSON.stringify(nextValue)
-        : previousValue !== nextValue;
-
-    if (changed) {
-      delete nextErrors[field];
-    }
-  }
-
-  return nextErrors;
-};
 
 /**
  * Prepare initial form data from project
@@ -267,15 +241,22 @@ export const useEditProject = (
       ? { projectId, revision: restoredSessionDraft.baselineRevision }
       : null
   );
-  const [formData, setFormData] = useState<ProjectFormValues | null>(
-    () => restoredSessionDraft?.formData ?? null
+  const {
+    formData,
+    setFormData,
+    fieldErrors,
+    setFieldErrors,
+    missingPhoto,
+    setMissingPhoto,
+    changeFormData,
+  } = useProjectFormState<ProjectFormValues | null>(
+    () => restoredSessionDraft?.formData ?? null,
+    restoredSessionDraft?.missingPhoto ?? false
   );
   const [submitting, setSubmitting] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [acceptedRevision, setAcceptedRevision] = useState<number | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<ProjectFormFieldErrors>({});
   const [imageCompatError, setImageCompatError] = useState<IncompatibleImageDetails | null>(null);
-  const [missingPhoto, setMissingPhoto] = useState(restoredSessionDraft?.missingPhoto ?? false);
   const [statusBeforeDateChange, setStatusBeforeDateChange] = useState<
     ProjectFormValues['status'] | null
   >(restoredSessionDraft?.statusBeforeDateChange ?? null);
@@ -363,23 +344,12 @@ export const useEditProject = (
     }
   }, [initialFormData, project?.id, formData]);
 
-  // Form data change handler (full data)
   const handleFormDataChange = useCallback(
-    (data: ProjectFormValues) => {
+    (update: ProjectFormUpdate) => {
       markChanged();
-      if (data.imageFile || data.imageRemoved) setMissingPhoto(false);
-      if (formData) {
-        setFieldErrors(errors => clearChangedFieldErrors(errors, formData, data));
-      }
-
-      setFormData(prev => {
-        if (prev && !hasProjectFormChanges(prev, data)) {
-          return prev;
-        }
-        return data;
-      });
+      changeFormData(update);
     },
-    [formData, markChanged]
+    [markChanged, changeFormData]
   );
 
   const useLatestRevision = useCallback(async () => {

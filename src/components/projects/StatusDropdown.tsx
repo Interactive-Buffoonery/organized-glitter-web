@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useAriaDisabledSelect } from '@/hooks/useAriaDisabledSelect';
 import { useProjectStatus } from '@/hooks/useProjectStatus';
 import { cn } from '@/lib/utils';
 import { FILTER_STATUS_ACTIVE_FILL } from '@/utils/statusColors';
@@ -48,17 +49,18 @@ const StatusDropdown = ({
 }: StatusDropdownProps) => {
   const { getStatusLabel } = useProjectStatus();
   const colorClass = getDropdownStatusColor(currentStatus);
+  const { selectProps, triggerProps } = useAriaDisabledSelect<ProjectStatus>(
+    disabled,
+    onStatusChange
+  );
 
   if (variant === 'pill') {
     return (
-      <Select
-        disabled={disabled}
-        value={currentStatus}
-        onValueChange={value => onStatusChange(value as ProjectStatus)}
-      >
+      <Select {...selectProps} value={currentStatus}>
         <SelectTrigger
+          {...triggerProps}
           className={cn(
-            'inline-flex size-auto min-h-11 min-w-0 items-center gap-2 rounded-full border-0 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] shadow-none focus:ring-0 focus:ring-offset-0',
+            'inline-flex size-auto min-h-11 min-w-0 items-center gap-2 rounded-full border-0 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] shadow-none focus:ring-2 focus:ring-offset-0',
             // Hide the default chevron so the pill stays minimal; it's clear-on-hover
             '[&>svg]:size-3',
             FILTER_STATUS_ACTIVE_FILL[currentStatus]
@@ -84,12 +86,12 @@ const StatusDropdown = ({
 
   return (
     <div className="w-full">
-      <Select
-        disabled={disabled}
-        value={currentStatus}
-        onValueChange={value => onStatusChange(value as ProjectStatus)}
-      >
-        <SelectTrigger className={`${colorClass} font-medium`} aria-label="Change project status">
+      <Select {...selectProps} value={currentStatus}>
+        <SelectTrigger
+          {...triggerProps}
+          className={`${colorClass} font-medium`}
+          aria-label="Change project status"
+        >
           <SelectValue placeholder={getStatusLabel(currentStatus)} />
         </SelectTrigger>
         <SelectContent className="bg-popover text-popover-foreground">

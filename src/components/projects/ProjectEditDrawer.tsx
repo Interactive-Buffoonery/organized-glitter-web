@@ -133,7 +133,6 @@ const ProjectEditDrawer = ({
               onStatusBeforeDateChange={setStatusBeforeDateChange}
               savedDateCompleted={project?.dateCompleted}
               fieldErrors={fieldErrors}
-              layout="drawer"
             />
           </div>
         ) : (

@@ -45,7 +45,6 @@ describe('unified item form layout', () => {
   );
   it.each([
     ['project', 'page'],
-    ['project', 'drawer'],
     ['book', 'page'],
     ['book', 'drawer'],
   ] as const)('orders the %s %s sections', (kind, layout) => {
@@ -54,7 +53,6 @@ describe('unified item form layout', () => {
         <div className="grid lg:grid-cols-[minmax(0,1fr)_320px]">
           <ProjectFormSections
             formData={{ title: '', status: 'wishlist', tags: [] } as ProjectFormValues}
-            layout={layout}
             companies={[]}
             artists={[]}
             isSubmitting={false}

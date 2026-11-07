@@ -33,7 +33,6 @@ interface ProjectFormSectionsProps {
   statusBeforeDateChange?: ProjectFormValues['status'] | null;
   onStatusBeforeDateChange?: (status: ProjectFormValues['status'] | null) => void;
   fieldErrors?: ProjectFormFieldErrors;
-  layout?: 'page' | 'drawer';
   onDraftCompany?: (data: CreateCompanyData) => void;
   onDraftArtist?: (data: CreateArtistData) => void;
 }

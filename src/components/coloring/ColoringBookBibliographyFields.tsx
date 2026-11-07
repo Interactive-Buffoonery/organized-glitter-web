@@ -157,7 +157,7 @@ export function ColoringBookBibliographyFields({
               ))}
             </SelectContent>
           </Select>
-        </div>{' '}
+        </div>
       </div>
     </Section>
   );

@@ -147,12 +147,12 @@ const ProjectFormSections = ({
     setCropFile(null);
     setIsCropDialogOpen(false);
     onChange({
-      ...formData,
+      ...formDataRef.current,
       imageFile: null,
       imageUrl: '',
       imageRemoved: true,
     });
-  }, [formData, imageUploadHook, onChange]);
+  }, [imageUploadHook, onChange]);
 
   const handleOpenCropDialog = useCallback(async () => {
     const remoteCropVersion = ++remoteCropVersionRef.current;
@@ -189,12 +189,12 @@ const ProjectFormSections = ({
       imageUploadHook.applyProcessedImage(file);
       setCropFile(file);
       onChange({
-        ...formData,
+        ...formDataRef.current,
         imageFile: file,
         imageRemoved: false,
       });
     },
-    [formData, imageUploadHook, onChange]
+    [imageUploadHook, onChange]
   );
 
   const handleUseOriginalImage = useCallback(
@@ -202,12 +202,12 @@ const ProjectFormSections = ({
       imageUploadHook.applyProcessedImage(file);
       setCropFile(file);
       onChange({
-        ...formData,
+        ...formDataRef.current,
         imageFile: file,
         imageRemoved: false,
       });
     },
-    [formData, imageUploadHook, onChange]
+    [imageUploadHook, onChange]
   );
 
   const handleTagsChange = useCallback(

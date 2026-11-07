@@ -1,15 +1,61 @@
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 import { requiredJobs } from '../ci-result.mjs';
 import {
   buildPhasePlan,
   ciJobForPhase,
+  phaseOutcome,
   parseArgs,
   formatValidationReport,
 } from '../run-local-validation.mjs';
 
 describe('local validation orchestrator', () => {
+  it('partitions all CI phases exactly once and rejects invalid selectors', () => {
+    const phases = buildPhasePlan('ci').map(([name]) => name);
+    expect(phases.flatMap(phase => buildPhasePlan('ci', phase))).toEqual(buildPhasePlan('ci'));
+    expect(() => buildPhasePlan('ci', 'static')).toThrow();
+    expect(() => parseArgs(['--profile=pr', '--base=origin/dev', '--phase=backend'])).toThrow();
+    expect(() => parseArgs(['--profile=ci', '--base=origin/dev', '--phase=typo'])).toThrow();
+    expect(parseArgs(['--profile=ci', '--base=origin/dev', '--phase=backend']).phase).toBe(
+      'backend'
+    );
+    expect(phaseOutcome('backend', 'ci', 'backend')).toBe('not-run');
+    expect(phaseOutcome('built-app', 'ci', 'backend')).toBe('delegated-to-ci-phase-built-app');
+    expect(phaseOutcome('static', 'ci', 'backend')).toBe('delegated-to-static-checks');
+  });
+
+  it('runs every CI phase in an isolated job and fails closed on the matrix result', () => {
+    const workflow = readFileSync(
+      new URL('../../.github/workflows/ci.yml', import.meta.url),
+      'utf8'
+    );
+    for (const [phase] of buildPhasePlan('ci')) expect(workflow).toContain(`- ${phase}`);
+    expect(workflow).toContain('fail-fast: false');
+    expect(workflow).toContain('run: pnpm test:pr:ci --phase=${{ matrix.phase }}');
+    expect(workflow).toContain('needs: [scope, validation-phase]');
+    expect(workflow).toContain('VALIDATION_RESULT: ${{ needs.validation-phase.result }}');
+    expect(workflow).toContain('test "$VALIDATION_RESULT" = success');
+  });
+
+  it('rejects every incomplete matrix outcome at the required gate', () => {
+    const workflow = readFileSync(
+      new URL('../../.github/workflows/ci.yml', import.meta.url),
+      'utf8'
+    );
+    const gate = workflow.split('  complete-pr:')[1].split('  result:')[0];
+    const command = gate.match(/run: (.+)/)[1];
+    for (const scope of ['success', 'failure', 'cancelled', 'skipped', '']) {
+      for (const matrix of ['success', 'failure', 'cancelled', 'skipped', '']) {
+        const result = spawnSync('sh', ['-c', command], {
+          env: { SCOPE_RESULT: scope, VALIDATION_RESULT: matrix },
+        });
+        expect(result.status === 0).toBe(scope === 'success' && matrix === 'success');
+      }
+    }
+  });
+
   it('delegates built-app browser suites from cloud to complete PR validation', () => {
     const builtApp = ['built-app', 'test:built-app'];
     expect(buildPhasePlan('pr')).toContainEqual(builtApp);
@@ -91,7 +137,7 @@ describe('local validation orchestrator', () => {
       new URL('../../.github/workflows/ci.yml', import.meta.url),
       'utf8'
     );
-    expect(workflow).toContain('run: pnpm test:pr:ci');
+    expect(workflow).toContain('run: pnpm test:pr:ci --phase=${{ matrix.phase }}');
     expect(workflow).toContain('.tmp/local-validation/*-ci/report.md');
     expect(workflow).toMatch(
       /needs: \[scope, static-checks, unit-tests, react-doctor, publication-security, complete-pr\]/
@@ -109,7 +155,7 @@ describe('local validation orchestrator', () => {
         .map(([name]) => ciJobForPhase(name))
         .filter(Boolean)
     );
-    for (const job of [...jobs, 'complete-pr']) {
+    for (const job of [...jobs, 'validation-phase']) {
       const block = workflow.split(`\n  ${job}:\n`)[1]?.split(/\n  [a-z-]+:\n/)[0];
       expect(block, job).toContain(headRef);
     }

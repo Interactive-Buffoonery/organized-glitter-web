@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrivateFileTokenContext } from '@/contexts/privateFileTokenState';
 import ProjectFormSections from '../ProjectFormSections';
@@ -16,6 +16,7 @@ const {
   onChangeMock,
   imageUploadState,
   resolveCompanyAndArtistIdsMock,
+  notesEditor,
 } = vi.hoisted(() => ({
   handleImageChangeMock: vi.fn(),
   handleImageRemoveMock: vi.fn(),
@@ -29,6 +30,7 @@ const {
     error: null as string | null,
   },
   resolveCompanyAndArtistIdsMock: vi.fn(),
+  notesEditor: { pendingUpdate: null as string | null },
 }));
 
 vi.mock('@/utils/project/field-mapping', () => ({
@@ -86,8 +88,8 @@ vi.mock('@/components/image/ImageCropDialog', () => ({
     ) : null,
 }));
 
-vi.mock('@/components/notes/RichTextEditor.lazy', () => ({
-  default: ({
+vi.mock('@/components/notes/RichTextEditor.lazy', () => {
+  const RichTextEditorMock = ({
     value,
     onChange,
     ariaLabel,
@@ -95,14 +97,23 @@ vi.mock('@/components/notes/RichTextEditor.lazy', () => ({
     value: string;
     onChange: (value: string) => void;
     ariaLabel?: string;
-  }) => (
-    <textarea
-      aria-label={ariaLabel}
-      value={value}
-      onChange={event => onChange(event.target.value)}
-    />
-  ),
-}));
+  }) => {
+    useEffect(() => {
+      if (notesEditor.pendingUpdate === null) return;
+      const update = notesEditor.pendingUpdate;
+      notesEditor.pendingUpdate = null;
+      onChange(update);
+    });
+    return (
+      <textarea
+        aria-label={ariaLabel}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+      />
+    );
+  };
+  return { default: RichTextEditorMock };
+});
 
 vi.mock('@/components/tags/InlineTagManager', () => ({
   InlineTagManager: () => <div data-testid="inline-tag-manager" />,
@@ -372,6 +383,17 @@ describe('ProjectFormSections project image cropping', () => {
     expect(submittedFormData?.get('date_purchased')).toBe('');
     expect(submittedFormData?.get('total_diamonds')).toBe('');
     expect(submittedFormData?.get('source_url')).toBe('');
+  });
+
+  it('keeps a typed title when the notes editor updates in the same commit', () => {
+    renderProjectForm({ ...baseFormData, title: '' });
+
+    notesEditor.pendingUpdate = 'A note';
+    fireEvent.change(screen.getByLabelText('Project title'), { target: { value: 'Kept' } });
+
+    expect(onChangeMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'Kept', generalNotes: 'A note' })
+    );
   });
 
   it('preserves edits made while the selected image is processing', async () => {

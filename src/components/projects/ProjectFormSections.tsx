@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { notifyError } from '@/lib/notifications';
 import { usePrivateFileUrl } from '@/hooks/usePrivateFileUrl';
@@ -70,7 +70,8 @@ const ProjectFormSections = ({
     ProjectFormValues['status']
   >('completed', statusBeforeDateChange, onStatusBeforeDateChange);
 
-  useEffect(() => {
+  // Layout effect so child effects, like the notes editor's updates, never spread stale values.
+  useLayoutEffect(() => {
     formDataRef.current = formData;
   }, [formData]);
 

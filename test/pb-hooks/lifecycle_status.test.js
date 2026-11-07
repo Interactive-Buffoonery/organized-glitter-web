@@ -36,27 +36,40 @@ describe.each(['date_completed', 'completed_at'])('%s lifecycle', field => {
 });
 
 describe('project lifecycle hook boundary', () => {
-  it('applies lifecycle before computing sort fields and continues after lifecycle failure', () => {
-    for (const fails of [false, true]) {
-      const calls = [];
-      const handlers = [];
-      const e = { app: { logger: () => ({ error: () => calls.push('logged') }) } };
-      vm.runInNewContext(readFileSync('pb_hooks/sort_proxy_sync.pb.js', 'utf8'), {
-        __hooks: '',
-        require: path =>
-          path.endsWith('/lifecycle_status.js')
-            ? {
-                applyCompletionStatus: () => {
-                  calls.push('lifecycle');
-                  if (fails) throw new Error('test failure');
-                },
-              }
-            : { syncProject: () => calls.push('sort') },
-        onRecordCreate: handler => handlers.push(handler),
-        onRecordUpdate: () => {},
-      });
-      handlers[0](e);
-      expect(calls).toEqual(fails ? ['lifecycle', 'logged', 'sort'] : ['lifecycle', 'sort']);
-    }
+  const runProjectHooks = fails => {
+    const calls = [];
+    const handlers = [];
+    const register = (handler, collection) => {
+      if (collection === 'projects') handlers.push(handler);
+    };
+    vm.runInNewContext(readFileSync('pb_hooks/sort_proxy_sync.pb.js', 'utf8'), {
+      __hooks: '',
+      require: path =>
+        path.endsWith('/lifecycle_status.js')
+          ? {
+              applyCompletionStatus: () => {
+                calls.push('lifecycle');
+                if (fails) throw new Error('test failure');
+              },
+            }
+          : { syncProject: () => calls.push('sort') },
+      onRecordCreate: register,
+      onRecordUpdate: register,
+    });
+    return { calls, handlers };
+  };
+
+  it('applies lifecycle before computing sort fields on create and update', () => {
+    const { calls, handlers } = runProjectHooks(false);
+    expect(handlers).toHaveLength(2);
+    handlers.forEach(handler => handler({}));
+    expect(calls).toEqual(['lifecycle', 'sort', 'lifecycle', 'sort']);
+  });
+
+  it('rejects the save when lifecycle fails on create and update', () => {
+    const { calls, handlers } = runProjectHooks(true);
+    expect(handlers).toHaveLength(2);
+    handlers.forEach(handler => expect(() => handler({})).toThrow('test failure'));
+    expect(calls).toEqual(['lifecycle', 'lifecycle']);
   });
 });

@@ -3,6 +3,13 @@
 Coding style rules for Organized Glitter. `AGENTS.md` links here from the Code
 section; keep both documents consistent when either changes.
 
+## Simplicity
+
+- Prefer the smallest change that fits existing patterns. Reuse before adding.
+- Keep one obvious place for each concern.
+- No abstractions, config, or scaffolding for needs that don't exist yet.
+- When the user's experience and the developer's experience conflict, the user wins.
+
 ## Naming
 
 | Kind         | Convention                                                   | Example                            |

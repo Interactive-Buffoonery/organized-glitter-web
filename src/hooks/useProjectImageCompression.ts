@@ -1,6 +1,6 @@
 import { notify } from '@/lib/notifications';
 import { useRef, useState } from 'react';
-import { compressProjectImage } from '@/utils/image/projectImageCompression';
+import { compressUserImage } from '@/utils/image/sharedImageCompression';
 
 import { logger } from '@/utils/logger';
 
@@ -16,7 +16,7 @@ interface CompressionProgress {
 
 /**
  * Custom hook for handling project image compression with progress tracking and user feedback.
- * Similar to useProgressImageCompression but optimized for project images with higher quality settings.
+ * Starts above 5MB and ignores progress updates from superseded compressions.
  * @returns {Object} An object containing the `compressImage` function, compression state, and a reset function.
  */
 export const useProjectImageCompression = () => {
@@ -65,7 +65,7 @@ export const useProjectImageCompression = () => {
       setIsCompressing(true);
       logger.log(`[useProjectImageCompression] Starting compression for ${file.name}`);
 
-      const compressedFile = await compressProjectImage(file, (progress: number) => {
+      const compressedFile = await compressUserImage(file, (progress: number) => {
         if (!isCurrentCompression()) return;
         setCompressionProgress({
           percentage: progress,
@@ -110,7 +110,7 @@ export const useProjectImageCompression = () => {
         });
       }
 
-      // Fall back to original file if compression fails and it's under the Supabase limit
+      // Keep the original as a fallback only when it is at most 6MB.
       if (file.size <= 6 * 1024 * 1024) {
         // 6MB fallback limit
         logger.log('[useProjectImageCompression] Using original file as fallback (under 6MB)');

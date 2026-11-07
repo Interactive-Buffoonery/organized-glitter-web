@@ -1,6 +1,6 @@
 import { notify } from '@/lib/notifications';
 import { useState } from 'react';
-import { compressProgressImage } from '@/utils/image/progressImageCompression';
+import { compressUserImage } from '@/utils/image/sharedImageCompression';
 
 import { logger } from '@/utils/logger';
 
@@ -16,8 +16,7 @@ interface CompressionProgress {
 
 /**
  * Custom hook for handling image compression with progress tracking and user feedback.
- * It uses `compressProgressImage` utility for the actual compression,
- * `useToast` for notifications.
+ * Uses the shared compressor above 3MB and keeps the original file on failure.
  * @returns {Object} An object containing the `compressImage` function, compression state, and a reset function.
  */
 export const useProgressImageCompression = () => {
@@ -55,7 +54,7 @@ export const useProgressImageCompression = () => {
     try {
       setIsCompressing(true);
 
-      const compressedFile = await compressProgressImage(file, (progress: number) => {
+      const compressedFile = await compressUserImage(file, (progress: number) => {
         setCompressionProgress({
           percentage: progress,
           status: progress < 100 ? 'Compressing...' : 'Complete',

@@ -33,7 +33,7 @@ import { ArchiveFilesService } from '@/services/pocketbase/archiveFiles.service'
 import { TAG_COLOR_PALETTE } from '@/utils/ui/tagColors';
 import { isServiceResponseError, type ServiceResponse } from '@/types/shared';
 import type { Tag, TagFormValues } from '@/types/tag';
-import { preparePhotoFileForUpload } from '@/features/import-export/bulk-photos/bulkPhotoImport';
+import { preparePhotoFileForUpload } from '@/utils/image/preparePhotoFileForUpload';
 import {
   findMissingOptionalPhotoWarnings,
   validateArchiveManifest,
@@ -767,7 +767,6 @@ function getMappedPageMediumIds(
 async function loadPhotoFile(
   zip: JSZip,
   path: string | undefined,
-  targetType: Parameters<typeof preparePhotoFileForUpload>[1],
   warnings: ArchiveWarning[],
   extractionBudget: { expandedBytes: number }
 ): Promise<File | undefined> {
@@ -789,7 +788,7 @@ async function loadPhotoFile(
     MAX_ARCHIVE_EXPANDED_BYTES
   );
   const name = path.split('/').pop() ?? 'imported-photo.jpg';
-  return preparePhotoFileForUpload(new File([blob], name, { type: blob.type }), targetType);
+  return preparePhotoFileForUpload(new File([blob], name, { type: blob.type }));
 }
 
 export async function readOrganizedGlitterArchive(file: File): Promise<ArchiveBundle> {
@@ -964,13 +963,7 @@ export async function importArchiveBundle(
       }
       const coverFile = existingProject
         ? undefined
-        : await loadPhotoFile(
-            bundle.zip,
-            project.coverPhotoPath,
-            'project-cover',
-            warnings,
-            extractionBudget
-          );
+        : await loadPhotoFile(bundle.zip, project.coverPhotoPath, warnings, extractionBudget);
       const created = existingProject
         ? existingProject
         : await adapter.createDiamondProject(project, coverFile, checkpoint.projectId || undefined);
@@ -1019,7 +1012,6 @@ export async function importArchiveBundle(
           const imageFile = await loadPhotoFile(
             bundle.zip,
             note.imagePath,
-            'project-progress-note',
             warnings,
             extractionBudget
           );
@@ -1086,13 +1078,7 @@ export async function importArchiveBundle(
           : undefined;
       const coverFile =
         shouldUseArchiveRestore || !existingBook
-          ? await loadPhotoFile(
-              bundle.zip,
-              book.coverPhotoPath,
-              'coloring-book-cover',
-              warnings,
-              extractionBudget
-            )
+          ? await loadPhotoFile(bundle.zip, book.coverPhotoPath, warnings, extractionBudget)
           : undefined;
       if (!existingBook && recoveryStore && !recoveryCheckpoint) {
         recoveryCheckpoint = { bookId: '', pages: {} };
@@ -1288,13 +1274,7 @@ export async function importArchiveBundle(
               batchStart,
               batchStart + ARCHIVE_PAGE_PHOTO_BATCH_SIZE
             )) {
-              const photoFile = await loadPhotoFile(
-                bundle.zip,
-                path,
-                'coloring-page-photo',
-                warnings,
-                extractionBudget
-              );
+              const photoFile = await loadPhotoFile(bundle.zip, path, warnings, extractionBudget);
               if (photoFile) photoFiles.push(photoFile);
             }
             if (photoFiles.length > 0) {
@@ -1439,7 +1419,6 @@ export async function importArchiveBundle(
             const imageFile = await loadPhotoFile(
               bundle.zip,
               note.imagePath,
-              'coloring-page-progress-note',
               warnings,
               extractionBudget
             );

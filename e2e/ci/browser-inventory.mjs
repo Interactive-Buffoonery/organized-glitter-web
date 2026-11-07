@@ -19,10 +19,11 @@ export const browserSpecInventory = {
     'authenticated/protected-file-rotation-local.spec.ts',
     'blog.spec.ts',
     'cold-load.spec.ts',
+    'dialog-motion/motion.spec.ts',
     'not-found.spec.ts',
     'pwa-navigation.spec.ts',
   ],
-  manualVisual: ['screen-review/screen-review.spec.ts'],
+  manualVisual: ['overview-layout.spec.ts', 'screen-review/screen-review.spec.ts'],
   hostedDeployment: [
     'hosted/authenticated.spec.ts',
     'hosted/mobile.spec.ts',

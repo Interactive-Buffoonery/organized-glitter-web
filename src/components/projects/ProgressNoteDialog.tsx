@@ -95,7 +95,6 @@ export function ProgressNoteDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        motion="fade"
         layout="keyboard-safe-sheet"
         className="progress-note-dialog-content border-border bg-card text-card-foreground flex flex-col overflow-hidden p-0 shadow-xl"
       >

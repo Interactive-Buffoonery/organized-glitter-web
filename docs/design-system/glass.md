@@ -234,7 +234,7 @@ If you need a sticky toolbar that's not a save bar (e.g. a bulk-action bar on
 the dashboard), copy the same outer markup:
 
 ```tsx
-<div className="border-border bg-background/95 sticky bottom-0 z-10 mt-6 border-t pt-4 pb-4 backdrop-blur max-lg:bottom-[var(--bottom-nav-total-height)] lg:pb-[calc(1rem+env(safe-area-inset-bottom))]">
+<div className="border-border bg-background/95 sticky bottom-0 z-10 mt-6 border-t pb-4 pt-4 backdrop-blur max-lg:bottom-[var(--bottom-nav-total-height)] lg:pb-[calc(1rem+env(safe-area-inset-bottom))]">
   …toolbar contents…
 </div>
 ```

@@ -16,6 +16,13 @@ function validateImageFile(file: File): void {
   }
 }
 
+/**
+ * Prepares archive and bulk-import photos regardless of destination. Both former
+ * target-specific compressors used these same options, with no size-based skip.
+ * The shared compressor can return the normalized original on failure at <=5MiB.
+ * Propagate remaining failures so import callers report the failed photo instead
+ * of applying either interactive hook's additional original-file fallback.
+ */
 export async function preparePhotoFileForUpload(file: File): Promise<File> {
   validateImageFile(file);
   const normalized = normalizeImageFile(file);

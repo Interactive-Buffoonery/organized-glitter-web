@@ -16,7 +16,10 @@ interface CompressionProgress {
 
 /**
  * Custom hook for handling project image compression with progress tracking and user feedback.
- * Starts above 5MB and ignores progress updates from superseded compressions.
+ * Skips files at or below 5MiB, then uses the shared 5MiB target and 2048px bound.
+ * Callers validate and normalize selections before compression (useImageUpload,
+ * ProjectCoverImageEditor). Keeps their interactive fallback policy separate from imports.
+ * Ignores progress updates from superseded compressions.
  * @returns {Object} An object containing the `compressImage` function, compression state, and a reset function.
  */
 export const useProjectImageCompression = () => {
@@ -110,7 +113,9 @@ export const useProjectImageCompression = () => {
         });
       }
 
-      // Keep the original as a fallback only when it is at most 6MB.
+      // Preserve the interactive 6MiB fallback, below PocketBase
+      // projects.image maxSize of 10MiB (collections.schema.json).
+      // This client cutoff is not the backend limit.
       if (file.size <= 6 * 1024 * 1024) {
         // 6MB fallback limit
         logger.log('[useProjectImageCompression] Using original file as fallback (under 6MB)');

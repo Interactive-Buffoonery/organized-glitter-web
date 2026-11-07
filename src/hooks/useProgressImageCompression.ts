@@ -16,7 +16,10 @@ interface CompressionProgress {
 
 /**
  * Custom hook for handling image compression with progress tracking and user feedback.
- * Uses the shared compressor above 3MB and keeps the original file on failure.
+ * Skips files at or below 3MiB, then uses the shared 5MiB target and 2048px bound.
+ * useProgressNoteForm validates and normalizes selections before calling this hook.
+ * Preserves the interactive original-file fallback on failure; PocketBase still
+ * enforces its 10MiB image field limit when saving a progress note.
  * @returns {Object} An object containing the `compressImage` function, compression state, and a reset function.
  */
 export const useProgressImageCompression = () => {

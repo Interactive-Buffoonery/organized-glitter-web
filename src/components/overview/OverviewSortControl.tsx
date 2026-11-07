@@ -114,7 +114,7 @@ export function OverviewSortControl({ value, onValueChange }: OverviewSortContro
         </Button>
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerContent
-            className="max-h-[85dvh] px-4 pb-6"
+            className="max-h-[70dvh] px-4 pb-6"
             aria-labelledby={titleId}
             aria-describedby={descriptionId}
           >

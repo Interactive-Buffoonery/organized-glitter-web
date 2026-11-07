@@ -129,7 +129,10 @@ describe('Coloring book sidebar', () => {
     );
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(screen.queryByText('No cover')).not.toBeInTheDocument();
-    expect(screen.getByText('1 of 24 done')).toBeInTheDocument();
+    expect(screen.queryByText('1 of 24 done')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByText('done').parentElement!).getByRole('definition')
+    ).toHaveTextContent('1');
   });
 
   it('offers an Add action for each empty value and opens the existing edit flow', async () => {

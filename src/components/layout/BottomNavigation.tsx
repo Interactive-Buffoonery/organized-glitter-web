@@ -22,6 +22,7 @@ import { useEnabledVerticals } from '@/hooks/useEnabledVerticals';
 import { resolveFileUrl } from '@/lib/pocketbase';
 import { createAvatarConfig } from '@/utils/image/avatarUtils';
 import { createLogger } from '@/utils/logger';
+import { isNavigationItemActive } from './navItems';
 import { MobileAccountMenu } from './MobileAccountMenu';
 import type { LucideIcon } from 'lucide-react';
 
@@ -111,7 +112,7 @@ const BottomNavigation = memo(() => {
       >
         <div className="flex h-[var(--bottom-nav-content-height)] items-center justify-around px-2">
           {NAVIGATION_ITEMS.slice(0, 2).map(({ label, icon: Icon, path, ariaLabel }) => {
-            const isActive = location.pathname === path;
+            const isActive = isNavigationItemActive(path, location.pathname);
 
             return (
               <Button
@@ -120,7 +121,7 @@ const BottomNavigation = memo(() => {
                 variant="ghost"
                 className={`h-auto min-h-[44px] min-w-[44px] flex-col gap-0 rounded-xl px-3 py-2 [&_svg]:size-6 ${
                   isActive
-                    ? 'bg-primary/12 hover:bg-primary/12 text-primary hover:text-primary'
+                    ? 'bg-primary/10 hover:bg-primary/10 text-primary hover:text-primary'
                     : 'text-muted-foreground'
                 }`}
               >
@@ -189,7 +190,7 @@ const BottomNavigation = memo(() => {
           ) : null}
 
           {NAVIGATION_ITEMS.slice(2).map(({ label, icon: Icon, path, ariaLabel }) => {
-            const isActive = location.pathname === path;
+            const isActive = isNavigationItemActive(path, location.pathname);
 
             return (
               <Button
@@ -198,7 +199,7 @@ const BottomNavigation = memo(() => {
                 variant="ghost"
                 className={`h-auto min-h-[44px] min-w-[44px] flex-col gap-0 rounded-xl px-3 py-2 [&_svg]:size-6 ${
                   isActive
-                    ? 'bg-primary/12 hover:bg-primary/12 text-primary hover:text-primary'
+                    ? 'bg-primary/10 hover:bg-primary/10 text-primary hover:text-primary'
                     : 'text-muted-foreground'
                 }`}
               >

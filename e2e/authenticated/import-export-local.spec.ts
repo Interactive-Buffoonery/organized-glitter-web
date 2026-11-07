@@ -243,6 +243,7 @@ const expectImportExportData = async (pb: PocketBase) => {
 
 test.describe('local import/export workflows', () => {
   test.describe.configure({ timeout: 120_000 });
+  test.use({ serviceWorkers: 'block' });
 
   test.skip(
     !isLocalUrl(pocketBaseUrl),
@@ -334,16 +335,24 @@ test.describe('local import/export workflows', () => {
       }
     };
     await checkReviewControls(false, 'before');
+    let signalUpload!: () => void;
+    const uploadStarted = new Promise<void>(resolve => {
+      signalUpload = resolve;
+    });
     let releaseUpload!: () => void;
     const uploadHeld = new Promise<void>(resolve => {
       releaseUpload = resolve;
     });
     await page.route('**/api/collections/projects/records/*', async route => {
-      if (route.request().method() === 'PATCH') await uploadHeld;
+      if (route.request().method() === 'PATCH') {
+        signalUpload();
+        await uploadHeld;
+      }
       await route.continue();
     });
     await page.getByRole('button', { name: 'Import confirmed photos' }).click();
     try {
+      await uploadStarted;
       await expect(page.getByText('Importing your confirmed choices...')).toBeVisible();
       await checkReviewControls(true, 'importing');
     } finally {

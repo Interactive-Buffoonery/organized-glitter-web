@@ -125,6 +125,13 @@ export function inspectException(value: unknown): Error | string | undefined {
   }
 }
 
+function stackStatus(stack: string | undefined, paths: Set<string> | undefined, frames: string[]) {
+  if (!stack) return 'missing_stack';
+  if (!paths) return 'missing_build_graph';
+  if (frames.length === 0) return 'no_matching_frames';
+  return 'retained';
+}
+
 function safeFrames(stack: string, paths: Set<string>): string[] {
   const frames: string[] = [];
   for (const line of stack.slice(0, MAX_STACK_LENGTH).split('\n', MAX_STACK_LINES)) {
@@ -170,18 +177,11 @@ export function safeException(value: unknown): {
   const stack = isError ? inspected.stack : undefined;
   const paths = stack ? buildChunkPaths() : undefined;
   const frames = stack && paths ? safeFrames(stack, paths) : [];
-  const exceptionStackStatus = !stack
-    ? 'missing_stack'
-    : !paths
-      ? 'missing_build_graph'
-      : frames.length > 0
-        ? 'retained'
-        : 'no_matching_frames';
   error.stack = [`${name}: ${message}`, ...frames].join('\n');
   return {
     error,
     properties: {
-      exception_stack_status: exceptionStackStatus,
+      exception_stack_status: stackStatus(stack, paths, frames),
       ...(!isError && { non_error_type: type }),
     },
   };

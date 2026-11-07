@@ -6,6 +6,9 @@ import {
 } from '@/utils/image/imagePolicy';
 import { compressUserImage } from './sharedImageCompression';
 
+// All five import photo fields have maxSize 10485760 in collections.schema.json.
+const IMPORT_PHOTO_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
 function validateImageFile(file: File): void {
   if (file.size > IMAGE_MAX_FILE_SIZE_BYTES) {
     throw new Error('Image exceeds the 50MB upload limit');
@@ -26,5 +29,9 @@ function validateImageFile(file: File): void {
 export async function preparePhotoFileForUpload(file: File): Promise<File> {
   validateImageFile(file);
   const normalized = normalizeImageFile(file);
-  return compressUserImage(normalized);
+  const compressed = await compressUserImage(normalized);
+  if (compressed.size > IMPORT_PHOTO_MAX_UPLOAD_BYTES) {
+    throw new Error('Image exceeds the 10MB upload limit after compression');
+  }
+  return compressed;
 }

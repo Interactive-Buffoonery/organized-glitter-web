@@ -55,9 +55,10 @@ describe('photo upload preparation', () => {
   });
 
   it('propagates compression failure instead of submitting the original file', async () => {
-    compress.mockRejectedValue(new Error('Could not compress'));
+    const error = new Error('Could not compress');
+    compress.mockRejectedValue(error);
     await expect(
       preparePhotoFileForUpload(new File(['photo'], 'photo.png', { type: 'image/png' }))
-    ).rejects.toThrow('Could not compress');
+    ).rejects.toBe(error);
   });
 });

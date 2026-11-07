@@ -4,10 +4,7 @@ import { notifyError } from '@/lib/notifications';
 import { usePrivateFileUrl } from '@/hooks/usePrivateFileUrl';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useNumberInput } from '@/hooks/useNumberInput';
-import {
-  useCompletionStatusConfirmation,
-  needsCompletionStatusConfirmation,
-} from '@/hooks/useCompletionStatusConfirmation';
+import { useCompletionStatusConfirmation } from '@/hooks/useCompletionStatusConfirmation';
 import { hasNewCompletionDate, useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
 import { ProjectCoverImageSection } from '@/components/projects/form-sections/ProjectCoverImageSection';
 import { ProjectDatesSection } from '@/components/projects/form-sections/ProjectDatesSection';
@@ -55,7 +52,7 @@ const ProjectFormSections = ({
   onDraftCompany,
   onDraftArtist,
 }: ProjectFormSectionsProps) => {
-  const { confirm, dialog } = useCompletionStatusConfirmation();
+  const { requestChange, dialog, triggerRef } = useCompletionStatusConfirmation();
   const imageUploadHook = useImageUpload('project-images', 'project-image');
   const { preview, applyProcessedImage } = imageUploadHook;
   const cropSourceUrl = usePrivateFileUrl(preview || formData.imageUrl);
@@ -107,18 +104,9 @@ const ProjectFormSections = ({
         savedDateCompleted
       );
       const applyStatus = () => onChange({ ...formDataRef.current, status: next });
-      if (
-        savedStatus === 'completed' &&
-        needsCompletionStatusConfirmation(status, next, dateCompleted)
-      ) {
-        void confirm().then(confirmed => {
-          if (confirmed) applyStatus();
-        });
-        return;
-      }
-      applyStatus();
+      void requestChange(status, next, dateCompleted, applyStatus, savedStatus ?? '');
     },
-    [confirm, onChange, savedDateCompleted, savedStatus, statusForStatusChange]
+    [requestChange, onChange, savedDateCompleted, savedStatus, statusForStatusChange]
   );
 
   const handleImageChange = useCallback(
@@ -246,6 +234,7 @@ const ProjectFormSections = ({
 
   const statusSection = (
     <ProjectStatusSection
+      triggerRef={triggerRef}
       formData={formData}
       isSubmitting={isSubmitting}
       fieldErrors={fieldErrors}

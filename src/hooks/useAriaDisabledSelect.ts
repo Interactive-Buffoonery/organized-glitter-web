@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 /**
  * Blocks a Radix Select without the native `disabled` attribute, which would drop keyboard focus
@@ -9,10 +9,12 @@ export function useAriaDisabledSelect<T extends string>(
   onChange: (value: T) => void
 ) {
   const [open, setOpen] = useState(false);
-  if (disabled && open) setOpen(false);
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
   return {
     selectProps: {
-      open,
+      open: open && !disabled,
       onOpenChange: (next: boolean) => setOpen(next && !disabled),
       onValueChange: (value: string) => {
         if (!disabled) onChange(value as T);

@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useEffect, useState, type JSX } from 'react';
+import { useRef, useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { ColoringPageStatusSection } from '@/components/coloring/detail/page/ColoringPageStatusSection';
 import StatusDropdown from '@/components/projects/StatusDropdown';
@@ -57,103 +57,79 @@ describe('completion status confirmation', () => {
     expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
   });
 
-  const askFromFocus = async (popups: JSX.Element) => {
-    let ask = () => {};
+  it.each(['Keep Completed', 'Change status'])(
+    'returns focus to the explicit trigger after %s',
+    async label => {
+      const Harness = () => {
+        const { confirm, dialog, triggerRef } = useCompletionStatusConfirmation();
+        return (
+          <>
+            <button type="button" aria-expanded="true">
+              Other popup
+            </button>
+            <button type="button" ref={triggerRef}>
+              Status
+            </button>
+            <button type="button" onClick={() => void confirm()}>
+              Choose status
+            </button>
+            {dialog}
+          </>
+        );
+      };
+      render(<Harness />);
+      await userEvent.click(screen.getByRole('button', { name: 'Choose status' }));
+      await userEvent.click(screen.getByRole('button', { name: label }));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Status' })).toHaveFocus());
+    }
+  );
+
+  it('applies unguarded changes synchronously and cancels guarded changes', async () => {
+    const apply = vi.fn();
     const Harness = () => {
-      const { confirm, dialog } = useCompletionStatusConfirmation();
-      ask = () => void confirm();
+      const { requestChange, dialog } = useCompletionStatusConfirmation();
+      const initialStatus = useRef('wishlist');
       return (
         <>
-          {popups}
+          <button
+            type="button"
+            onClick={() => {
+              void requestChange(
+                'completed',
+                'progress',
+                '2026-01-01',
+                apply,
+                initialStatus.current
+              );
+              if (initialStatus.current === 'wishlist') expect(apply).toHaveBeenCalledTimes(1);
+              initialStatus.current = 'completed';
+            }}
+          >
+            Change
+          </button>
           {dialog}
         </>
       );
     };
     render(<Harness />);
-    act(() => ask());
-    return screen.findByRole('alertdialog', undefined, { timeout: 2000 });
-  };
-
-  const expandedTrigger = (name: string, popupId: string, role?: string) => (
-    <button
-      type="button"
-      role={role}
-      aria-haspopup={role ? undefined : 'dialog'}
-      aria-expanded="true"
-      aria-controls={popupId}
-      aria-label={name}
-    >
-      {name}
-    </button>
-  );
-
-  it('opens the prompt when the Select never unmounts, and returns focus to its trigger', async () => {
-    const Option = () => {
-      useEffect(() => screen.getByRole('option').focus(), []);
-      return (
-        <div role="option" aria-selected="false" tabIndex={-1}>
-          On Hold
-        </div>
-      );
-    };
-    await askFromFocus(
-      <>
-        {expandedTrigger('Other', 'other-popup')}
-        {expandedTrigger('Status', 'stuck-listbox', 'combobox')}
-        <div id="stuck-listbox" role="listbox">
-          <Option />
-        </div>
-      </>
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Change', exact: true }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Change', exact: true }));
     await userEvent.click(screen.getByRole('button', { name: 'Keep Completed' }));
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Status' })).toHaveFocus());
-  });
-
-  it('returns focus to the popover that holds focus, not the first open popup', async () => {
-    const Choice = () => {
-      useEffect(() => screen.getByRole('button', { name: 'On Hold' }).focus(), []);
-      return <button type="button">On Hold</button>;
-    };
-    await askFromFocus(
-      <>
-        {expandedTrigger('Other', 'other-popup')}
-        {expandedTrigger('Book status', 'status-popup')}
-        <div data-radix-popper-content-wrapper="">
-          <div id="status-popup" role="dialog">
-            <Choice />
-          </div>
-        </div>
-      </>
-    );
-    await userEvent.keyboard('{Escape}');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Book status' })).toHaveFocus());
-  });
-
-  it('leaves focus to the dialog when nothing identifies the trigger', async () => {
-    await askFromFocus(
-      <>
-        {expandedTrigger('Other', 'other-popup')}
-        {expandedTrigger('Book status', 'status-popup')}
-      </>
-    );
-    await userEvent.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'Other' })).not.toHaveFocus();
-    expect(screen.getByRole('button', { name: 'Book status' })).not.toHaveFocus();
-  });
-
-  it('uses the only open Select when nothing has focus', async () => {
-    await askFromFocus(expandedTrigger('Status', 'closed-listbox', 'combobox'));
-    await userEvent.keyboard('{Escape}');
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Status' })).toHaveFocus());
+    expect(apply).toHaveBeenCalledTimes(1);
   });
 
   describe.each([
     [
       'project',
-      (disabled: boolean, onChange: () => void) => (
+      (
+        disabled: boolean,
+        onChange: () => void,
+        triggerRef: React.RefObject<HTMLButtonElement | null>
+      ) => (
         <StatusDropdown
           currentStatus="completed"
+          triggerRef={triggerRef}
           onStatusChange={onChange}
           variant="pill"
           disabled={disabled}
@@ -163,9 +139,14 @@ describe('completion status confirmation', () => {
     ],
     [
       'coloring page',
-      (disabled: boolean, onChange: () => void) => (
+      (
+        disabled: boolean,
+        onChange: () => void,
+        triggerRef: React.RefObject<HTMLButtonElement | null>
+      ) => (
         <ColoringPageStatusSection
           status="completed"
+          triggerRef={triggerRef}
           onStatusChange={onChange}
           disabled={disabled}
         />
@@ -176,17 +157,21 @@ describe('completion status confirmation', () => {
     const confirmAndSave = async () => {
       const save = vi.fn();
       const Harness = () => {
-        const { confirm, dialog } = useCompletionStatusConfirmation();
+        const { confirm, dialog, triggerRef } = useCompletionStatusConfirmation();
         const [saving, setSaving] = useState(false);
         return (
           <>
-            {control(saving, () => {
-              void confirm().then(confirmed => {
-                if (!confirmed) return;
-                save();
-                setSaving(true);
-              });
-            })}
+            {control(
+              saving,
+              () => {
+                void confirm().then(confirmed => {
+                  if (!confirmed) return;
+                  save();
+                  setSaving(true);
+                });
+              },
+              triggerRef
+            )}
             {dialog}
           </>
         );

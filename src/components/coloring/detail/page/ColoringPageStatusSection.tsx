@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import {
   Select,
   SelectContent,
@@ -23,12 +24,14 @@ const STATUS_OPTIONS: ColoringPageStatus[] = [
 
 interface ColoringPageStatusSectionProps {
   status: ColoringPageStatus;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
   disabled?: boolean;
   onStatusChange: (status: ColoringPageStatus) => void | Promise<unknown>;
 }
 
 export function ColoringPageStatusSection({
   status,
+  triggerRef,
   disabled = false,
   onStatusChange,
 }: ColoringPageStatusSectionProps) {
@@ -40,6 +43,7 @@ export function ColoringPageStatusSection({
     <div>
       <Select {...selectProps} value={status}>
         <SelectTrigger
+          ref={triggerRef}
           {...triggerProps}
           aria-label="Change page status"
           className={cn(

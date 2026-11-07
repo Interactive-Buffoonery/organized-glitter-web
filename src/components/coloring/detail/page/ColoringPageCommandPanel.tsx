@@ -4,10 +4,7 @@ import { ColorsSummary } from './ColorsSummary';
 import { DetailSpecStrip } from './DetailSpecStrip';
 import { ColoringPageDateLine } from './ColoringPageDateLine';
 import { FinishDatePrompt } from './FinishDatePrompt';
-import {
-  useCompletionStatusConfirmation,
-  needsCompletionStatusConfirmation,
-} from '@/hooks/useCompletionStatusConfirmation';
+import { useCompletionStatusConfirmation } from '@/hooks/useCompletionStatusConfirmation';
 import type { UseColoringPageLifecycleDatesResult } from '@/hooks/coloring/useColoringPageLifecycleDates';
 import type { UseColoringPageMediumSelectionResult } from '@/hooks/coloring/useColoringPageMediumSelection';
 import type { UseColoringPageMysteryRevealResult } from '@/hooks/coloring/useColoringPageMysteryReveal';
@@ -56,7 +53,7 @@ export function ColoringPageCommandPanel({
   onEditOpenChange,
   onPhotos,
 }: ColoringPageCommandPanelProps) {
-  const { confirm, dialog } = useCompletionStatusConfirmation();
+  const { requestChange, dialog, triggerRef } = useCompletionStatusConfirmation();
   const { user } = useAuth();
   const keys = useColorKeys(page.id, user?.id ?? '');
   const [editor, setEditor] = useState<'mediums' | 'dates' | null>(null);
@@ -80,14 +77,12 @@ export function ColoringPageCommandPanel({
         <div className="flex items-center justify-between gap-3">
           <ColoringPageStatusSection
             status={page.status}
-            onStatusChange={async status => {
-              if (
-                needsCompletionStatusConfirmation(page.status, status, page.completedAt) &&
-                !(await confirm())
+            triggerRef={triggerRef}
+            onStatusChange={status =>
+              requestChange(page.status, status, page.completedAt, () =>
+                statusAction.changeStatus(status)
               )
-                return;
-              return statusAction.changeStatus(status);
-            }}
+            }
             disabled={statusAction.isPending}
           />
           {day && <span className="text-muted-foreground text-sm tabular-nums">Day {day}</span>}

@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 // No React import needed with modern JSX transform
 import { ProjectStatus } from '@/types/project';
 import {
@@ -14,6 +15,7 @@ import { FILTER_STATUS_ACTIVE_FILL } from '@/utils/statusColors';
 
 interface StatusDropdownProps {
   currentStatus: ProjectStatus;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
   onStatusChange: (status: ProjectStatus) => void;
   /**
    * `default`: full-width Select trigger (form control look).
@@ -43,6 +45,7 @@ const getDropdownStatusColor = (status: string) => {
 
 const StatusDropdown = ({
   currentStatus,
+  triggerRef,
   onStatusChange,
   variant = 'default',
   disabled = false,
@@ -58,6 +61,7 @@ const StatusDropdown = ({
     return (
       <Select {...selectProps} value={currentStatus}>
         <SelectTrigger
+          ref={triggerRef}
           {...triggerProps}
           className={cn(
             'inline-flex size-auto min-h-11 min-w-0 items-center gap-2 rounded-full border-0 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] shadow-none focus:ring-2 focus:ring-offset-0',
@@ -88,6 +92,7 @@ const StatusDropdown = ({
     <div className="w-full">
       <Select {...selectProps} value={currentStatus}>
         <SelectTrigger
+          ref={triggerRef}
           {...triggerProps}
           className={`${colorClass} font-medium`}
           aria-label="Change project status"

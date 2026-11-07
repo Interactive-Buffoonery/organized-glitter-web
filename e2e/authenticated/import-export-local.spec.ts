@@ -243,6 +243,7 @@ const expectImportExportData = async (pb: PocketBase) => {
 
 test.describe('local import/export workflows', () => {
   test.describe.configure({ timeout: 120_000 });
+  test.use({ serviceWorkers: 'block' });
 
   test.skip(
     !isLocalUrl(pocketBaseUrl),
@@ -308,13 +309,64 @@ test.describe('local import/export workflows', () => {
     await expect(page.getByText(/Included/).first()).toBeVisible();
     await expect(page.getByText(/Unmatched/i).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Import confirmed photos' })).toBeEnabled();
+    const checkReviewControls = async (locked: boolean, stage: string) => {
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const label of ['Target type', 'Target record']) {
+          const controls = page.getByRole('combobox', { name: label });
+          for (const control of await controls.all()) {
+            if (locked) await expect(control).toBeDisabled();
+            else if (label === 'Target type') await expect(control).toBeEnabled();
+          }
+        }
+        const include = page.getByRole('checkbox', { name: 'Include cover.jpg', exact: true });
+        const overwrite = page.getByRole('button', { name: 'Allow existing cover overwrites' });
+        if (locked) {
+          await expect(include).toBeDisabled();
+          await expect(overwrite).toBeDisabled();
+        } else {
+          await expect(include).toBeEnabled();
+          await expect(overwrite).toBeEnabled();
+        }
+        await page.screenshot({
+          path: test.info().outputPath(`review-${stage}-${width}.png`),
+          fullPage: true,
+        });
+      }
+    };
+    await checkReviewControls(false, 'before');
+    let signalUpload!: () => void;
+    const uploadStarted = new Promise<void>(resolve => {
+      signalUpload = resolve;
+    });
+    let releaseUpload!: () => void;
+    const uploadHeld = new Promise<void>(resolve => {
+      releaseUpload = resolve;
+    });
+    await page.route('**/api/collections/projects/records/*', async route => {
+      if (route.request().method() === 'PATCH') {
+        signalUpload();
+        await uploadHeld;
+      }
+      await route.continue();
+    });
     await page.getByRole('button', { name: 'Import confirmed photos' }).click();
+    try {
+      await uploadStarted;
+      await expect(page.getByText('Importing your confirmed choices...')).toBeVisible();
+      await checkReviewControls(true, 'importing');
+    } finally {
+      releaseUpload();
+    }
+
     await expect(page.getByRole('heading', { name: 'Bulk photo result' })).toBeVisible({
       timeout: 45_000,
     });
     await expect(
       page.getByText('2 imported, 1 skipped, 0 failed, 1 progress notes created, 0 overwrites.')
     ).toBeVisible();
+
+    await checkReviewControls(false, 'completed');
 
     await expectImportExportData(pb);
 

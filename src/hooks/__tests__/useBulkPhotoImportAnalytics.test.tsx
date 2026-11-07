@@ -109,6 +109,49 @@ describe('bulk photo import analytics', () => {
     serviceMocks.coloringService.listAllPagesByBook.mockResolvedValue({});
   });
 
+  it.each(['completion', 'failure'])('locks choices until import %s', async outcome => {
+    let resolveImport!: (value: unknown) => void;
+    let rejectImport!: (reason: Error) => void;
+    mockImportBulkPhotos.mockReturnValue(
+      new Promise((resolve, reject) => {
+        resolveImport = resolve;
+        rejectImport = reject;
+      })
+    );
+    const { result } = renderHookWithProviders(() => useBulkPhotoImport());
+    await act(async () => {
+      await result.current.analyzeFileList([fileWithPath('cover.jpg', 'Starry Fox/cover.jpg')]);
+    });
+    const originalRows = result.current.rows;
+    const edit = result.current.updateRow;
+    let pending!: Promise<unknown>;
+    act(() => {
+      pending = result.current.importConfirmed();
+      edit(originalRows[0].id, { targetId: 'other', confirmed: false, overwrite: true });
+      result.current.setRows([]);
+    });
+    expect(result.current.rows).toBe(originalRows);
+    expect(result.current.loading).toBe(true);
+    expect(mockImportBulkPhotos).toHaveBeenCalledWith(originalRows, result.current.library);
+    await act(async () => {
+      if (outcome === 'failure') rejectImport(new Error('Upload failed'));
+      else
+        resolveImport({
+          importedCount: 1,
+          skippedCount: 0,
+          failedCount: 0,
+          createdProgressNoteCount: 0,
+          overwriteCount: 0,
+          errors: [],
+        });
+      await pending;
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.rows).toBe(originalRows);
+    act(() => edit(originalRows[0].id, { confirmed: false }));
+    expect(result.current.rows[0].confirmed).toBe(false);
+  });
+
   it('keeps a completed import successful when cache refresh rejects', async () => {
     const completed = {
       importedCount: 1,

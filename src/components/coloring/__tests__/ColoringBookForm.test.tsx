@@ -261,7 +261,7 @@ describe('ColoringBookForm', () => {
       <ColoringBookForm {...baseProps} initialBook={coloringBook()} />
     );
     fireEvent.change(getByLabelText('Completed'), { target: { value: '2026-09-20' } });
-    expect(getByText('Clear the completion date to change the status.')).toBeInTheDocument();
+    expect(getByText('Remove the completion date to change the status.')).toBeInTheDocument();
     await user.click(getByRole('combobox', { name: 'Status' }));
     await user.click(getByRole('option', { name: 'In progress' }));
     expect(queryByRole('alertdialog')).not.toBeInTheDocument();

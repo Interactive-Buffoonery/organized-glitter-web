@@ -76,7 +76,7 @@ may have entered on purpose.
 ### D3. Form behavior when someone picks another status after entering a new completion date
 
 - **A. Keep the snap-back and explain it (recommended).** Show a short hint
-  under Status, such as "Clear the completion date to change the status."
+  under Status, such as "Remove the completion date to change the status."
   This needs no server change.
 - **B. Picking another status clears the newly entered date.** The person's
   pick wins, and the saved date is restored. This is a different rule from

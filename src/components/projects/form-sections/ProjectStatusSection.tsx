@@ -59,7 +59,7 @@ export const ProjectStatusSection = ({
     </Select>
     {completionDateHint && (
       <p className="text-muted-foreground text-sm">
-        Clear the completion date to change the status.
+        Remove the completion date to change the status.
       </p>
     )}
     <FieldError field="status" message={fieldErrors.status} />

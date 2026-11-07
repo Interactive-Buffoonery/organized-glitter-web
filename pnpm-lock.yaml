@@ -44,7 +44,7 @@ importers:
         version: 5.2.8
       '@hookform/resolvers':
         specifier: ^5.2.2
-        version: 5.2.2(react-hook-form@7.75.0(react@19.2.6))
+        version: 5.2.2(react-hook-form@7.91.0(@types/react@19.2.14)(react@19.2.6))
       '@hugeicons/core-free-icons':
         specifier: ^4.1.1
         version: 4.1.4
@@ -187,8 +187,8 @@ importers:
         specifier: ^6.2.4
         version: 6.2.4(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react-hook-form:
-        specifier: ^7.73.1
-        version: 7.75.0(react@19.2.6)
+        specifier: ^7.91.0
+        version: 7.91.0(@types/react@19.2.14)(react@19.2.6)
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.14)(react@19.2.6)
@@ -5800,11 +5800,15 @@ packages:
       react: '>=16.4.0'
       react-dom: '>=16.4.0'
 
-  react-hook-form@7.75.0:
-    resolution: {integrity: sha512-Ovv94H+0p3sJ7B9B5QxPuCP1u8V/cHuVGyH55cSwodYDtoJwK+fqk3vjfIgSX59I2U/bU4z0nRJ9HMLpNiWEmw==}
+  react-hook-form@7.91.0:
+    resolution: {integrity: sha512-5BEBUnCBwa28AFXYTYmOaB/+CSpJ/+CWVASHEvIGUzFdHyUiPHeRhG7r5hOZ8nZi0yP7pbHdFNXO/p31EKTJFQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
+      '@types/react': '*'
       react: ^16.8.0 || ^17 || ^18 || ^19
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
@@ -8131,10 +8135,10 @@ snapshots:
 
   '@fontsource/caveat@5.2.8': {}
 
-  '@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.6))':
+  '@hookform/resolvers@5.2.2(react-hook-form@7.91.0(@types/react@19.2.14)(react@19.2.6))':
     dependencies:
       '@standard-schema/utils': 0.3.0
-      react-hook-form: 7.75.0(react@19.2.6)
+      react-hook-form: 7.91.0(@types/react@19.2.14)(react@19.2.6)
 
   '@hugeicons/core-free-icons@4.1.4': {}
 
@@ -12614,9 +12618,11 @@ snapshots:
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
 
-  react-hook-form@7.75.0(react@19.2.6):
+  react-hook-form@7.91.0(@types/react@19.2.14)(react@19.2.6):
     dependencies:
       react: 19.2.6
+    optionalDependencies:
+      '@types/react': 19.2.14
 
   react-is@17.0.2: {}
 

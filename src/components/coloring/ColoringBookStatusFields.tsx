@@ -1,3 +1,4 @@
+import { getColoringBookStatusColor, getColoringBookStatusLabel } from '@/utils/statusColors';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
@@ -25,8 +26,14 @@ export function ColoringBookStatusFields({
           onValueChange={value => setField('status', value as ColoringBooksStatusOptions)}
           disabled={isSubmitting}
         >
-          <SelectTrigger id="coloring-status" aria-label="Status">
-            <SelectValue />
+          <SelectTrigger className="min-h-11" id="coloring-status" aria-label="Status">
+            <SelectValue>
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${getColoringBookStatusColor(values.status)}`}
+              >
+                {getColoringBookStatusLabel(values.status)}
+              </span>
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {COLORING_BOOK_STATUS_OPTIONS.map(status => (
@@ -37,7 +44,7 @@ export function ColoringBookStatusFields({
           </SelectContent>
         </Select>
 
-        <div className="flex h-10 items-center gap-3">
+        <div className="flex min-h-11 items-center gap-3">
           <Checkbox
             id="coloring-is-mystery"
             checked={values.isMystery}

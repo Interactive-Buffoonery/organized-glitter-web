@@ -128,7 +128,7 @@ export function ColoringTaxonomySelect({
           onValueChange={next => onChange(next === NONE_VALUE ? '' : next)}
           disabled={disabled || isCreating}
         >
-          <SelectTrigger id={id} className="min-w-0 flex-1 pointer-coarse:h-11" aria-label={label}>
+          <SelectTrigger id={id} className="min-h-11 min-w-0 flex-1" aria-label={label}>
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>

@@ -108,7 +108,7 @@ const fillProjectTitle = async (page: Page, title: string) => {
     timeout: 15_000,
   });
 
-  await page.getByLabel('Project title').fill(title);
+  await page.getByLabel('Title *').fill(title);
 };
 
 const fillProjectWithCover = async (page: Page, title: string) => {

@@ -184,7 +184,7 @@ function EntitySelectInner<TCreateData, TResult extends { name: string }>({
     <>
       <FormField id={entityName} label={entityLabel} error={error}>
         <div className="flex gap-2">
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <Select
               value={value || NO_SELECTION_VALUE}
               onValueChange={next => onChange(next === NO_SELECTION_VALUE ? '' : next)}
@@ -192,7 +192,7 @@ function EntitySelectInner<TCreateData, TResult extends { name: string }>({
             >
               <SelectTrigger
                 id={entityName}
-                className="bg-background dark:text-foreground w-full"
+                className="bg-background dark:text-foreground min-h-11 w-full"
                 disabled={isDisabled}
                 aria-label={entityLabel}
                 aria-invalid={error ? 'true' : 'false'}
@@ -225,7 +225,7 @@ function EntitySelectInner<TCreateData, TResult extends { name: string }>({
             type="button"
             variant="outline"
             size={triggerButtonSize}
-            className={triggerButtonSize === 'sm' ? 'ml-2' : undefined}
+            className="size-11 shrink-0 p-0"
             disabled={isDisabled}
             aria-label={`Add ${entityLabel}`}
             onClick={e => {

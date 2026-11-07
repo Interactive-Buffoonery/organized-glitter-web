@@ -222,7 +222,7 @@ describe('EditProject page', () => {
     editProjectState.draft.pending = true;
     const { rerender } = renderWithProviders(<EditProject />);
 
-    expect(screen.getByRole('button', { name: 'Update project' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Restore draft' }));
     expect(restoreDraftMock).toHaveBeenCalledOnce();
 
@@ -230,7 +230,7 @@ describe('EditProject page', () => {
     editProjectState.draft.pending = false;
     editProjectState.photoChoicePending = true;
     rerender(<EditProject />);
-    expect(screen.getByRole('button', { name: 'Update project' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
 
     await user.click(screen.getByRole('button', { name: 'Continue without new photo' }));
     expect(continueWithoutPhotoMock).toHaveBeenCalledOnce();

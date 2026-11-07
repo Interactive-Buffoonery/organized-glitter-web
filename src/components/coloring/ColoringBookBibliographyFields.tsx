@@ -13,7 +13,6 @@ import {
   type ColoringBookFormat,
   type ColoringBookLanguage,
 } from '@/constants/coloringBookMetadata';
-import { ColoringTaxonomySelect } from './ColoringTaxonomySelect';
 import { FieldError, Section } from './ColoringBookFormPrimitives';
 import {
   getColoringBookErrorId,
@@ -22,36 +21,20 @@ import {
 
 const NONE_VALUE = '__none__';
 
-interface TaxonomyOption {
-  id: string;
-  name: string;
-}
-
-interface ColoringBookBibliographyFieldsProps extends ColoringBookFieldSectionProps {
-  maxTotalPages: number;
-  publishers: TaxonomyOption[];
-  illustrators: TaxonomyOption[];
-  onCreatePublisher: (name: string) => Promise<TaxonomyOption>;
-  onCreateIllustrator: (name: string) => Promise<TaxonomyOption>;
-}
-
 export function ColoringBookBibliographyFields({
   values,
   fieldErrors,
   isSubmitting,
   setField,
   maxTotalPages,
-  publishers,
-  illustrators,
-  onCreatePublisher,
-  onCreateIllustrator,
-}: ColoringBookBibliographyFieldsProps) {
+}: ColoringBookFieldSectionProps & { maxTotalPages: number }) {
   return (
-    <Section label="Book Info">
-      <div className="grid gap-4 sm:grid-cols-2">
+    <Section label="Details">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="space-y-2">
-          <Label htmlFor="coloring-total-pages">Number of pages *</Label>
+          <Label htmlFor="coloring-total-pages">Pages *</Label>
           <Input
+            className="min-h-11"
             id="coloring-total-pages"
             type="number"
             min={1}
@@ -68,7 +51,6 @@ export function ColoringBookBibliographyFields({
           />
           <FieldError field="totalPages" fieldErrors={fieldErrors} />
         </div>
-
         <div className="space-y-2">
           <Label htmlFor="coloring-book-format">Format</Label>
           <Select
@@ -78,7 +60,7 @@ export function ColoringBookBibliographyFields({
             }
             disabled={isSubmitting}
           >
-            <SelectTrigger id="coloring-book-format" aria-label="Format">
+            <SelectTrigger className="min-h-11" id="coloring-book-format" aria-label="Format">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -91,89 +73,10 @@ export function ColoringBookBibliographyFields({
             </SelectContent>
           </Select>
         </div>
-
-        <ColoringTaxonomySelect
-          id="coloring-publisher"
-          label="Publisher"
-          value={values.publisher}
-          options={publishers}
-          disabled={isSubmitting}
-          placeholder="No publisher"
-          createTitle="Add publisher"
-          createLabel="Add publisher"
-          onChange={value => setField('publisher', value)}
-          onCreate={onCreatePublisher}
-        />
-        <ColoringTaxonomySelect
-          id="coloring-illustrator"
-          label="Illustrator"
-          value={values.illustrator}
-          options={illustrators}
-          disabled={isSubmitting}
-          placeholder="No illustrator"
-          createTitle="Add illustrator"
-          createLabel="Add illustrator"
-          onChange={value => setField('illustrator', value)}
-          onCreate={onCreateIllustrator}
-        />
-
-        <div className="space-y-2">
-          <Label htmlFor="coloring-series">Series</Label>
-          <Input
-            id="coloring-series"
-            value={values.series ?? ''}
-            onChange={event => setField('series', event.target.value)}
-            disabled={isSubmitting}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="coloring-theme">Theme</Label>
-          <Input
-            id="coloring-theme"
-            value={values.theme ?? ''}
-            onChange={event => setField('theme', event.target.value)}
-            placeholder="Pixar"
-            disabled={isSubmitting}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="coloring-isbn">ISBN</Label>
-          <Input
-            id="coloring-isbn"
-            value={values.isbn ?? ''}
-            onChange={event => setField('isbn', event.target.value)}
-            disabled={isSubmitting}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="coloring-language">Language</Label>
-          <Select
-            value={values.language || NONE_VALUE}
-            onValueChange={value =>
-              setField('language', value === NONE_VALUE ? '' : (value as ColoringBookLanguage))
-            }
-            disabled={isSubmitting}
-          >
-            <SelectTrigger id="coloring-language" aria-label="Language">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE_VALUE}>No language</SelectItem>
-              {COLORING_BOOK_LANGUAGE_OPTIONS.map(option => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="space-y-2">
           <Label htmlFor="coloring-publication-year">Publication year</Label>
           <Input
+            className="min-h-11"
             id="coloring-publication-year"
             type="number"
             inputMode="numeric"
@@ -192,16 +95,69 @@ export function ColoringBookBibliographyFields({
           />
           <FieldError field="publicationYear" fieldErrors={fieldErrors} />
         </div>
-
         <div className="space-y-2">
           <Label htmlFor="coloring-edition">Edition</Label>
           <Input
+            className="min-h-11"
             id="coloring-edition"
             value={values.edition ?? ''}
             onChange={event => setField('edition', event.target.value)}
             disabled={isSubmitting}
           />
         </div>
+        <div className="space-y-2 lg:col-span-2">
+          <Label htmlFor="coloring-series">Series</Label>
+          <Input
+            className="min-h-11"
+            id="coloring-series"
+            value={values.series ?? ''}
+            onChange={event => setField('series', event.target.value)}
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="space-y-2 lg:col-span-2">
+          <Label htmlFor="coloring-theme">Theme</Label>
+          <Input
+            className="min-h-11"
+            id="coloring-theme"
+            value={values.theme ?? ''}
+            onChange={event => setField('theme', event.target.value)}
+            placeholder="Pixar"
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="space-y-2 lg:col-span-2">
+          <Label htmlFor="coloring-isbn">ISBN</Label>
+          <Input
+            className="min-h-11"
+            id="coloring-isbn"
+            value={values.isbn ?? ''}
+            onChange={event => setField('isbn', event.target.value)}
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="space-y-2 lg:col-span-2">
+          <Label htmlFor="coloring-language">Language</Label>
+          <Select
+            value={values.language || NONE_VALUE}
+            onValueChange={value =>
+              setField('language', value === NONE_VALUE ? '' : (value as ColoringBookLanguage))
+            }
+            disabled={isSubmitting}
+          >
+            <SelectTrigger className="min-h-11" id="coloring-language" aria-label="Language">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE_VALUE}>No language</SelectItem>
+              {COLORING_BOOK_LANGUAGE_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>{' '}
       </div>
     </Section>
   );

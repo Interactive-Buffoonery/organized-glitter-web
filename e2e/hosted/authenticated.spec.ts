@@ -11,7 +11,7 @@ test('key signed-in routes load in one paced session', async ({ page }) => {
 
   await visit('/overview', page.getByRole('heading', { name: /^Welcome back,/ }));
   await visit('/dashboard', libraryPageHeading(page));
-  await visit('/projects/new', page.getByLabel('Project title'));
+  await visit('/projects/new', page.getByLabel('Title *'));
   await visit(
     '/dashboard?craft=coloring',
     page.getByRole('searchbox', { name: 'Search coloring books' })

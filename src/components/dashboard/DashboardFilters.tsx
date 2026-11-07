@@ -112,16 +112,10 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
               className="mt-0.5"
               checked={filters.searchAllFields}
               onCheckedChange={value => updateSearchAllFields(Boolean(value))}
-              aria-describedby="search-all-fields-help"
             />
-            <div>
-              <Label htmlFor="search-all-fields" className="text-sm font-normal">
-                Search notes and kit links
-              </Label>
-              <p id="search-all-fields-help" className="text-muted-foreground mt-1 text-xs">
-                Includes more fields. Searches may take longer.
-              </p>
-            </div>
+            <Label htmlFor="search-all-fields" className="text-sm font-normal">
+              Search notes and kit links (slower)
+            </Label>
           </div>
           <FilterDropdown
             label="Company"
@@ -181,42 +175,33 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
                 </Label>
               </div>
 
-              {activeStatus !== 'everything' && (
-                <p className="text-muted-foreground text-xs">
-                  Choose All to include archived or destashed kits.
-                </p>
-              )}
-              <div className="flex items-center gap-x-3">
-                <Checkbox
-                  id="include-destashed-kits"
-                  checked={includeDestashed}
-                  onCheckedChange={checked => updateIncludeDestashed(Boolean(checked))}
-                  disabled={activeStatus !== 'everything'}
-                  data-testid="include-destashed-checkbox"
-                />
-                <Label
-                  htmlFor="include-destashed-kits"
-                  className={`text-sm font-normal ${activeStatus !== 'everything' ? 'text-muted-foreground' : ''}`}
-                >
-                  Destashed kits
-                </Label>
-              </div>
+              {activeStatus === 'everything' && (
+                <>
+                  <div className="flex items-center gap-x-3">
+                    <Checkbox
+                      id="include-destashed-kits"
+                      checked={includeDestashed}
+                      onCheckedChange={checked => updateIncludeDestashed(Boolean(checked))}
+                      data-testid="include-destashed-checkbox"
+                    />
+                    <Label htmlFor="include-destashed-kits" className="text-sm font-normal">
+                      Destashed kits
+                    </Label>
+                  </div>
 
-              <div className="flex items-center gap-x-3">
-                <Checkbox
-                  id="include-archived-kits"
-                  checked={includeArchived}
-                  onCheckedChange={checked => updateIncludeArchived(Boolean(checked))}
-                  disabled={activeStatus !== 'everything'}
-                  data-testid="include-archived-checkbox"
-                />
-                <Label
-                  htmlFor="include-archived-kits"
-                  className={`text-sm font-normal ${activeStatus !== 'everything' ? 'text-muted-foreground' : ''}`}
-                >
-                  Archived kits
-                </Label>
-              </div>
+                  <div className="flex items-center gap-x-3">
+                    <Checkbox
+                      id="include-archived-kits"
+                      checked={includeArchived}
+                      onCheckedChange={checked => updateIncludeArchived(Boolean(checked))}
+                      data-testid="include-archived-checkbox"
+                    />
+                    <Label htmlFor="include-archived-kits" className="text-sm font-normal">
+                      Archived kits
+                    </Label>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

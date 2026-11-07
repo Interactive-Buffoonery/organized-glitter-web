@@ -53,6 +53,19 @@ describe('getActiveFilterResetPatch', () => {
 });
 
 describe('dashboard filter panel search scope', () => {
+  it('counts destashed and archived kits only under All', () => {
+    const flags = { includeDestashed: true, includeArchived: true };
+
+    expect(getDashboardFilterPanelSummary({ ...getDefaultFilters(), ...flags }).count).toBe(2);
+    expect(
+      getDashboardFilterPanelSummary({
+        ...getDefaultFilters(),
+        ...flags,
+        activeStatus: 'wishlist',
+      }).count
+    ).toBe(1);
+  });
+
   it('counts broader search but excludes the search text', () => {
     const summary = getDashboardFilterPanelSummary({
       ...getDefaultFilters(),

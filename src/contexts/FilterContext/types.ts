@@ -91,8 +91,8 @@ const countFilters = (
   if (filters.selectedDrillShape !== 'all') count++;
   if (filters.selectedYearFinished !== 'all') count++;
   if (!filters.includeMiniKits) count++;
-  if (filters.includeDestashed) count++;
-  if (filters.includeArchived) count++;
+  if (filters.activeStatus === 'everything' && filters.includeDestashed) count++;
+  if (filters.activeStatus === 'everything' && filters.includeArchived) count++;
   if (includeSearchTerm && filters.searchTerm) count++;
   if (includeSearchAllFields && filters.searchAllFields) count++;
   count += filters.selectedTags.length;

@@ -45,7 +45,7 @@ export function transitionBulkPhoto(state: BulkPhotoState, event: BulkPhotoEvent
         ? { phase: 'idle', id: state.id, rows: [] }
         : state;
     case 'rows':
-      return { ...state, rows: event.rows };
+      return state.phase === 'review' ? { ...state, rows: event.rows } : state;
     case 'import':
       return state.phase === 'review' ? { ...state, phase: 'importing' } : state;
     case 'result':

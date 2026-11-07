@@ -33,4 +33,19 @@ describe('bulk photo phases', () => {
       initialBulkPhotoState
     );
   });
+  it('accepts row replacements only during review', () => {
+    const analyzing = transitionBulkPhoto(initialBulkPhotoState, { type: 'analyze' });
+    const review = transitionBulkPhoto(analyzing, {
+      type: 'ready',
+      id: analyzing.id,
+      rows: [],
+      library,
+    });
+    const importing = transitionBulkPhoto(review, { type: 'import' });
+    const rows: typeof review.rows = [];
+    for (const state of [initialBulkPhotoState, analyzing, importing]) {
+      expect(transitionBulkPhoto(state, { type: 'rows', rows })).toBe(state);
+    }
+    expect(transitionBulkPhoto(review, { type: 'rows', rows }).rows).toBe(rows);
+  });
 });

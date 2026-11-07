@@ -245,7 +245,6 @@ export function useBulkPhotoImport() {
   const updateRow = useCallback(
     (rowId: string, patch: Partial<BulkPhotoReviewRow>) => {
       const current = stateRef.current;
-      if (current.phase !== 'review') return;
       transition({
         type: 'rows',
         rows: current.rows.map(row => (row.id === rowId ? { ...row, ...patch } : row)),

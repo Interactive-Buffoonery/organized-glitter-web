@@ -1,4 +1,5 @@
 import { captureException } from '@/services/analytics-escape-hatch';
+import { installBuildGraph, removeBuildGraph } from '@/test-utils/buildGraph';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCapture = vi.fn();
@@ -13,21 +14,12 @@ vi.mock('posthog-js', () => ({
 
 describe('analytics-escape-hatch', () => {
   beforeEach(() => {
-    const manifest = document.createElement('script');
-    manifest.id = 'app-bootstrap-resources';
-    manifest.type = 'application/json';
-    manifest.textContent = JSON.stringify({
-      graphs: {
-        '/assets/main-AbCd1234.js': [],
-        '/assets/ProjectDetail-LongerBuildHash123.js': [],
-      },
-    });
-    document.head.appendChild(manifest);
+    installBuildGraph();
     mockCapture.mockClear();
     mockCaptureException.mockClear();
   });
 
-  afterEach(() => document.getElementById('app-bootstrap-resources')?.remove());
+  afterEach(removeBuildGraph);
 
   describe('captureException', () => {
     it.each(['v8', 'safari'])('passes build-listed lazy locations to the SDK (%s)', format => {

@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import posthog from 'posthog-js';
 import type { CaptureResult } from 'posthog-js';
 import { captureException } from '@/services/analytics-escape-hatch';
+import { installBuildGraph, removeBuildGraph } from '@/test-utils/buildGraph';
 
 // Exercise the installed SDK parser, stopping every payload before transport.
 describe('exception SDK payload', () => {
@@ -32,7 +33,7 @@ describe('exception SDK payload', () => {
   });
   afterAll(() => vi.unstubAllGlobals());
   afterEach(() => {
-    document.getElementById('app-bootstrap-resources')?.remove();
+    removeBuildGraph();
     posthog.opt_out_capturing();
   });
 
@@ -42,11 +43,7 @@ describe('exception SDK payload', () => {
       events.length = 0;
       posthog.opt_in_capturing({ captureEventName: false });
       const path = '/assets/ProjectDetail-LongerBuildHash123.js';
-      const manifest = document.createElement('script');
-      manifest.id = 'app-bootstrap-resources';
-      manifest.type = 'application/json';
-      manifest.textContent = JSON.stringify({ graphs: { [path]: [] } });
-      document.head.appendChild(manifest);
+      installBuildGraph({ [path]: [] });
       const location = `${window.location.origin}${path}?token=synthetic-private-token`;
       const error = new TypeError('synthetic-private-message');
       Object.defineProperty(error, 'stack', {

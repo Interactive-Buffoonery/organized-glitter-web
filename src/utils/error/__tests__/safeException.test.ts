@@ -1,23 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { safeException } from '@/utils/error/safeException';
+import { BUILD_GRAPH_ID, installBuildGraph, removeBuildGraph } from '@/test-utils/buildGraph';
 
 const asset = () => `${window.location.origin}/assets/main-AbCd1234.js`;
 
 describe('safeException', () => {
   beforeEach(() => {
-    const manifest = document.createElement('script');
-    manifest.id = 'app-bootstrap-resources';
-    manifest.type = 'application/json';
-    manifest.textContent = JSON.stringify({
-      graphs: {
-        '/assets/main-AbCd1234.js': [],
-        '/assets/ProjectDetail-LongerBuildHash123.js': [],
-      },
-    });
-    document.head.appendChild(manifest);
+    installBuildGraph();
   });
 
-  afterEach(() => document.getElementById('app-bootstrap-resources')?.remove());
+  afterEach(removeBuildGraph);
 
   it('retains exact build-listed lazy chunks in Safari and V8 stacks', () => {
     const path = '/assets/ProjectDetail-LongerBuildHash123.js';
@@ -34,7 +26,7 @@ privateFunction@${window.location.origin}${path}?token=synthetic-token#private:1
   });
 
   it('fails closed without a valid build graph, including formerly allowed filenames', () => {
-    const manifest = document.getElementById('app-bootstrap-resources')!;
+    const manifest = document.getElementById(BUILD_GRAPH_ID)!;
     const error = new Error('private prose');
     Object.defineProperty(error, 'stack', { value: `Error: private prose\n    at ${asset()}:1:2` });
     for (const value of [
@@ -64,7 +56,7 @@ privateFunction@${window.location.origin}${path}?token=synthetic-token#private:1
     ['/src/private-photo.js'],
     Array(257).fill('/assets/main-AbCd1234.js'),
   ])('rejects malformed graph dependencies (%j)', dependencies => {
-    document.getElementById('app-bootstrap-resources')!.textContent = JSON.stringify({
+    document.getElementById(BUILD_GRAPH_ID)!.textContent = JSON.stringify({
       graphs: { '/assets/main-AbCd1234.js': dependencies },
     });
     const error = new Error('private prose');
@@ -83,7 +75,7 @@ privateFunction@${window.location.origin}${path}?token=synthetic-token#private:1
     expect(safeException(error).properties).toEqual({
       exception_stack_status: 'no_matching_frames',
     });
-    document.getElementById('app-bootstrap-resources')!.textContent = JSON.stringify({
+    document.getElementById(BUILD_GRAPH_ID)!.textContent = JSON.stringify({
       graphs: Object.fromEntries(
         Array.from({ length: 257 }, (_, i) => [`/assets/chunk-${i}.js`, []])
       ),
@@ -94,7 +86,7 @@ privateFunction@${window.location.origin}${path}?token=synthetic-token#private:1
   });
 
   it('does not accept source files, URLs or tokens as build graph keys', () => {
-    document.getElementById('app-bootstrap-resources')!.textContent = JSON.stringify({
+    document.getElementById(BUILD_GRAPH_ID)!.textContent = JSON.stringify({
       graphs: Object.fromEntries(
         [
           '/assets/../private-photo.js',

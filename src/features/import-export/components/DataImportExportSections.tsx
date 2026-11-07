@@ -1177,20 +1177,26 @@ function PhotoImportTask({
             value={35}
             className="h-2"
             aria-label="Importing photos"
-            aria-valuetext="Working"
+            aria-valuetext={
+              bulkPhotoImport.rows.length > 0 ? 'Importing your confirmed choices...' : 'Working'
+            }
           />
           <output
             className="text-muted-foreground block text-sm"
             aria-live="polite"
             aria-atomic="true"
           >
-            Working
+            {bulkPhotoImport.rows.length > 0 ? 'Importing your confirmed choices...' : 'Working'}
           </output>
         </div>
       )}
 
       {bulkPhotoImport.rows.length > 0 && (
-        <div className="space-y-4">
+        <fieldset
+          disabled={bulkPhotoImport.loading}
+          aria-label="Photo import choices"
+          className="min-w-0 space-y-4"
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <p className="text-sm font-medium">
               {pluralize(bulkPhotoImport.rows.length, 'photo')} ready for review
@@ -1216,7 +1222,7 @@ function PhotoImportTask({
             targetOptions={targetOptions}
             updateBulkRow={updateBulkRow}
           />
-        </div>
+        </fieldset>
       )}
 
       {bulkPhotoImport.lastResult && <BulkPhotoResultPanel result={bulkPhotoImport.lastResult} />}

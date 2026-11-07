@@ -1,5 +1,6 @@
 import { captureException } from '@/services/analytics-escape-hatch';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { installBuildGraph, removeBuildGraph } from '@/test-utils/buildGraph';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCapture = vi.fn();
 const mockCaptureException = vi.fn();
@@ -13,11 +14,31 @@ vi.mock('posthog-js', () => ({
 
 describe('analytics-escape-hatch', () => {
   beforeEach(() => {
+    installBuildGraph();
     mockCapture.mockClear();
     mockCaptureException.mockClear();
   });
 
+  afterEach(removeBuildGraph);
+
   describe('captureException', () => {
+    it.each(['v8', 'safari'])('passes build-listed lazy locations to the SDK (%s)', format => {
+      const path = `${window.location.origin}/assets/ProjectDetail-LongerBuildHash123.js`;
+      const error = new Error('private diary token=synthetic-token');
+      Object.defineProperty(error, 'stack', {
+        value:
+          format === 'v8'
+            ? `Error: private diary\n    at privatePhoto.png (${path}?token=synthetic-token:12:34)`
+            : `privatePhoto.png@${path}?token=synthetic-token:12:34`,
+      });
+      captureException(error);
+      const [safe] = mockCaptureException.mock.calls[0];
+      expect(safe.stack).toBe(`Error: Application error (message redacted)\n    at ${path}:12:34`);
+      expect(`${safe.stack} ${JSON.stringify(mockCaptureException.mock.calls[0][1])}`).not.toMatch(
+        /privatePhoto|diary|synthetic-token/
+      );
+    });
+
     it('redacts messages, custom fields and stack text while retaining app locations', () => {
       const error = new TypeError('private diary https://example.test/reset?token=synthetic-token');
       Object.defineProperty(error, 'stack', {

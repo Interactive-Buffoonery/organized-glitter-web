@@ -45,7 +45,13 @@ const ciJobs = {
 
 export const ciJobForPhase = name => ciJobs[name];
 
-export function buildPhasePlan(profile) {
+export function buildPhasePlan(profile, phase) {
+  if (phase !== undefined) {
+    if (profile !== 'ci') throw new Error('Phase selection requires the ci profile.');
+    const selected = buildPhasePlan(profile).filter(([name]) => name === phase);
+    if (selected.length !== 1) throw new Error(`Unknown CI phase: ${phase}`);
+    return selected;
+  }
   if (!profiles.has(profile)) throw new Error(`Unknown validation profile: ${profile}`);
   if (profile === 'backend') return [['backend', 'test:ci:backend']];
   if (profile === 'cloud') return sharedPhases.slice(0, 6);
@@ -57,17 +63,28 @@ export function buildPhasePlan(profile) {
   ];
 }
 
+export function phaseOutcome(name, profile, phase) {
+  if (buildPhasePlan(profile, phase).some(([candidate]) => candidate === name)) return 'not-run';
+  if (profile !== 'ci') return 'delegated-to-ci';
+  return ciJobForPhase(name)
+    ? `delegated-to-${ciJobForPhase(name)}`
+    : `delegated-to-ci-phase-${name}`;
+}
+
 export function parseArgs(argv) {
   let base;
   let profile;
+  let phase;
   for (const arg of argv) {
     if (arg.startsWith('--base=')) base = arg.slice('--base='.length);
+    else if (arg.startsWith('--phase=')) phase = arg.slice('--phase='.length);
     else if (arg.startsWith('--profile=')) profile = arg.slice('--profile='.length);
     else throw new Error(`Unknown validation argument: ${arg}`);
   }
   if (!base) throw new Error('Local validation requires an explicit --base=<git-ref>.');
   if (!profiles.has(profile)) throw new Error(`Unknown validation profile: ${profile}`);
-  return { base, profile };
+  buildPhasePlan(profile, phase);
+  return { base, profile, phase };
 }
 
 const run = (command, args, options = {}) => {
@@ -240,6 +257,9 @@ export function formatValidationReport(summary) {
     '# Local PocketBase and CI results',
     '',
     `Result: ${summary.outcome}`,
+    ...(summary.selectedPhase
+      ? [`CI phase: ${summary.selectedPhase}. Complete PR validation requires every sibling phase.`]
+      : []),
     ...(summary.profile === 'cloud'
       ? [
           'Browser coverage: delegated to CI, not passed locally.',
@@ -320,7 +340,7 @@ export function runAdvisoryNativeReport(base, runDir, runFn = run, env = process
 }
 
 export function runLocalValidation(argv = process.argv.slice(2)) {
-  const { base, profile } = parseArgs(argv);
+  const { base, profile, phase: selectedPhase } = parseArgs(argv);
   const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}-${profile}`;
   const runDir = path.join(summaryRoot, runId);
   const summaryPath = path.join(runDir, 'summary.json');
@@ -329,6 +349,7 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
   const summary = {
     schemaVersion: 1,
     profile,
+    selectedPhase,
     runId,
     startedAt: new Date().toISOString(),
     outcome: 'running',
@@ -346,11 +367,7 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
       ([name, script]) => ({
         name,
         script,
-        outcome: buildPhasePlan(profile).some(([phase]) => phase === name)
-          ? 'not-run'
-          : profile === 'ci'
-            ? `delegated-to-${ciJobForPhase(name)}`
-            : 'delegated-to-ci',
+        outcome: phaseOutcome(name, profile, selectedPhase),
       })
     ),
   };
@@ -390,7 +407,7 @@ export function runLocalValidation(argv = process.argv.slice(2)) {
   const repository = summary.repository;
 
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-  for (const [name, script] of buildPhasePlan(profile)) {
+  for (const [name, script] of buildPhasePlan(profile, selectedPhase)) {
     const startedAt = new Date();
     const phase = summary.phases.find(phase => phase.name === name);
     Object.assign(phase, { startedAt: startedAt.toISOString(), outcome: 'running' });

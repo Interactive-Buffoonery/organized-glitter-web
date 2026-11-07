@@ -40,7 +40,7 @@ jobs:
           CI_PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           CI_MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           CI_PUSH_BEFORE_SHA: ${{ github.event.before }}
-          CI_EXPLICIT_BASE: ${{ inputs.comparison_base || '04789b9d000e6eb1390ca2a6ae60f855a3b1fca6' }}
+          CI_EXPLICIT_BASE: ${{ inputs.comparison_base }}
           CI_BRANCH_CREATION_BASE: 04789b9d000e6eb1390ca2a6ae60f855a3b1fca6
           CI_HEAD_SHA: ${{ github.sha }}
           CI_TARGET_BRANCH: ${{ github.base_ref || github.event.merge_group.base_ref || github.ref_name }}
@@ -111,8 +111,17 @@ jobs:
       - name: Scan publication inputs, history, tree, and output
         run: pnpm test:publication
 
-  complete-pr:
-    name: Complete PR validation
+  validation-phase:
+    name: Validate ${{ matrix.phase }}
+    strategy:
+      fail-fast: false
+      matrix:
+        phase:
+          - backend
+          - built-app
+          - browser-smoke
+          - protected-file-browser
+          - blog-browser
     needs: scope
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -132,9 +141,10 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
       - name: Install lockfile-matched browsers and system libraries
+        if: matrix.phase != 'backend'
         run: pnpm exec playwright install --with-deps chromium webkit
-      - name: Run backend and browser PR phases
-        run: pnpm test:pr:ci
+      - name: Run isolated validation phase
+        run: pnpm test:pr:ci --phase=${{ matrix.phase }}
       - name: Summarize phase outcomes without runtime artifacts
         if: always()
         shell: bash
@@ -144,6 +154,19 @@ jobs:
               cat "$report" >> "$GITHUB_STEP_SUMMARY"
             fi
           done
+
+  complete-pr:
+    name: Complete PR validation
+    if: always()
+    needs: [scope, validation-phase]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every validation phase to pass
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          VALIDATION_RESULT: ${{ needs.validation-phase.result }}
+        run: test "$SCOPE_RESULT" = success && test "$VALIDATION_RESULT" = success
 
   result:
     name: CI result

@@ -101,6 +101,8 @@ test.describe('coloring book UI creation', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport);
+      await page.mouse.move(0, 0);
+      await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 15_000 });
       await page.getByRole('button', { name: 'Edit coloring book' }).click();
       const editor = page.getByRole('dialog', { name: 'Edit coloring book' });
       await expect(editor).toBeVisible();

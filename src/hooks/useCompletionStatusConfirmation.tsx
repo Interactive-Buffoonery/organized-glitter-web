@@ -9,10 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { createLogger } from '@/utils/logger';
 
-const logger = createLogger('useCompletionStatusConfirmation');
-const SELECT_CLOSE_WAIT_MS = 1000;
 const POPUP_SELECTOR = '[role="listbox"], [data-radix-popper-content-wrapper] [role="dialog"]';
 
 function findReturnFocusTarget() {
@@ -51,7 +48,6 @@ export function useCompletionStatusConfirmation({ countsAsFinished = true } = {}
   const [open, setOpen] = useState(false);
   const resolve = useRef<((confirmed: boolean) => void) | null>(null);
   const returnFocusTo = useRef<HTMLElement | null>(null);
-  const pendingOpenFrame = useRef(0);
   const finish = useCallback((confirmed: boolean) => {
     resolve.current?.(confirmed);
     resolve.current = null;
@@ -59,32 +55,15 @@ export function useCompletionStatusConfirmation({ countsAsFinished = true } = {}
   }, []);
   useEffect(
     () => () => {
-      cancelAnimationFrame(pendingOpenFrame.current);
       resolve.current?.(false);
     },
     []
   );
   const confirm = useCallback(() => {
     resolve.current?.(false);
-    cancelAnimationFrame(pendingOpenFrame.current);
     const trigger = findReturnFocusTarget();
     returnFocusTo.current = trigger;
-    const listboxId =
-      trigger?.getAttribute('role') === 'combobox' ? trigger.getAttribute('aria-controls') : null;
-    const deadline = performance.now() + SELECT_CLOSE_WAIT_MS;
-    // Select and AlertDialog resolve different Radix layer versions. Opening while the Select is
-    // still mounted makes the dialog restore the Select's pointer-events lock when it closes.
-    const openAfterSelectCloses = () => {
-      if (listboxId && document.getElementById(listboxId)) {
-        if (performance.now() < deadline) {
-          pendingOpenFrame.current = requestAnimationFrame(openAfterSelectCloses);
-          return;
-        }
-        logger.error('Select stayed open; showing the status prompt anyway');
-      }
-      setOpen(true);
-    };
-    pendingOpenFrame.current = requestAnimationFrame(openAfterSelectCloses);
+    setOpen(true);
     return new Promise<boolean>(done => {
       resolve.current = done;
     });

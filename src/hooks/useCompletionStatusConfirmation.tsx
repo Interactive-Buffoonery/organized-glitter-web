@@ -24,7 +24,10 @@ export function needsCompletionStatusConfirmation(
   );
 }
 
-export function useCompletionStatusConfirmation({ countsAsFinished = true } = {}) {
+export function useCompletionStatusConfirmation({
+  countsAsFinished = true,
+  subject = 'project',
+}: { countsAsFinished?: boolean; subject?: 'project' | 'book' | 'page' } = {}) {
   const [open, setOpen] = useState(false);
   const resolve = useRef<((confirmed: boolean) => void) | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -81,8 +84,8 @@ export function useCompletionStatusConfirmation({ countsAsFinished = true } = {}
         <AlertDialogHeader>
           <AlertDialogTitle>Change from Completed?</AlertDialogTitle>
           <AlertDialogDescription>
-            Did you mean to change this status? The completion date is kept
-            {countsAsFinished ? ' and this still counts as finished.' : '.'}
+            Did you mean to change this {subject}&apos;s status? The completion date will be kept
+            {countsAsFinished ? ` and this ${subject} still counts as finished.` : '.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

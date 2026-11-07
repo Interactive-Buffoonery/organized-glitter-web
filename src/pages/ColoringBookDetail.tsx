@@ -74,6 +74,7 @@ const ColoringBookDetail = () => {
   const illustratorsQuery = useBookIllustrators(user?.id);
   const { requestChange, dialog, triggerRef } = useCompletionStatusConfirmation({
     countsAsFinished: false,
+    subject: 'book',
   });
   const updateBook = useUpdateColoringBook();
   const deleteBook = useDeleteColoringBook();

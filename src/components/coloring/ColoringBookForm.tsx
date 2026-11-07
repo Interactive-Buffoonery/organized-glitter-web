@@ -207,6 +207,7 @@ export function ColoringBookForm({
   );
   const { requestChange, dialog, triggerRef } = useCompletionStatusConfirmation({
     countsAsFinished: false,
+    subject: 'book',
   });
   const {
     statusBeforeDateChange,

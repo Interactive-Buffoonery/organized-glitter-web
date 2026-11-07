@@ -241,7 +241,7 @@ describe('ColoringBookForm', () => {
     );
     await user.click(getByRole('combobox', { name: 'Status' }));
     await user.click(getByRole('option', { name: 'In progress' }));
-    expect(await findByRole('alertdialog')).toHaveTextContent('completion date is kept');
+    expect(await findByRole('alertdialog')).toHaveTextContent('completion date will be kept');
     expect(getByRole('alertdialog')).not.toHaveTextContent('still counts as finished');
     await user.click(getByRole('button', { name: 'Keep Completed' }));
     expect(getByRole('combobox', { name: 'Status' })).toHaveTextContent('Completed');

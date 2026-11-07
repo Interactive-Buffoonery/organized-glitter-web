@@ -46,7 +46,7 @@ describe('completion status confirmation', () => {
   it('leaves out the finished claim for records that stats do not count', async () => {
     renderPrompt(false);
     await userEvent.click(screen.getByRole('button', { name: 'Ask' }));
-    expect(await screen.findByText(/completion date is kept/)).toBeInTheDocument();
+    expect(await screen.findByText(/completion date will be kept/)).toBeInTheDocument();
     expect(screen.queryByText(/still counts as finished/)).not.toBeInTheDocument();
   });
 
@@ -221,7 +221,9 @@ describe('completion status confirmation', () => {
   ] as const)('%s resolves the pending change', async (label, expected) => {
     const resolved = renderPrompt();
     await userEvent.click(screen.getByRole('button', { name: 'Ask' }));
-    expect(await screen.findByText(/still counts as finished/)).toBeInTheDocument();
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      "Did you mean to change this project's status? The completion date will be kept and this project still counts as finished."
+    );
     await userEvent.click(screen.getByRole('button', { name: label }));
     await waitFor(() => expect(resolved).toHaveBeenCalledWith(expected));
   });

@@ -42,7 +42,7 @@ const NestedFixture = () => (
         </DrawerPrimitive.Trigger>
         <DrawerContent>
           <DrawerTitle>Outer dialog</DrawerTitle>
-          <DrawerDescription>Mixed Radix versions through Vaul.</DrawerDescription>
+          <DrawerDescription>Nested dialog focus through Vaul.</DrawerDescription>
           <input aria-label="Outer value" />
           <NestedDialog />
           <DrawerPrimitive.Close asChild>

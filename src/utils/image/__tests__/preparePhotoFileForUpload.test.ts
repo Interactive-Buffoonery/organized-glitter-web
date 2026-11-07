@@ -30,6 +30,30 @@ describe('photo upload preparation', () => {
     expect(compress).not.toHaveBeenCalled();
   });
 
+  it.each([10 * 1024 * 1024, 5 * 1024 * 1024])(
+    'accepts a large source compressed to %i bytes',
+    async size => {
+      const source = new File(['source'], 'photo.jpg', { type: 'image/jpeg' });
+      Object.defineProperty(source, 'size', { value: 50 * 1024 * 1024 });
+      const output = new File(['compressed'], 'photo.jpg', { type: 'image/jpeg' });
+      Object.defineProperty(output, 'size', { value: size });
+      compress.mockResolvedValue(output);
+
+      await expect(preparePhotoFileForUpload(source)).resolves.toBe(output);
+      expect(compress).toHaveBeenCalledWith(source);
+    }
+  );
+
+  it('rejects compressed output one byte over the destination limit', async () => {
+    const output = new File(['compressed'], 'photo.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(output, 'size', { value: 10 * 1024 * 1024 + 1 });
+    compress.mockResolvedValue(output);
+
+    await expect(
+      preparePhotoFileForUpload(new File(['source'], 'photo.jpg', { type: 'image/jpeg' }))
+    ).rejects.toThrow('Image exceeds the 10MB upload limit after compression');
+  });
+
   it('propagates compression failure instead of submitting the original file', async () => {
     compress.mockRejectedValue(new Error('Could not compress'));
     await expect(

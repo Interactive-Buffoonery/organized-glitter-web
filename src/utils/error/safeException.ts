@@ -13,10 +13,49 @@ const ERROR_NAMES = new Set([
   'ImportExportError',
 ]);
 
-// Only fixed build entry/vendor names are accepted. Arbitrary filenames,
-// source paths, function labels and third-party URLs are never forwarded.
-const APP_ASSET =
-  /^\/assets\/(?:main|react-vendor|pocketbase-vendor|analytics-vendor|form-vendor|ui-vendor)-[A-Za-z0-9_-]{8}\.js$/;
+const MAX_BUILD_GRAPH_LENGTH = 512 * 1024;
+const MAX_BUILD_CHUNKS = 256;
+const BUILD_RESOURCE_PATH = /^\/assets\/[A-Za-z0-9_./-]+\.(?:js|css)$/;
+
+function isBuildResource(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    BUILD_RESOURCE_PATH.test(value) &&
+    !value.split('/').some(part => part === '.' || part === '..')
+  );
+}
+
+// This inert JSON is emitted from Rollup's actual chunk graph, including lazy
+// chunks. Never infer an approved filename from the error's own stack.
+function buildChunkPaths(): Set<string> | undefined {
+  try {
+    const element = document.getElementById('app-bootstrap-resources');
+    if (element?.tagName !== 'SCRIPT' || element.getAttribute('type') !== 'application/json') {
+      return undefined;
+    }
+    const text = element.textContent;
+    if (!text || text.length > MAX_BUILD_GRAPH_LENGTH) return undefined;
+    const config: unknown = JSON.parse(text);
+    if (!config || typeof config !== 'object' || !('graphs' in config)) return undefined;
+    const graphs = config.graphs;
+    if (!graphs || typeof graphs !== 'object' || Array.isArray(graphs)) return undefined;
+    const paths = Object.keys(graphs);
+    if (paths.length === 0 || paths.length > MAX_BUILD_CHUNKS) return undefined;
+    if (paths.some(path => !isBuildResource(path) || !path.endsWith('.js'))) return undefined;
+    if (
+      Object.values(graphs).some(
+        dependencies =>
+          !Array.isArray(dependencies) ||
+          dependencies.length > MAX_BUILD_CHUNKS ||
+          !dependencies.every(isBuildResource)
+      )
+    )
+      return undefined;
+    return new Set(paths);
+  } catch {
+    return undefined;
+  }
+}
 
 // V8 exposes stack through a shared native accessor. Never invoke a custom
 // accessor or custom stack formatter, and reject accessor-based headers before
@@ -86,7 +125,14 @@ export function inspectException(value: unknown): Error | string | undefined {
   }
 }
 
-function safeFrames(stack: string): string[] {
+function stackStatus(stack: string | undefined, paths: Set<string> | undefined, frames: string[]) {
+  if (!stack) return 'missing_stack';
+  if (!paths) return 'missing_build_graph';
+  if (frames.length === 0) return 'no_matching_frames';
+  return 'retained';
+}
+
+function safeFrames(stack: string, paths: Set<string>): string[] {
   const frames: string[] = [];
   for (const line of stack.slice(0, MAX_STACK_LENGTH).split('\n', MAX_STACK_LINES)) {
     if (!/^\s*at\s/.test(line) && !/^[^\s@]*@https?:\/\//.test(line)) continue;
@@ -96,7 +142,7 @@ function safeFrames(stack: string): string[] {
     try {
       const url = new URL(location[1]);
       if (url.origin !== window.location.origin || url.username || url.password) continue;
-      if (!APP_ASSET.test(url.pathname)) continue;
+      if (!paths.has(url.pathname)) continue;
       frames.push(`    at ${url.origin}${url.pathname}:${location[2]}:${location[3]}`);
       if (frames.length === MAX_FRAMES) break;
     } catch {
@@ -128,8 +174,15 @@ export function safeException(value: unknown): {
   error.name = name;
   // Never keep the stack generated here: it would falsely group reports at
   // the sanitizer instead of the original throw site.
-  error.stack = [`${name}: ${message}`, ...(isError ? safeFrames(inspected.stack ?? '') : [])].join(
-    '\n'
-  );
-  return { error, ...(!isError && { properties: { non_error_type: type } }) };
+  const stack = isError ? inspected.stack : undefined;
+  const paths = stack ? buildChunkPaths() : undefined;
+  const frames = stack && paths ? safeFrames(stack, paths) : [];
+  error.stack = [`${name}: ${message}`, ...frames].join('\n');
+  return {
+    error,
+    properties: {
+      exception_stack_status: stackStatus(stack, paths, frames),
+      ...(!isError && { non_error_type: type }),
+    },
+  };
 }

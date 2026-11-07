@@ -148,11 +148,16 @@ custom names, causes, aggregate members and custom serialization are not forward
 handling reports only a fixed reason type and never calls `String(reason)`.
 
 Stack inspection is bounded to 16 KiB and 100 lines, with at most 20 retained frames. Only
-same-origin `/assets/main-*.js` entry and vendor bundles with fixed names and eight-character
-build hashes are retained, with line and column numbers for grouping and source-map lookup. Query
-strings, fragments, credentials, function labels, arbitrary filenames, source paths, extension
-frames and third-party locations are discarded. Unrecognized lazy chunks and development
-source frames are omitted; reports without approved frames group by the fixed error type.
+same-origin JavaScript chunk paths listed in the document's build-generated
+`app-bootstrap-resources.graphs` are retained, with line and column numbers for grouping and
+source-map lookup. This existing Rollup graph includes entry, vendor and lazy chunks; a path
+must match an emitted chunk exactly. The reader accepts at most 256 chunk keys and 512 KiB of
+inert JSON, and fails closed when the graph is missing or malformed. No network lookup is needed.
+Query strings, fragments, credentials, function labels, arbitrary filenames, source paths,
+extension frames and third-party locations are discarded. Development source frames and chunks
+from another build are omitted. Reports without approved frames keep the fixed error type and
+redacted message. The fixed `exception_stack_status` property distinguishes `retained`,
+`missing_stack`, `missing_build_graph` and `no_matching_frames`; it never copies rejected input.
 No sanitizer-generated stack is used as a replacement throw site.
 
 This is preventive hardening, not evidence of an observed leak. It does not enable automatic

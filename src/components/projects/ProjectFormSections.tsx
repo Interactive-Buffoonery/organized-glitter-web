@@ -94,28 +94,30 @@ const ProjectFormSections = ({
   }, [formData.tags]);
 
   const handleInputChange = useCallback(
-    async (field: keyof ProjectFormValues, value: ProjectFormValues[keyof ProjectFormValues]) => {
-      if (field === 'status') {
-        const next = statusForStatusChange(
-          value as ProjectFormValues['status'],
-          formData.dateCompleted,
-          savedDateCompleted
-        );
-        if (
-          savedStatus === 'completed' &&
-          needsCompletionStatusConfirmation(formData.status, next, formData.dateCompleted) &&
-          !(await confirm())
-        )
-          return;
-        onChange({
-          ...formDataRef.current,
-          status: next,
+    (field: keyof ProjectFormValues, value: ProjectFormValues[keyof ProjectFormValues]) => {
+      if (field !== 'status') {
+        onChange({ ...formDataRef.current, [field]: value });
+        return;
+      }
+      const { status, dateCompleted } = formDataRef.current;
+      const next = statusForStatusChange(
+        value as ProjectFormValues['status'],
+        dateCompleted,
+        savedDateCompleted
+      );
+      const applyStatus = () => onChange({ ...formDataRef.current, status: next });
+      if (
+        savedStatus === 'completed' &&
+        needsCompletionStatusConfirmation(status, next, dateCompleted)
+      ) {
+        void confirm().then(confirmed => {
+          if (confirmed) applyStatus();
         });
         return;
       }
-      onChange({ ...formData, [field]: value });
+      applyStatus();
     },
-    [formData, onChange, savedDateCompleted, statusForStatusChange, confirm, savedStatus]
+    [confirm, onChange, savedDateCompleted, savedStatus, statusForStatusChange]
   );
 
   const handleImageChange = useCallback(

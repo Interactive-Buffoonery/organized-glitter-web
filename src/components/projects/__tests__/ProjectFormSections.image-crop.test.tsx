@@ -293,6 +293,27 @@ describe('ProjectFormSections project image cropping', () => {
       );
     });
 
+    it('keeps edits that arrive while the prompt is open', async () => {
+      const user = userEvent.setup();
+      const props = {
+        companies: [],
+        artists: [],
+        isSubmitting: false,
+        onChange: onChangeMock,
+        savedDateCompleted: '2026-09-20',
+        savedStatus: 'completed' as const,
+      };
+      const saved = { ...baseFormData, status: 'completed' as const, dateCompleted: '2026-09-20' };
+      const { rerender } = render(<ProjectFormSections formData={saved} {...props} />);
+      await pickOnHold(user);
+      await screen.findByRole('alertdialog');
+      rerender(<ProjectFormSections formData={{ ...saved, title: 'Newer title' }} {...props} />);
+      await user.click(screen.getByRole('button', { name: 'Change status' }));
+      expect(onChangeMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'onhold', title: 'Newer title' })
+      );
+    });
+
     it('does not prompt once the date has been cleared in the form', async () => {
       const user = userEvent.setup();
       renderSavedCompleted('');

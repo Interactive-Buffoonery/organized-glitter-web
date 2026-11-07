@@ -289,34 +289,12 @@ export function ColoringBookForm({
     };
   }, [previewUrl]);
 
-  const setField = async <K extends keyof ColoringBookFormValues>(
+  const applyField = <K extends keyof ColoringBookFormValues>(
     field: K,
-    value: ColoringBookFormValues[K]
+    value: ColoringBookFormValues[K],
+    status: ColoringBookFormValues['status']
   ) => {
-    let status = values.status;
-    if (field === 'status') {
-      status = statusForStatusChange(
-        value as ColoringBookFormValues['status'],
-        values.dateCompleted,
-        initialBook?.dateCompleted
-      );
-    }
-    if (
-      field === 'status' &&
-      initialBook?.status === 'completed' &&
-      needsCompletionStatusConfirmation(values.status, status, values.dateCompleted) &&
-      !(await confirm())
-    )
-      return;
     markChanged();
-    if (field === 'dateCompleted') {
-      status = statusForDateChange(
-        String(value ?? ''),
-        values.dateCompleted,
-        values.status,
-        initialBook?.dateCompleted
-      );
-    }
     setValues(current => ({
       ...current,
       [field]: value,
@@ -328,6 +306,39 @@ export function ColoringBookForm({
       delete next[field];
       return next;
     });
+  };
+
+  const setField = <K extends keyof ColoringBookFormValues>(
+    field: K,
+    value: ColoringBookFormValues[K]
+  ) => {
+    let status = values.status;
+    if (field === 'status') {
+      status = statusForStatusChange(
+        value as ColoringBookFormValues['status'],
+        values.dateCompleted,
+        initialBook?.dateCompleted
+      );
+      if (
+        initialBook?.status === 'completed' &&
+        needsCompletionStatusConfirmation(values.status, status, values.dateCompleted)
+      ) {
+        const confirmedStatus = status;
+        void confirm().then(confirmed => {
+          if (confirmed) applyField(field, value, confirmedStatus);
+        });
+        return;
+      }
+    }
+    if (field === 'dateCompleted') {
+      status = statusForDateChange(
+        String(value ?? ''),
+        values.dateCompleted,
+        values.status,
+        initialBook?.dateCompleted
+      );
+    }
+    applyField(field, value, status);
   };
 
   const applyCoverImage = (file: File | null) => {

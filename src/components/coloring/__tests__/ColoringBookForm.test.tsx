@@ -209,6 +209,26 @@ describe('ColoringBookForm', () => {
     onCreateIllustrator: vi.fn(),
   };
 
+  it('keeps edits that arrive while the status prompt is open', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    const { findByRole, getByRole, getByLabelText, queryByRole } = renderWithProviders(
+      <ColoringBookForm
+        {...baseProps}
+        onSubmit={onSubmit}
+        initialBook={{ ...coloringBook(), status: 'completed', dateCompleted: '2026-09-20' }}
+      />
+    );
+    await user.click(getByRole('combobox', { name: 'Status' }));
+    await user.click(getByRole('option', { name: 'In progress' }));
+    await findByRole('alertdialog');
+    fireEvent.change(getByLabelText('Notes'), { target: { value: 'Newer note' } });
+    await user.click(getByRole('button', { name: 'Change status' }));
+    await waitFor(() => expect(queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(getByLabelText('Notes')).toHaveValue('Newer note');
+    expect(getByRole('combobox', { name: 'Status' })).toHaveTextContent('In progress');
+  });
+
   it('confirms a saved Completed status change and keeps the date', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(true);

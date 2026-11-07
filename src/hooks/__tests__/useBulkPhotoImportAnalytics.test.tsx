@@ -197,6 +197,7 @@ describe('bulk photo import analytics', () => {
       await result.current.analyzeZipFile(file);
     });
 
+    expect(result.current.loading).toBe(false);
     expect(serviceMocks.projectsService.getAllForUser).not.toHaveBeenCalled();
     expect(serviceMocks.coloringService.listAllBooks).not.toHaveBeenCalled();
     expect(mockNotify).toHaveBeenCalledWith(
@@ -268,6 +269,38 @@ describe('bulk photo import analytics', () => {
     });
 
     expect(result.current.rows).toHaveLength(1);
+    expect(result.current.rows[0].path).toBe('Starry Fox/new.jpg');
+    expect(result.current.loading).toBe(false);
+  });
+  it('imports current review data through a callback retained before analysis', async () => {
+    const { result } = renderHookWithProviders(() => useBulkPhotoImport());
+    const importConfirmed = result.current.importConfirmed;
+    mockImportBulkPhotos.mockResolvedValue({ importedCount: 1, skippedCount: 0, failedCount: 0 });
+
+    await act(async () => {
+      await result.current.analyzeFileList([fileWithPath('new.jpg', 'Starry Fox/new.jpg')]);
+    });
+    const reviewedRows = result.current.rows;
+    const reviewedLibrary = result.current.library;
+    await act(async () => {
+      await importConfirmed();
+    });
+
+    expect(mockImportBulkPhotos).toHaveBeenCalledWith(reviewedRows, reviewedLibrary);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('ends loading after library analysis fails and allows a fresh analysis', async () => {
+    serviceMocks.projectsService.getAllForUser.mockRejectedValueOnce(new Error('Unavailable'));
+    const { result } = renderHookWithProviders(() => useBulkPhotoImport());
+    await act(async () => {
+      await result.current.analyzeFileList([fileWithPath('old.jpg', 'Starry Fox/old.jpg')]);
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.library).toBeNull();
+    await act(async () => {
+      await result.current.analyzeFileList([fileWithPath('new.jpg', 'Starry Fox/new.jpg')]);
+    });
     expect(result.current.rows[0].path).toBe('Starry Fox/new.jpg');
     expect(result.current.loading).toBe(false);
   });

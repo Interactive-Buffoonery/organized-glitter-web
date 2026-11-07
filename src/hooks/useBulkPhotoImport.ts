@@ -1,4 +1,3 @@
-import type { SetStateAction } from 'react';
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import JSZip from 'jszip';
@@ -169,15 +168,6 @@ export function useBulkPhotoImport() {
   const library = 'library' in state ? state.library : null;
   const lastResult = 'lastResult' in state ? state.lastResult : null;
   const loading = state.phase === 'analyzing' || state.phase === 'importing';
-  const setRows = useCallback(
-    (update: SetStateAction<BulkPhotoReviewRow[]>) => {
-      transition({
-        type: 'rows',
-        rows: typeof update === 'function' ? update(stateRef.current.rows) : update,
-      });
-    },
-    [transition]
-  );
   const beginAnalysis = useCallback(() => transition({ type: 'analyze' }).id, [transition]);
 
   const analyzeInputs = useCallback(
@@ -212,9 +202,8 @@ export function useBulkPhotoImport() {
           failed_count: 1,
         });
         notify({ kind: 'error', title: 'Photo analysis failed', description: message });
-        return [];
-      } finally {
         transition({ type: 'analysis-finished', id: analysisId });
+        return [];
       }
     },
     [transition]
@@ -246,9 +235,8 @@ export function useBulkPhotoImport() {
           failed_count: 1,
         });
         notify({ kind: 'error', title: 'ZIP import failed', description: message });
-        return [];
-      } finally {
         transition({ type: 'analysis-finished', id: analysisId });
+        return [];
       }
     },
     [analyzeInputs, beginAnalysis, transition]
@@ -256,16 +244,18 @@ export function useBulkPhotoImport() {
 
   const updateRow = useCallback(
     (rowId: string, patch: Partial<BulkPhotoReviewRow>) => {
-      setRows(currentRows =>
-        currentRows.map(row => (row.id === rowId ? { ...row, ...patch } : row))
-      );
+      transition({
+        type: 'rows',
+        rows: stateRef.current.rows.map(row => (row.id === rowId ? { ...row, ...patch } : row)),
+      });
     },
-    [setRows]
+    [transition]
   );
 
   const importConfirmed = useCallback(async () => {
     const current = stateRef.current;
-    if (!library || current.phase !== 'review' || current.id !== state.id) return null;
+    if (current.phase !== 'review') return null;
+    const { rows, library } = current;
     const readyAnalysisId = current.id;
     transition({ type: 'import' });
     const startedAt = Date.now();
@@ -325,7 +315,7 @@ export function useBulkPhotoImport() {
     } finally {
       transition({ type: 'import-finished', id: readyAnalysisId });
     }
-  }, [library, queryClient, state.id, rows, transition]);
+  }, [queryClient, transition]);
 
   return {
     analyzeFileList,
@@ -333,7 +323,6 @@ export function useBulkPhotoImport() {
     importConfirmed,
     updateRow,
     rows,
-    setRows,
     library,
     loading,
     lastResult,

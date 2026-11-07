@@ -433,3 +433,17 @@ restored. Deploy the receipt migration and archive hooks before the client.
 An `r:<id>` symbol is retained exactly. When its request is not readable in the
 restoring account, clients render the neutral placeholder. The normal backend
 hook may replace it with a resolved symbol for a same-user request.
+
+If a coloring page photo cannot be prepared, restore appends the successfully
+prepared prefix and defers that photo and every later photo on that page. The
+summary reports the source path and deferred count separately from existing
+photos skipped on retry. Journal entries, color references, color keys, and later
+pages can still restore. Backend append failures retain the existing stop behavior;
+unconfirmed writes are not counted as imported.
+
+After repairing the source photo, retry the same archive to append the remaining
+photos in order without duplicates, provided the stored prefix is unchanged.
+Photo recovery uses the existing photo count, not per-photo receipts. Adding,
+deleting, or reordering page photos between attempts can invalidate that prefix
+and prevent safe count-based recovery. Keep the original ZIP and avoid photo edits
+until recovery finishes.

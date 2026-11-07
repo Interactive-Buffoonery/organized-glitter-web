@@ -175,6 +175,8 @@ test.describe('local atomic project deletion', () => {
     await expectRecordExists(pb, 'tags', created.tagId);
 
     await page.unroute(`**${projectDeletePath}`);
+    await page.mouse.move(0, 0);
+    await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 15_000 });
     await deleteProjectFromDetail(page);
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
 

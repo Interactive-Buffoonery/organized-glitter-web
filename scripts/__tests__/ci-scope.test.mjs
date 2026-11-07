@@ -30,3 +30,38 @@ describe('CI merge queue scope', () => {
     expect(JSON.parse(result.stdout)).toMatchObject({ full: true });
   });
 });
+
+describe('recurring CI comparison', () => {
+  for (const eventName of ['schedule', 'workflow_dispatch']) {
+    it(`compares ${eventName} against the preceding revision by default`, () => {
+      expect(resolveComparison({ eventName, headSha: 'head' })).toEqual({
+        base: 'head^',
+        head: 'head',
+        range: 'head^..head',
+      });
+    });
+
+    it(`preserves an explicit ${eventName} baseline`, () => {
+      expect(resolveComparison({ eventName, headSha: 'head', explicitBase: 'release' })).toEqual({
+        base: 'release',
+        head: 'head',
+        range: 'release..head',
+      });
+    });
+
+    it(`keeps every validation phase enabled for ${eventName}`, () => {
+      const result = spawnSync(process.execPath, ['scripts/ci-scope.mjs'], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CI_EVENT_NAME: eventName,
+          CI_HEAD_SHA: 'HEAD',
+          CI_EXPLICIT_BASE: '',
+          CI_TARGET_BRANCH: 'dev',
+        },
+      });
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({ backend: true, browser: true, full: true });
+    });
+  }
+});

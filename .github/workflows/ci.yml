@@ -40,7 +40,7 @@ jobs:
           CI_PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           CI_MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           CI_PUSH_BEFORE_SHA: ${{ github.event.before }}
-          CI_EXPLICIT_BASE: ${{ inputs.comparison_base || '04789b9d000e6eb1390ca2a6ae60f855a3b1fca6' }}
+          CI_EXPLICIT_BASE: ${{ inputs.comparison_base }}
           CI_BRANCH_CREATION_BASE: 04789b9d000e6eb1390ca2a6ae60f855a3b1fca6
           CI_HEAD_SHA: ${{ github.sha }}
           CI_TARGET_BRANCH: ${{ github.base_ref || github.event.merge_group.base_ref || github.ref_name }}

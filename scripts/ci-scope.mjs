@@ -48,7 +48,7 @@ export function resolveComparison({
     return { base, head, range: `${base}..${head}` };
   }
   if (eventName === 'schedule' || eventName === 'workflow_dispatch') {
-    const base = requireValue(explicitBase, 'Explicit comparison baseline');
+    const base = explicitBase || `${head}^`;
     return { base, head, range: `${base}..${head}` };
   }
   throw new Error(`Unsupported CI event: ${eventName || '(missing)'}.`);

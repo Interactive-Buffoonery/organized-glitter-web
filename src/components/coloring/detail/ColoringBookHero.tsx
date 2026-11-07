@@ -45,7 +45,10 @@ export const ColoringBookHero = ({
             <PopoverTrigger asChild>
               <Button
                 type="button"
-                disabled={updatePending}
+                aria-disabled={updatePending}
+                onClick={event => {
+                  if (updatePending) event.preventDefault();
+                }}
                 variant="ghost"
                 className={cn(
                   'min-h-11 rounded-full px-3 text-xs font-semibold',

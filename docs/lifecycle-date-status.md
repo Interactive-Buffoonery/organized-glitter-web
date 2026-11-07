@@ -25,3 +25,16 @@ Legacy archive project restore uses an authenticated PocketBase route with a
 restore context, so a saved completion date does not replace the archived
 status. The route assigns the signed-in user and checks ownership of related
 companies and artists.
+
+In web forms, a newly entered completion date keeps Status at Completed. A hint
+under Status explains that clearing the new date allows another status. This
+snap-back does not ask for confirmation.
+
+When a saved Completed project, book, or page has a completion date, choosing
+another status in a single-record web control asks for confirmation. The prompt
+explains that the date is kept. For projects and pages, it also says the record
+still counts as finished, because stats count their dates. Book dates are not
+counted, so the book prompt leaves that out. Cancel keeps Completed. Choosing
+Archived or Destashed, or clearing the date first in a form, does not show this
+prompt.
+Dates and date-based stats are unchanged.

@@ -27,6 +27,7 @@ interface ProjectStatusSectionProps {
   isSubmitting: boolean;
   fieldErrors: ProjectFormFieldErrors;
   onFieldChange: ProjectFormFieldChange;
+  completionDateHint?: boolean;
 }
 
 export const ProjectStatusSection = ({
@@ -34,6 +35,7 @@ export const ProjectStatusSection = ({
   isSubmitting,
   fieldErrors,
   onFieldChange,
+  completionDateHint,
 }: ProjectStatusSectionProps) => (
   <Section label="Status">
     <Label htmlFor="status" className="sr-only">
@@ -55,6 +57,11 @@ export const ProjectStatusSection = ({
         ))}
       </SelectContent>
     </Select>
+    {completionDateHint && (
+      <p className="text-muted-foreground text-sm">
+        Remove the completion date to change the status.
+      </p>
+    )}
     <FieldError field="status" message={fieldErrors.status} />
   </Section>
 );

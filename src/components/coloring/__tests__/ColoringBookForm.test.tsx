@@ -209,6 +209,87 @@ describe('ColoringBookForm', () => {
     onCreateIllustrator: vi.fn(),
   };
 
+  it('keeps edits that arrive while the status prompt is open', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    const { findByRole, getByRole, getByLabelText, queryByRole } = renderWithProviders(
+      <ColoringBookForm
+        {...baseProps}
+        onSubmit={onSubmit}
+        initialBook={{ ...coloringBook(), status: 'completed', dateCompleted: '2026-09-20' }}
+      />
+    );
+    await user.click(getByRole('combobox', { name: 'Status' }));
+    await user.click(getByRole('option', { name: 'In progress' }));
+    await findByRole('alertdialog');
+    fireEvent.change(getByLabelText('Notes'), { target: { value: 'Newer note' } });
+    await user.click(getByRole('button', { name: 'Change status' }));
+    await waitFor(() => expect(queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(getByLabelText('Notes')).toHaveValue('Newer note');
+    expect(getByRole('combobox', { name: 'Status' })).toHaveTextContent('In progress');
+  });
+
+  it('confirms a saved Completed status change and keeps the date', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    const { findByRole, getByRole, getByLabelText, queryByRole } = renderWithProviders(
+      <ColoringBookForm
+        {...baseProps}
+        onSubmit={onSubmit}
+        initialBook={{ ...coloringBook(), status: 'completed', dateCompleted: '2026-09-20' }}
+      />
+    );
+    await user.click(getByRole('combobox', { name: 'Status' }));
+    await user.click(getByRole('option', { name: 'In progress' }));
+    expect(await findByRole('alertdialog')).toHaveTextContent('completion date is kept');
+    expect(getByRole('alertdialog')).not.toHaveTextContent('still counts as finished');
+    await user.click(getByRole('button', { name: 'Keep Completed' }));
+    expect(getByRole('combobox', { name: 'Status' })).toHaveTextContent('Completed');
+    await user.click(getByRole('combobox', { name: 'Status' }));
+    await user.click(getByRole('option', { name: 'In progress' }));
+    await user.click(await findByRole('button', { name: 'Change status' }));
+    await waitFor(() => expect(queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(getByLabelText('Completed')).toHaveValue('2026-09-20');
+    await user.click(getByRole('button', { name: 'Add book' }));
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'in_progress', dateCompleted: '2026-09-20' }),
+        expect.any(Function),
+        0
+      )
+    );
+  });
+
+  it('does not prompt once the completion date has been cleared in the form', async () => {
+    const user = userEvent.setup();
+    const { getByRole, getByLabelText, queryByRole } = renderWithProviders(
+      <ColoringBookForm
+        {...baseProps}
+        initialBook={{ ...coloringBook(), status: 'completed', dateCompleted: '2026-09-20' }}
+      />
+    );
+    fireEvent.change(getByLabelText('Completed'), { target: { value: '' } });
+    await user.click(getByRole('combobox', { name: 'Status' }));
+    await user.click(getByRole('option', { name: 'In progress' }));
+    expect(queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(getByRole('combobox', { name: 'Status' })).toHaveTextContent('In progress');
+  });
+
+  it('explains a new completion date without prompting on snap-back', async () => {
+    const user = userEvent.setup();
+    const { getByRole, getByLabelText, getByText, queryByRole } = renderWithProviders(
+      <ColoringBookForm {...baseProps} initialBook={coloringBook()} />
+    );
+    fireEvent.change(getByLabelText('Completed'), { target: { value: '2026-09-20' } });
+    expect(getByText('Remove the completion date to change the status.')).toBeInTheDocument();
+    await user.click(getByRole('combobox', { name: 'Status' }));
+    await user.click(getByRole('option', { name: 'In progress' }));
+    expect(queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(getByRole('combobox', { name: 'Status' })).toHaveTextContent('Completed');
+    fireEvent.change(getByLabelText('Completed'), { target: { value: '' } });
+    expect(getByRole('combobox', { name: 'Status' })).toHaveTextContent('In progress');
+  });
+
   it('restores the prior book status after a session expires with a completion date', async () => {
     const onSubmit = vi.fn().mockResolvedValue(true);
     const props = {

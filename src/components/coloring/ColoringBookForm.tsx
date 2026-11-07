@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, RefObject } from 'react';
+import {
+  useCompletionStatusConfirmation,
+  needsCompletionStatusConfirmation,
+} from '@/hooks/useCompletionStatusConfirmation';
 import { ImageCropDialog } from '@/components/image/ImageCropDialog';
-import { useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
+import { hasNewCompletionDate, useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
 import { ColoringBooksStatusOptions } from '@/types/pocketbase.types';
 import {
   validateColoringBookForm,
@@ -204,6 +208,7 @@ export function ColoringBookForm({
   const [missingPhoto, setMissingPhoto] = useState(
     restoredSessionDraft.current?.missingPhoto ?? false
   );
+  const { confirm, dialog } = useCompletionStatusConfirmation({ countsAsFinished: false });
   const {
     statusBeforeDateChange,
     setStatusBeforeDateChange,
@@ -284,27 +289,12 @@ export function ColoringBookForm({
     };
   }, [previewUrl]);
 
-  const setField = <K extends keyof ColoringBookFormValues>(
+  const applyField = <K extends keyof ColoringBookFormValues>(
     field: K,
-    value: ColoringBookFormValues[K]
+    value: ColoringBookFormValues[K],
+    status: ColoringBookFormValues['status']
   ) => {
     markChanged();
-    let status = values.status;
-    if (field === 'status') {
-      status = statusForStatusChange(
-        value as ColoringBookFormValues['status'],
-        values.dateCompleted,
-        initialBook?.dateCompleted
-      );
-    }
-    if (field === 'dateCompleted') {
-      status = statusForDateChange(
-        String(value ?? ''),
-        values.dateCompleted,
-        values.status,
-        initialBook?.dateCompleted
-      );
-    }
     setValues(current => ({
       ...current,
       [field]: value,
@@ -316,6 +306,39 @@ export function ColoringBookForm({
       delete next[field];
       return next;
     });
+  };
+
+  const setField = <K extends keyof ColoringBookFormValues>(
+    field: K,
+    value: ColoringBookFormValues[K]
+  ) => {
+    let status = values.status;
+    if (field === 'status') {
+      status = statusForStatusChange(
+        value as ColoringBookFormValues['status'],
+        values.dateCompleted,
+        initialBook?.dateCompleted
+      );
+      if (
+        initialBook?.status === 'completed' &&
+        needsCompletionStatusConfirmation(values.status, status, values.dateCompleted)
+      ) {
+        const confirmedStatus = status;
+        void confirm().then(confirmed => {
+          if (confirmed) applyField(field, value, confirmedStatus);
+        });
+        return;
+      }
+    }
+    if (field === 'dateCompleted') {
+      status = statusForDateChange(
+        String(value ?? ''),
+        values.dateCompleted,
+        values.status,
+        initialBook?.dateCompleted
+      );
+    }
+    applyField(field, value, status);
   };
 
   const applyCoverImage = (file: File | null) => {
@@ -393,7 +416,13 @@ export function ColoringBookForm({
   const isDrawerLayout = layout === 'drawer';
   const statusAndTags = (
     <>
-      <ColoringBookStatusFields {...sharedProps} />
+      <ColoringBookStatusFields
+        {...sharedProps}
+        completionDateHint={Boolean(
+          hasNewCompletionDate(values.dateCompleted, initialBook?.dateCompleted) &&
+          values.status === 'completed'
+        )}
+      />
       <ColoringBookTagManager
         selectedTags={(values.tags ?? []) as Tag[]}
         disabled={isSaving}
@@ -415,6 +444,7 @@ export function ColoringBookForm({
         handleCancel();
       }}
     >
+      {dialog}
       {draft.recoverable && (
         <DraftRecoveryPanel
           changedOnServer={draft.recoverable.baselineUpdatedAt !== initialBook?.updatedAt}

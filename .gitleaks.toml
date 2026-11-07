@@ -16,3 +16,11 @@ condition = "AND"
 paths = ['''(^|/)dist/assets/pocketbase-vendor-[^/]+\.js\.map$''']
 regexTarget = "secret"
 regexes = ['''^this\.collections=new$''']
+
+[[allowlists]]
+description = "Build commit SHA in generated output when a chunk hash contains the sgp_ keyword"
+targetRules = ["sourcegraph-access-token"]
+condition = "AND"
+paths = ['''(^|/)dist/''']
+regexTarget = "secret"
+regexes = ['''^[a-fA-F0-9]{40}$''']

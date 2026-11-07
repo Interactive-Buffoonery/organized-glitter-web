@@ -38,3 +38,4 @@ Add one when a choice is **stable**, **cross-cutting**, and **costly to reverse*
 | [0020](./0020-native-swiftui-app-in-separate-repository.md) | Build the native SwiftUI app in a separate repository         | Accepted   |
 | 0021 (historical reference outside this extraction)         | Retired catalog plan                                          | Superseded |
 | [0022](./0022-free-catalog-and-optional-tips.md)            | Keep the app free with website-only support                   | Accepted   |
+| [0023](./0023-explicit-lifecycle-state-machines.md)         | Make lifecycle and multi-step UI states explicit              | Accepted   |

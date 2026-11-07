@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { notifyError } from '@/lib/notifications';
 import { usePrivateFileUrl } from '@/hooks/usePrivateFileUrl';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useNumberInput } from '@/hooks/useNumberInput';
-import { useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
+import {
+  useCompletionStatusConfirmation,
+  needsCompletionStatusConfirmation,
+} from '@/hooks/useCompletionStatusConfirmation';
+import { hasNewCompletionDate, useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
 import { ProjectCoverImageSection } from '@/components/projects/form-sections/ProjectCoverImageSection';
 import { ProjectDatesSection } from '@/components/projects/form-sections/ProjectDatesSection';
 import { ProjectKitInfoSection } from '@/components/projects/form-sections/ProjectKitInfoSection';
@@ -27,6 +31,7 @@ interface ProjectFormSectionsProps {
   isSubmitting: boolean;
   onChange: (data: ProjectFormValues) => void;
   savedDateCompleted?: string | null;
+  savedStatus?: ProjectFormValues['status'];
   statusBeforeDateChange?: ProjectFormValues['status'] | null;
   onStatusBeforeDateChange?: (status: ProjectFormValues['status'] | null) => void;
   fieldErrors?: ProjectFormFieldErrors;
@@ -42,6 +47,7 @@ const ProjectFormSections = ({
   isSubmitting,
   onChange,
   savedDateCompleted,
+  savedStatus,
   statusBeforeDateChange,
   onStatusBeforeDateChange,
   fieldErrors = EMPTY_FIELD_ERRORS,
@@ -49,6 +55,7 @@ const ProjectFormSections = ({
   onDraftCompany,
   onDraftArtist,
 }: ProjectFormSectionsProps) => {
+  const { confirm, dialog } = useCompletionStatusConfirmation();
   const imageUploadHook = useImageUpload('project-images', 'project-image');
   const { preview, applyProcessedImage } = imageUploadHook;
   const cropSourceUrl = usePrivateFileUrl(preview || formData.imageUrl);
@@ -63,7 +70,8 @@ const ProjectFormSections = ({
     ProjectFormValues['status']
   >('completed', statusBeforeDateChange, onStatusBeforeDateChange);
 
-  useEffect(() => {
+  // Layout effect so child effects, like the notes editor's updates, never spread stale values.
+  useLayoutEffect(() => {
     formDataRef.current = formData;
   }, [formData]);
 
@@ -88,20 +96,29 @@ const ProjectFormSections = ({
 
   const handleInputChange = useCallback(
     (field: keyof ProjectFormValues, value: ProjectFormValues[keyof ProjectFormValues]) => {
-      if (field === 'status') {
-        onChange({
-          ...formData,
-          status: statusForStatusChange(
-            value as ProjectFormValues['status'],
-            formData.dateCompleted,
-            savedDateCompleted
-          ),
+      if (field !== 'status') {
+        onChange({ ...formDataRef.current, [field]: value });
+        return;
+      }
+      const { status, dateCompleted } = formDataRef.current;
+      const next = statusForStatusChange(
+        value as ProjectFormValues['status'],
+        dateCompleted,
+        savedDateCompleted
+      );
+      const applyStatus = () => onChange({ ...formDataRef.current, status: next });
+      if (
+        savedStatus === 'completed' &&
+        needsCompletionStatusConfirmation(status, next, dateCompleted)
+      ) {
+        void confirm().then(confirmed => {
+          if (confirmed) applyStatus();
         });
         return;
       }
-      onChange({ ...formData, [field]: value });
+      applyStatus();
     },
-    [formData, onChange, savedDateCompleted, statusForStatusChange]
+    [confirm, onChange, savedDateCompleted, savedStatus, statusForStatusChange]
   );
 
   const handleImageChange = useCallback(
@@ -232,6 +249,10 @@ const ProjectFormSections = ({
       formData={formData}
       isSubmitting={isSubmitting}
       fieldErrors={fieldErrors}
+      completionDateHint={Boolean(
+        hasNewCompletionDate(formData.dateCompleted, savedDateCompleted) &&
+        formData.status === 'completed'
+      )}
       onFieldChange={handleInputChange}
     />
   );
@@ -252,6 +273,7 @@ const ProjectFormSections = ({
 
   return (
     <>
+      {dialog}
       <div className="min-w-0 lg:col-start-1 lg:row-start-1">
         <ProjectTitleSection
           formData={formData}

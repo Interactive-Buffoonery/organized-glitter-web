@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrivateFileTokenContext } from '@/contexts/privateFileTokenState';
 import ProjectFormSections from '../ProjectFormSections';
@@ -16,6 +16,7 @@ const {
   onChangeMock,
   imageUploadState,
   resolveCompanyAndArtistIdsMock,
+  notesEditor,
 } = vi.hoisted(() => ({
   handleImageChangeMock: vi.fn(),
   handleImageRemoveMock: vi.fn(),
@@ -29,6 +30,7 @@ const {
     error: null as string | null,
   },
   resolveCompanyAndArtistIdsMock: vi.fn(),
+  notesEditor: { pendingUpdate: null as string | null },
 }));
 
 vi.mock('@/utils/project/field-mapping', () => ({
@@ -86,8 +88,8 @@ vi.mock('@/components/image/ImageCropDialog', () => ({
     ) : null,
 }));
 
-vi.mock('@/components/notes/RichTextEditor.lazy', () => ({
-  default: ({
+vi.mock('@/components/notes/RichTextEditor.lazy', () => {
+  const RichTextEditorMock = ({
     value,
     onChange,
     ariaLabel,
@@ -95,14 +97,23 @@ vi.mock('@/components/notes/RichTextEditor.lazy', () => ({
     value: string;
     onChange: (value: string) => void;
     ariaLabel?: string;
-  }) => (
-    <textarea
-      aria-label={ariaLabel}
-      value={value}
-      onChange={event => onChange(event.target.value)}
-    />
-  ),
-}));
+  }) => {
+    useEffect(() => {
+      if (notesEditor.pendingUpdate === null) return;
+      const update = notesEditor.pendingUpdate;
+      notesEditor.pendingUpdate = null;
+      onChange(update);
+    });
+    return (
+      <textarea
+        aria-label={ariaLabel}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+      />
+    );
+  };
+  return { default: RichTextEditorMock };
+});
 
 vi.mock('@/components/tags/InlineTagManager', () => ({
   InlineTagManager: () => <div data-testid="inline-tag-manager" />,
@@ -247,6 +258,84 @@ describe('ProjectFormSections project image cropping', () => {
     );
   });
 
+  describe('leaving a saved Completed status', () => {
+    const renderSavedCompleted = (dateCompleted: string) =>
+      render(
+        <ProjectFormSections
+          formData={{ ...baseFormData, status: 'completed', dateCompleted }}
+          companies={[]}
+          artists={[]}
+          isSubmitting={false}
+          onChange={onChangeMock}
+          savedDateCompleted="2026-09-20"
+          savedStatus="completed"
+        />
+      );
+    const pickOnHold = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(screen.getByRole('combobox', { name: 'Status' }));
+      await user.click(screen.getByRole('option', { name: 'On Hold' }));
+    };
+
+    it('asks first, and changes nothing when kept', async () => {
+      const user = userEvent.setup();
+      renderSavedCompleted('2026-09-20');
+      await pickOnHold(user);
+      expect(await screen.findByRole('alertdialog')).toHaveTextContent('still counts as finished');
+      await user.click(screen.getByRole('button', { name: 'Keep Completed' }));
+      expect(onChangeMock).not.toHaveBeenCalled();
+    });
+
+    it('returns focus to Status after Escape', async () => {
+      const user = userEvent.setup();
+      renderSavedCompleted('2026-09-20');
+      await pickOnHold(user);
+      await screen.findByRole('alertdialog');
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.getByRole('combobox', { name: 'Status' })).toHaveFocus());
+    });
+
+    it('applies the status and keeps the date when confirmed', async () => {
+      const user = userEvent.setup();
+      renderSavedCompleted('2026-09-20');
+      await pickOnHold(user);
+      await user.click(await screen.findByRole('button', { name: 'Change status' }));
+      expect(onChangeMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'onhold', dateCompleted: '2026-09-20' })
+      );
+    });
+
+    it('keeps edits that arrive while the prompt is open', async () => {
+      const user = userEvent.setup();
+      const props = {
+        companies: [],
+        artists: [],
+        isSubmitting: false,
+        onChange: onChangeMock,
+        savedDateCompleted: '2026-09-20',
+        savedStatus: 'completed' as const,
+      };
+      const saved = { ...baseFormData, status: 'completed' as const, dateCompleted: '2026-09-20' };
+      const { rerender } = render(<ProjectFormSections formData={saved} {...props} />);
+      await pickOnHold(user);
+      await screen.findByRole('alertdialog');
+      rerender(<ProjectFormSections formData={{ ...saved, title: 'Newer title' }} {...props} />);
+      await user.click(screen.getByRole('button', { name: 'Change status' }));
+      expect(onChangeMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'onhold', title: 'Newer title' })
+      );
+    });
+
+    it('does not prompt once the date has been cleared in the form', async () => {
+      const user = userEvent.setup();
+      renderSavedCompleted('');
+      await pickOnHold(user);
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(onChangeMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'onhold', dateCompleted: '' })
+      );
+    });
+  });
+
   it('sends real full-form clear controls through the update mapper and adapter', async () => {
     let submittedFormData: FormData | undefined;
 
@@ -294,6 +383,17 @@ describe('ProjectFormSections project image cropping', () => {
     expect(submittedFormData?.get('date_purchased')).toBe('');
     expect(submittedFormData?.get('total_diamonds')).toBe('');
     expect(submittedFormData?.get('source_url')).toBe('');
+  });
+
+  it('keeps a typed title when the notes editor updates in the same commit', () => {
+    renderProjectForm({ ...baseFormData, title: '' });
+
+    notesEditor.pendingUpdate = 'A note';
+    fireEvent.change(screen.getByLabelText('Project title'), { target: { value: 'Kept' } });
+
+    expect(onChangeMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'Kept', generalNotes: 'A note' })
+    );
   });
 
   it('preserves edits made while the selected image is processing', async () => {

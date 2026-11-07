@@ -40,8 +40,7 @@ export function ColoringBookStatusFields({
 
         {completionDateHint && (
           <p className="text-muted-foreground text-sm">
-            Set to Completed because you added a completion date. Clear the date to choose another
-            status.
+            Clear the completion date to change the status.
           </p>
         )}
         <div className="flex h-10 items-center gap-3">

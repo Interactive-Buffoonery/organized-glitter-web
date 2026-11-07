@@ -94,6 +94,9 @@ for (const parent of ['dialog', 'drawer']) {
       const outerTrigger = page.getByRole('button', { name: 'Open outer dialog' });
       await outerTrigger.click();
       const outerInput = page.getByRole('textbox', { name: 'Outer value' });
+      if (parent === 'drawer') {
+        await outerInput.click();
+      }
       await expect(outerInput).toBeFocused();
       await outerInput.fill('Keep this draft');
       const innerTrigger = page.getByRole('button', { name: 'Open inner dialog' });

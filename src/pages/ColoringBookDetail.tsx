@@ -75,7 +75,10 @@ const ColoringBookDetail = () => {
   const tagsQuery = useColoringBookTags(id);
   const publishersQuery = useBookPublishers(user?.id);
   const illustratorsQuery = useBookIllustrators(user?.id);
-  const { confirm, dialog } = useCompletionStatusConfirmation({ countsAsFinished: false });
+  const { confirm, dialog } = useCompletionStatusConfirmation({
+    countsAsFinished: false,
+    subject: 'book',
+  });
   const updateBook = useUpdateColoringBook();
   const deleteBook = useDeleteColoringBook();
   const syncBookTags = useSyncColoringBookTags();

@@ -1,3 +1,4 @@
+import { CraftingStreak } from '@/features/crafting-streak/CraftingStreak';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { AddNoteCTA } from '@/components/notes-feed/AddNoteCTA';
@@ -150,9 +151,12 @@ export default function NotesFeedPage() {
       <div className="container mx-auto max-w-3xl px-4 py-6 sm:py-8">
         <header className="mb-6 space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="font-handwritten text-4xl leading-none tracking-tight md:text-5xl">
-              Notes
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-handwritten text-4xl leading-none tracking-tight md:text-5xl">
+                Notes
+              </h1>
+              <CraftingStreak location="notes" />
+            </div>
             <AddNoteCTA
               visibleTab={visibleTab}
               sourceId={sourceId}

@@ -14,6 +14,7 @@ export const browserSpecInventory = {
     'pwa-safe-area.spec.ts',
   ],
   affectedOrRelease: [
+    'authenticated/crafting-streak-local.spec.ts',
     'authenticated/color-keys-local.spec.ts',
     'authenticated/library-redesign-local.spec.ts',
     'authenticated/protected-file-rotation-local.spec.ts',

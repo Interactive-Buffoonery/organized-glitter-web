@@ -13,9 +13,10 @@ export const invalidateNotesFeedQueries = (
   const { userId, ...params } = options;
 
   if (userId) {
-    return queryClient.invalidateQueries({
-      queryKey: queryKeys.notesFeed.list(userId, params),
-    });
+    return Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.notesFeed.list(userId, params) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.notesFeed.streak(userId) }),
+    ]);
   }
 
   return queryClient.invalidateQueries({

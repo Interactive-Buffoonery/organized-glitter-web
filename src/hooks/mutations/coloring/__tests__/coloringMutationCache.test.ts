@@ -73,6 +73,7 @@ describe('coloring mutation cache', () => {
 
   it('clears the deleted book pages and photo maps without touching other books', async () => {
     const client = makeClient();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
     const detailKey = queryKeys.coloring.pages.detail(page.id);
     const pagesKey = queryKeys.coloring.pages.book('book-1');
     const photosKey = queryKeys.coloring.pages.bookPhotos('book-1', 'user-1');
@@ -87,6 +88,9 @@ describe('coloring mutation cache', () => {
     }).subscribe(() => undefined);
 
     await clearDeletedColoringBook(client, 'book-1');
+    await vi.waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.notesFeed.all })
+    );
 
     expect(client.getQueryData(detailKey)).toBeUndefined();
     expect(client.getQueryData(pagesKey)).toBeUndefined();

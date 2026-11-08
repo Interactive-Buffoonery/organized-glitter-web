@@ -133,7 +133,7 @@ export const clearDeletedColoringBook = async (
   });
   void settleInvalidations(
     queryClient,
-    [queryKeys.coloring.books.lists(), queryKeys.coloring.tags.stats()],
+    [queryKeys.coloring.books.lists(), queryKeys.coloring.tags.stats(), queryKeys.notesFeed.all],
     'Coloring book cache refresh failed after delete'
   );
 };

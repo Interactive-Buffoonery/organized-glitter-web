@@ -6,7 +6,11 @@ import { usePrivateFileUrl } from '@/hooks/usePrivateFileUrl';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useNumberInput } from '@/hooks/useNumberInput';
 import { useCompletionStatusConfirmation } from '@/hooks/useCompletionStatusConfirmation';
-import { hasNewCompletionDate, useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
+import {
+  completionStatusForChange,
+  hasNewCompletionDate,
+  useCompletionDateStatus,
+} from '@/hooks/useCompletionDateStatus';
 import { ProjectCoverImageSection } from '@/components/projects/form-sections/ProjectCoverImageSection';
 import { ProjectDatesSection } from '@/components/projects/form-sections/ProjectDatesSection';
 import { ProjectKitInfoSection } from '@/components/projects/form-sections/ProjectKitInfoSection';
@@ -98,7 +102,20 @@ const ProjectFormSections = ({
         dateCompleted,
         savedDateCompleted
       );
-      const applyStatus = () => onChange(previous => ({ ...previous, status: next }));
+      const applyStatus = () =>
+        onChange(previous =>
+          previous.status !== status
+            ? previous
+            : {
+                ...previous,
+                status: completionStatusForChange(
+                  value as ProjectFormValues['status'],
+                  previous.dateCompleted,
+                  savedDateCompleted,
+                  'completed'
+                ),
+              }
+        );
       void requestChange(status, next, dateCompleted, applyStatus, savedStatus ?? '');
     },
     [formData, requestChange, onChange, savedDateCompleted, savedStatus, statusForStatusChange]

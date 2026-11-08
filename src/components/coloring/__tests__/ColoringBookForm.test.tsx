@@ -229,6 +229,25 @@ describe('ColoringBookForm', () => {
     expect(getByRole('combobox', { name: 'Status' })).toHaveTextContent('In progress');
   });
 
+  it('keeps a newer completion date and recomputes status after confirmation', async () => {
+    const user = userEvent.setup();
+    const view = renderWithProviders(
+      <ColoringBookForm
+        {...baseProps}
+        initialBook={{ ...coloringBook(), status: 'completed', dateCompleted: '2026-09-20' }}
+      />
+    );
+    await user.click(view.getByRole('combobox', { name: 'Status' }));
+    await user.click(view.getByRole('option', { name: 'In progress' }));
+    await view.findByRole('alertdialog');
+    fireEvent.change(view.getByLabelText('Completed', { exact: true }), {
+      target: { value: '2026-10-01' },
+    });
+    await user.click(view.getByRole('button', { name: 'Change status' }));
+    expect(view.getByLabelText('Completed', { exact: true })).toHaveValue('2026-10-01');
+    expect(view.getByRole('combobox', { name: 'Status' })).toHaveTextContent('Completed');
+  });
+
   it('confirms a saved Completed status change and keeps the date', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(true);

@@ -328,8 +328,28 @@ describe('ProjectFormSections project image cropping', () => {
       await pickOnHold(user);
       await user.click(await screen.findByRole('button', { name: 'Change status' }));
       expect(
-        onChangeMock.mock.calls.at(-1)?.[0]({ ...baseFormData, dateCompleted: '2026-09-20' })
+        onChangeMock.mock.calls.at(-1)?.[0]({
+          ...baseFormData,
+          status: 'completed',
+          dateCompleted: '2026-09-20',
+        })
       ).toEqual(expect.objectContaining({ status: 'onhold', dateCompleted: '2026-09-20' }));
+    });
+
+    it('recomputes status from the latest completion date after delayed confirmation', async () => {
+      const user = userEvent.setup();
+      const saved = { ...baseFormData, status: 'completed' as const, dateCompleted: '2026-09-20' };
+      renderSavedCompleted('2026-09-20');
+      await pickOnHold(user);
+      await screen.findByRole('alertdialog');
+      await user.click(screen.getByRole('button', { name: 'Change status' }));
+      const apply = onChangeMock.mock.calls.at(-1)?.[0];
+      expect(apply({ ...saved, dateCompleted: '2026-10-01' })).toEqual(
+        expect.objectContaining({ status: 'completed', dateCompleted: '2026-10-01' })
+      );
+      expect(apply({ ...saved, status: 'archived' })).toEqual(
+        expect.objectContaining({ status: 'archived' })
+      );
     });
 
     it('keeps edits that arrive while the prompt is open', async () => {
@@ -358,9 +378,13 @@ describe('ProjectFormSections project image cropping', () => {
       renderSavedCompleted('');
       await pickOnHold(user);
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-      expect(onChangeMock.mock.calls.at(-1)?.[0]({ ...baseFormData, dateCompleted: '' })).toEqual(
-        expect.objectContaining({ status: 'onhold', dateCompleted: '' })
-      );
+      expect(
+        onChangeMock.mock.calls.at(-1)?.[0]({
+          ...baseFormData,
+          status: 'completed',
+          dateCompleted: '',
+        })
+      ).toEqual(expect.objectContaining({ status: 'onhold', dateCompleted: '' }));
     });
   });
 

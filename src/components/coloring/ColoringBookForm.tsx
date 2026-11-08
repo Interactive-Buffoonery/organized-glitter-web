@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, RefObject } from 'react';
 import { useCompletionStatusConfirmation } from '@/hooks/useCompletionStatusConfirmation';
 import { ImageCropDialog } from '@/components/image/ImageCropDialog';
-import { hasNewCompletionDate, useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
+import {
+  completionStatusForChange,
+  hasNewCompletionDate,
+  useCompletionDateStatus,
+} from '@/hooks/useCompletionDateStatus';
 import { ColoringBooksStatusOptions } from '@/types/pocketbase.types';
 import {
   validateColoringBookForm,
@@ -298,7 +302,7 @@ export function ColoringBookForm({
     setValues(current => ({
       ...current,
       [field]: value,
-      status,
+      ...(field === 'dateCompleted' ? { status } : {}),
     }));
     setFieldErrors(current => {
       if (!current[field]) return current;
@@ -324,7 +328,22 @@ export function ColoringBookForm({
         values.status,
         nextStatus,
         values.dateCompleted,
-        () => applyField(field, value, nextStatus),
+        () => {
+          markChanged();
+          setValues(previous =>
+            previous.status !== values.status
+              ? previous
+              : {
+                  ...previous,
+                  status: completionStatusForChange(
+                    value as ColoringBookFormValues['status'],
+                    previous.dateCompleted,
+                    initialBook?.dateCompleted,
+                    'completed'
+                  ),
+                }
+          );
+        },
         initialBook?.status ?? ''
       );
       return;

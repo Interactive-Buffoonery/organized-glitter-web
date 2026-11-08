@@ -84,3 +84,43 @@ for (const width of [1071, 390]) {
     }
   }
 }
+
+for (const parent of ['dialog', 'drawer']) {
+  for (const width of [1071, 390]) {
+    test(`nested ${parent} focus at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.goto(`/e2e/dialog-motion/index.html?nested&parent=${parent}`);
+      const outerTrigger = page.getByRole('button', { name: 'Open outer dialog' });
+      await outerTrigger.click();
+      const outerInput = page.getByRole('textbox', { name: 'Outer value' });
+      if (parent === 'drawer') {
+        await outerInput.click();
+      }
+      await expect(outerInput).toBeFocused();
+      await outerInput.fill('Keep this draft');
+      const innerTrigger = page.getByRole('button', { name: 'Open inner dialog' });
+      await innerTrigger.click();
+      const inner = page.getByRole('dialog', { name: 'Inner dialog', exact: true });
+      const innerInput = inner.getByRole('textbox', { name: 'Inner value' });
+      await expect(innerInput).toBeFocused();
+      await page.keyboard.press('Shift+Tab');
+      await expect(inner.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(innerInput).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(inner).toHaveCount(0);
+      await expect(innerTrigger).toBeFocused();
+      await expect(outerInput).toHaveValue('Keep this draft');
+      await innerTrigger.click();
+      await inner.getByRole('button', { name: 'Close', exact: true }).click();
+      await expect(inner).toHaveCount(0);
+      await expect(innerTrigger).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(outerTrigger).toBeFocused();
+      await page.getByRole('button', { name: 'Outside control' }).click();
+      await expect(page.getByRole('button', { name: 'Outside control' })).toBeFocused();
+    });
+  }
+}

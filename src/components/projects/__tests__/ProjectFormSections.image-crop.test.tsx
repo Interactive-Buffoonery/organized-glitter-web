@@ -8,6 +8,7 @@ import ProjectFormSections from '../ProjectFormSections';
 import { buildUpdateProjectFormData } from '@/hooks/mutations/projectMutationAdapters';
 import { toUpdateProjectInput } from '@/hooks/mutations/projectCommands';
 import type { ProjectFormValues } from '@/types/project';
+import type { Tag } from '@/types/tag';
 
 const {
   handleImageChangeMock,
@@ -17,6 +18,7 @@ const {
   imageUploadState,
   resolveCompanyAndArtistIdsMock,
   notesEditor,
+  pendingImageEdits,
 } = vi.hoisted(() => ({
   handleImageChangeMock: vi.fn(),
   handleImageRemoveMock: vi.fn(),
@@ -31,6 +33,10 @@ const {
   },
   resolveCompanyAndArtistIdsMock: vi.fn(),
   notesEditor: { pendingUpdate: null as string | null },
+  pendingImageEdits: {
+    crop: null as Promise<File> | null,
+    tags: null as Promise<Tag[]> | null,
+  },
 }));
 
 vi.mock('@/utils/project/field-mapping', () => ({
@@ -72,9 +78,12 @@ vi.mock('@/components/image/ImageCropDialog', () => ({
         <p>{file?.name}</p>
         <button
           type="button"
-          onClick={() =>
-            onCropComplete(new File(['cropped'], 'project-cropped.jpg', { type: 'image/jpeg' }))
-          }
+          onClick={async () => {
+            const cropped = pendingImageEdits.crop
+              ? await pendingImageEdits.crop
+              : new File(['cropped'], 'project-cropped.jpg', { type: 'image/jpeg' });
+            onCropComplete(cropped);
+          }}
         >
           Use crop
         </button>
@@ -116,7 +125,18 @@ vi.mock('@/components/notes/RichTextEditor.lazy', () => {
 });
 
 vi.mock('@/components/tags/InlineTagManager', () => ({
-  InlineTagManager: () => <div data-testid="inline-tag-manager" />,
+  InlineTagManager: ({ onTagsChange }: { onTagsChange: (tags: Tag[]) => void }) => {
+    return (
+      <button
+        type="button"
+        onClick={async () => {
+          if (pendingImageEdits.tags) onTagsChange(await pendingImageEdits.tags);
+        }}
+      >
+        Create tag
+      </button>
+    );
+  },
 }));
 
 vi.mock('@/components/projects/form/EntitySelect', () => ({
@@ -212,6 +232,8 @@ describe('ProjectFormSections project image cropping', () => {
     Element.prototype.setPointerCapture ??= vi.fn();
     Element.prototype.releasePointerCapture ??= vi.fn();
     Element.prototype.scrollIntoView ??= vi.fn();
+    pendingImageEdits.crop = null;
+    pendingImageEdits.tags = null;
     handleImageChangeMock.mockReset();
     handleImageRemoveMock.mockReset();
     applyProcessedImageMock.mockReset();
@@ -468,6 +490,45 @@ describe('ProjectFormSections project image cropping', () => {
       expect.objectContaining({
         title: 'After',
         imageFile: selectedFile,
+        imageRemoved: false,
+      })
+    );
+  });
+
+  it('keeps a tag created while a crop is processing', async () => {
+    const tagCreation = deferred<Tag[]>();
+    const cropProcessing = deferred<File>();
+    pendingImageEdits.tags = tagCreation.promise;
+    pendingImageEdits.crop = cropProcessing.promise;
+    const selectedFile = new File(['original'], 'project.jpg', { type: 'image/jpeg' });
+    const croppedFile = new File(['cropped'], 'project-cropped.jpg', { type: 'image/jpeg' });
+    const tags = [{ id: 'new-tag', name: 'New tag', color: '#14b8a6' } as Tag];
+    handleImageChangeMock.mockResolvedValue(selectedFile);
+    const { container } = renderProjectForm({ ...baseFormData, title: 'Kept' });
+
+    // Tag creation can outlive its popover, so it can finish behind the crop modal.
+    fireEvent.click(screen.getByRole('button', { name: 'Create tag' }));
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [selectedFile] },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Use crop' }));
+
+    await act(async () => {
+      tagCreation.resolve(tags);
+      await tagCreation.promise;
+    });
+    expect(onChangeMock).toHaveBeenLastCalledWith(expect.objectContaining({ tags }));
+    fireEvent.change(screen.getByLabelText('Project title'), { target: { value: 'Newer title' } });
+
+    await act(async () => {
+      cropProcessing.resolve(croppedFile);
+      await cropProcessing.promise;
+    });
+    expect(onChangeMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Newer title',
+        tags,
+        imageFile: croppedFile,
         imageRemoved: false,
       })
     );

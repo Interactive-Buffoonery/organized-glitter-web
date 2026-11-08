@@ -330,6 +330,12 @@ export function ColoringBookForm({
         values.dateCompleted,
         () => {
           markChanged();
+          setFieldErrors(current => {
+            if (!current.status) return current;
+            const next = { ...current };
+            delete next.status;
+            return next;
+          });
           setValues(previous =>
             previous.status !== values.status
               ? previous

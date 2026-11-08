@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import PocketBase from 'pocketbase';
 import { assertLocalE2ETargets, isLocalUrl } from '../fixtures/local-safety';
+import { waitForScreenshotReady } from '../screen-review/assertions';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -10,8 +11,10 @@ const appUrl = process.env.E2E_APP_URL ?? 'http://localhost:3000';
 async function selectMode(page: Page, mode: string) {
   await page.goto('/profile');
   await expect(page.getByText('Lets you track your consecutive crafting days!')).toBeVisible();
-  await page.getByRole('combobox', { name: 'Crafting streak', exact: true }).click();
-  await page.getByRole('option', { name: mode, exact: true }).click();
+  await waitForScreenshotReady(page, 'Streak preference');
+  await page.getByRole('combobox', { name: 'Crafting streak', exact: true }).press('Enter');
+  await page.getByRole('option', { name: mode, exact: true }).focus();
+  await page.keyboard.press('Enter');
 }
 
 for (const width of [1440, 390]) {
@@ -42,6 +45,9 @@ for (const width of [1440, 390]) {
       theme => localStorage.setItem('theme', theme),
       width === 390 ? 'dark' : 'light'
     );
+    await pb
+      .collection('users')
+      .update(user.id, { theme_preference: width === 390 ? 'dark' : 'light' });
     let projectId: string | undefined;
     let coloringNoteId: string | undefined;
     try {
@@ -50,10 +56,19 @@ for (const width of [1440, 390]) {
         'Off'
       );
       await selectMode(page, 'Show on Home');
+      await waitForScreenshotReady(page, 'Streak preference');
+      await page
+        .getByRole('combobox', { name: 'Crafting streak', exact: true })
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: testInfo.outputPath(`preference-${width}.png`),
+        fullPage: true,
+      });
       await page.goto('/overview');
       const zero = page.getByRole('link', { name: 'No current crafting streak. Opens Notes.' });
       await expect(zero).toBeVisible();
       await expect(zero.locator('svg')).toHaveAttribute('fill', 'none');
+      await waitForScreenshotReady(page, 'Home zero flame');
       await page.screenshot({
         path: testInfo.outputPath(`home-zero-${width}.png`),
         fullPage: true,
@@ -94,6 +109,7 @@ for (const width of [1440, 390]) {
       await expect(status.locator('svg')).toHaveAttribute('fill', 'currentColor');
       await page.reload();
       await expect(status).toBeVisible();
+      await waitForScreenshotReady(page, 'Notes active flame');
       await page.screenshot({
         path: testInfo.outputPath(`notes-active-${width}.png`),
         fullPage: true,
@@ -120,9 +136,15 @@ for (const width of [1440, 390]) {
       await page.goto('/notes');
       await expect(page.getByRole('img', { name: /crafting streak/ })).toHaveCount(0);
     } finally {
-      if (coloringNoteId)
-        await pb.collection('coloring_page_progress_notes').delete(coloringNoteId);
-      if (projectId) await pb.collection('projects').delete(projectId);
+      await Promise.all([
+        pb
+          .collection('users')
+          .update(user.id, { theme_preference: user.theme_preference || 'system' }),
+        coloringNoteId
+          ? pb.collection('coloring_page_progress_notes').delete(coloringNoteId)
+          : Promise.resolve(),
+        projectId ? pb.collection('projects').delete(projectId) : Promise.resolve(),
+      ]);
     }
   });
 }

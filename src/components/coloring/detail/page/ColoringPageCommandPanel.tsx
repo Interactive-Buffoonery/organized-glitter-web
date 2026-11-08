@@ -56,7 +56,7 @@ export function ColoringPageCommandPanel({
   onEditOpenChange,
   onPhotos,
 }: ColoringPageCommandPanelProps) {
-  const { confirm, dialog } = useCompletionStatusConfirmation();
+  const { confirm, dialog } = useCompletionStatusConfirmation({ subject: 'page' });
   const { user } = useAuth();
   const keys = useColorKeys(page.id, user?.id ?? '');
   const [editor, setEditor] = useState<'mediums' | 'dates' | null>(null);

@@ -208,7 +208,10 @@ export function ColoringBookForm({
   const [missingPhoto, setMissingPhoto] = useState(
     restoredSessionDraft.current?.missingPhoto ?? false
   );
-  const { confirm, dialog } = useCompletionStatusConfirmation({ countsAsFinished: false });
+  const { confirm, dialog } = useCompletionStatusConfirmation({
+    countsAsFinished: false,
+    subject: 'book',
+  });
   const {
     statusBeforeDateChange,
     setStatusBeforeDateChange,

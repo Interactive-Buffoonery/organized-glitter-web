@@ -20,7 +20,7 @@ export function craftingStreak(dates: string[], now: Date, timeZone: string): nu
   }).formatToParts(now);
   const part = (type: string) => parts.find(p => p.type === type)!.value;
   const today = `${part('year')}-${part('month')}-${part('day')}`;
-  const days = new Set(dates.filter(date => savedDay(date) === date));
+  const days = new Set(dates);
   const cursor = new Date(`${today}T12:00:00Z`);
   const label = () => cursor.toISOString().slice(0, 10);
   const previous = () => cursor.setUTCDate(cursor.getUTCDate() - 1);

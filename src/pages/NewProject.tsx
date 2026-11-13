@@ -551,7 +551,7 @@ const NewProject = () => {
 
         <ProjectFormFooter
           submitting={submitting}
-          disabled={!formData.title?.trim() || draft.pending || photoChoicePending}
+          disabled={draft.pending || photoChoicePending}
           onCancel={handleCancel}
           onSubmit={() => handleSubmit(formData)}
           submitLabel="Create project"

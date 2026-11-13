@@ -298,7 +298,7 @@ describe('ProjectFormSections project image cropping', () => {
       />
     );
 
-    fireEvent.change(screen.getByLabelText('Date completed'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Completed'), { target: { value: '' } });
     expect(
       onChangeMock.mock.calls.at(-1)?.[0]({
         ...baseFormData,
@@ -463,7 +463,7 @@ describe('ProjectFormSections project image cropping', () => {
     renderProjectForm({ ...baseFormData, title: '' });
 
     notesEditor.pendingUpdate = 'A note';
-    fireEvent.change(screen.getByLabelText('Project title'), { target: { value: 'Kept' } });
+    fireEvent.change(screen.getByLabelText('Title *'), { target: { value: 'Kept' } });
 
     expect(onChangeMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ title: 'Kept', generalNotes: 'A note' })
@@ -479,7 +479,7 @@ describe('ProjectFormSections project image cropping', () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
     fireEvent.change(input, { target: { files: [selectedFile] } });
-    fireEvent.change(screen.getByLabelText('Project title'), { target: { value: 'After' } });
+    fireEvent.change(screen.getByLabelText('Title *'), { target: { value: 'After' } });
 
     await act(async () => {
       imageProcessing.resolve(selectedFile);
@@ -520,7 +520,7 @@ describe('ProjectFormSections project image cropping', () => {
     expect(onChangeMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ tags, imageFile: selectedFile })
     );
-    fireEvent.change(screen.getByLabelText('Project title'), { target: { value: 'Newer title' } });
+    fireEvent.change(screen.getByLabelText('Title *'), { target: { value: 'Newer title' } });
 
     await act(async () => {
       cropProcessing.resolve(croppedFile);

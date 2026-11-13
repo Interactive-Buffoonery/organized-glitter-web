@@ -43,6 +43,26 @@ describe('useImageUpload', () => {
     vi.unstubAllGlobals();
   });
 
+  it('validates and normalizes project selections before compression', async () => {
+    const { result } = renderHook(() => useImageUpload('project-images'));
+    const oversized = new File(['photo'], 'large.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(oversized, 'size', { value: 50 * 1024 * 1024 + 1 });
+    await act(async () => {
+      await result.current.handleImageChange(changeEventFor(new File(['text'], 'notes.txt')));
+      await result.current.handleImageChange(changeEventFor(oversized));
+    });
+    expect(compressImageMock).not.toHaveBeenCalled();
+
+    const photo = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'my photo.jpg');
+    compressImageMock.mockImplementation(async file => file);
+    await act(async () => {
+      await result.current.handleImageChange(changeEventFor(photo));
+    });
+    expect(compressImageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'my-photo.jpg', type: 'image/jpeg' })
+    );
+  });
+
   it('ignores compression results from a superseded file selection', async () => {
     const firstCompression = deferred<File>();
     const secondCompression = deferred<File>();

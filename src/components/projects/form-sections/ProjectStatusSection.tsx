@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -24,6 +25,7 @@ const STATUS_OPTIONS: Record<ProjectStatus, string> = {
 
 interface ProjectStatusSectionProps {
   formData: ProjectFormValues;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
   isSubmitting: boolean;
   fieldErrors: ProjectFormFieldErrors;
   onFieldChange: ProjectFormFieldChange;
@@ -32,6 +34,7 @@ interface ProjectStatusSectionProps {
 
 export const ProjectStatusSection = ({
   formData,
+  triggerRef,
   isSubmitting,
   fieldErrors,
   onFieldChange,
@@ -46,7 +49,7 @@ export const ProjectStatusSection = ({
       onValueChange={value => onFieldChange('status', value as ProjectStatus)}
       disabled={isSubmitting}
     >
-      <SelectTrigger id="status" aria-label="Status">
+      <SelectTrigger ref={triggerRef} id="status" aria-label="Status">
         <SelectValue placeholder="Select status..." />
       </SelectTrigger>
       <SelectContent>

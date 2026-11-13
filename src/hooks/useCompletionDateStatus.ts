@@ -10,6 +10,20 @@ export function hasNewCompletionDate(
   return Boolean(selectedDate && selectedDate.toString() !== originalDate?.toString());
 }
 
+export function completionStatusForChange<TStatus extends string>(
+  nextStatus: TStatus,
+  currentDate: string | null | undefined,
+  savedDate: string | null | undefined,
+  completedStatus: TStatus
+): TStatus {
+  return hasNewCompletionDate(currentDate, savedDate) &&
+    nextStatus !== completedStatus &&
+    nextStatus !== 'archived' &&
+    nextStatus !== 'destashed'
+    ? completedStatus
+    : nextStatus;
+}
+
 export function useCompletionDateStatus<TStatus extends string>(
   completedStatus: TStatus,
   statusBeforeDateChange?: TStatus | null,

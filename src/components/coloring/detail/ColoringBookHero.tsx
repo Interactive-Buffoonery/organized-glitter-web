@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { getColoringBookStatusColor, getColoringBookStatusLabel } from '@/utils/
 
 interface ColoringBookHeroProps {
   book: ColoringBookDTO;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
   coverUrl: string;
   inProgressPages: number | undefined;
   safeCompletedPages: number;
@@ -23,6 +25,7 @@ interface ColoringBookHeroProps {
 
 export const ColoringBookHero = ({
   book,
+  triggerRef,
   coverUrl,
   inProgressPages,
   safeCompletedPages,
@@ -42,7 +45,7 @@ export const ColoringBookHero = ({
       <div className="min-w-0 flex-1 space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Popover>
-            <PopoverTrigger asChild>
+            <PopoverTrigger ref={triggerRef} asChild>
               <Button
                 type="button"
                 aria-disabled={updatePending}

@@ -44,7 +44,9 @@ describe('ColoringBookHero completion prompt focus', () => {
       const Harness = () => {
         const [pending, setPending] = useState(false);
         const [status, setStatus] = useState(ColoringBooksStatusOptions.completed);
-        const { confirm, dialog } = useCompletionStatusConfirmation({ countsAsFinished: false });
+        const { confirm, dialog, triggerRef } = useCompletionStatusConfirmation({
+          countsAsFinished: false,
+        });
         return (
           <>
             <ColoringBookHero
@@ -53,6 +55,7 @@ describe('ColoringBookHero completion prompt focus', () => {
               inProgressPages={0}
               safeCompletedPages={10}
               safeCompletionPct={100}
+              triggerRef={triggerRef}
               updatePending={pending}
               onStatusChange={async next => {
                 if (await confirm()) {
@@ -72,6 +75,7 @@ describe('ColoringBookHero completion prompt focus', () => {
       await user.click(trigger);
       await user.click(screen.getByRole('button', { name: 'In progress' }));
       expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
       if (action === 'Escape') await user.keyboard('{Escape}');
       else await user.click(screen.getByRole('button', { name: action }));
       await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());

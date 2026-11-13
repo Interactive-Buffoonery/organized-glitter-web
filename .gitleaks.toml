@@ -21,6 +21,6 @@ regexes = ['''^this\.collections=new$''']
 description = "Build commit SHA in generated output when a chunk hash contains the sgp_ keyword"
 targetRules = ["sourcegraph-access-token"]
 condition = "AND"
-paths = ['''(^|/)dist/''']
+paths = ['''(^|/)dist/assets/[^/]+\.js(\.map)?$''']
 regexTarget = "secret"
 regexes = ['''^[a-fA-F0-9]{40}$''']

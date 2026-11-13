@@ -14,7 +14,7 @@ interface ProjectCoverImageSectionProps {
   onImageChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onImageRemove: () => void;
   onCropImage: () => void;
-  onCropDialogOpenChange: (open: boolean) => void;
+  onCropDialogClose: () => void;
   onCropComplete: (file: File) => void;
   onUseOriginalImage: (file: File) => void;
 }
@@ -29,7 +29,7 @@ export const ProjectCoverImageSection = ({
   onImageChange,
   onImageRemove,
   onCropImage,
-  onCropDialogOpenChange,
+  onCropDialogClose,
   onCropComplete,
   onUseOriginalImage,
 }: ProjectCoverImageSectionProps) => (
@@ -53,7 +53,9 @@ export const ProjectCoverImageSection = ({
       outputHeight={900}
       presets={PROJECT_IMAGE_CROP_PRESETS}
       defaultPresetId="rectangle-4-3"
-      onOpenChange={onCropDialogOpenChange}
+      onOpenChange={open => {
+        if (!open) onCropDialogClose();
+      }}
       onCropComplete={onCropComplete}
       onUseOriginal={onUseOriginalImage}
     />

@@ -25,6 +25,12 @@ import type { Tag } from '@/types/tag';
 import type { CreateCompanyData } from '@/hooks/mutations/useCompanyMutations';
 import type { CreateArtistData } from '@/hooks/mutations/useArtistMutations';
 
+import {
+  initialProjectImageState,
+  transitionProjectImage,
+  imageChangeFromFields,
+  imageChangeFields,
+} from './projectImageState';
 import { Section } from './form-sections/ProjectFormSectionPrimitives';
 
 const EMPTY_FIELD_ERRORS: ProjectFormFieldErrors = {};
@@ -63,11 +69,20 @@ const ProjectFormSections = ({
   const { preview, applyProcessedImage } = imageUploadHook;
   const cropSourceUrl = usePrivateFileUrl(preview || formData.imageUrl);
   const [projectTags, setProjectTags] = useState<Tag[]>(formData.tags || []);
-  const [cropFile, setCropFile] = useState<File | null>(null);
-  const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
+  const [imageState, setImageState] = useState(() => ({
+    ...initialProjectImageState,
+    change: imageChangeFromFields(formData),
+  }));
+  const imageStateRef = useRef(imageState);
+  const transitionImage = useCallback((event: Parameters<typeof transitionProjectImage>[1]) => {
+    const next = transitionProjectImage(imageStateRef.current, event);
+    imageStateRef.current = next;
+    setImageState(next);
+    return next;
+  }, []);
+  const cropFile = imageState.crop.phase === 'open' ? imageState.crop.file : null;
+  const isCropDialogOpen = imageState.crop.phase === 'open';
   const restoredImageFile = useRef(formData.imageFile);
-  const imageSelectionVersionRef = useRef(0);
-  const remoteCropVersionRef = useRef(0);
   const { statusForStatusChange, statusForDateChange } = useCompletionDateStatus<
     ProjectFormValues['status']
   >('completed', statusBeforeDateChange, onStatusBeforeDateChange);
@@ -84,8 +99,14 @@ const ProjectFormSections = ({
   }, [formData.imageFile, formData.imageRemoved, preview, applyProcessedImage]);
 
   useEffect(() => {
-    remoteCropVersionRef.current += 1;
-  }, [formData.imageFile, formData.imageUrl]);
+    transitionImage({
+      type: 'source-changed',
+      change: imageChangeFromFields({
+        imageFile: formData.imageFile,
+        imageRemoved: formData.imageRemoved,
+      }),
+    });
+  }, [formData.imageFile, formData.imageUrl, formData.imageRemoved, transitionImage]);
 
   useEffect(() => {
     setProjectTags(formData.tags || []);
@@ -124,91 +145,62 @@ const ProjectFormSections = ({
 
   const handleImageChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
-      const imageSelectionVersion = ++imageSelectionVersionRef.current;
-      remoteCropVersionRef.current += 1;
+      const imageSelectionVersion = transitionImage({ type: 'select' }).selection;
       const file = await imageUploadHook.handleImageChange(event);
-      if (file && imageSelectionVersion === imageSelectionVersionRef.current) {
-        setCropFile(file);
-        setIsCropDialogOpen(true);
-        onChange(previous => ({
-          ...previous,
-          imageFile: file,
-          imageRemoved: false,
-        }));
+      if (file && imageSelectionVersion === imageStateRef.current.selection) {
+        const next = transitionImage({ type: 'selected', id: imageSelectionVersion, file });
+        onChange(previous => ({ ...previous, ...imageChangeFields(next.change) }));
       }
     },
-    [imageUploadHook, onChange]
+    [imageUploadHook, onChange, transitionImage]
   );
 
   const handleImageRemove = useCallback(() => {
-    imageSelectionVersionRef.current += 1;
-    remoteCropVersionRef.current += 1;
     restoredImageFile.current = null;
     imageUploadHook.handleImageRemove();
-    setCropFile(null);
-    setIsCropDialogOpen(false);
-    onChange(previous => ({
-      ...previous,
-      imageFile: null,
-      imageUrl: '',
-      imageRemoved: true,
-    }));
-  }, [imageUploadHook, onChange]);
+    const next = transitionImage({ type: 'remove' });
+    onChange(previous => ({ ...previous, ...imageChangeFields(next.change) }));
+  }, [imageUploadHook, onChange, transitionImage]);
 
   const handleOpenCropDialog = useCallback(async () => {
-    const remoteCropVersion = ++remoteCropVersionRef.current;
+    const remoteCropVersion = transitionImage({ type: 'load-crop' }).revision;
     const localFile = formData.imageFile ?? imageUploadHook.processedFile;
     if (localFile) {
-      setCropFile(localFile);
-      setIsCropDialogOpen(true);
+      transitionImage({ type: 'open-crop', file: localFile });
       return;
     }
 
     const url = cropSourceUrl;
-    if (!url) return;
+    if (!url) {
+      transitionImage({ type: 'crop-failed', id: remoteCropVersion });
+      return;
+    }
 
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
-      if (remoteCropVersion !== remoteCropVersionRef.current) return;
+      if (remoteCropVersion !== imageStateRef.current.revision) return;
       const filename = url.split('/').pop()?.split('?')[0] || 'project-image';
       const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
-      setCropFile(file);
-      setIsCropDialogOpen(true);
+      transitionImage({ type: 'loaded-crop', id: remoteCropVersion, file });
     } catch (err) {
-      if (remoteCropVersion !== remoteCropVersionRef.current) return;
+      if (remoteCropVersion !== imageStateRef.current.revision) return;
+      transitionImage({ type: 'crop-failed', id: remoteCropVersion });
       notifyError(
         'Could not load image for cropping',
         err instanceof Error ? err.message : 'Try replacing the image and cropping again.'
       );
     }
-  }, [formData.imageFile, imageUploadHook.processedFile, cropSourceUrl]);
+  }, [formData.imageFile, imageUploadHook.processedFile, cropSourceUrl, transitionImage]);
 
-  const handleCropComplete = useCallback(
+  const handleApplyImage = useCallback(
     (file: File) => {
       imageUploadHook.applyProcessedImage(file);
-      setCropFile(file);
-      onChange(previous => ({
-        ...previous,
-        imageFile: file,
-        imageRemoved: false,
-      }));
+      const next = transitionImage({ type: 'apply', file });
+      onChange(previous => ({ ...previous, ...imageChangeFields(next.change) }));
     },
-    [imageUploadHook, onChange]
-  );
-
-  const handleUseOriginalImage = useCallback(
-    (file: File) => {
-      imageUploadHook.applyProcessedImage(file);
-      setCropFile(file);
-      onChange(previous => ({
-        ...previous,
-        imageFile: file,
-        imageRemoved: false,
-      }));
-    },
-    [imageUploadHook, onChange]
+    [imageUploadHook, onChange, transitionImage]
   );
 
   const handleTagsChange = useCallback(
@@ -297,9 +289,9 @@ const ProjectFormSections = ({
           onImageChange={handleImageChange}
           onImageRemove={handleImageRemove}
           onCropImage={handleOpenCropDialog}
-          onCropDialogOpenChange={setIsCropDialogOpen}
-          onCropComplete={handleCropComplete}
-          onUseOriginalImage={handleUseOriginalImage}
+          onCropDialogClose={() => transitionImage({ type: 'close-crop' })}
+          onCropComplete={handleApplyImage}
+          onUseOriginalImage={handleApplyImage}
         />
 
         {statusSection}

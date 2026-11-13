@@ -444,6 +444,62 @@ try {
   await admin.collection('projects').delete(poisoned.id);
   const empty = await request(ownerClient, 'snapshot');
   assert.equal((await empty.json()).projects.length, 0);
+  const completionDate = '2026-01-02 12:00:00.000Z';
+  const correctedDate = '2026-01-03 12:00:00.000Z';
+  const lifecycleBook = await admin.collection('coloring_books').create({
+    user: owner.id,
+    title: 'Lifecycle book',
+    total_pages: 2,
+    status: 'in_progress',
+    date_completed: completionDate,
+  });
+  const lifecycleProject = await admin.collection('projects').create({
+    user: owner.id,
+    title: 'Lifecycle project',
+    kit_category: 'full',
+    status: 'progress',
+    date_completed: completionDate,
+  });
+  const lifecyclePage = await admin.collection('coloring_pages').create({
+    book: lifecycleBook.id,
+    page_number: 3,
+    status: 'in_progress',
+    completed_at: completionDate,
+  });
+  for (const [collection, created, dateField, active] of [
+    ['projects', lifecycleProject, 'date_completed', 'progress'],
+    ['coloring_books', lifecycleBook, 'date_completed', 'in_progress'],
+    ['coloring_pages', lifecyclePage, 'completed_at', 'in_progress'],
+  ]) {
+    assert.equal(created.status, 'completed', `${collection}: new completion date on create`);
+    const manual = await admin.collection(collection).update(created.id, { status: active });
+    assert.equal(manual.status, active, `${collection}: status-only edit`);
+    assert.equal(manual[dateField], completionDate, `${collection}: historical date retained`);
+    const unchanged = await admin
+      .collection(collection)
+      .update(created.id, { [dateField]: completionDate });
+    assert.equal(unchanged.status, active, `${collection}: same saved date`);
+    const corrected = await admin
+      .collection(collection)
+      .update(created.id, { [dateField]: correctedDate });
+    assert.equal(corrected.status, 'completed', `${collection}: corrected date`);
+    const cleared = await admin.collection(collection).update(created.id, { [dateField]: '' });
+    assert.equal(cleared.status, 'completed', `${collection}: clear date without changing status`);
+    if (collection !== 'coloring_pages') {
+      for (const status of ['archived', 'destashed']) {
+        const exempt = await admin
+          .collection(collection)
+          .update(created.id, { status, [dateField]: completionDate });
+        assert.equal(exempt.status, status, `${collection}: ${status} exemption`);
+        await admin.collection(collection).update(created.id, { [dateField]: '' });
+      }
+    }
+  }
+  await admin.collection('coloring_books').delete(lifecycleBook.id);
+  await admin.collection('projects').delete(lifecycleProject.id);
+  console.log(
+    'PocketBase lifecycle: project, book and page create/update dates, historical status and exemptions passed'
+  );
   console.log(
     'PocketBase mobile sync: snapshot, ownership, merge, conflict, replay, and deletion passed'
   );

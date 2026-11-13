@@ -23,6 +23,7 @@ const ProgressNoteForm = ({
   onSuccess,
   disabled = false,
   variant = 'default',
+  composerInputRef,
 }: ProgressNoteFormProps) => {
   const {
     date,
@@ -139,6 +140,7 @@ const ProgressNoteForm = ({
       <form onSubmit={handleSubmit} className="border-border/60 bg-card rounded-xl border p-3">
         {cropDialog}
         <Textarea
+          ref={composerInputRef}
           value={content}
           onChange={event => handleContentChange(event.target.value)}
           disabled={areInputsDisabled}

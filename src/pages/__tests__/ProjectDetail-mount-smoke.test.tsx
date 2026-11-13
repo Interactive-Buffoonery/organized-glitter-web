@@ -76,6 +76,8 @@ const {
     projectData: { ...baseProjectData },
     projectQueryState: { available: true },
     progressNotesState: {
+      isLoading: false,
+      error: null as Error | null,
       data: [] as Array<{
         id: string;
         projectId: string;
@@ -204,9 +206,9 @@ vi.mock('@/hooks/mutations/useProjectDetailMutations', () => {
 vi.mock('@/hooks/queries/useProgressNotes', () => ({
   useProgressNotesQuery: () => ({
     data: progressNotesState.data,
-    isLoading: false,
-    isError: false,
-    error: null,
+    isLoading: progressNotesState.isLoading,
+    isError: Boolean(progressNotesState.error),
+    error: progressNotesState.error,
   }),
 }));
 
@@ -295,6 +297,8 @@ beforeEach(() => {
   captureMock.mockReset();
   Object.assign(projectData, { ...baseProjectData });
   progressNotesState.data = [];
+  progressNotesState.isLoading = false;
+  progressNotesState.error = null;
   editProjectState.project = { ...baseProjectData };
   editProjectState.formData = { ...baseProjectData, tags: [] };
   editProjectState.submitting = false;
@@ -306,6 +310,40 @@ afterEach(() => {
 });
 
 describe('ProjectDetail behavior', () => {
+  it.each(['loading', 'error'] as const)(
+    'scrolls to the progress section when notes are %s',
+    async state => {
+      progressNotesState.isLoading = state === 'loading';
+      progressNotesState.error = state === 'error' ? new Error('Unavailable') : null;
+      const user = userEvent.setup();
+      const { default: ProjectDetail } = await import('../ProjectDetail');
+      renderWithProviders(<ProjectDetail />);
+      const heading = await screen.findByRole('heading', { name: /Progress.*entries/ });
+      const region = heading.closest('section')!.parentElement!;
+      const scroll = vi.fn();
+      region.scrollIntoView = scroll;
+      expect(
+        screen.queryByRole('textbox', { name: 'Add a progress note' })
+      ).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Log progress' }));
+      expect(scroll).toHaveBeenCalled();
+    }
+  );
+
+  it('moves keyboard focus from Log progress to the inline composer', async () => {
+    const user = userEvent.setup();
+    const scroll = vi.fn();
+    const { default: ProjectDetail } = await import('../ProjectDetail');
+    renderWithProviders(<ProjectDetail />);
+    const composer = await screen.findByRole('textbox', { name: 'Add a progress note' });
+    composer.scrollIntoView = scroll;
+    const shortcut = screen.getByRole('button', { name: 'Log progress' });
+    shortcut.focus();
+    await user.keyboard('{Enter}');
+    expect(composer).toHaveFocus();
+    expect(scroll).toHaveBeenCalled();
+  });
+
   it('does not display navigation data belonging to another account', async () => {
     projectQueryState.available = false;
     useLocationMock.mockReturnValue({

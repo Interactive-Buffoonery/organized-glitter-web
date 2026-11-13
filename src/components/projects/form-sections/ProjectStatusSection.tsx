@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -24,16 +25,20 @@ const STATUS_OPTIONS: Record<ProjectStatus, string> = {
 
 interface ProjectStatusSectionProps {
   formData: ProjectFormValues;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
   isSubmitting: boolean;
   fieldErrors: ProjectFormFieldErrors;
   onFieldChange: ProjectFormFieldChange;
+  completionDateHint?: boolean;
 }
 
 export const ProjectStatusSection = ({
   formData,
+  triggerRef,
   isSubmitting,
   fieldErrors,
   onFieldChange,
+  completionDateHint,
 }: ProjectStatusSectionProps) => (
   <Section label="Status">
     <Label htmlFor="status" className="sr-only">
@@ -44,7 +49,7 @@ export const ProjectStatusSection = ({
       onValueChange={value => onFieldChange('status', value as ProjectStatus)}
       disabled={isSubmitting}
     >
-      <SelectTrigger id="status" aria-label="Status">
+      <SelectTrigger ref={triggerRef} id="status" aria-label="Status">
         <SelectValue placeholder="Select status..." />
       </SelectTrigger>
       <SelectContent>
@@ -55,6 +60,11 @@ export const ProjectStatusSection = ({
         ))}
       </SelectContent>
     </Select>
+    {completionDateHint && (
+      <p className="text-muted-foreground text-sm">
+        Remove the completion date to change the status.
+      </p>
+    )}
     <FieldError field="status" message={fieldErrors.status} />
   </Section>
 );

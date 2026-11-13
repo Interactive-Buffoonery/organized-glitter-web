@@ -1,10 +1,16 @@
+import type { ProjectFormUpdate } from '@/hooks/useProjectFormState';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { notifyError } from '@/lib/notifications';
 import { usePrivateFileUrl } from '@/hooks/usePrivateFileUrl';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useNumberInput } from '@/hooks/useNumberInput';
-import { useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
+import { useCompletionStatusConfirmation } from '@/hooks/useCompletionStatusConfirmation';
+import {
+  completionStatusForChange,
+  hasNewCompletionDate,
+  useCompletionDateStatus,
+} from '@/hooks/useCompletionDateStatus';
 import { ProjectCoverImageSection } from '@/components/projects/form-sections/ProjectCoverImageSection';
 import { ProjectDatesSection } from '@/components/projects/form-sections/ProjectDatesSection';
 import { ProjectKitInfoSection } from '@/components/projects/form-sections/ProjectKitInfoSection';
@@ -32,8 +38,9 @@ interface ProjectFormSectionsProps {
   companies: string[];
   artists: string[];
   isSubmitting: boolean;
-  onChange: (data: ProjectFormValues) => void;
+  onChange: (update: ProjectFormUpdate) => void;
   savedDateCompleted?: string | null;
+  savedStatus?: ProjectFormValues['status'];
   statusBeforeDateChange?: ProjectFormValues['status'] | null;
   onStatusBeforeDateChange?: (status: ProjectFormValues['status'] | null) => void;
   fieldErrors?: ProjectFormFieldErrors;
@@ -49,6 +56,7 @@ const ProjectFormSections = ({
   isSubmitting,
   onChange,
   savedDateCompleted,
+  savedStatus,
   statusBeforeDateChange,
   onStatusBeforeDateChange,
   fieldErrors = EMPTY_FIELD_ERRORS,
@@ -56,6 +64,7 @@ const ProjectFormSections = ({
   onDraftCompany,
   onDraftArtist,
 }: ProjectFormSectionsProps) => {
+  const { requestChange, dialog, triggerRef } = useCompletionStatusConfirmation();
   const imageUploadHook = useImageUpload('project-images', 'project-image');
   const { preview, applyProcessedImage } = imageUploadHook;
   const cropSourceUrl = usePrivateFileUrl(preview || formData.imageUrl);
@@ -73,15 +82,10 @@ const ProjectFormSections = ({
   }, []);
   const cropFile = imageState.crop.phase === 'open' ? imageState.crop.file : null;
   const isCropDialogOpen = imageState.crop.phase === 'open';
-  const formDataRef = useRef(formData);
   const restoredImageFile = useRef(formData.imageFile);
   const { statusForStatusChange, statusForDateChange } = useCompletionDateStatus<
     ProjectFormValues['status']
   >('completed', statusBeforeDateChange, onStatusBeforeDateChange);
-
-  useEffect(() => {
-    formDataRef.current = formData;
-  }, [formData]);
 
   useEffect(() => {
     if (
@@ -110,20 +114,33 @@ const ProjectFormSections = ({
 
   const handleInputChange = useCallback(
     (field: keyof ProjectFormValues, value: ProjectFormValues[keyof ProjectFormValues]) => {
-      if (field === 'status') {
-        onChange({
-          ...formData,
-          status: statusForStatusChange(
-            value as ProjectFormValues['status'],
-            formData.dateCompleted,
-            savedDateCompleted
-          ),
-        });
+      if (field !== 'status') {
+        onChange(previous => ({ ...previous, [field]: value }));
         return;
       }
-      onChange({ ...formData, [field]: value });
+      const { status, dateCompleted } = formData;
+      const next = statusForStatusChange(
+        value as ProjectFormValues['status'],
+        dateCompleted,
+        savedDateCompleted
+      );
+      const applyStatus = () =>
+        onChange(previous =>
+          previous.status !== status
+            ? previous
+            : {
+                ...previous,
+                status: completionStatusForChange(
+                  value as ProjectFormValues['status'],
+                  previous.dateCompleted,
+                  savedDateCompleted,
+                  'completed'
+                ),
+              }
+        );
+      void requestChange(status, next, dateCompleted, applyStatus, savedStatus ?? '');
     },
-    [formData, onChange, savedDateCompleted, statusForStatusChange]
+    [formData, requestChange, onChange, savedDateCompleted, savedStatus, statusForStatusChange]
   );
 
   const handleImageChange = useCallback(
@@ -132,25 +149,18 @@ const ProjectFormSections = ({
       const file = await imageUploadHook.handleImageChange(event);
       if (file && imageSelectionVersion === imageStateRef.current.selection) {
         const next = transitionImage({ type: 'selected', id: imageSelectionVersion, file });
-        onChange({
-          ...formDataRef.current,
-          ...imageChangeFields(next.change),
-        });
+        onChange(previous => ({ ...previous, ...imageChangeFields(next.change) }));
       }
     },
     [imageUploadHook, onChange, transitionImage]
   );
 
   const handleImageRemove = useCallback(() => {
-    transitionImage({ type: 'remove' });
     restoredImageFile.current = null;
     imageUploadHook.handleImageRemove();
-
-    onChange({
-      ...formData,
-      ...imageChangeFields(imageStateRef.current.change),
-    });
-  }, [formData, imageUploadHook, onChange, transitionImage]);
+    const next = transitionImage({ type: 'remove' });
+    onChange(previous => ({ ...previous, ...imageChangeFields(next.change) }));
+  }, [imageUploadHook, onChange, transitionImage]);
 
   const handleOpenCropDialog = useCallback(async () => {
     const remoteCropVersion = transitionImage({ type: 'load-crop' }).revision;
@@ -184,51 +194,37 @@ const ProjectFormSections = ({
     }
   }, [formData.imageFile, imageUploadHook.processedFile, cropSourceUrl, transitionImage]);
 
-  const handleCropComplete = useCallback(
+  const handleApplyImage = useCallback(
     (file: File) => {
       imageUploadHook.applyProcessedImage(file);
       const next = transitionImage({ type: 'apply', file });
-      onChange({
-        ...formData,
-        ...imageChangeFields(next.change),
-      });
+      onChange(previous => ({ ...previous, ...imageChangeFields(next.change) }));
     },
-    [formData, imageUploadHook, onChange, transitionImage]
-  );
-
-  const handleUseOriginalImage = useCallback(
-    (file: File) => {
-      imageUploadHook.applyProcessedImage(file);
-      const next = transitionImage({ type: 'apply', file });
-      onChange({
-        ...formData,
-        ...imageChangeFields(next.change),
-      });
-    },
-    [formData, imageUploadHook, onChange, transitionImage]
+    [imageUploadHook, onChange, transitionImage]
   );
 
   const handleTagsChange = useCallback(
     (tags: Tag[]) => {
       setProjectTags(tags);
-      onChange({ ...formData, tags });
+      onChange(previous => ({ ...previous, tags }));
     },
-    [formData, onChange]
+    [onChange]
   );
 
   const handleDateChange = useCallback(
     (field: keyof ProjectFormValues, value: string) => {
       if (field === 'dateCompleted') {
-        onChange({
-          ...formData,
+        const status = statusForDateChange(
+          value,
+          formData.dateCompleted,
+          formData.status,
+          savedDateCompleted
+        );
+        onChange(previous => ({
+          ...previous,
           dateCompleted: value,
-          status: statusForDateChange(
-            value,
-            formData.dateCompleted,
-            formData.status,
-            savedDateCompleted
-          ),
-        });
+          status,
+        }));
         return;
       }
       handleInputChange(field, value || null);
@@ -244,9 +240,14 @@ const ProjectFormSections = ({
 
   const statusSection = (
     <ProjectStatusSection
+      triggerRef={triggerRef}
       formData={formData}
       isSubmitting={isSubmitting}
       fieldErrors={fieldErrors}
+      completionDateHint={Boolean(
+        hasNewCompletionDate(formData.dateCompleted, savedDateCompleted) &&
+        formData.status === 'completed'
+      )}
       onFieldChange={handleInputChange}
     />
   );
@@ -267,6 +268,7 @@ const ProjectFormSections = ({
 
   return (
     <>
+      {dialog}
       <div className="min-w-0 lg:col-start-1 lg:row-start-1">
         <ProjectTitleSection
           formData={formData}
@@ -324,8 +326,8 @@ const ProjectFormSections = ({
           onCropDialogOpenChange={open => {
             if (!open) transitionImage({ type: 'close-crop' });
           }}
-          onCropComplete={handleCropComplete}
-          onUseOriginalImage={handleUseOriginalImage}
+          onCropComplete={handleApplyImage}
+          onUseOriginalImage={handleApplyImage}
         />
 
         {isDrawerLayout ? null : statusSection}

@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, RefObject } from 'react';
+import { useCompletionStatusConfirmation } from '@/hooks/useCompletionStatusConfirmation';
 import { ImageCropDialog } from '@/components/image/ImageCropDialog';
-import { useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
+import {
+  completionStatusForChange,
+  hasNewCompletionDate,
+  useCompletionDateStatus,
+} from '@/hooks/useCompletionDateStatus';
 import { ColoringBooksStatusOptions } from '@/types/pocketbase.types';
 import {
   validateColoringBookForm,
@@ -204,6 +209,10 @@ export function ColoringBookForm({
   const [missingPhoto, setMissingPhoto] = useState(
     restoredSessionDraft.current?.missingPhoto ?? false
   );
+  const { requestChange, dialog, triggerRef } = useCompletionStatusConfirmation({
+    countsAsFinished: false,
+    subject: 'book',
+  });
   const {
     statusBeforeDateChange,
     setStatusBeforeDateChange,
@@ -284,11 +293,29 @@ export function ColoringBookForm({
     };
   }, [previewUrl]);
 
+  const applyField = <K extends keyof ColoringBookFormValues>(
+    field: K,
+    value: ColoringBookFormValues[K],
+    status: ColoringBookFormValues['status']
+  ) => {
+    markChanged();
+    setValues(current => ({
+      ...current,
+      [field]: value,
+      ...(field === 'dateCompleted' ? { status } : {}),
+    }));
+    setFieldErrors(current => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
   const setField = <K extends keyof ColoringBookFormValues>(
     field: K,
     value: ColoringBookFormValues[K]
   ) => {
-    markChanged();
     let status = values.status;
     if (field === 'status') {
       status = statusForStatusChange(
@@ -296,6 +323,36 @@ export function ColoringBookForm({
         values.dateCompleted,
         initialBook?.dateCompleted
       );
+      const nextStatus = status;
+      void requestChange(
+        values.status,
+        nextStatus,
+        values.dateCompleted,
+        () => {
+          markChanged();
+          setFieldErrors(current => {
+            if (!current.status) return current;
+            const next = { ...current };
+            delete next.status;
+            return next;
+          });
+          setValues(previous =>
+            previous.status !== values.status
+              ? previous
+              : {
+                  ...previous,
+                  status: completionStatusForChange(
+                    value as ColoringBookFormValues['status'],
+                    previous.dateCompleted,
+                    initialBook?.dateCompleted,
+                    'completed'
+                  ),
+                }
+          );
+        },
+        initialBook?.status ?? ''
+      );
+      return;
     }
     if (field === 'dateCompleted') {
       status = statusForDateChange(
@@ -305,17 +362,7 @@ export function ColoringBookForm({
         initialBook?.dateCompleted
       );
     }
-    setValues(current => ({
-      ...current,
-      [field]: value,
-      status,
-    }));
-    setFieldErrors(current => {
-      if (!current[field]) return current;
-      const next = { ...current };
-      delete next[field];
-      return next;
-    });
+    applyField(field, value, status);
   };
 
   const applyCoverImage = (file: File | null) => {
@@ -393,7 +440,14 @@ export function ColoringBookForm({
   const isDrawerLayout = layout === 'drawer';
   const statusAndTags = (
     <>
-      <ColoringBookStatusFields {...sharedProps} />
+      <ColoringBookStatusFields
+        triggerRef={triggerRef}
+        {...sharedProps}
+        completionDateHint={Boolean(
+          hasNewCompletionDate(values.dateCompleted, initialBook?.dateCompleted) &&
+          values.status === 'completed'
+        )}
+      />
       <ColoringBookTagManager
         selectedTags={(values.tags ?? []) as Tag[]}
         disabled={isSaving}
@@ -415,6 +469,7 @@ export function ColoringBookForm({
         handleCancel();
       }}
     >
+      {dialog}
       {draft.recoverable && (
         <DraftRecoveryPanel
           changedOnServer={draft.recoverable.baselineUpdatedAt !== initialBook?.updatedAt}

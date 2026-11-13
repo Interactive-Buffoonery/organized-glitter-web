@@ -4,6 +4,7 @@ import { ColorsSummary } from './ColorsSummary';
 import { DetailSpecStrip } from './DetailSpecStrip';
 import { ColoringPageDateLine } from './ColoringPageDateLine';
 import { FinishDatePrompt } from './FinishDatePrompt';
+import { useCompletionStatusConfirmation } from '@/hooks/useCompletionStatusConfirmation';
 import type { UseColoringPageLifecycleDatesResult } from '@/hooks/coloring/useColoringPageLifecycleDates';
 import type { UseColoringPageMediumSelectionResult } from '@/hooks/coloring/useColoringPageMediumSelection';
 import type { UseColoringPageMysteryRevealResult } from '@/hooks/coloring/useColoringPageMysteryReveal';
@@ -52,6 +53,9 @@ export function ColoringPageCommandPanel({
   onEditOpenChange,
   onPhotos,
 }: ColoringPageCommandPanelProps) {
+  const { requestChange, dialog, triggerRef } = useCompletionStatusConfirmation({
+    subject: 'page',
+  });
   const { user } = useAuth();
   const keys = useColorKeys(page.id, user?.id ?? '');
   const [editor, setEditor] = useState<'mediums' | 'dates' | null>(null);
@@ -70,11 +74,17 @@ export function ColoringPageCommandPanel({
   const editDate = () => setEditor('dates');
   return (
     <aside className="space-y-6 lg:sticky lg:top-24" aria-label="Page details">
+      {dialog}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <ColoringPageStatusSection
             status={page.status}
-            onStatusChange={statusAction.changeStatus}
+            triggerRef={triggerRef}
+            onStatusChange={status =>
+              requestChange(page.status, status, page.completedAt, () =>
+                statusAction.changeStatus(status)
+              )
+            }
             disabled={statusAction.isPending}
           />
           {day && <span className="text-muted-foreground text-sm tabular-nums">Day {day}</span>}

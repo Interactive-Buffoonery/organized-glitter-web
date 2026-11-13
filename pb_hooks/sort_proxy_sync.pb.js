@@ -2,11 +2,13 @@
 
 // Keep project sort proxies in sync before persistence, without a second write.
 onRecordCreate(e => {
-  require(`${__hooks}/sort_proxy_helpers.js`).syncProject(e, false);
+  require(`${__hooks}/lifecycle_status.js`).applyCompletionStatus(e, 'date_completed', false);
+  require(`${__hooks}/sort_proxy_helpers.js`).syncProject(e);
 }, 'projects');
 
 onRecordUpdate(e => {
-  require(`${__hooks}/sort_proxy_helpers.js`).syncProject(e, true);
+  require(`${__hooks}/lifecycle_status.js`).applyCompletionStatus(e, 'date_completed', true);
+  require(`${__hooks}/sort_proxy_helpers.js`).syncProject(e);
 }, 'projects');
 
 onRecordUpdate(e => {

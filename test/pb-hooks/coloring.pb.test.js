@@ -100,8 +100,12 @@ function loadHook() {
     }
   );
 
+  const lifecycle = { exports: {} };
+  vm.runInNewContext(readFileSync(resolve(process.cwd(), 'pb_hooks/lifecycle_status.js'), 'utf8'), {
+    module: lifecycle,
+  });
   vm.runInNewContext(code, {
-    require: () => module.exports,
+    require: path => (path.endsWith('/lifecycle_status.js') ? lifecycle.exports : module.exports),
     __hooks: '',
     ApiError: MockApiError,
     BadRequestError: MockApiError,
@@ -161,5 +165,30 @@ describe('coloring PocketBase hook page reconciliation', () => {
       'This coloring page is not owned by the current user.'
     );
     expect(txApp.save).not.toHaveBeenCalled();
+  });
+});
+
+describe.each(['coloring_books', 'coloring_pages'])('%s lifecycle wiring', collection => {
+  it.each(['create', 'update'])('%s applies the shared rule before saving', operation => {
+    const handlers = loadHook();
+    const handler = handlers[operation].find(item => item.collection === collection).handler;
+    const field = collection === 'coloring_books' ? 'date_completed' : 'completed_at';
+    const status = collection === 'coloring_books' ? 'in_progress' : 'not_started';
+    for (const restore of [false, true]) {
+      const record = new MockRecord({ total_pages: 1, status, [field]: '2026-01-02' });
+      record.originalRecord = new MockRecord({ total_pages: 1, status, [field]: '' });
+      const saved = new Error('persistence boundary');
+      expect(() =>
+        handler({
+          record,
+          context: { value: key => key === 'organized_glitter_archive_restore' && restore },
+          next: () => {
+            throw saved;
+          },
+        })
+      ).toThrow(saved);
+      expect(record.getString('status')).toBe(restore ? status : 'completed');
+      expect(record.getString(field)).toBe('2026-01-02');
+    }
   });
 });

@@ -15,44 +15,40 @@ import type { Tag } from '@/types/tag';
 
 const logger = createLogger('QueryOptionsFactory');
 
-async function fetchAllCompanies(userId: string): Promise<CompanyListItem[]> {
+async function fetchTaxonomy<T>(
+  userId: string,
+  operation: string,
+  recordLabel: string,
+  loadPage: (
+    page: number,
+    pageSize: number
+  ) => Promise<{
+    items: T[];
+    totalItems: number;
+    totalPages: number;
+  }>
+): Promise<T[]> {
   if (!userId) {
     throw new Error('User ID is required');
   }
 
-  logger.debug(`Fetching all companies for user ${userId}`);
-
-  const timer = createQueryTimer('QueryOptionsFactory', 'fetchAllCompanies');
-
-  const { items } = await listAllPages(
-    (page, pageSize) => CompaniesService.list(userId, { page, pageSize }),
-    500,
-    { recordLabel: 'companies' }
-  );
-
+  logger.debug(`Fetching ${recordLabel} for user ${userId}`);
+  const timer = createQueryTimer('QueryOptionsFactory', operation);
+  const { items } = await listAllPages(loadPage, 500, { recordLabel });
   timer.stop({ itemCount: items.length });
-
   return items;
 }
 
-async function fetchArtists(userId: string): Promise<ArtistListItem[]> {
-  if (!userId) {
-    throw new Error('User ID is required');
-  }
-
-  logger.debug(`Fetching artists for user ${userId}`);
-
-  const timer = createQueryTimer('QueryOptionsFactory', 'fetchArtists');
-
-  const { items } = await listAllPages(
-    (page, pageSize) => ArtistsService.list(userId, { page, pageSize }),
-    500,
-    { recordLabel: 'artists' }
+function fetchAllCompanies(userId: string): Promise<CompanyListItem[]> {
+  return fetchTaxonomy(userId, 'fetchAllCompanies', 'companies', (page, pageSize) =>
+    CompaniesService.list(userId, { page, pageSize })
   );
+}
 
-  timer.stop({ itemCount: items.length });
-
-  return items;
+function fetchArtists(userId: string): Promise<ArtistListItem[]> {
+  return fetchTaxonomy(userId, 'fetchArtists', 'artists', (page, pageSize) =>
+    ArtistsService.list(userId, { page, pageSize })
+  );
 }
 
 async function fetchTags(userId: string): Promise<Tag[]> {

@@ -197,6 +197,7 @@ describe('bulk photo import analytics', () => {
       await result.current.analyzeZipFile(file);
     });
 
+    expect(result.current.loading).toBe(false);
     expect(serviceMocks.projectsService.getAllForUser).not.toHaveBeenCalled();
     expect(serviceMocks.coloringService.listAllBooks).not.toHaveBeenCalled();
     expect(mockNotify).toHaveBeenCalledWith(
@@ -270,5 +271,77 @@ describe('bulk photo import analytics', () => {
     expect(result.current.rows).toHaveLength(1);
     expect(result.current.rows[0].path).toBe('Starry Fox/new.jpg');
     expect(result.current.loading).toBe(false);
+  });
+  it('imports current review data through a callback retained before analysis', async () => {
+    const { result } = renderHookWithProviders(() => useBulkPhotoImport());
+    const importConfirmed = result.current.importConfirmed;
+    mockImportBulkPhotos.mockResolvedValue({ importedCount: 1, skippedCount: 0, failedCount: 0 });
+
+    await act(async () => {
+      await result.current.analyzeFileList([fileWithPath('new.jpg', 'Starry Fox/new.jpg')]);
+    });
+    const reviewedRows = result.current.rows;
+    const reviewedLibrary = result.current.library;
+    await act(async () => {
+      await importConfirmed();
+    });
+
+    expect(mockImportBulkPhotos).toHaveBeenCalledWith(reviewedRows, reviewedLibrary);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('ends loading after library analysis fails and allows a fresh analysis', async () => {
+    serviceMocks.projectsService.getAllForUser.mockRejectedValueOnce(new Error('Unavailable'));
+    const { result } = renderHookWithProviders(() => useBulkPhotoImport());
+    await act(async () => {
+      await result.current.analyzeFileList([fileWithPath('old.jpg', 'Starry Fox/old.jpg')]);
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.library).toBeNull();
+    await act(async () => {
+      await result.current.analyzeFileList([fileWithPath('new.jpg', 'Starry Fox/new.jpg')]);
+    });
+    expect(result.current.rows[0].path).toBe('Starry Fox/new.jpg');
+    expect(result.current.loading).toBe(false);
+  });
+  it('accepts row edits only while reviewing, including after a failed import', async () => {
+    const { result } = renderHookWithProviders(() => useBulkPhotoImport());
+    let rejectImport!: (error: Error) => void;
+    mockImportBulkPhotos.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectImport = reject;
+        })
+    );
+    await act(async () => {
+      await result.current.analyzeFileList([fileWithPath('photo.jpg', 'Starry Fox/photo.jpg')]);
+    });
+    const rowId = result.current.rows[0].id;
+    act(() => result.current.updateRow(rowId, { excluded: true }));
+    expect(result.current.rows[0].excluded).toBe(true);
+    act(() => result.current.updateRow(rowId, { excluded: false }));
+
+    let importing!: Promise<unknown>;
+    act(() => {
+      importing = result.current.importConfirmed();
+    });
+    act(() => result.current.updateRow(rowId, { excluded: true }));
+    expect(result.current.rows[0].excluded).toBe(false);
+    await act(async () => {
+      rejectImport(new Error('Upload failed'));
+      await importing;
+    });
+    act(() => result.current.updateRow(rowId, { excluded: true }));
+    expect(result.current.rows[0].excluded).toBe(true);
+
+    await act(async () => {
+      const analyzing = result.current.analyzeFileList([
+        fileWithPath('new.jpg', 'Starry Fox/new.jpg'),
+      ]);
+      result.current.updateRow(rowId, { excluded: true });
+      await analyzing;
+    });
+    expect(result.current.rows[0].path).toBe('Starry Fox/new.jpg');
+    expect(result.current.rows[0].excluded).toBe(false);
   });
 });

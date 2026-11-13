@@ -151,9 +151,9 @@ const ProjectCoverImageEditor = ({ project }: ProjectCoverImageEditorProps) => {
         outputType={CROP_OUTPUT_TYPE}
         presets={PROJECT_IMAGE_CROP_PRESETS}
         defaultPresetId="rectangle-4-3"
-        onOpenChange={() =>
-          setImageState(state => transitionProjectImage(state, { type: 'close-crop' }))
-        }
+        onOpenChange={open => {
+          if (!open) setImageState(state => transitionProjectImage(state, { type: 'close-crop' }));
+        }}
         onCropComplete={handleCropComplete}
         onUseOriginal={handleUseOriginal}
       />

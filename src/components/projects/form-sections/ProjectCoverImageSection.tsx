@@ -53,7 +53,9 @@ export const ProjectCoverImageSection = ({
       outputHeight={900}
       presets={PROJECT_IMAGE_CROP_PRESETS}
       defaultPresetId="rectangle-4-3"
-      onOpenChange={onCropDialogClose}
+      onOpenChange={open => {
+        if (!open) onCropDialogClose();
+      }}
       onCropComplete={onCropComplete}
       onUseOriginal={onUseOriginalImage}
     />

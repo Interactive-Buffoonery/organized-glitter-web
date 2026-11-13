@@ -323,9 +323,7 @@ const ProjectFormSections = ({
           onImageChange={handleImageChange}
           onImageRemove={handleImageRemove}
           onCropImage={handleOpenCropDialog}
-          onCropDialogOpenChange={open => {
-            if (!open) transitionImage({ type: 'close-crop' });
-          }}
+          onCropDialogClose={() => transitionImage({ type: 'close-crop' })}
           onCropComplete={handleApplyImage}
           onUseOriginalImage={handleApplyImage}
         />

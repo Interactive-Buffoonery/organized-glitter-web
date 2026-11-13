@@ -51,12 +51,10 @@ export function transitionProjectImage(
         selection: state.selection + 1,
         revision: state.revision + 1,
       };
-    case 'load-crop':
-      return {
-        ...state,
-        revision: state.revision + 1,
-        crop: { phase: 'loading', id: state.revision + 1 },
-      };
+    case 'load-crop': {
+      const revision = state.revision + 1;
+      return { ...state, revision, crop: { phase: 'loading', id: revision } };
+    }
     case 'loaded-crop':
       return state.crop.phase === 'loading' && event.id === state.revision
         ? { ...state, crop: { phase: 'open', file: event.file } }

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, RefObject } from 'react';
-import {
-  useCompletionStatusConfirmation,
-  needsCompletionStatusConfirmation,
-} from '@/hooks/useCompletionStatusConfirmation';
+import { useCompletionStatusConfirmation } from '@/hooks/useCompletionStatusConfirmation';
 import { ImageCropDialog } from '@/components/image/ImageCropDialog';
-import { hasNewCompletionDate, useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
+import {
+  completionStatusForChange,
+  hasNewCompletionDate,
+  useCompletionDateStatus,
+} from '@/hooks/useCompletionDateStatus';
 import { ColoringBooksStatusOptions } from '@/types/pocketbase.types';
 import {
   validateColoringBookForm,
@@ -208,7 +209,7 @@ export function ColoringBookForm({
   const [missingPhoto, setMissingPhoto] = useState(
     restoredSessionDraft.current?.missingPhoto ?? false
   );
-  const { confirm, dialog } = useCompletionStatusConfirmation({
+  const { requestChange, dialog, triggerRef } = useCompletionStatusConfirmation({
     countsAsFinished: false,
     subject: 'book',
   });
@@ -301,7 +302,7 @@ export function ColoringBookForm({
     setValues(current => ({
       ...current,
       [field]: value,
-      status,
+      ...(field === 'dateCompleted' ? { status } : {}),
     }));
     setFieldErrors(current => {
       if (!current[field]) return current;
@@ -322,16 +323,36 @@ export function ColoringBookForm({
         values.dateCompleted,
         initialBook?.dateCompleted
       );
-      if (
-        initialBook?.status === 'completed' &&
-        needsCompletionStatusConfirmation(values.status, status, values.dateCompleted)
-      ) {
-        const confirmedStatus = status;
-        void confirm().then(confirmed => {
-          if (confirmed) applyField(field, value, confirmedStatus);
-        });
-        return;
-      }
+      const nextStatus = status;
+      void requestChange(
+        values.status,
+        nextStatus,
+        values.dateCompleted,
+        () => {
+          markChanged();
+          setFieldErrors(current => {
+            if (!current.status) return current;
+            const next = { ...current };
+            delete next.status;
+            return next;
+          });
+          setValues(previous =>
+            previous.status !== values.status
+              ? previous
+              : {
+                  ...previous,
+                  status: completionStatusForChange(
+                    value as ColoringBookFormValues['status'],
+                    previous.dateCompleted,
+                    initialBook?.dateCompleted,
+                    'completed'
+                  ),
+                }
+          );
+        },
+        initialBook?.status ?? ''
+      );
+      return;
     }
     if (field === 'dateCompleted') {
       status = statusForDateChange(
@@ -420,6 +441,7 @@ export function ColoringBookForm({
   const statusAndTags = (
     <>
       <ColoringBookStatusFields
+        triggerRef={triggerRef}
         {...sharedProps}
         completionDateHint={Boolean(
           hasNewCompletionDate(values.dateCompleted, initialBook?.dateCompleted) &&

@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ProjectFormUpdate } from '@/hooks/useProjectFormState';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { notifyError } from '@/lib/notifications';
 import { usePrivateFileUrl } from '@/hooks/usePrivateFileUrl';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useNumberInput } from '@/hooks/useNumberInput';
+import { useCompletionStatusConfirmation } from '@/hooks/useCompletionStatusConfirmation';
 import {
-  useCompletionStatusConfirmation,
-  needsCompletionStatusConfirmation,
-} from '@/hooks/useCompletionStatusConfirmation';
-import { hasNewCompletionDate, useCompletionDateStatus } from '@/hooks/useCompletionDateStatus';
+  completionStatusForChange,
+  hasNewCompletionDate,
+  useCompletionDateStatus,
+} from '@/hooks/useCompletionDateStatus';
 import { ProjectCoverImageSection } from '@/components/projects/form-sections/ProjectCoverImageSection';
 import { ProjectDatesSection } from '@/components/projects/form-sections/ProjectDatesSection';
 import { ProjectKitInfoSection } from '@/components/projects/form-sections/ProjectKitInfoSection';
@@ -29,7 +31,7 @@ interface ProjectFormSectionsProps {
   companies: string[];
   artists: string[];
   isSubmitting: boolean;
-  onChange: (data: ProjectFormValues) => void;
+  onChange: (update: ProjectFormUpdate) => void;
   savedDateCompleted?: string | null;
   savedStatus?: ProjectFormValues['status'];
   statusBeforeDateChange?: ProjectFormValues['status'] | null;
@@ -55,25 +57,19 @@ const ProjectFormSections = ({
   onDraftCompany,
   onDraftArtist,
 }: ProjectFormSectionsProps) => {
-  const { confirm, dialog } = useCompletionStatusConfirmation();
+  const { requestChange, dialog, triggerRef } = useCompletionStatusConfirmation();
   const imageUploadHook = useImageUpload('project-images', 'project-image');
   const { preview, applyProcessedImage } = imageUploadHook;
   const cropSourceUrl = usePrivateFileUrl(preview || formData.imageUrl);
   const [projectTags, setProjectTags] = useState<Tag[]>(formData.tags || []);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
-  const formDataRef = useRef(formData);
   const restoredImageFile = useRef(formData.imageFile);
   const imageSelectionVersionRef = useRef(0);
   const remoteCropVersionRef = useRef(0);
   const { statusForStatusChange, statusForDateChange } = useCompletionDateStatus<
     ProjectFormValues['status']
   >('completed', statusBeforeDateChange, onStatusBeforeDateChange);
-
-  // Layout effect so child effects, like the notes editor's updates, never spread stale values.
-  useLayoutEffect(() => {
-    formDataRef.current = formData;
-  }, [formData]);
 
   useEffect(() => {
     if (
@@ -97,28 +93,32 @@ const ProjectFormSections = ({
   const handleInputChange = useCallback(
     (field: keyof ProjectFormValues, value: ProjectFormValues[keyof ProjectFormValues]) => {
       if (field !== 'status') {
-        onChange({ ...formDataRef.current, [field]: value });
+        onChange(previous => ({ ...previous, [field]: value }));
         return;
       }
-      const { status, dateCompleted } = formDataRef.current;
+      const { status, dateCompleted } = formData;
       const next = statusForStatusChange(
         value as ProjectFormValues['status'],
         dateCompleted,
         savedDateCompleted
       );
-      const applyStatus = () => onChange({ ...formDataRef.current, status: next });
-      if (
-        savedStatus === 'completed' &&
-        needsCompletionStatusConfirmation(status, next, dateCompleted)
-      ) {
-        void confirm().then(confirmed => {
-          if (confirmed) applyStatus();
-        });
-        return;
-      }
-      applyStatus();
+      const applyStatus = () =>
+        onChange(previous =>
+          previous.status !== status
+            ? previous
+            : {
+                ...previous,
+                status: completionStatusForChange(
+                  value as ProjectFormValues['status'],
+                  previous.dateCompleted,
+                  savedDateCompleted,
+                  'completed'
+                ),
+              }
+        );
+      void requestChange(status, next, dateCompleted, applyStatus, savedStatus ?? '');
     },
-    [confirm, onChange, savedDateCompleted, savedStatus, statusForStatusChange]
+    [formData, requestChange, onChange, savedDateCompleted, savedStatus, statusForStatusChange]
   );
 
   const handleImageChange = useCallback(
@@ -129,11 +129,11 @@ const ProjectFormSections = ({
       if (file && imageSelectionVersion === imageSelectionVersionRef.current) {
         setCropFile(file);
         setIsCropDialogOpen(true);
-        onChange({
-          ...formDataRef.current,
+        onChange(previous => ({
+          ...previous,
           imageFile: file,
           imageRemoved: false,
-        });
+        }));
       }
     },
     [imageUploadHook, onChange]
@@ -146,13 +146,13 @@ const ProjectFormSections = ({
     imageUploadHook.handleImageRemove();
     setCropFile(null);
     setIsCropDialogOpen(false);
-    onChange({
-      ...formData,
+    onChange(previous => ({
+      ...previous,
       imageFile: null,
       imageUrl: '',
       imageRemoved: true,
-    });
-  }, [formData, imageUploadHook, onChange]);
+    }));
+  }, [imageUploadHook, onChange]);
 
   const handleOpenCropDialog = useCallback(async () => {
     const remoteCropVersion = ++remoteCropVersionRef.current;
@@ -188,49 +188,50 @@ const ProjectFormSections = ({
     (file: File) => {
       imageUploadHook.applyProcessedImage(file);
       setCropFile(file);
-      onChange({
-        ...formData,
+      onChange(previous => ({
+        ...previous,
         imageFile: file,
         imageRemoved: false,
-      });
+      }));
     },
-    [formData, imageUploadHook, onChange]
+    [imageUploadHook, onChange]
   );
 
   const handleUseOriginalImage = useCallback(
     (file: File) => {
       imageUploadHook.applyProcessedImage(file);
       setCropFile(file);
-      onChange({
-        ...formData,
+      onChange(previous => ({
+        ...previous,
         imageFile: file,
         imageRemoved: false,
-      });
+      }));
     },
-    [formData, imageUploadHook, onChange]
+    [imageUploadHook, onChange]
   );
 
   const handleTagsChange = useCallback(
     (tags: Tag[]) => {
       setProjectTags(tags);
-      onChange({ ...formData, tags });
+      onChange(previous => ({ ...previous, tags }));
     },
-    [formData, onChange]
+    [onChange]
   );
 
   const handleDateChange = useCallback(
     (field: keyof ProjectFormValues, value: string) => {
       if (field === 'dateCompleted') {
-        onChange({
-          ...formData,
+        const status = statusForDateChange(
+          value,
+          formData.dateCompleted,
+          formData.status,
+          savedDateCompleted
+        );
+        onChange(previous => ({
+          ...previous,
           dateCompleted: value,
-          status: statusForDateChange(
-            value,
-            formData.dateCompleted,
-            formData.status,
-            savedDateCompleted
-          ),
-        });
+          status,
+        }));
         return;
       }
       handleInputChange(field, value || null);
@@ -246,6 +247,7 @@ const ProjectFormSections = ({
 
   const statusSection = (
     <ProjectStatusSection
+      triggerRef={triggerRef}
       formData={formData}
       isSubmitting={isSubmitting}
       fieldErrors={fieldErrors}

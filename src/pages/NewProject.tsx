@@ -1,3 +1,4 @@
+import { useProjectFormState, type ProjectFormUpdate } from '@/hooks/useProjectFormState';
 import { notify } from '@/lib/notifications';
 
 /**
@@ -38,11 +39,7 @@ import {
 } from '@/components/projects/IncompatibleImageDialog';
 import { toCreateProjectInput } from '@/hooks/mutations/projectCommands';
 import { isImageMimeRejection, normalizeError } from '@/services/errors';
-import {
-  mapProjectServerFieldErrors,
-  validateProjectFormValues,
-  type ProjectFormFieldErrors,
-} from '@/schemas/project.schema';
+import { mapProjectServerFieldErrors, validateProjectFormValues } from '@/schemas/project.schema';
 
 import { logger } from '@/utils/logger';
 import { useAppReady } from '@/hooks/useAppReady';
@@ -69,29 +66,6 @@ type NewProjectDraft = {
   missingPhoto: boolean;
   companies: Map<string, CreateCompanyData>;
   artists: Map<string, CreateArtistData>;
-};
-
-const clearChangedFieldErrors = (
-  errors: ProjectFormFieldErrors,
-  previous: ProjectFormValues,
-  next: ProjectFormValues
-): ProjectFormFieldErrors => {
-  const nextErrors = { ...errors };
-
-  for (const field of Object.keys(nextErrors) as Array<keyof ProjectFormValues>) {
-    const previousValue = previous[field];
-    const nextValue = next[field];
-    const changed =
-      Array.isArray(previousValue) || Array.isArray(nextValue)
-        ? JSON.stringify(previousValue) !== JSON.stringify(nextValue)
-        : previousValue !== nextValue;
-
-    if (changed) {
-      delete nextErrors[field];
-    }
-  }
-
-  return nextErrors;
 };
 
 const NewProject = () => {
@@ -133,7 +107,6 @@ const NewProject = () => {
   const [submitting, setSubmitting] = useState(false);
   const submissionSequence = useRef(0);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<ProjectFormFieldErrors>({});
   const [imageCompatError, setImageCompatError] = useState<IncompatibleImageDetails | null>(null);
 
   const [initialFormData] = useState<ProjectFormValues>(() => ({
@@ -157,10 +130,18 @@ const NewProject = () => {
     imageFile: null,
     tags: [],
   }));
-  const [formData, setFormData] = useState<ProjectFormValues>(
-    () => restoredDraft.current?.formData ?? initialFormData
+  const {
+    formData,
+    setFormData,
+    fieldErrors,
+    setFieldErrors,
+    missingPhoto,
+    setMissingPhoto,
+    changeFormData,
+  } = useProjectFormState(
+    () => restoredDraft.current?.formData ?? initialFormData,
+    restoredDraft.current?.missingPhoto ?? false
   );
-  const [missingPhoto, setMissingPhoto] = useState(restoredDraft.current?.missingPhoto ?? false);
   const [statusBeforeDateChange, setStatusBeforeDateChange] = useState<
     ProjectFormValues['status'] | null
   >(restoredDraft.current?.statusBeforeDateChange ?? null);
@@ -226,11 +207,9 @@ const NewProject = () => {
     confirmDiscard(() => navigate('/dashboard'));
   };
 
-  const handleFormChange = (data: ProjectFormValues) => {
+  const handleFormChange = (update: ProjectFormUpdate) => {
     markChanged();
-    if (data.imageFile || data.imageRemoved) setMissingPhoto(false);
-    setFieldErrors(errors => clearChangedFieldErrors(errors, formData, data));
-    setFormData(data);
+    changeFormData(update);
   };
 
   const handleSubmit = async (data: ProjectFormValues) => {

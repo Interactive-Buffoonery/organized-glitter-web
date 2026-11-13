@@ -1,10 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import {
-  useCompletionStatusConfirmation,
-  needsCompletionStatusConfirmation,
-} from '@/hooks/useCompletionStatusConfirmation';
+import { useCompletionStatusConfirmation } from '@/hooks/useCompletionStatusConfirmation';
 import MainLayout from '@/components/layout/MainLayout';
 import ColoringBookEditDrawer from '@/components/coloring/ColoringBookEditDrawer';
 import { ColoringBookDetailActions } from '@/components/coloring/detail/ColoringBookDetailActions';
@@ -75,7 +72,7 @@ const ColoringBookDetail = () => {
   const tagsQuery = useColoringBookTags(id);
   const publishersQuery = useBookPublishers(user?.id);
   const illustratorsQuery = useBookIllustrators(user?.id);
-  const { confirm, dialog } = useCompletionStatusConfirmation({
+  const { requestChange, dialog, triggerRef } = useCompletionStatusConfirmation({
     countsAsFinished: false,
     subject: 'book',
   });
@@ -135,20 +132,17 @@ const ColoringBookDetail = () => {
 
   const handleStatusChange = async (status: ColoringBookStatus) => {
     if (!book || status === book.status) return;
-    if (
-      needsCompletionStatusConfirmation(book.status, status, book.dateCompleted) &&
-      !(await confirm())
-    )
-      return;
-    try {
-      await updateBook.mutateAsync({ bookId: book.id, patch: { status } });
-    } catch (error) {
-      notify({
-        kind: 'error',
-        title: 'Status update failed',
-        description: error instanceof Error ? error.message : 'Please try again.',
-      });
-    }
+    return requestChange(book.status, status, book.dateCompleted, async () => {
+      try {
+        await updateBook.mutateAsync({ bookId: book.id, patch: { status } });
+      } catch (error) {
+        notify({
+          kind: 'error',
+          title: 'Status update failed',
+          description: error instanceof Error ? error.message : 'Please try again.',
+        });
+      }
+    });
   };
 
   const handleDelete = async () => {
@@ -362,6 +356,7 @@ const ColoringBookDetail = () => {
                 safeCompletionPct={safeCompletionPct}
                 inProgressPages={inProgressPages}
                 updatePending={updateBook.isPending}
+                triggerRef={triggerRef}
                 onStatusChange={handleStatusChange}
               />
             </div>

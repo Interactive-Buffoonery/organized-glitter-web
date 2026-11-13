@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type RefObject } from 'react';
 import { SectionHeading } from '@/components/shared/Section';
 import { Button } from '@/components/ui/button';
 import { InlineTagManager } from '@/components/tags/InlineTagManager';
@@ -20,10 +20,12 @@ import { safeKitUrl } from './projectDetailUrl';
 export function ProjectStatusSummary({
   project,
   onStatusChange,
+  statusTriggerRef,
   disabled = false,
 }: {
   project: ProjectType;
   onStatusChange: (status: ProjectStatus) => void;
+  statusTriggerRef?: RefObject<HTMLButtonElement | null>;
   disabled?: boolean;
 }) {
   const [field, setField] = useState<KitField | null>(null);
@@ -43,6 +45,7 @@ export function ProjectStatusSummary({
     <div>
       <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
         <StatusDropdown
+          triggerRef={statusTriggerRef}
           currentStatus={project.status}
           onStatusChange={onStatusChange}
           variant="pill"

@@ -1,6 +1,6 @@
 import { notify } from '@/lib/notifications';
 import { useRef, useState } from 'react';
-import { compressProjectImage } from '@/utils/image/projectImageCompression';
+import { compressUserImage } from '@/utils/image/sharedImageCompression';
 
 import { logger } from '@/utils/logger';
 
@@ -16,7 +16,10 @@ interface CompressionProgress {
 
 /**
  * Custom hook for handling project image compression with progress tracking and user feedback.
- * Similar to useProgressImageCompression but optimized for project images with higher quality settings.
+ * Skips files at or below 5MiB, then uses the shared 5MiB target and 2048px bound.
+ * Callers validate and normalize selections before compression (useImageUpload,
+ * ProjectCoverImageEditor). Keeps their interactive fallback policy separate from imports.
+ * Ignores progress updates from superseded compressions.
  * @returns {Object} An object containing the `compressImage` function, compression state, and a reset function.
  */
 export const useProjectImageCompression = () => {
@@ -65,7 +68,7 @@ export const useProjectImageCompression = () => {
       setIsCompressing(true);
       logger.log(`[useProjectImageCompression] Starting compression for ${file.name}`);
 
-      const compressedFile = await compressProjectImage(file, (progress: number) => {
+      const compressedFile = await compressUserImage(file, (progress: number) => {
         if (!isCurrentCompression()) return;
         setCompressionProgress({
           percentage: progress,
@@ -110,7 +113,9 @@ export const useProjectImageCompression = () => {
         });
       }
 
-      // Fall back to original file if compression fails and it's under the Supabase limit
+      // Preserve the interactive 6MiB fallback, below PocketBase
+      // projects.image maxSize of 10MiB (collections.schema.json).
+      // This client cutoff is not the backend limit.
       if (file.size <= 6 * 1024 * 1024) {
         // 6MB fallback limit
         logger.log('[useProjectImageCompression] Using original file as fallback (under 6MB)');

@@ -189,6 +189,7 @@ export interface ArchiveImportResult {
   importedPhotoCount: number;
   skippedRecordCount: number;
   skippedPagePhotoCount: number;
+  deferredPagePhotoCount: number;
   matchedExistingRecordCount: number;
   archiveSchemaVersion: OrganizedGlitterArchiveManifestV1['schemaVersion'];
   refMap: Partial<Record<ArchiveRef, string>>;

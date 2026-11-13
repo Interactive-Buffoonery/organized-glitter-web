@@ -517,7 +517,9 @@ describe('ProjectFormSections project image cropping', () => {
       tagCreation.resolve(tags);
       await tagCreation.promise;
     });
-    expect(onChangeMock).toHaveBeenLastCalledWith(expect.objectContaining({ tags }));
+    expect(onChangeMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ tags, imageFile: selectedFile })
+    );
     fireEvent.change(screen.getByLabelText('Project title'), { target: { value: 'Newer title' } });
 
     await act(async () => {

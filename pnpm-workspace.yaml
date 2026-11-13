@@ -1,5 +1,6 @@
 overrides:
   '@radix-ui/react-dialog': '$@radix-ui/react-dialog'
+  '@types/node': '$@types/node'
   '@internationalized/date': 3.12.4
   '@typescript/old': npm:typescript@6.0.3
   rollup: npm:@rollup/wasm-node@^4.55.1

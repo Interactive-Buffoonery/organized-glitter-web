@@ -228,6 +228,24 @@ describe('useEditProject', () => {
     refetchProjectMock.mockReset();
   });
 
+  it('composes concurrent functional form updates without losing title or notes', async () => {
+    const { result } = renderHook(() => useEditProject('project-123'), { wrapper });
+    await waitFor(() => expect(result.current.formData).not.toBeNull());
+    const change = result.current.handleFormDataChange;
+    act(() => {
+      change(previous => ({ ...previous, title: 'Concurrent title' }));
+      change(previous => ({ ...previous, generalNotes: 'Concurrent notes' }));
+      change(previous => ({ ...previous, tags: [] }));
+    });
+    expect(result.current.formData).toEqual(
+      expect.objectContaining({
+        title: 'Concurrent title',
+        generalNotes: 'Concurrent notes',
+        tags: [],
+      })
+    );
+  });
+
   it.each([true, false])('keeps an untouched edit clean (page: %s)', async navigateOnSubmit => {
     delayedProject = {
       ...baseProject,

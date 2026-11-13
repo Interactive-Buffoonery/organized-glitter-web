@@ -1,6 +1,29 @@
 import { useEffect, useRef } from 'react';
 import { getDateFieldSelectedDate } from '@/components/ui/date-field-utils';
 
+export function hasNewCompletionDate(
+  currentDate: string | null | undefined,
+  savedDate: string | null | undefined
+): boolean {
+  const selectedDate = getDateFieldSelectedDate(currentDate ?? '');
+  const originalDate = getDateFieldSelectedDate(savedDate ?? '');
+  return Boolean(selectedDate && selectedDate.toString() !== originalDate?.toString());
+}
+
+export function completionStatusForChange<TStatus extends string>(
+  nextStatus: TStatus,
+  currentDate: string | null | undefined,
+  savedDate: string | null | undefined,
+  completedStatus: TStatus
+): TStatus {
+  return hasNewCompletionDate(currentDate, savedDate) &&
+    nextStatus !== completedStatus &&
+    nextStatus !== 'archived' &&
+    nextStatus !== 'destashed'
+    ? completedStatus
+    : nextStatus;
+}
+
 export function useCompletionDateStatus<TStatus extends string>(
   completedStatus: TStatus,
   statusBeforeDateChange?: TStatus | null,
@@ -22,11 +45,8 @@ export function useCompletionDateStatus<TStatus extends string>(
     currentDate: string | null | undefined,
     savedDate: string | null | undefined
   ): TStatus => {
-    const selectedDate = getDateFieldSelectedDate(currentDate ?? '');
-    const originalDate = getDateFieldSelectedDate(savedDate ?? '');
     if (
-      selectedDate &&
-      selectedDate.toString() !== originalDate?.toString() &&
+      hasNewCompletionDate(currentDate, savedDate) &&
       nextStatus !== completedStatus &&
       nextStatus !== 'archived' &&
       nextStatus !== 'destashed'

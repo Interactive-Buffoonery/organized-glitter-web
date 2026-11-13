@@ -208,6 +208,7 @@ const EditProjectSession = () => {
               statusBeforeDateChange={statusBeforeDateChange}
               onStatusBeforeDateChange={setStatusBeforeDateChange}
               savedDateCompleted={project.dateCompleted}
+              savedStatus={project.status}
               fieldErrors={fieldErrors}
             />
           ) : null}

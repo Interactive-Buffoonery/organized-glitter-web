@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import {
   Select,
   SelectContent,
@@ -5,6 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useAriaDisabledSelect } from '@/hooks/useAriaDisabledSelect';
 import { cn } from '@/lib/utils';
 import {
   ColoringPagesStatusOptions,
@@ -22,23 +24,27 @@ const STATUS_OPTIONS: ColoringPageStatus[] = [
 
 interface ColoringPageStatusSectionProps {
   status: ColoringPageStatus;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
   disabled?: boolean;
   onStatusChange: (status: ColoringPageStatus) => void | Promise<unknown>;
 }
 
 export function ColoringPageStatusSection({
   status,
+  triggerRef,
   disabled = false,
   onStatusChange,
 }: ColoringPageStatusSectionProps) {
+  const { selectProps, triggerProps } = useAriaDisabledSelect<ColoringPageStatus>(
+    disabled,
+    onStatusChange
+  );
   return (
     <div>
-      <Select
-        value={status}
-        onValueChange={value => onStatusChange(value as ColoringPageStatus)}
-        disabled={disabled}
-      >
+      <Select {...selectProps} value={status}>
         <SelectTrigger
+          ref={triggerRef}
+          {...triggerProps}
           aria-label="Change page status"
           className={cn(
             'h-11 min-h-11 w-auto min-w-36 rounded-full border-0 px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-offset-0',

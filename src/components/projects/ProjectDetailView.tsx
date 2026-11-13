@@ -11,7 +11,7 @@
  */
 
 import { sessionDraftKeys } from '@/services/auth/sessionDraftKeys';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, type RefObject } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,7 @@ interface ProjectDetailViewProps {
     dashboardContext?: DashboardFilterContext;
   };
   onStatusChange: (status: ProjectStatus) => void;
+  statusTriggerRef?: RefObject<HTMLButtonElement | null>;
   onUpdateNotes: (notes: string) => Promise<void>;
   onArchive: () => void;
   onDelete: () => void;
@@ -186,6 +187,7 @@ const ProjectDetailView = ({
   isMobile,
   navigationState,
   onStatusChange,
+  statusTriggerRef,
   onUpdateNotes,
   onArchive,
   onDelete,
@@ -306,6 +308,7 @@ const ProjectDetailView = ({
             <ProjectStatusSummary
               key={project.id}
               project={project}
+              statusTriggerRef={statusTriggerRef}
               onStatusChange={onStatusChange}
               disabled={isSubmitting}
             />
@@ -343,6 +346,7 @@ const ProjectDetailView = ({
               <ProjectStatusSummary
                 key={project.id}
                 project={project}
+                statusTriggerRef={statusTriggerRef}
                 onStatusChange={onStatusChange}
                 disabled={isSubmitting}
               />

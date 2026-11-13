@@ -225,14 +225,7 @@ onRecordCreate(e => {
   if (!e.record.getString('status')) {
     e.record.set('status', 'purchased');
   }
-  if (
-    !isArchiveRestore &&
-    e.record.getString('date_completed') &&
-    e.record.getString('status') !== 'archived' &&
-    e.record.getString('status') !== 'destashed'
-  ) {
-    e.record.set('status', 'completed');
-  }
+  require(`${__hooks}/lifecycle_status.js`).applyCompletionStatus(e, 'date_completed', false);
 
   e.next();
 
@@ -271,17 +264,7 @@ onRecordUpdate(e => {
   const maximumGeneratedPages = 500;
   const isArchiveRestore = e.context.value('organized_glitter_archive_restore') === true;
   const isBatchedReduction = e.context.value('organized_glitter_page_reduction') === true;
-  const completionDate = e.record.getString('date_completed');
-  const incomingStatus = e.record.getString('status');
-  if (
-    !isArchiveRestore &&
-    completionDate &&
-    completionDate !== e.record.original().getString('date_completed') &&
-    incomingStatus !== 'archived' &&
-    incomingStatus !== 'destashed'
-  ) {
-    e.record.set('status', 'completed');
-  }
+  require(`${__hooks}/lifecycle_status.js`).applyCompletionStatus(e, 'date_completed', true);
   const previousTotalPages = Number(e.record.original().get('total_pages'));
   const nextTotalPages = Number(e.record.get('total_pages'));
   if (!Number.isSafeInteger(nextTotalPages) || nextTotalPages < 1) {
@@ -435,9 +418,7 @@ onRecordCreate(e => {
   if (!e.record.getString('status')) {
     e.record.set('status', 'not_started');
   }
-  if (!isArchiveRestore && e.record.getString('completed_at')) {
-    e.record.set('status', 'completed');
-  }
+  require(`${__hooks}/lifecycle_status.js`).applyCompletionStatus(e, 'completed_at', false);
 
   const status = e.record.getString('status');
   const now = new Date().toISOString();
@@ -496,14 +477,7 @@ onRecordCreate(e => {
 
 onRecordUpdate(e => {
   const isArchiveRestore = e.context.value('organized_glitter_archive_restore') === true;
-  const completionDate = e.record.getString('completed_at');
-  if (
-    !isArchiveRestore &&
-    completionDate &&
-    completionDate !== e.record.original().getString('completed_at')
-  ) {
-    e.record.set('status', 'completed');
-  }
+  require(`${__hooks}/lifecycle_status.js`).applyCompletionStatus(e, 'completed_at', true);
   const previousStatus = e.record.original().getString('status');
   const nextStatus = e.record.getString('status');
   const now = new Date().toISOString();

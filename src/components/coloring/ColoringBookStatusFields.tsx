@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import { getColoringBookStatusColor, getColoringBookStatusLabel } from '@/utils/statusColors';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -15,9 +16,14 @@ import type { ColoringBookFieldSectionProps } from './coloringBookFormTypes';
 
 export function ColoringBookStatusFields({
   values,
+  triggerRef,
   isSubmitting,
   setField,
-}: ColoringBookFieldSectionProps) {
+  completionDateHint,
+}: ColoringBookFieldSectionProps & {
+  completionDateHint?: boolean;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
+}) {
   return (
     <Section label="Status">
       <div className="space-y-4">
@@ -26,7 +32,12 @@ export function ColoringBookStatusFields({
           onValueChange={value => setField('status', value as ColoringBooksStatusOptions)}
           disabled={isSubmitting}
         >
-          <SelectTrigger className="min-h-11" id="coloring-status" aria-label="Status">
+          <SelectTrigger
+            ref={triggerRef}
+            className="min-h-11"
+            id="coloring-status"
+            aria-label="Status"
+          >
             <SelectValue>
               <span
                 className={`rounded-full px-2.5 py-1 text-xs font-medium ${getColoringBookStatusColor(values.status)}`}
@@ -44,6 +55,11 @@ export function ColoringBookStatusFields({
           </SelectContent>
         </Select>
 
+        {completionDateHint && (
+          <p className="text-muted-foreground text-sm">
+            Remove the completion date to change the status.
+          </p>
+        )}
         <div className="flex min-h-11 items-center gap-3">
           <Checkbox
             id="coloring-is-mystery"

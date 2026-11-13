@@ -153,11 +153,14 @@ Source: `src/hooks/queries/queryKeys.ts` + `randomizerQueryKeys` in `useSpinHist
 | `['notesFeed', 'list']`            | `queryKeys.notesFeed.lists()`            | Base for cross-craft feed lists |
 | `['notesFeed', 'list', hash, key]` | `queryKeys.notesFeed.list(user, params)` | Notes page infinite feed        |
 
+| `['notesFeed', 'streak', hash]` | `queryKeys.notesFeed.streak(user)` | Complete crafting dates |
+
 **Invalidated by:**
 
 - Diamond progress note create/update/delete/image removal -> `invalidateNotesFeedQueries`
 - Coloring page progress note create/update/delete/image removal -> `invalidateNotesFeedQueries`
-- The helper uses `notesFeed.all` by default and supports scoped list invalidation when caller context is available.
+- Project and coloring book deletion -> `notesFeed.all`
+- The helper uses `notesFeed.all` by default; scoped invalidation refreshes the user’s list and streak.
 
 ### noteTargets
 

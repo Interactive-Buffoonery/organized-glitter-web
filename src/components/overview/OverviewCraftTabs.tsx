@@ -1,5 +1,5 @@
 import { usePostHog } from '@posthog/react';
-import { cn } from '@/lib/utils';
+import SegmentedControl from '@/components/shared/SegmentedControl';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import type { OverviewCraftFilter } from '@/services/pocketbase/overview.service';
 
@@ -34,40 +34,23 @@ export function OverviewCraftTabs({
   }
 
   return (
-    <div
-      className="border-border/70 bg-muted/35 inline-flex max-w-full rounded-xl border p-1"
-      role="group"
-      aria-label="Filter active projects"
-    >
-      {visibleOptions.map(option => {
-        const isActive = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            aria-pressed={isActive}
-            onClick={() => {
-              onValueChange(option.value);
-              if (option.value !== value) {
-                posthog.capture(AnalyticsEvent.OVERVIEW_CRAFT_FILTER_CHANGED, {
-                  surface: 'overview',
-                  from_craft: value,
-                  to_craft: option.value,
-                });
-              }
-            }}
-            className={cn(
-              'min-h-9 rounded-lg px-3 py-1.5 text-sm font-semibold tracking-tight whitespace-nowrap transition-colors pointer-coarse:min-h-11',
-              'focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none',
-              isActive
-                ? 'bg-primary/20 text-foreground ring-primary/35 shadow-[inset_0_1px_0_hsl(var(--glass-highlight)),0_1px_4px_rgba(0,0,0,0.08)] ring-1'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
+    <SegmentedControl
+      value={value}
+      options={visibleOptions}
+      variant="glass"
+      ariaLabel="Filter active projects"
+      className="w-fit max-w-full"
+      buttonClassName="min-h-9 flex-none px-2.5 whitespace-nowrap"
+      onValueChange={next => {
+        onValueChange(next);
+        if (next !== value) {
+          posthog.capture(AnalyticsEvent.OVERVIEW_CRAFT_FILTER_CHANGED, {
+            surface: 'overview',
+            from_craft: value,
+            to_craft: next,
+          });
+        }
+      }}
+    />
   );
 }

@@ -31,7 +31,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useEnabledVerticals } from '@/hooks/useEnabledVerticals';
 import { useAppReady } from '@/hooks/useAppReady';
-import { notify } from '@/lib/notifications';
 import { getDashboardMode, getDashboardModeSearchParams } from '@/pages/dashboardUrlParams';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import { createLogger } from '@/utils/logger';
@@ -116,11 +115,6 @@ const DiamondDashboardPane: React.FC = () => {
         window.setTimeout(() => {
           setRecentlyEditedProjectId(null);
         }, 3000);
-        notify({
-          kind: 'info',
-          title: 'Position Restored',
-          description: 'Returned to your previous location after editing.',
-        });
       }
     } catch (error) {
       logger.error('Error during dashboard restoration', error);

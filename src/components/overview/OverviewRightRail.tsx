@@ -14,25 +14,12 @@ interface OverviewRightRailProps {
   isLoading: boolean;
 }
 
-const QUICK_LINKS = [
-  { label: 'Manage diamond paintings', href: '/dashboard' },
-  { label: 'Manage coloring books', href: '/dashboard?craft=coloring' },
-  { label: 'Import content', href: '/profile?tab=data' },
-  { label: 'Randomizer', href: '/randomizer' },
-  { label: 'Stats', href: '/stats' },
-];
-
 export function OverviewRightRail({
   snapshot,
   canUseDiamond,
   canUseColoring,
   isLoading,
 }: OverviewRightRailProps) {
-  const quickLinks = QUICK_LINKS.filter(link => {
-    if (link.href === '/dashboard') return canUseDiamond;
-    if (link.href === '/dashboard?craft=coloring') return canUseColoring;
-    return true;
-  });
   const snapshotRows = [
     canUseDiamond
       ? {
@@ -52,34 +39,10 @@ export function OverviewRightRail({
   return (
     <GlassPanel
       role="complementary"
-      aria-labelledby="overview-quick-links-heading"
+      aria-labelledby="overview-snapshot-heading"
       className="self-start p-5 sm:p-6"
     >
-      <section aria-labelledby="overview-quick-links-heading">
-        <h2
-          id="overview-quick-links-heading"
-          className="text-foreground text-base font-semibold tracking-tight"
-        >
-          Quick links
-        </h2>
-        <div className="border-border/60 mt-5 divide-y">
-          {quickLinks.map(link => (
-            <Link
-              key={link.href}
-              to={link.href}
-              className="text-foreground hover:text-primary flex items-center justify-between gap-4 py-4 text-sm font-medium transition-colors"
-            >
-              {link.label}
-              <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section
-        aria-labelledby="overview-snapshot-heading"
-        className="border-border/60 mt-7 border-t pt-7"
-      >
+      <section aria-labelledby="overview-snapshot-heading">
         <h2
           id="overview-snapshot-heading"
           className="text-foreground text-base font-semibold tracking-tight"
@@ -101,6 +64,14 @@ export function OverviewRightRail({
           ))}
         </div>
       </section>
+
+      <Link
+        to="/profile?tab=data"
+        className="text-foreground hover:text-primary border-border/60 mt-5 flex min-h-11 items-center justify-between gap-4 border-t pt-4 text-sm font-medium"
+      >
+        Import content
+        <ChevronRight aria-hidden="true" className="size-4" />
+      </Link>
 
       <div className="border-border/60 mt-7 border-t pt-6">
         <div className="flex gap-3">

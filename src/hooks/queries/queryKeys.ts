@@ -246,6 +246,8 @@ export const queryKeys = {
   // Cross-craft notes feed keys
   notesFeed: {
     all: ['notesFeed'] as const,
+    streak: (userId: string) =>
+      [...queryKeys.notesFeed.all, 'streak', createUserKeyHash(userId)] as const,
     lists: () => [...queryKeys.notesFeed.all, 'list'] as const,
     list: (userId: string, params: NotesFeedQueryParams = {}) =>
       [

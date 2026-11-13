@@ -1,3 +1,4 @@
+import { CraftingStreak } from '@/features/crafting-streak/CraftingStreak';
 import { memo, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -33,7 +34,10 @@ function WelcomeSectionComponent({ displayName, isLoadingProfile = false }: Welc
             firstName || 'friend'
           )}
         </h1>
-        <p className="text-muted-foreground text-sm">{todayLabel}</p>
+        <div className="flex flex-wrap items-center gap-x-2">
+          <p className="text-muted-foreground text-sm">{todayLabel}</p>
+          <CraftingStreak location="home" />
+        </div>
       </div>
     </header>
   );

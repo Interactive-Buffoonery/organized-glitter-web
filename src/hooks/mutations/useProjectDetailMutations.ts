@@ -368,6 +368,7 @@ export const useDeleteProjectMutation = () => {
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.lists() });
       invalidateStatsQueries(queryClient, 'diamond');
+      await invalidateNotesFeedQueries(queryClient);
     },
     onError: error => {
       handleMutationError(error, 'delete project');

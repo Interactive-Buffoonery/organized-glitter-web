@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import ProjectsGrid from '@/components/dashboard/ProjectsGrid';
 import DashboardStatusSegments from '@/components/dashboard/DashboardStatusSegments';
 import ResultsSummaryBar from '@/components/dashboard/ResultsSummaryBar';
@@ -37,15 +38,23 @@ const ProjectsSectionComponent = ({ dashboardData, isCorrectingPage }: ProjectsS
   // Dismiss splash on mount; projects still use in-app loading UI.
   useAppReady();
 
+  const hasLoadError =
+    dashboardData.errorProjects && !ErrorHandler.isCancelledError(dashboardData.errorProjects);
+  const errorNotice = hasLoadError ? (
+    <div role="alert" className="border-border space-y-3 rounded-xl border p-5">
+      <p className="text-foreground font-medium">Could not load your projects</p>
+      <p className="text-muted-foreground text-sm">Please try again. Your library is still here.</p>
+      <Button type="button" variant="glass" onClick={() => dashboardData.refetchProjects()}>
+        Try again
+      </Button>
+    </div>
+  ) : null;
+
+  const hasUnavailableResults = !!hasLoadError && dashboardData.projects.length === 0;
+
   return (
     <div className="space-y-6 lg:col-span-3">
-      {dashboardData.errorProjects &&
-        !ErrorHandler.isCancelledError(dashboardData.errorProjects) && (
-          <div className="rounded-md border border-red-500 p-4 text-red-500">
-            <p>Error loading projects: {dashboardData.errorProjects.message}</p>
-            <p>Please try refreshing the page or contact support if the issue persists.</p>
-          </div>
-        )}
+      {errorNotice}
 
       <DashboardStatusSegments
         activeStatus={filters.activeStatus}
@@ -59,6 +68,7 @@ const ProjectsSectionComponent = ({ dashboardData, isCorrectingPage }: ProjectsS
         totalItems={dashboardData.totalItems}
         totalItemsIsEstimate={dashboardData.totalItemsIsEstimate}
         isLoading={dashboardData.isLoadingProjects}
+        showCount={!hasUnavailableResults}
         sortField={filters.sortField}
         sortDirection={filters.sortDirection}
         activeFilterCount={activeFilterCount}
@@ -66,7 +76,9 @@ const ProjectsSectionComponent = ({ dashboardData, isCorrectingPage }: ProjectsS
         onClearAll={clearActiveFilters}
       />
 
-      <ProjectsGrid dashboardData={dashboardData} isCorrectingPage={isCorrectingPage} />
+      {!hasUnavailableResults && (
+        <ProjectsGrid dashboardData={dashboardData} isCorrectingPage={isCorrectingPage} />
+      )}
     </div>
   );
 };

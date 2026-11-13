@@ -170,7 +170,7 @@ const ProjectTitleBlock = ({ project }: { project: ProjectType }) => (
     <h1
       className={cn(
         'font-handwritten text-foreground m-0 leading-[1.05] tracking-tight break-words',
-        'text-[40px] sm:text-[clamp(40px,5.5vw,64px)]'
+        'text-3xl md:text-4xl'
       )}
     >
       {project.title || 'Untitled Project'}
@@ -285,7 +285,7 @@ const ProjectDetailView = ({
               onClick={navigateToEdit}
               disabled={isSubmitting}
               aria-label="Edit project"
-              className="text-primary hover:bg-primary/10 hover:text-primary min-h-11 px-2.5 font-medium"
+              className="text-foreground min-h-11 px-2.5 font-medium"
             >
               Edit
             </Button>
@@ -312,9 +312,6 @@ const ProjectDetailView = ({
               onStatusChange={onStatusChange}
               disabled={isSubmitting}
             />
-            <ProjectKitTags project={project} />
-            <ProjectKitAbout project={project} />
-            {note}
             <div ref={progressRegionRef}>
               <ProjectProgressNotes
                 project={project}
@@ -322,6 +319,9 @@ const ProjectDetailView = ({
                 composerInputRef={composerInputRef}
               />
             </div>
+            <ProjectKitTags project={project} />
+            <ProjectKitAbout project={project} />
+            {note}
           </div>
         </div>
       ) : (
@@ -342,7 +342,7 @@ const ProjectDetailView = ({
                 />
               </div>
             </div>
-            <aside className="sticky top-[80px] space-y-6 self-start">
+            <aside className="sticky top-[calc(var(--site-header-total-height)+5.5rem)] space-y-6 self-start">
               <ProjectStatusSummary
                 key={project.id}
                 project={project}

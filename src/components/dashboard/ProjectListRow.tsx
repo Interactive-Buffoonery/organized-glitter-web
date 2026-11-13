@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { useProjectStatus } from '@/hooks/useProjectStatus';
+import { StatusPill } from '@/components/shared/StatusPill';
+import { FILTER_STATUS_ACTIVE_FILL, PROJECT_FILTER_STATUS_LABEL } from '@/utils/statusColors';
 import { ProjectType } from '@/types/project';
 import { getLifecycleDate, getSizeAndShapeLabel } from './projectsTableUtils';
 import ProjectThumbnail from './ProjectThumbnail';
@@ -20,8 +21,6 @@ const ProjectListRowComponent = ({
   skipImageLoading = false,
   isRecentlyEdited = false,
 }: ProjectListRowProps) => {
-  const { getStatusColor, getStatusLabel } = useProjectStatus();
-
   const openProject = useCallback(() => {
     if (onNavigate) {
       onNavigate(project.id);
@@ -54,12 +53,7 @@ const ProjectListRowComponent = ({
     [onClick, onNavigate, openProject]
   );
 
-  const statusLabel =
-    project.status === 'purchased'
-      ? 'Purchased'
-      : project.status === 'kitted'
-        ? 'Kitted Up'
-        : getStatusLabel(project.status);
+  const statusLabel = PROJECT_FILTER_STATUS_LABEL[project.status];
 
   const artistLabel = project.artist && project.artist !== '-' ? project.artist : null;
   const companyAndArtist = [project.company, artistLabel].filter(Boolean).join(' · ');
@@ -83,7 +77,7 @@ const ProjectListRowComponent = ({
         aria-label={linkLabel}
         onClick={handleProjectClick}
         className={cn(
-          'glow-hover text-card-foreground focus-visible:ring-ring group flex w-full cursor-pointer overflow-hidden rounded-xl border text-left shadow-sm transition-all duration-300 ease-out focus-visible:ring-2 focus-visible:outline-none',
+          'text-card-foreground focus-visible:ring-ring group flex w-full cursor-pointer overflow-hidden rounded-xl border text-left transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none',
           isRecentlyEdited
             ? 'border-accent bg-accent/10 ring-accent ring-opacity-50 ring-2'
             : 'border-border bg-card hover:border-primary/20'
@@ -124,14 +118,7 @@ const ProjectListRowComponent = ({
           </div>
 
           <div className="flex-shrink-0">
-            <span
-              className={cn(
-                'rounded-full px-3 py-1 text-xs font-medium shadow-md transition-all duration-200 group-hover:scale-105',
-                getStatusColor(project.status)
-              )}
-            >
-              {statusLabel}
-            </span>
+            <StatusPill label={statusLabel} className={FILTER_STATUS_ACTIVE_FILL[project.status]} />
           </div>
         </div>
       </a>

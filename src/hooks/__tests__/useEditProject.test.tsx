@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, render, renderHook, waitFor } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -186,6 +186,8 @@ vi.mock('@/components/projects/form/EntitySelect', () => ({
   EntitySelect: ({ entityLabel }: { entityLabel: string }) => <div>{entityLabel}</div>,
 }));
 
+import RichTextEditor from '@/components/notes/RichTextEditor';
+
 import { useEditProject } from '../useEditProject';
 import { ProjectRelationLookupError } from '@/utils/project/projectSaveError';
 
@@ -243,6 +245,46 @@ describe('useEditProject', () => {
       })
     );
   });
+
+  it.each([true, false])('keeps an untouched edit clean (page: %s)', async navigateOnSubmit => {
+    delayedProject = {
+      ...baseProject,
+      status: 'completed',
+      dateCompleted: '2026-03-01 12:00:00.000Z',
+    };
+    const { result } = renderHook(() => useEditProject('project-123', { navigateOnSubmit }), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.formData).not.toBeNull());
+    expect(navigationWarningState.isDirty).toBe(false);
+    expect(result.current.draft.dirty).toBe(false);
+  });
+
+  it.each([true, false])(
+    'keeps stored notes unchanged when opening an edit (page: %s)',
+    async navigateOnSubmit => {
+      delayedProject = {
+        ...baseProject,
+        status: 'completed',
+        dateCompleted: '2026-03-01 12:00:00.000Z',
+        generalNotes: '<p>Saved notes</p>',
+      };
+      function Editor() {
+        const edit = useEditProject('project-123', { navigateOnSubmit });
+        return edit.formData ? (
+          <RichTextEditor
+            value={edit.formData.generalNotes || ''}
+            onChange={generalNotes =>
+              edit.handleFormDataChange({ ...edit.formData!, generalNotes })
+            }
+          />
+        ) : null;
+      }
+      const view = render(<Editor />, { wrapper });
+      await waitFor(() => expect(view.getByRole('textbox')).toBeInTheDocument());
+      expect(navigationWarningState.isDirty).toBe(false);
+    }
+  );
 
   it('does not accept another project revision from a late recovery result', async () => {
     refetchProjectMock.mockResolvedValue({

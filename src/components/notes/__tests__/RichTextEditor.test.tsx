@@ -1,4 +1,4 @@
-import { createEvent, fireEvent, render, screen } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +10,18 @@ describe('RichTextEditor', () => {
     Object.defineProperty(event, 'pointerType', { value: 'touch' });
     return fireEvent(element, event);
   };
+
+  it.each(['', 'Plain notes', '<p>Legacy notes</p>'])(
+    'does not emit unchanged content on mount or when disabled: %s',
+    async value => {
+      const onChange = vi.fn();
+      const { rerender } = render(<RichTextEditor value={value} onChange={onChange} />);
+      await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
+      expect(onChange).not.toHaveBeenCalled();
+      rerender(<RichTextEditor value={value} onChange={onChange} disabled />);
+      expect(onChange).not.toHaveBeenCalled();
+    }
+  );
 
   it('saves and reopens an explicit numbered list from the toolbar', async () => {
     const user = userEvent.setup();

@@ -142,7 +142,7 @@ export function ColoringBookTagManager({
             type="button"
             variant="outline"
             size="sm"
-            className="text-muted-foreground h-8 border-dashed text-xs"
+            className="text-muted-foreground min-h-11 border-dashed text-xs"
             disabled={disabled}
           >
             <Plus className="mr-1 size-3" />

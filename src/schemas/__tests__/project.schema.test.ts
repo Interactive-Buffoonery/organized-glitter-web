@@ -65,6 +65,12 @@ describe('ProjectFormSchema cross-field validation', () => {
 });
 
 describe('validateProjectFormValues', () => {
+  it('reports whitespace-only titles as required', () => {
+    const result = validateProjectFormValues({ ...validBase, title: '   ' }, '2026-10-04');
+    expect(result.isValid).toBe(false);
+    expect(result.fieldErrors.title).toBe('Title is required');
+  });
+
   it('maps non-number color count validation errors to the colorCount field', () => {
     const result = validateProjectFormValues(
       {

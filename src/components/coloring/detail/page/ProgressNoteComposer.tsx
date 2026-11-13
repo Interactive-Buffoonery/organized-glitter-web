@@ -94,7 +94,6 @@ export function ProgressNoteComposer({ onSubmit, disabled }: ProgressNoteFormPro
         open={form.isCropDialogOpen}
         file={form.cropFile}
         title="Crop progress photo"
-        description="Fit the whole photo, or crop a detail."
         aspect={4 / 3}
         outputWidth={1200}
         outputHeight={900}

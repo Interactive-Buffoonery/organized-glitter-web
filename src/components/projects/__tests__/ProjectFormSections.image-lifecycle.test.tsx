@@ -16,6 +16,7 @@ vi.mock('@/hooks/useProjectImageCompression', () => ({
     compressionProgress: null,
   }),
 }));
+vi.mock('@/components/tags/InlineTagManager', () => ({ InlineTagManager: () => null }));
 vi.mock('@/lib/notifications', () => ({ notify: vi.fn(), notifyError: vi.fn() }));
 vi.mock('@/components/projects/form-sections/ProjectTitleSection', () => ({
   ProjectTitleSection: () => null,

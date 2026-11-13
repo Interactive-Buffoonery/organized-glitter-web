@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FieldError, Section } from './ColoringBookFormPrimitives';
+import { FieldError } from './ColoringBookFormPrimitives';
 import {
   getColoringBookErrorId,
   type ColoringBookFieldSectionProps,
@@ -13,11 +13,12 @@ export function ColoringBookSourceFields({
   setField,
 }: ColoringBookFieldSectionProps) {
   return (
-    <Section label="Source URL">
-      <Label htmlFor="coloring-source-url" className="sr-only">
+    <div className="space-y-2">
+      <Label htmlFor="coloring-source-url" className="text-sm font-medium">
         Source URL
       </Label>
       <Input
+        className="min-h-11"
         id="coloring-source-url"
         type="url"
         value={values.sourceUrl ?? ''}
@@ -28,6 +29,6 @@ export function ColoringBookSourceFields({
         aria-describedby={fieldErrors.sourceUrl ? getColoringBookErrorId('sourceUrl') : undefined}
       />
       <FieldError field="sourceUrl" fieldErrors={fieldErrors} />
-    </Section>
+    </div>
   );
 }

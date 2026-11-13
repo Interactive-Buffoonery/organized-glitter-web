@@ -62,7 +62,11 @@ export const BaseProjectFormObjectSchema = z.object({
       const pocketbaseIdRegex = /^[a-z0-9]{15}$/;
       return pocketbaseIdRegex.test(val);
     }, 'User authentication is incomplete. Please refresh the page and try again.'),
-  title: z.string().min(1, 'Title is required').max(255, 'Title must be 255 characters or less'),
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Title is required')
+    .max(255, 'Title must be 255 characters or less'),
   company: z.string().max(100, 'Company must be 100 characters or less').optional().nullable(),
   artist: z.string().max(100, 'Artist must be 100 characters or less').optional().nullable(),
   drillShape: DrillShapeEnum.optional().nullable(),

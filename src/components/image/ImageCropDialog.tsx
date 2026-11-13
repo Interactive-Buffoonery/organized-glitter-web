@@ -18,7 +18,7 @@ interface ImageCropDialogProps {
   open: boolean;
   file: File | null;
   title: string;
-  description: string;
+  description?: string;
   aspect: number;
   outputWidth: number;
   outputHeight: number;
@@ -213,10 +213,11 @@ export function ImageCropDialog({
       <DialogContent
         className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 p-0 sm:h-auto sm:max-h-[min(760px,92dvh)] sm:max-w-3xl sm:rounded-lg sm:border"
         onCloseAutoFocus={onAfterClose}
+        {...(!description && { 'aria-describedby': undefined })}
       >
         <DialogHeader className="border-border shrink-0 border-b px-5 py-4 pr-14 text-left">
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 sm:p-5">

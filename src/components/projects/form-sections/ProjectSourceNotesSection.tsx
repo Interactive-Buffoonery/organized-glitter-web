@@ -19,12 +19,13 @@ export const ProjectSourceNotesSection = ({
   fieldErrors,
   onFieldChange,
 }: ProjectSourceNotesSectionProps) => (
-  <>
-    <Section label="Source URL">
-      <Label htmlFor="sourceUrl" className="sr-only">
+  <Section label="Source and notes">
+    <div className="space-y-2">
+      <Label htmlFor="sourceUrl" className="text-sm font-medium">
         Source URL
       </Label>
       <Input
+        className="min-h-11"
         id="sourceUrl"
         type="url"
         value={formData.sourceUrl || ''}
@@ -35,10 +36,10 @@ export const ProjectSourceNotesSection = ({
         aria-describedby={fieldErrors.sourceUrl ? getErrorId('sourceUrl') : undefined}
       />
       <FieldError field="sourceUrl" message={fieldErrors.sourceUrl} />
-    </Section>
+    </div>
 
-    <Section label="Notes">
-      <Label className="sr-only">Notes</Label>
+    <div className="space-y-2">
+      <Label className="text-sm font-medium">Notes</Label>
       <RichTextEditor
         value={formData.generalNotes || ''}
         onChange={value => onFieldChange('generalNotes', value)}
@@ -49,6 +50,6 @@ export const ProjectSourceNotesSection = ({
         ariaDescribedBy={fieldErrors.generalNotes ? getErrorId('generalNotes') : undefined}
       />
       <FieldError field="generalNotes" message={fieldErrors.generalNotes} />
-    </Section>
-  </>
+    </div>
+  </Section>
 );

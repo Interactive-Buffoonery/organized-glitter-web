@@ -1,5 +1,6 @@
 import { ArchiveRestoreSignInError } from '@/services/pocketbase/archiveColorKeys.service';
 import JSZip from 'jszip';
+import imageCompression from 'browser-image-compression';
 import { ClientResponseError } from 'pocketbase';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -793,6 +794,215 @@ describe('archive import', () => {
     expect(appendColoringPagePhotos).toHaveBeenCalledWith('current-page', [
       expect.objectContaining({ name: '2.jpg' }),
     ]);
+  });
+
+  async function pagePhotoFailureFixture() {
+    const photoPaths = Array.from({ length: 9 }, (_, index) => `photos/page/${index + 1}.jpg`);
+    const zip = new JSZip();
+    for (const path of photoPaths) zip.file(path, new Uint8Array([1]));
+    const manifest = validManifest({
+      coloringBooks: [
+        {
+          ref: 'coloring-book:photo-failure',
+          oldId: 'photo-failure',
+          title: 'Photo failure book',
+          isMystery: false,
+          status: 'in_stash',
+          totalPages: 1,
+          tags: [],
+          pages: [
+            {
+              ...archiveColoringPage(1),
+              photoPaths,
+              colorReference: {
+                ref: 'coloring-color-reference:prefix',
+                notes: 'Keep reference',
+                photoPaths: [],
+              },
+              colorKeys: [
+                {
+                  ref: 'coloring-color-key:prefix',
+                  position: 0,
+                  symbol: 'A',
+                  code: '',
+                  color_name: '',
+                  swatch: '',
+                  tried: [],
+                  note: '',
+                  created: '',
+                  updated: '',
+                },
+              ],
+              progressNotes: [
+                {
+                  ref: 'coloring-page-note:after-photos',
+                  oldId: 'after-photos',
+                  content: 'Keep the journal',
+                  date: '2026-05-20',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const storedPage = makeColoringPage({ id: 'new-page' });
+    const adapter = makeImportAdapter({
+      createColoringBook: vi
+        .fn()
+        .mockResolvedValue({ id: 'new-book', title: 'Photo failure book' }),
+      listColoringPages: vi.fn().mockResolvedValue([storedPage]),
+      appendColoringPagePhotos: vi.fn().mockImplementation(async (_, files: File[]) => {
+        storedPage.photos.push(...files.map(file => file.name));
+        return storedPage;
+      }),
+      restoreColorReference: vi
+        .fn()
+        .mockResolvedValue({ referenceId: 'new-reference', addedPhotoCount: 0 }),
+      restoreColorKeys: vi.fn().mockResolvedValue({
+        outcome: 'created',
+        refMap: { 'coloring-color-key:prefix': 'new-key' },
+      }),
+      createColoringPageProgressNote: vi.fn().mockResolvedValue({ id: 'new-note' }),
+    });
+    return { zip, manifest, adapter, storedPage };
+  }
+
+  // Isolate compression output here: a real browser compressor cannot deterministically
+  // produce an oversized result or fail only the middle file in every environment.
+  it.each(
+    [1, 3, 4, 5, 8, 9].flatMap(position =>
+      ['oversized output', 'compression failure'].map(failure => ({ position, failure }))
+    )
+  )('preserves prefix at photo $position with $failure', async ({ position, failure }) => {
+    const { zip, manifest, adapter, storedPage } = await pagePhotoFailureFixture();
+    if (failure === 'compression failure') {
+      zip.file(`photos/page/${position}.jpg`, new Uint8Array(6 * 1024 * 1024));
+    }
+    vi.mocked(imageCompression).mockImplementation(async file => {
+      if (file.name === `${position}.jpg`) {
+        if (failure === 'compression failure') throw new Error('Cannot decode image');
+        return new File([new Uint8Array(10 * 1024 * 1024 + 1)], file.name, {
+          type: 'image/jpeg',
+        });
+      }
+      return file;
+    });
+    try {
+      const result = await importArchiveBundle({ zip, manifest, warnings: [] }, adapter);
+      expect(
+        vi
+          .mocked(adapter.appendColoringPagePhotos)
+          .mock.calls.flatMap(([, files]) => files.map(file => file.name))
+      ).toEqual(Array.from({ length: position - 1 }, (_, i) => `${i + 1}.jpg`));
+      expect(result).toMatchObject({
+        success: false,
+        importedPhotoCount: position - 1,
+        deferredPagePhotoCount: 10 - position,
+        createdColoringBookCount: 1,
+        createdProgressNoteCount: 1,
+        skippedRecordCount: 0,
+        skippedPagePhotoCount: 0,
+        refMap: {
+          'coloring-book:photo-failure': 'new-book',
+          'coloring-page:old-page-1': 'new-page',
+          'coloring-page-note:after-photos': 'new-note',
+        },
+      });
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain(`photos/page/${position}.jpg`);
+      expect(result.errors[0]).toContain(
+        failure === 'compression failure' ? 'Image compression failed' : '10MB upload limit'
+      );
+      expect(result.warnings).toContainEqual(
+        expect.objectContaining({
+          code: 'failed-coloring-page-photo-preparation',
+          path: `photos/page/${position}.jpg`,
+          recordRef: 'coloring-page:old-page-1',
+        })
+      );
+      expect(adapter.restoreColorReference).toHaveBeenCalledOnce();
+      expect(adapter.restoreColorKeys).toHaveBeenCalledOnce();
+      const prefix = Array.from({ length: position - 1 }, (_, i) => `${i + 1}.jpg`);
+      expect(storedPage.photos).toEqual(prefix);
+      vi.mocked(adapter.listExistingColoringBooks).mockResolvedValue([
+        { id: 'new-book', title: 'Photo failure book' },
+      ]);
+      vi.mocked(adapter.appendColoringPagePhotos).mockClear();
+      const persistent = await importArchiveBundle({ zip, manifest, warnings: [] }, adapter);
+      expect(persistent.success).toBe(false);
+      expect(persistent.importedPhotoCount).toBe(0);
+      expect(persistent.deferredPagePhotoCount).toBe(10 - position);
+      expect(adapter.appendColoringPagePhotos).not.toHaveBeenCalled();
+      expect(storedPage.photos).toEqual(prefix);
+      vi.mocked(imageCompression).mockImplementation(async file => file);
+      const repaired = await importArchiveBundle({ zip, manifest, warnings: [] }, adapter);
+      expect(repaired.errors).toEqual([]);
+      expect(repaired.importedPhotoCount).toBe(10 - position);
+      expect(storedPage.photos).toEqual(Array.from({ length: 9 }, (_, i) => `${i + 1}.jpg`));
+      expect(storedPage.photos[0]).toBe('1.jpg');
+    } finally {
+      vi.mocked(imageCompression).mockImplementation(async file => file);
+    }
+  });
+
+  it('continues restoring later pages after preparation failure', async () => {
+    const { zip, manifest, adapter } = await pagePhotoFailureFixture();
+    zip.file('photos/later.jpg', new Uint8Array([1]));
+    manifest.coloringBooks[0].pages.push({
+      ...archiveColoringPage(2),
+      photoPaths: ['photos/later.jpg'],
+    });
+    vi.mocked(adapter.listColoringPages).mockResolvedValue([
+      makeColoringPage({ id: 'new-page' }),
+      makeColoringPage({ id: 'later-page', pageNumber: 2 }),
+    ]);
+    vi.mocked(imageCompression).mockImplementation(async file => {
+      if (file.name === '3.jpg') return new File([new Uint8Array(10 * 1024 * 1024 + 1)], file.name);
+      return file;
+    });
+    try {
+      const result = await importArchiveBundle({ zip, manifest, warnings: [] }, adapter);
+      expect(result.importedPhotoCount).toBe(3);
+      expect(result.deferredPagePhotoCount).toBe(7);
+      expect(adapter.appendColoringPagePhotos).toHaveBeenLastCalledWith('later-page', [
+        expect.objectContaining({ name: 'later.jpg' }),
+      ]);
+      expect(result.refMap['coloring-page:old-page-2']).toBe('later-page');
+    } finally {
+      vi.mocked(imageCompression).mockImplementation(async file => file);
+    }
+  });
+
+  it('does not count a lost append response and resumes from the stored prefix', async () => {
+    const { zip, manifest, adapter, storedPage } = await pagePhotoFailureFixture();
+    vi.mocked(adapter.appendColoringPagePhotos).mockImplementationOnce(async (_, files) => {
+      storedPage.photos.push(...files.map(file => file.name));
+      throw new Error('Response lost');
+    });
+    const first = await importArchiveBundle({ zip, manifest, warnings: [] }, adapter);
+    expect(first.importedPhotoCount).toBe(0);
+    expect(first.success).toBe(false);
+    expect(adapter.appendColoringPagePhotos).toHaveBeenCalledOnce();
+    expect(adapter.createColoringPageProgressNote).not.toHaveBeenCalled();
+    vi.mocked(adapter.listExistingColoringBooks).mockResolvedValue([
+      { id: 'new-book', title: 'Photo failure book' },
+    ]);
+    const retry = await importArchiveBundle({ zip, manifest, warnings: [] }, adapter);
+    expect(retry.errors).toEqual([]);
+    expect(retry.importedPhotoCount).toBe(5);
+    expect(storedPage.photos).toEqual(Array.from({ length: 9 }, (_, i) => `${i + 1}.jpg`));
+  });
+
+  it('stops later page photo batches after a backend append failure', async () => {
+    const { zip, manifest, adapter } = await pagePhotoFailureFixture();
+    vi.mocked(adapter.appendColoringPagePhotos).mockRejectedValue(new Error('Backend unavailable'));
+    const result = await importArchiveBundle({ zip, manifest, warnings: [] }, adapter);
+    expect(adapter.appendColoringPagePhotos).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(false);
+    expect(result.importedPhotoCount).toBe(0);
+    expect(result.errors).toEqual(['Page 1 in Photo failure book: Backend unavailable']);
+    expect(adapter.createColoringPageProgressNote).not.toHaveBeenCalled();
   });
 
   async function sessionArchiveZip(

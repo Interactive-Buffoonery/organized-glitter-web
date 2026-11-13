@@ -838,6 +838,7 @@ export async function importArchiveBundle(
     importedPhotoCount: 0,
     skippedRecordCount: 0,
     skippedPagePhotoCount: 0,
+    deferredPagePhotoCount: 0,
     matchedExistingRecordCount: 0,
     archiveSchemaVersion: bundle.manifest.schemaVersion,
     refMap: {},
@@ -1263,6 +1264,7 @@ export async function importArchiveBundle(
         const skippedPhotoCount = Math.min(createdPage.photos.length, presentPhotoPaths.length);
         const remainingPhotoPaths = presentPhotoPaths.slice(skippedPhotoCount);
         let photoAppendFailed = false;
+        let photoPreparationFailed = false;
         for (
           let batchStart = 0;
           batchStart < remainingPhotoPaths.length;
@@ -1274,13 +1276,29 @@ export async function importArchiveBundle(
               batchStart,
               batchStart + ARCHIVE_PAGE_PHOTO_BATCH_SIZE
             )) {
-              const photoFile = await loadPhotoFile(bundle.zip, path, warnings, extractionBudget);
-              if (photoFile) photoFiles.push(photoFile);
+              try {
+                const photoFile = await loadPhotoFile(bundle.zip, path, warnings, extractionBudget);
+                if (photoFile) photoFiles.push(photoFile);
+              } catch (error) {
+                const deferredCount = remainingPhotoPaths.length - batchStart - photoFiles.length;
+                const message = `Page ${page.pageNumber} in ${book.title}, ${path}: ${error instanceof Error ? error.message : 'Photo preparation failed'}. Deferred ${deferredCount} photos; repair the source and retry the same archive.`;
+                result.errors.push(message);
+                result.deferredPagePhotoCount += deferredCount;
+                warnings.push({
+                  code: 'failed-coloring-page-photo-preparation',
+                  message,
+                  path,
+                  recordRef: page.ref,
+                });
+                photoPreparationFailed = true;
+                break;
+              }
             }
             if (photoFiles.length > 0) {
               await adapter.appendColoringPagePhotos(createdPage.id, photoFiles);
               result.importedPhotoCount += photoFiles.length;
             }
+            if (photoPreparationFailed) break;
           } catch (error) {
             captureRecoverableImportError(error, {
               source: 'archive_import',

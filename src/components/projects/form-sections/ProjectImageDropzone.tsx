@@ -117,6 +117,7 @@ export const ProjectImageDropzone: React.FC<ProjectImageDropzoneProps> = ({
           htmlFor="project-image-input"
           onFile={handleFile}
           disabled={isUploading}
+          sizeHint="up to 10MB"
           className="aspect-[4/3]"
         >
           <input

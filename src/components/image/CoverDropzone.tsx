@@ -6,6 +6,7 @@ interface CoverDropzoneProps {
   htmlFor: string;
   onFile: (file: File) => void;
   disabled?: boolean;
+  sizeHint?: string;
   className?: string;
   children?: ReactNode;
 }
@@ -14,6 +15,7 @@ export function CoverDropzone({
   htmlFor,
   onFile,
   disabled = false,
+  sizeHint,
   className,
   children,
 }: CoverDropzoneProps) {
@@ -59,7 +61,9 @@ export function CoverDropzone({
         Drag & drop, or{' '}
         <span className="text-primary underline-offset-4 group-hover:underline">choose a file</span>
       </span>
-      <span className="text-muted-foreground text-xs">JPG, PNG, GIF, WebP or HEIC</span>
+      <span className="text-muted-foreground text-xs">
+        JPG, PNG, GIF, WebP or HEIC{sizeHint && ` · ${sizeHint}`}
+      </span>
       {children}
     </label>
   );

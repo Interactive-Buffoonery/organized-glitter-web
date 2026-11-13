@@ -7,3 +7,8 @@ export const APP_NAV_ITEMS = [
   { path: '/options', label: 'Manage Lists' },
   { path: '/profile', label: 'Settings' },
 ] as const;
+
+export function isNavigationItemActive(path: string, pathname: string): boolean {
+  const roots = path === '/dashboard' ? ['/dashboard', '/projects', '/coloring'] : [path];
+  return roots.some(root => pathname === root || pathname.startsWith(`${root}/`));
+}

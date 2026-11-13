@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthMenu } from './AuthMenu';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
-import { APP_NAV_ITEMS } from './navItems';
+import { APP_NAV_ITEMS, isNavigationItemActive } from './navItems';
 import { createAvatarConfig } from '@/utils/image/avatarUtils';
 import { resolveFileUrl } from '@/lib/pocketbase';
 import { getPageScrollY } from '@/utils/scrollPosition';
@@ -105,10 +105,7 @@ export function SiteHeader({ currentPage = '' }: SiteHeaderProps) {
             className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex"
           >
             {APP_NAV_ITEMS.map(({ path, label }) => {
-              const isActive =
-                path === '/dashboard'
-                  ? location.pathname === '/dashboard' || location.pathname === '/coloring'
-                  : location.pathname === path;
+              const isActive = isNavigationItemActive(path, location.pathname);
 
               return (
                 <Link

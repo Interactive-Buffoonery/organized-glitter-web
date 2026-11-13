@@ -140,9 +140,23 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-project
-      - name: Install lockfile-matched browsers and system libraries
+      - name: Read Playwright version
+        id: playwright
         if: matrix.phase != 'backend'
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        if: matrix.phase != 'backend'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install lockfile-matched browsers and system libraries
+        if: matrix.phase != 'backend' && steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Install browser system libraries
+        if: matrix.phase != 'backend' && steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium webkit
       - name: Run isolated validation phase
         run: pnpm test:pr:ci --phase=${{ matrix.phase }}
       - name: Summarize phase outcomes without runtime artifacts

@@ -36,6 +36,7 @@ import {
   DraftRecoveryPanel,
   DraftStorageError,
 } from '@/components/drafts/DraftRecoveryPanel';
+import { Section } from './ColoringBookFormPrimitives';
 import { ColoringBookAcquisitionFields } from './ColoringBookAcquisitionFields';
 import { ColoringBookBibliographyFields } from './ColoringBookBibliographyFields';
 import { ColoringBookCoverPanel } from './ColoringBookCoverPanel';
@@ -490,27 +491,8 @@ export function ColoringBookForm({
         <div
           className={cn('min-w-0 self-start', !isDrawerLayout && 'lg:col-start-1 lg:row-start-1')}
         >
-          <ColoringBookIdentityFields {...sharedProps} />
-        </div>
-
-        {isDrawerLayout ? (
-          <div
-            data-testid="coloring-book-drawer-status-tags"
-            className="grid gap-8 md:grid-cols-2 md:items-start"
-          >
-            {statusAndTags}
-          </div>
-        ) : null}
-
-        <div
-          className={cn(
-            'min-w-0',
-            isDrawerLayout ? 'order-none' : 'order-3 lg:order-none lg:col-start-1 lg:row-start-2'
-          )}
-        >
-          <ColoringBookBibliographyFields
+          <ColoringBookIdentityFields
             {...sharedProps}
-            maxTotalPages={Math.max(COLORING_BOOK_MAX_PAGES, initialBook?.totalPages ?? 0)}
             publishers={publishers.map(publisher => ({ id: publisher.id, name: publisher.name }))}
             illustrators={illustrators.map(illustrator => ({
               id: illustrator.id,
@@ -519,9 +501,6 @@ export function ColoringBookForm({
             onCreatePublisher={onCreatePublisher}
             onCreateIllustrator={onCreateIllustrator}
           />
-          <ColoringBookAcquisitionFields {...sharedProps} />
-          <ColoringBookSourceFields {...sharedProps} />
-          <ColoringBookNotesFields {...sharedProps} />
         </div>
 
         <aside
@@ -537,8 +516,24 @@ export function ColoringBookForm({
             onFileChange={handleFileChange}
             onRemoveImage={handleRemoveImage}
           />
-          {isDrawerLayout ? null : statusAndTags}
+          {statusAndTags}
         </aside>
+        <div
+          className={cn(
+            'min-w-0',
+            isDrawerLayout ? 'order-none' : 'order-3 lg:order-none lg:col-start-1 lg:row-start-2'
+          )}
+        >
+          <ColoringBookBibliographyFields
+            {...sharedProps}
+            maxTotalPages={Math.max(COLORING_BOOK_MAX_PAGES, initialBook?.totalPages ?? 0)}
+          />
+          <ColoringBookAcquisitionFields {...sharedProps} />
+          <Section label="Source and notes">
+            <ColoringBookSourceFields {...sharedProps} />
+            <ColoringBookNotesFields {...sharedProps} />
+          </Section>
+        </div>
       </div>
 
       {showFooter ? (
@@ -556,8 +551,7 @@ export function ColoringBookForm({
       <ImageCropDialog
         open={isCropDialogOpen}
         file={cropFile}
-        title="Frame coloring book cover"
-        description="Choose a book cover crop, square crop, or fit the whole cover."
+        title="Crop your cover"
         aspect={3 / 4}
         outputWidth={900}
         outputHeight={1200}

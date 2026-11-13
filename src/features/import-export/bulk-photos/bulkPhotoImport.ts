@@ -1,12 +1,5 @@
 import type { MarkdownString } from '@/types/markdown';
-import {
-  IMAGE_MAX_FILE_SIZE_BYTES,
-  hasSupportedImageExtension,
-  isSupportedImageMime,
-  normalizeImageFile,
-} from '@/utils/image/imagePolicy';
-import { compressProjectImage } from '@/utils/image/projectImageCompression';
-import { compressProgressImage } from '@/utils/image/progressImageCompression';
+import { preparePhotoFileForUpload } from '@/utils/image/preparePhotoFileForUpload';
 import { projectsService } from '@/services/pocketbase/projects.service';
 import { ColoringService, type ColoringPageDTO } from '@/services/pocketbase/coloring.service';
 import { ProgressNotesService } from '@/services/pocketbase/progressNotes.service';
@@ -86,28 +79,6 @@ function getDefaultAdapter(): BulkPhotoImportAdapter {
       });
     },
   };
-}
-
-function validateImageFile(file: File): void {
-  if (file.size > IMAGE_MAX_FILE_SIZE_BYTES) {
-    throw new Error('Image exceeds the 50MB upload limit');
-  }
-
-  if (!isSupportedImageMime(file.type) && !hasSupportedImageExtension(file.name)) {
-    throw new Error('Unsupported image type');
-  }
-}
-
-export async function preparePhotoFileForUpload(
-  file: File,
-  targetType: BulkPhotoTargetType
-): Promise<File> {
-  validateImageFile(file);
-  const normalized = normalizeImageFile(file);
-  if (targetType === 'project-progress-note' || targetType === 'coloring-page-progress-note') {
-    return compressProgressImage(normalized);
-  }
-  return compressProjectImage(normalized);
 }
 
 async function runWithConcurrency<T>(
@@ -213,7 +184,7 @@ export async function importBulkPhotos(
         return;
       }
 
-      const file = await preparePhotoFileForUpload(row.file, row.targetType);
+      const file = await preparePhotoFileForUpload(row.file);
       const date = row.date || lastModifiedDate(row.file);
       const note = row.note || DEFAULT_PROGRESS_NOTE_BODY;
 

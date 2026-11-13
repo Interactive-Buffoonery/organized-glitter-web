@@ -87,10 +87,6 @@ export const ColoringBookHero = ({
               </div>
             </PopoverContent>
           </Popover>
-
-          <span className="text-muted-foreground text-xs tabular-nums">
-            {safeCompletedPages} of {book.totalPages} done
-          </span>
         </div>
         <Progress
           value={safeCompletionPct}

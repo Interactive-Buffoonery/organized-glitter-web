@@ -285,7 +285,7 @@ const ColoringBookDetail = () => {
         )}
 
         <header className="lg:border-border/60 space-y-2 lg:border-b lg:pb-6">
-          <h1 className="font-handwritten text-4xl leading-tight tracking-tight md:text-5xl">
+          <h1 className="font-handwritten text-3xl leading-tight tracking-tight md:text-4xl">
             {book.title}
           </h1>
           <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-sm">

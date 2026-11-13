@@ -19,12 +19,13 @@ export const ProjectDatesSection = ({
   onDateChange,
 }: ProjectDatesSectionProps) => (
   <Section label="Dates">
-    <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+    <div className="grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
       <div className="space-y-2">
         <Label htmlFor="datePurchased" className="text-foreground text-sm font-medium">
-          Date purchased
+          Purchased
         </Label>
         <DateField
+          inputClassName="min-h-11"
           id="datePurchased"
           value={formData.datePurchased || ''}
           onChange={value => onDateChange('datePurchased', value)}
@@ -38,9 +39,10 @@ export const ProjectDatesSection = ({
       </div>
       <div className="space-y-2">
         <Label htmlFor="dateReceived" className="text-foreground text-sm font-medium">
-          Date received
+          Received
         </Label>
         <DateField
+          inputClassName="min-h-11"
           id="dateReceived"
           value={formData.dateReceived || ''}
           onChange={value => onDateChange('dateReceived', value)}
@@ -54,9 +56,10 @@ export const ProjectDatesSection = ({
       </div>
       <div className="space-y-2">
         <Label htmlFor="dateStarted" className="text-foreground text-sm font-medium">
-          Date started
+          Started
         </Label>
         <DateField
+          inputClassName="min-h-11"
           id="dateStarted"
           value={formData.dateStarted || ''}
           onChange={value => onDateChange('dateStarted', value)}
@@ -70,9 +73,10 @@ export const ProjectDatesSection = ({
       </div>
       <div className="space-y-2">
         <Label htmlFor="dateCompleted" className="text-foreground text-sm font-medium">
-          Date completed
+          Completed
         </Label>
         <DateField
+          inputClassName="min-h-11"
           id="dateCompleted"
           value={formData.dateCompleted || ''}
           onChange={value => onDateChange('dateCompleted', value)}

@@ -86,7 +86,7 @@ test.describe('coloring book UI creation', () => {
     });
 
     await page.getByRole('textbox', { name: 'Title *', exact: true }).fill(title);
-    await page.getByRole('spinbutton', { name: 'Number of pages' }).fill('2');
+    await page.getByRole('spinbutton', { name: 'Pages *' }).fill('2');
     await expect.poll(() => hasColoringBookDraft(page, title)).toBe(true);
     await page.getByRole('button', { name: 'Add book', exact: true }).click();
 
@@ -95,6 +95,12 @@ test.describe('coloring book UI creation', () => {
     expect(bookId, 'created coloring book URL must contain its record ID').toBeTruthy();
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
     await expect(page.getByText('2 pages', { exact: true })).toBeVisible();
+
+    const creationNotice = page
+      .locator('[data-sonner-toast]')
+      .filter({ hasText: 'Coloring book added' });
+    await page.mouse.move(0, 0);
+    await expect(creationNotice).not.toBeVisible({ timeout: 10_000 });
 
     for (const viewport of [
       { width: 1280, height: 900 },

@@ -79,7 +79,7 @@ const RichTextEditor = ({
   });
 
   useEffect(() => {
-    editor?.setEditable(!disabled);
+    editor?.setEditable(!disabled, false);
   }, [disabled, editor]);
 
   useEffect(() => {

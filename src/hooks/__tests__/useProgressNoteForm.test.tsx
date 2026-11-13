@@ -32,6 +32,29 @@ describe('useProgressNoteForm image cropping state', () => {
     successMock.mockReset();
   });
 
+  it('validates and normalizes selected photos before compression', async () => {
+    const { result } = renderHook(() =>
+      useProgressNoteForm({ onSubmit: submitMock, onSuccess: successMock })
+    );
+    const select = (file: File) =>
+      ({ target: { files: [file] } }) as unknown as React.ChangeEvent<HTMLInputElement>;
+    const oversized = new File(['photo'], 'large.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(oversized, 'size', { value: 50 * 1024 * 1024 + 1 });
+    await act(async () => {
+      await result.current.handleImageChange(select(new File(['text'], 'notes.txt')));
+      await result.current.handleImageChange(select(oversized));
+    });
+    expect(compressImageMock).not.toHaveBeenCalled();
+
+    compressImageMock.mockImplementation(async file => file);
+    await act(async () => {
+      await result.current.handleImageChange(select(new File(['photo'], 'my photo.jpg')));
+    });
+    expect(compressImageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'my-photo.jpg', type: 'image/jpeg' })
+    );
+  });
+
   it('keeps the date, caption, and photo when the parent reports a failed save', async () => {
     const photo = new File(['photo'], 'progress.jpg', { type: 'image/jpeg' });
     submitMock.mockResolvedValue(false);

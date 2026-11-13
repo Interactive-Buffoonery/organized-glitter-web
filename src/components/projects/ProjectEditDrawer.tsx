@@ -134,7 +134,6 @@ const ProjectEditDrawer = ({
               savedDateCompleted={project?.dateCompleted}
               savedStatus={project?.status}
               fieldErrors={fieldErrors}
-              layout="drawer"
             />
           </div>
         ) : (
@@ -175,6 +174,7 @@ const ProjectEditDrawer = ({
           <Button
             type="button"
             variant="ghost"
+            className="min-h-11"
             onClick={() => confirmDiscard(() => onOpenChange(false))}
             disabled={submitting}
           >
@@ -182,6 +182,8 @@ const ProjectEditDrawer = ({
           </Button>
           <Button
             id="project-drawer-save"
+            className="min-h-11"
+            variant="default"
             type="button"
             onClick={handleSave}
             disabled={submitting || !formData || draft.pending || photoChoicePending}

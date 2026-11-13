@@ -100,7 +100,6 @@ const Overview = () => {
     trackToAnalytics: false,
   });
 
-  const criticalUserEmail = user?.email || '';
   const displayName = useMemo(() => profile?.username || '', [profile?.username]);
   const [activeCraftFilter, setActiveCraftFilter] =
     useState<OverviewCraftFilter>(readInitialCraftFilter);
@@ -204,13 +203,7 @@ const Overview = () => {
     <MainLayout currentPage="Overview">
       <OverviewErrorBoundary onCacheRefresh={overviewQuery.refetch} hasInfrastructureError={false}>
         <div className="container mx-auto px-4 py-8 lg:py-12">
-          <WelcomeSection
-            displayName={displayName}
-            avatarUrl={profile?.avatarUrl || null}
-            avatarType={null}
-            email={criticalUserEmail}
-            isLoadingProfile={profileLoading}
-          />
+          <WelcomeSection displayName={displayName} isLoadingProfile={profileLoading} />
 
           <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-14">
             <section aria-labelledby="in-progress-heading">

@@ -164,6 +164,9 @@ const EditColoringBookSession = () => {
                 Back
               </Button>
             </div>
+            <p className="font-handwritten text-primary m-0 block w-fit rotate-[-2deg] text-2xl leading-tight font-semibold tracking-tight">
+              Editing
+            </p>
             <h1 className="text-foreground mt-3 truncate text-3xl leading-tight font-semibold tracking-tight md:text-4xl">
               Edit book
             </h1>
@@ -190,7 +193,7 @@ const EditColoringBookSession = () => {
           publishers={publishersQuery.data?.items ?? []}
           illustrators={illustratorsQuery.data?.items ?? []}
           isSubmitting={saveEdit.isPending}
-          submitLabel="Update book"
+          submitLabel="Save changes"
           submittingLabel="Saving..."
           onCancel={handleCancel}
           onSubmit={handleSubmit}

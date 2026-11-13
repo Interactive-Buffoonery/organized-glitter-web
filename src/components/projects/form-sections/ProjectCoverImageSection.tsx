@@ -33,7 +33,7 @@ export const ProjectCoverImageSection = ({
   onCropComplete,
   onUseOriginalImage,
 }: ProjectCoverImageSectionProps) => (
-  <Section label="Cover Image" flush="lg">
+  <Section label="Cover" flush="lg">
     <ProjectImageDropzone
       imageUrl={imageUrl}
       isUploading={isUploading}
@@ -48,7 +48,6 @@ export const ProjectCoverImageSection = ({
       open={isCropDialogOpen}
       file={cropFile}
       title="Crop project image"
-      description="Choose a rectangle or square crop, then drag and zoom until the cover looks right."
       aspect={4 / 3}
       outputWidth={1200}
       outputHeight={900}

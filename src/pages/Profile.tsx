@@ -11,6 +11,7 @@ import { useAvatar } from '@/hooks/useAvatar';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import AccountSettings from '@/components/profile/AccountSettings';
 import { DataImportExportSections } from '@/features/import-export/components/DataImportExportSections';
+import { CraftingStreakPreference } from '@/components/profile/CraftingStreakPreference';
 import { ThemePreferences } from '@/components/profile/ThemePreferences';
 import { TimezonePreferences } from '@/components/profile/TimezonePreferences';
 import { VerticalToggles } from '@/components/profile/VerticalToggles';
@@ -252,6 +253,10 @@ const Profile = () => {
                       />
                       <TimezonePreferences onTimezoneUpdate={handleTimezoneUpdate} />
                     </div>
+                  </SettingsSection>
+
+                  <SettingsSection title="On this browser">
+                    <CraftingStreakPreference />
                   </SettingsSection>
 
                   <SettingsSection

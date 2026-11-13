@@ -159,7 +159,7 @@ export const screenInventory: ScreenDefinition[] = [
     id: 'project-edit',
     title: 'Edit project',
     path: getDiamondProjectEditPath,
-    ready: page => page.getByRole('button', { name: 'Update project' }),
+    ready: page => page.getByRole('button', { name: 'Save changes' }),
     review: 'authenticated',
     notes: 'Skipped when the E2E account has no diamond project fixture.',
   },

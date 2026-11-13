@@ -192,6 +192,9 @@ vi.mock('@/components/projects/ProjectFormSections', () => ({
       >
         Fill sections
       </button>
+      <button type="button" onClick={() => onChange({ ...formData, title: '   ' })}>
+        Set blank title
+      </button>
       <button
         type="button"
         onClick={() =>
@@ -327,6 +330,17 @@ describe('NewProject page', () => {
     renderWithProviders(<NewProject />);
 
     expect(screen.getByRole('status')).toHaveTextContent('Select your photo again before saving.');
+  });
+
+  it('rejects a spaces-only title before creating project metadata', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NewProject />);
+    await user.click(screen.getByRole('button', { name: 'Fill sections' }));
+    await user.click(screen.getByRole('button', { name: 'Set blank title' }));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+    expect(createCompanyMutateAsync).not.toHaveBeenCalled();
+    expect(createArtistMutateAsync).not.toHaveBeenCalled();
+    expect(createProjectMutateAsync).not.toHaveBeenCalled();
   });
 
   it('stops project creation when a requested company cannot be created', async () => {

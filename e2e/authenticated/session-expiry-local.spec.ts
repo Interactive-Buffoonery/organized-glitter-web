@@ -45,7 +45,7 @@ test('keeps a project draft when a save discovers an expired session', async ({
 }, testInfo) => {
   await page.goto('/projects/new');
   await expect(page.getByRole('heading', { name: 'New project' })).toBeVisible();
-  await page.getByLabel('Project title').fill('Unsent session recovery project');
+  await page.getByLabel('Title *').fill('Unsent session recovery project');
   await page.locator('#project-image-input').setInputFiles(coverFixture);
   await page
     .getByRole('dialog', { name: 'Crop project image' })
@@ -79,7 +79,7 @@ test('keeps a project draft when a save discovers an expired session', async ({
   await keepCurrentSessionDraft(page);
 
   await expect(page).toHaveURL(/\/projects\/new$/);
-  await expect(page.getByLabel('Project title')).toHaveValue('Unsent session recovery project');
+  await expect(page.getByLabel('Title *')).toHaveValue('Unsent session recovery project');
   await expect(page.getByRole('img', { name: 'Project preview' })).toBeVisible();
   expect(createAttempts, 'the failed write is not replayed automatically').toBe(1);
 
@@ -90,7 +90,7 @@ test('keeps a project draft when a save discovers an expired session', async ({
 
 test('clears a mounted draft when another account replaces the session', async ({ page }) => {
   await page.goto('/projects/new');
-  await page.getByLabel('Project title').fill('Private account A draft');
+  await page.getByLabel('Title *').fill('Private account A draft');
 
   await page.evaluate(() => {
     const authStore = (
@@ -108,6 +108,6 @@ test('clears a mounted draft when another account replaces the session', async (
     authStore.save(authStore.token, { ...authStore.record, id: 'account-b-test' });
   });
 
-  await expect(page.getByLabel('Project title')).toHaveValue('');
-  await expect(page.getByLabel('Project title')).not.toHaveValue('Private account A draft');
+  await expect(page.getByLabel('Title *')).toHaveValue('');
+  await expect(page.getByLabel('Title *')).not.toHaveValue('Private account A draft');
 });

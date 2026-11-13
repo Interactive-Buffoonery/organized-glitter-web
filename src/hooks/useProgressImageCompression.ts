@@ -1,6 +1,6 @@
 import { notify } from '@/lib/notifications';
 import { useState } from 'react';
-import { compressProgressImage } from '@/utils/image/progressImageCompression';
+import { compressUserImage } from '@/utils/image/sharedImageCompression';
 
 import { logger } from '@/utils/logger';
 
@@ -16,8 +16,10 @@ interface CompressionProgress {
 
 /**
  * Custom hook for handling image compression with progress tracking and user feedback.
- * It uses `compressProgressImage` utility for the actual compression,
- * `useToast` for notifications.
+ * Skips files at or below 3MiB, then uses the shared 5MiB target and 2048px bound.
+ * useProgressNoteForm validates and normalizes selections before calling this hook.
+ * Preserves the interactive original-file fallback on failure; PocketBase still
+ * enforces its 10MiB image field limit when saving a progress note.
  * @returns {Object} An object containing the `compressImage` function, compression state, and a reset function.
  */
 export const useProgressImageCompression = () => {
@@ -55,7 +57,7 @@ export const useProgressImageCompression = () => {
     try {
       setIsCompressing(true);
 
-      const compressedFile = await compressProgressImage(file, (progress: number) => {
+      const compressedFile = await compressUserImage(file, (progress: number) => {
         setCompressionProgress({
           percentage: progress,
           status: progress < 100 ? 'Compressing...' : 'Complete',

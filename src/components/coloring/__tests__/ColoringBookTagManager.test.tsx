@@ -58,4 +58,30 @@ describe('ColoringBookTagManager', () => {
     expect(screen.getByTestId('selected')).toHaveTextContent(/^Animals,Botanical,Mandala$/);
     expect(screen.getByRole('button', { name: 'Remove Animals tag' })).toBeInTheDocument();
   });
+
+  it('ignores picks when the parent locks tags while the picker is open', async () => {
+    coloringTagsServiceMock.createColoringTag.mockClear();
+    coloringTagsServiceMock.listColoringTags.mockResolvedValue({
+      status: 'success',
+      data: [tag('b', 'Botanical')],
+    });
+    const onTagsChange = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = renderWithProviders(
+      <ColoringBookTagManager selectedTags={[]} onTagsChange={onTagsChange} />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Add tag' }));
+    const existing = await screen.findByText('Botanical');
+    rerender(<ColoringBookTagManager selectedTags={[]} disabled onTagsChange={onTagsChange} />);
+
+    await user.click(existing);
+    expect(onTagsChange).not.toHaveBeenCalled();
+
+    await user.type(screen.getByPlaceholderText('Search or create tags...'), 'Mandala');
+    await user.click(await screen.findByText(/Create "Mandala"/));
+
+    expect(onTagsChange).not.toHaveBeenCalled();
+    expect(coloringTagsServiceMock.createColoringTag).not.toHaveBeenCalled();
+  });
 });

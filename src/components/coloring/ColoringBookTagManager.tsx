@@ -169,7 +169,7 @@ export function ColoringBookTagManager({
                       value={tag.name}
                       onSelect={() => handleAddTag(tag)}
                       className="flex cursor-pointer items-center gap-2"
-                      disabled={isCreating}
+                      disabled={isLocked}
                     >
                       <span
                         className="size-3 rounded-full"
@@ -189,7 +189,7 @@ export function ColoringBookTagManager({
                     key="create-new-coloring-tag-command-item"
                     onSelect={() => void handleCreateAndAddTag()}
                     className="flex cursor-pointer items-center gap-2"
-                    disabled={isCreating}
+                    disabled={isLocked}
                   >
                     <Hash className="size-3" />
                     <span className="truncate">

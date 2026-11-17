@@ -20,7 +20,7 @@ import React, { useEffect } from 'react';
 import { createLogger } from '@/utils/logger';
 import { AppProviders } from '@/components/layout/AppProviders.tsx';
 import { AppRoutes } from '@/components/routing/AppRoutes.tsx';
-import { ColoringWalkthroughGate } from '@/components/onboarding';
+import { ColoringWalkthroughGate, WhatsNewGate } from '@/components/onboarding';
 import { useAppInitialization } from '@/hooks/useAppInitialization.ts';
 import { useConnectionRecovery } from '@/hooks/useConnectionRecovery.ts';
 import { OfflinePage } from '@/components/OfflinePage.tsx';
@@ -86,6 +86,7 @@ const App: React.FC = () => {
       <AppProviders>
         <AppRoutes />
         <ColoringWalkthroughGate />
+        <WhatsNewGate />
       </AppProviders>
 
       {connectionState.status !== 'online' && (

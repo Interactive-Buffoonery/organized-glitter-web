@@ -157,7 +157,8 @@ routerAdd(
 
     return e.json(200, { outcome });
   },
-  $apis.requireAuth('users')
+  $apis.requireAuth('users'),
+  e => require(`${__hooks}/crafting_activity.js`).afterRoute(e)
 );
 
 routerAdd(
@@ -273,7 +274,8 @@ routerAdd(
 
     return e.json(200, { id: restoredId, status: restoredStatus });
   },
-  $apis.requireAuth('users')
+  $apis.requireAuth('users'),
+  e => require(`${__hooks}/crafting_activity.js`).afterRoute(e)
 );
 
 routerAdd(
@@ -477,7 +479,8 @@ routerAdd(
       pages: restoredPages,
     });
   },
-  $apis.requireAuth('users')
+  $apis.requireAuth('users'),
+  e => require(`${__hooks}/crafting_activity.js`).afterRoute(e)
 );
 
 routerAdd(
@@ -543,7 +546,8 @@ routerAdd(
 
     return e.json(200, { completedPages, completionPercentage });
   },
-  $apis.requireAuth('users')
+  $apis.requireAuth('users'),
+  e => require(`${__hooks}/crafting_activity.js`).afterRoute(e)
 );
 
 routerAdd(
@@ -672,5 +676,6 @@ routerAdd(
     });
     return e.json(200, result);
   },
-  $apis.requireAuth('users')
+  $apis.requireAuth('users'),
+  e => require(`${__hooks}/crafting_activity.js`).afterRoute(e)
 );

@@ -211,5 +211,6 @@ routerAdd(
     return e.json(200, { reference: result, addedPhotoCount });
   },
   $apis.requireAuth('users'),
-  $apis.bodyLimit(200 * 1024 * 1024)
+  $apis.bodyLimit(200 * 1024 * 1024),
+  e => require(`${__hooks}/crafting_activity.js`).afterRoute(e)
 );

@@ -142,7 +142,8 @@ routerAdd(
 
     return e.json(200, response);
   },
-  $apis.requireAuth('users')
+  $apis.requireAuth('users'),
+  e => require(`${__hooks}/crafting_activity.js`).afterRoute(e)
 );
 
 routerAdd(
@@ -202,7 +203,8 @@ routerAdd(
 
     return e.json(200, response);
   },
-  $apis.requireAuth('users')
+  $apis.requireAuth('users'),
+  e => require(`${__hooks}/crafting_activity.js`).afterRoute(e)
 );
 
 onRecordCreate(e => {

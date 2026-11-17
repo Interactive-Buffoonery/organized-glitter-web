@@ -131,3 +131,9 @@ collections use the standard online collection APIs. They are not part of the
 v1 snapshot or apply allowlist. Fetch keys again after a request is resolved;
 server propagation appears on the next online fetch. See
 [Coloring Color Keys](../coloring-color-keys.md).
+
+The additive `crafting_activity` and `crafting_day_marks` collections use the
+standard online collection APIs and are not part of the v1 snapshot or apply
+allowlist. Successful `/api/mobile/sync/apply` writes record activity for the
+signed-in user, so native edits count toward the streak. A native streak can
+read both collections online; see [API Contract](../API_CONTRACT.md).

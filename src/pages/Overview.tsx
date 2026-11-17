@@ -25,6 +25,7 @@ import type { OverviewCraftFilter, OverviewFeedItem } from '@/services/pocketbas
 import { OverviewService } from '@/services/pocketbase/overview.service';
 import { logger } from '@/utils/logger';
 import { AlertCircle } from 'lucide-react';
+import { CraftingStreak } from '@/features/crafting-streak/CraftingStreak';
 
 const ACTIVE_CRAFT_STORAGE_KEY = 'og.overview.activeCraftFilter';
 const ACTIVE_SORT_STORAGE_KEY = 'og.overview.activeSort';
@@ -206,63 +207,68 @@ const Overview = () => {
           <WelcomeSection displayName={displayName} isLoadingProfile={profileLoading} />
 
           <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-14">
-            <section aria-labelledby="in-progress-heading">
-              <div className="mb-6 flex flex-col items-start gap-5">
-                <h2
-                  id="in-progress-heading"
-                  className="text-foreground m-0 inline-flex items-center gap-2.5 text-sm font-semibold tracking-tight"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="bg-primary inline-block h-[2px] w-[22px] rounded-sm"
-                  />
-                  In progress
-                </h2>
-                <div className="flex w-full flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <OverviewCraftTabs
-                    value={visibleCraftFilter}
-                    canUseDiamond={canUseDiamond}
-                    canUseColoring={canUseColoring}
-                    onValueChange={handleCraftFilterChange}
-                  />
-                  <OverviewSortControl value={activeSort} onValueChange={handleSortChange} />
+            <div className="min-w-0">
+              <CraftingStreak />
+              <section aria-labelledby="in-progress-heading">
+                <div className="mb-6 flex flex-col items-start gap-5">
+                  <h2
+                    id="in-progress-heading"
+                    className="text-foreground m-0 inline-flex items-center gap-2.5 text-sm font-semibold tracking-tight"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="bg-primary inline-block h-[2px] w-[22px] rounded-sm"
+                    />
+                    In progress
+                  </h2>
+                  <div className="flex w-full flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <OverviewCraftTabs
+                      value={visibleCraftFilter}
+                      canUseDiamond={canUseDiamond}
+                      canUseColoring={canUseColoring}
+                      onValueChange={handleCraftFilterChange}
+                    />
+                    <OverviewSortControl value={activeSort} onValueChange={handleSortChange} />
+                  </div>
                 </div>
-              </div>
 
-              {overviewQuery.isError && overviewData.items.length === 0 ? (
-                <div className="space-y-6 py-12 text-center">
-                  <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
-                    <ErrorIcon />
+                {overviewQuery.isError && overviewData.items.length === 0 ? (
+                  <div className="space-y-6 py-12 text-center">
+                    <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
+                      <ErrorIcon />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-foreground text-lg font-medium">
+                        Unable to load Overview
+                      </h3>
+                      <p className="text-muted-foreground mx-auto max-w-md">
+                        There was a problem loading your active projects. Please try again.
+                      </p>
+                    </div>
+                    <div className="flex flex-col justify-center gap-3 sm:flex-row">
+                      <Button type="button" onClick={() => overviewQuery.refetch()} variant="glass">
+                        Try again
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => window.location.reload()}
+                      >
+                        Refresh page
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <h3 className="text-foreground text-lg font-medium">Unable to load Overview</h3>
-                    <p className="text-muted-foreground mx-auto max-w-md">
-                      There was a problem loading your active projects. Please try again.
-                    </p>
-                  </div>
-                  <div className="flex flex-col justify-center gap-3 sm:flex-row">
-                    <Button type="button" onClick={() => overviewQuery.refetch()} variant="glass">
-                      Try again
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => window.location.reload()}
-                    >
-                      Refresh page
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <OverviewActivityList
-                  items={visibleItems}
-                  activeCraftFilter={visibleCraftFilter}
-                  isLoading={overviewQuery.isLoading || verticalsLoading}
-                  isError={overviewQuery.isError}
-                  onRetry={() => overviewQuery.refetch()}
-                />
-              )}
-            </section>
+                ) : (
+                  <OverviewActivityList
+                    items={visibleItems}
+                    activeCraftFilter={visibleCraftFilter}
+                    isLoading={overviewQuery.isLoading || verticalsLoading}
+                    isError={overviewQuery.isError}
+                    onRetry={() => overviewQuery.refetch()}
+                  />
+                )}
+              </section>
+            </div>
 
             <OverviewRightRail
               snapshot={overviewData.snapshot}

@@ -242,10 +242,7 @@ const Profile = () => {
 
               <TabsContent value="preferences">
                 <GlassPanel className="divide-border/60 divide-y">
-                  <SettingsSection
-                    title="Appearance"
-                    description="Theme and time zone for your account, applied across devices."
-                  >
+                  <SettingsSection title="Appearance">
                     <div className="space-y-6">
                       <ThemePreferences
                         currentThemePreference={profileData?.themePreference}
@@ -259,10 +256,7 @@ const Profile = () => {
                     <CraftingStreakPreference />
                   </SettingsSection>
 
-                  <SettingsSection
-                    title="Trackers"
-                    description="Pick which hobbies show up in your navigation and library. Turning one off hides it; nothing is deleted."
-                  >
+                  <SettingsSection title="Trackers">
                     <VerticalToggles />
                   </SettingsSection>
                 </GlassPanel>

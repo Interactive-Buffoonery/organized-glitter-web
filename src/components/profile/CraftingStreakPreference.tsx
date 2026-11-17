@@ -36,7 +36,6 @@ export function CraftingStreakPreference() {
         <SelectContent>
           <SelectItem value="off">Off</SelectItem>
           <SelectItem value="home">Show on Home</SelectItem>
-          <SelectItem value="notes">Show in Notes</SelectItem>
         </SelectContent>
       </Select>
     </div>

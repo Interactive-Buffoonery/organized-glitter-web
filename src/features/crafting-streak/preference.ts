@@ -1,10 +1,9 @@
-export type StreakMode = 'off' | 'home' | 'notes';
+export type StreakMode = 'off' | 'home';
 const sessionChoices = new Map<string, StreakMode>();
 const changeEvent = 'crafting-streak-preference';
 export const modeKey = (backend: string, userId: string) =>
   `crafting-streak:${encodeURIComponent(backend)}:${encodeURIComponent(userId)}`;
-const validMode = (value: unknown): StreakMode =>
-  value === 'home' || value === 'notes' ? value : 'off';
+const validMode = (value: unknown): StreakMode => (value === 'home' ? value : 'off');
 
 export function readMode(key: string): StreakMode {
   if (sessionChoices.has(key)) return sessionChoices.get(key)!;

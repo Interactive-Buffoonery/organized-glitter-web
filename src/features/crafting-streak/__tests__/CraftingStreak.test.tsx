@@ -16,8 +16,7 @@ const show = () =>
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
       <MemoryRouter>
-        <CraftingStreak location="home" />
-        <CraftingStreak location="notes" />
+        <CraftingStreak />
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -31,7 +30,7 @@ it('does not request or render anything when off', () => {
   expect(state.dates).not.toHaveBeenCalled();
   expect(screen.queryByLabelText(/crafting streak/i)).not.toBeInTheDocument();
 });
-it('shows zero as an outline link only on Home', async () => {
+it('shows zero as an outline link to Notes', async () => {
   state.dates.mockResolvedValue([]);
   show();
   const link = await screen.findByRole('link', {
@@ -40,13 +39,6 @@ it('shows zero as an outline link only on Home', async () => {
   expect(link).toHaveAttribute('href', '/notes');
   expect(link.querySelector('svg')).toHaveAttribute('fill', 'none');
   expect(link.textContent).toBe('');
-});
-it('makes Notes a status, not a self-navigation button', async () => {
-  state.mode = 'notes';
-  state.dates.mockResolvedValue([]);
-  show();
-  expect(await screen.findByLabelText('No current crafting streak')).toBeInTheDocument();
-  expect(screen.queryByRole('link')).not.toBeInTheDocument();
 });
 it('never represents a failed read as zero', async () => {
   state.dates.mockRejectedValue(new Error());

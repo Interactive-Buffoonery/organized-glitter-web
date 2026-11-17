@@ -1,4 +1,3 @@
-import { CraftingStreak } from '@/features/crafting-streak/CraftingStreak';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { AddNoteCTA } from '@/components/notes-feed/AddNoteCTA';
@@ -155,7 +154,6 @@ export default function NotesFeedPage() {
               <h1 className="font-handwritten text-4xl leading-none tracking-tight md:text-5xl">
                 Notes
               </h1>
-              <CraftingStreak location="notes" />
             </div>
             <AddNoteCTA
               visibleTab={visibleTab}

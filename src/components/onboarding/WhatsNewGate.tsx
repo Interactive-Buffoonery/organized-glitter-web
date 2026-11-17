@@ -18,20 +18,20 @@ export const WHATS_NEW_RELEASE = '2026-11';
 
 const CHANGES = [
   {
-    title: 'One library for everything',
-    body: 'Kits and coloring books share the same cleaner library, with quick status filters.',
+    title: 'One library',
+    body: "Your kits and coloring books are in one place now. Filter by status to find what you're working on.",
   },
   {
-    title: 'Photo-first detail pages',
-    body: 'Kits, coloring books and coloring pages now lead with your photos and keep a progress journal.',
+    title: 'Photos up front',
+    body: 'Kits, coloring books and coloring pages open with your photos first, and each one has a progress journal.',
   },
   {
-    title: 'Easier color tracking',
-    body: 'Page colors have their own screen. Tap a color to edit it in place while your color strip photo stays pinned at the top.',
+    title: 'Coloring page colors',
+    body: 'Each coloring page has its own colors screen. Tap a color to change it, and your color strip photo stays at the top while you work.',
   },
   {
     title: 'Crafting streak',
-    body: 'Count your crafting days in a row on Home or in Notes. Turn it on in Profile, under Preferences.',
+    body: "See how many days in a row you've crafted, on Home or in Notes. Turn it on in Profile, under Preferences.",
   },
 ];
 
@@ -90,7 +90,9 @@ export function WhatsNewGate() {
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>What's new</DialogTitle>
-          <DialogDescription>Here's what changed in Organized Glitter.</DialogDescription>
+          <DialogDescription>
+            I've made some changes to Organized Glitter. Here's the quick version.
+          </DialogDescription>
         </DialogHeader>
         <ul className="space-y-3 text-sm">
           {CHANGES.map(change => (
@@ -101,11 +103,11 @@ export function WhatsNewGate() {
           ))}
         </ul>
         <p className="text-muted-foreground text-sm">
-          Questions, or something not working right? Send feedback here
+          Questions, or something not working right? Send me feedback here
           {contactEmail && mailto ? (
             <>
               {' '}
-              or email{' '}
+              or email me at{' '}
               <a className="text-primary underline underline-offset-2" href={mailto}>
                 {contactEmail}
               </a>

@@ -32,9 +32,12 @@ export const useProgressNoteForm = ({
   onSubmit,
   onSuccess,
   disabled = false,
+  initialDate,
 }: UseProgressNoteFormProps) => {
   const userTimezone = useUserTimezone();
-  const [date, setDate] = useState<string>(() => getCurrentDateInUserTimezone(userTimezone));
+  const [date, setDate] = useState<string>(
+    () => initialDate ?? getCurrentDateInUserTimezone(userTimezone)
+  );
   const [content, setContent] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageAnnouncement, setImageAnnouncement] = useState<string | null>(null);
@@ -52,10 +55,10 @@ export const useProgressNoteForm = ({
     setImageAnnouncement(null);
     setCropFile(null);
     setIsCropDialogOpen(false);
-    setDate(getCurrentDateInUserTimezone(userTimezone));
+    setDate(initialDate ?? getCurrentDateInUserTimezone(userTimezone));
     setErrors({});
     resetCompressionState();
-  }, [resetCompressionState, userTimezone]);
+  }, [initialDate, resetCompressionState, userTimezone]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {

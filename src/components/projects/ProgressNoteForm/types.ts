@@ -6,6 +6,8 @@ export interface ProgressNoteFormProps {
   onSuccess?: () => void;
   composerInputRef?: Ref<HTMLTextAreaElement>;
   disabled?: boolean;
+  /** Day the form starts on and resets to. Defaults to today in the user's timezone. */
+  initialDate?: string;
   variant?: 'default' | 'dialog-sheet' | 'composer';
 }
 

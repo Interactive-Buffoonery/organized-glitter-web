@@ -184,6 +184,16 @@ try {
   });
   assert.equal((await activityOf(d.user.id)).length, 1, 'custom write routes log activity');
 
+  const r = await account('crafter-r');
+  const reconciled = await admin
+    .collection('coloring_books')
+    .create({ user: r.user.id, title: 'Reconcile', total_pages: 1, status: 'in_progress' });
+  await r.client.send('/api/archive/reconcile-coloring-book-metrics', {
+    method: 'POST',
+    body: { bookId: reconciled.id },
+  });
+  assert.deepEqual(await activityOf(r.user.id), [], 'metric recompute alone does not log');
+
   const e = await account('crafter-e');
   await admin.send('/api/test/crafting/table/off', { method: 'POST' });
   try {

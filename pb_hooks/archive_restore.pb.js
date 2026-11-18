@@ -546,8 +546,7 @@ routerAdd(
 
     return e.json(200, { completedPages, completionPercentage });
   },
-  $apis.requireAuth('users'),
-  e => require(`${__hooks}/crafting_activity.js`).afterRoute(e)
+  $apis.requireAuth('users')
 );
 
 routerAdd(

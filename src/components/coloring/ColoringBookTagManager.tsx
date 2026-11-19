@@ -38,6 +38,7 @@ export function ColoringBookTagManager({
   const [searchQuery, setSearchQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const isLocked = disabled || isCreating;
 
   const loadTags = useCallback(async () => {
     const response = await ColoringTagService.listColoringTags({ search: searchQuery });
@@ -127,7 +128,7 @@ export function ColoringBookTagManager({
             <TagBadge
               key={tag.id}
               tag={tag}
-              removable={!disabled}
+              removable={!isLocked}
               onRemove={() => handleRemoveTag(tag)}
             />
           ))}
@@ -143,7 +144,7 @@ export function ColoringBookTagManager({
             variant="outline"
             size="sm"
             className="text-muted-foreground min-h-11 border-dashed text-xs"
-            disabled={disabled}
+            disabled={isLocked}
           >
             <Plus className="mr-1 size-3" />
             Add tag
@@ -168,6 +169,7 @@ export function ColoringBookTagManager({
                       value={tag.name}
                       onSelect={() => handleAddTag(tag)}
                       className="flex cursor-pointer items-center gap-2"
+                      disabled={isLocked}
                     >
                       <span
                         className="size-3 rounded-full"
@@ -187,7 +189,7 @@ export function ColoringBookTagManager({
                     key="create-new-coloring-tag-command-item"
                     onSelect={() => void handleCreateAndAddTag()}
                     className="flex cursor-pointer items-center gap-2"
-                    disabled={isCreating}
+                    disabled={isLocked}
                   >
                     <Hash className="size-3" />
                     <span className="truncate">

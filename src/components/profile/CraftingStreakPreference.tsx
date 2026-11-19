@@ -13,9 +13,14 @@ export function CraftingStreakPreference() {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <span id="crafting-streak-label" className="text-sm font-medium">
-          Crafting streak
-        </span>
+        <div className="flex items-center gap-2">
+          <span id="crafting-streak-label" className="text-sm font-medium">
+            Crafting streak
+          </span>
+          <span className="border-primary/40 text-primary rounded-sm border px-1.5 py-px font-mono text-[10px] leading-4 font-semibold tracking-wider uppercase">
+            Beta
+          </span>
+        </div>
         <p id="crafting-streak-description" className="text-muted-foreground text-sm">
           Lets you track your consecutive crafting days!
         </p>
@@ -31,7 +36,6 @@ export function CraftingStreakPreference() {
         <SelectContent>
           <SelectItem value="off">Off</SelectItem>
           <SelectItem value="home">Show on Home</SelectItem>
-          <SelectItem value="notes">Show in Notes</SelectItem>
         </SelectContent>
       </Select>
     </div>

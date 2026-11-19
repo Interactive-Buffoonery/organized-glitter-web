@@ -36,7 +36,7 @@ function WelcomeSectionComponent({ displayName, isLoadingProfile = false }: Welc
         </h1>
         <div className="flex flex-wrap items-center gap-x-2">
           <p className="text-muted-foreground text-sm">{todayLabel}</p>
-          <CraftingStreak location="home" />
+          <CraftingStreak />
         </div>
       </div>
     </header>

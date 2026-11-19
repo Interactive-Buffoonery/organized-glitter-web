@@ -3,7 +3,7 @@ import { Ellipsis, Flame } from 'lucide-react';
 import { useCraftingStreak } from '@/hooks/queries/useCraftingStreak';
 import { useStreakMode } from './useStreakMode';
 
-function Indicator({ location }: { location: 'home' | 'notes' }) {
+function Indicator() {
   const { count, isPending } = useCraftingStreak();
   const label =
     count === undefined
@@ -28,7 +28,7 @@ function Indicator({ location }: { location: 'home' | 'notes' }) {
         {count > 0 && <span>{count}</span>}
       </>
     );
-  return location === 'home' ? (
+  return (
     <Link
       to="/notes"
       aria-label={`${label}. Opens Notes.`}
@@ -37,14 +37,10 @@ function Indicator({ location }: { location: 'home' | 'notes' }) {
     >
       {content}
     </Link>
-  ) : (
-    <span role="img" aria-label={label} title={label} className={classes}>
-      {content}
-    </span>
   );
 }
 
-export function CraftingStreak({ location }: { location: 'home' | 'notes' }) {
+export function CraftingStreak() {
   const { mode } = useStreakMode();
-  return mode === location ? <Indicator location={location} /> : null;
+  return mode === 'home' ? <Indicator /> : null;
 }

@@ -102,20 +102,20 @@ for (const width of [1440, 390]) {
         content: 'Synthetic coloring progress.',
       });
       coloringNoteId = coloringNote.id;
-      await selectMode(page, 'Show in Notes');
-      await page.goto('/notes');
-      const status = page.getByRole('img', { name: '2-day crafting streak', exact: true });
+      await page.goto('/overview');
+      const status = page.getByRole('link', {
+        name: '2-day crafting streak. Opens Notes.',
+        exact: true,
+      });
       await expect(status).toBeVisible();
       await expect(status.locator('svg')).toHaveAttribute('fill', 'currentColor');
       await page.reload();
       await expect(status).toBeVisible();
-      await waitForScreenshotReady(page, 'Notes active flame');
+      await waitForScreenshotReady(page, 'Home active flame');
       await page.screenshot({
-        path: testInfo.outputPath(`notes-active-${width}.png`),
+        path: testInfo.outputPath(`home-active-${width}.png`),
         fullPage: true,
       });
-      await page.goto('/overview');
-      await expect(page.getByRole('link', { name: /crafting streak/ })).toHaveCount(0);
 
       await page.route('**/api/collections/*/records?*', async route => {
         if (new URL(route.request().url()).searchParams.get('fields') === 'id,date') {
@@ -126,15 +126,14 @@ for (const width of [1440, 390]) {
           });
         } else await route.continue();
       });
-      await page.goto('/notes');
       await page.reload();
       await expect(
-        page.getByRole('img', { name: 'Crafting streak unavailable', exact: true })
+        page.getByRole('link', { name: 'Crafting streak unavailable. Opens Notes.', exact: true })
       ).toBeVisible({ timeout: 20000 });
-      await expect(page.getByRole('img', { name: 'No current crafting streak' })).toHaveCount(0);
+      await expect(page.getByRole('link', { name: /No current crafting streak/ })).toHaveCount(0);
       await selectMode(page, 'Off');
-      await page.goto('/notes');
-      await expect(page.getByRole('img', { name: /crafting streak/ })).toHaveCount(0);
+      await page.goto('/overview');
+      await expect(page.getByRole('link', { name: /crafting streak/ })).toHaveCount(0);
     } finally {
       await Promise.all([
         pb

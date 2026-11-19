@@ -30,6 +30,7 @@ interface ProgressNoteDialogProps {
   }) => Promise<boolean>;
   disabled?: boolean;
   target?: ProgressNoteDialogTarget;
+  initialDate?: string;
 }
 
 const TARGET_KIND_ICONS: Record<ProgressNoteDialogTargetKind, LucideIcon> = {
@@ -91,6 +92,7 @@ export function ProgressNoteDialog({
   onSubmit,
   disabled = false,
   target,
+  initialDate,
 }: ProgressNoteDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -110,7 +112,12 @@ export function ProgressNoteDialog({
             </DialogDescription>
           </DialogHeader>
         )}
-        <ProgressNoteForm onSubmit={onSubmit} disabled={disabled} variant="dialog-sheet" />
+        <ProgressNoteForm
+          onSubmit={onSubmit}
+          disabled={disabled}
+          initialDate={initialDate}
+          variant="dialog-sheet"
+        />
       </DialogContent>
     </Dialog>
   );

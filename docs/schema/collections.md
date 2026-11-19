@@ -403,3 +403,29 @@ Resolution validates a Unicode/custom symbol, freezes it after resolution, and
 atomically replaces the request placeholder only on that requester's keys.
 Notifications run after commit and never fail a saved request. See the feature
 contract for rate limiting, notification behavior, and known limits.
+
+### `crafting_activity` (base)
+
+Server-derived activity for the Home crafting streak. Required `user` relation
+cascades on account deletion. Required `slot` date is the start of a UTC
+15-minute window. Unique index: (`user`, `slot`), so each user has at most one
+row per window. Both timestamps are autodates.
+
+Verified owners can list and view their own rows. Create, update, and delete are
+superuser-only. `pb_hooks/crafting_activity.pb.js` records a slot after any
+successful signed-in create, update, or delete request on the tracked crafting
+collections (including `/api/batch`) and after each custom write route. Superuser
+writes are not recorded. Logging failures leave a warning and never fail the
+write. Migration `1792700005` backfills slots from existing `created` and
+`updated` timestamps.
+
+### `crafting_day_marks` (base)
+
+Days a user marks as crafting days by hand. Required `user` relation cascades on
+account deletion. Required `day` text is `YYYY-MM-DD`. Unique index: (`user`,
+`day`). Both timestamps are autodates.
+
+Verified owners can create, list, view, and delete their own marks. Updates are
+not allowed. A create hook rejects days that are not real calendar dates or fall
+outside UTC today minus 8 days through UTC today plus 1 day, which covers the
+visible week in every time zone.

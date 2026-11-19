@@ -5,7 +5,12 @@ import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 import { CraftingStreakService } from '@/services/pocketbase/craftingStreak.service';
-import { craftingStreak } from '@/features/crafting-streak/streak';
+import {
+  craftingStreak,
+  craftingWeek,
+  slotDay,
+  type WeekDay,
+} from '@/features/crafting-streak/streak';
 
 export function useCraftingStreak() {
   const { user } = useAuth();
@@ -24,17 +29,26 @@ export function useCraftingStreak() {
   }, []);
   const query = useQuery({
     queryKey: queryKeys.notesFeed.streak(user?.id || 'anonymous'),
-    queryFn: ({ signal }) => CraftingStreakService.dates(user!.id, signal),
+    queryFn: ({ signal }) => CraftingStreakService.history(user!.id, new Date(), signal),
     enabled: !!user,
     ...queryFreshness('activity'),
+    // Any write elsewhere in the app can add today's activity, so Home rechecks on every visit.
+    refetchOnMount: 'always',
   });
   let count: number | undefined;
+  let week: WeekDay[] = [];
   if (query.data && !query.isError) {
     try {
-      count = craftingStreak(query.data, now, timezone);
+      const { noteDates, slots, marks } = query.data;
+      const activityDays = [
+        ...noteDates,
+        ...slots.map(slot => slotDay(slot, timezone)).filter((day): day is string => !!day),
+      ];
+      count = craftingStreak([...activityDays, ...marks.map(mark => mark.day)], now, timezone);
+      week = craftingWeek({ activityDays, marks }, now, timezone);
     } catch {
       /* Invalid zone is unavailable. */
     }
   }
-  return { count, isPending: query.isPending };
+  return { count, week, isPending: query.isPending };
 }

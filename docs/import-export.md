@@ -30,6 +30,11 @@ Archive backup is the recommended first step before large imports or restore wor
 
 CSV exports exclude photos and progress note images. No photo-only export format exists.
 
+Crafting streak data is not archived. `crafting_activity` is derived from saved
+changes, so a restore records fresh activity for the restoring user. Manual
+`crafting_day_marks` only apply to the visible week and the server rejects older
+days, so they could not be restored on a later date.
+
 ## Organized Glitter CSV
 
 Use the standard CSV format for diamond project text fields and tags. The `Import project data` section in `Settings > Data` lets users download the Organized Glitter CSV template, fill in one diamond project per row, then import the completed file.

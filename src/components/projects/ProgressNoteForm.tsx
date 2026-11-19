@@ -24,6 +24,7 @@ const ProgressNoteForm = ({
   disabled = false,
   variant = 'default',
   composerInputRef,
+  initialDate,
 }: ProgressNoteFormProps) => {
   const {
     date,
@@ -48,7 +49,7 @@ const ProgressNoteForm = ({
     setIsCropDialogOpen,
     isFormDisabled,
     areInputsDisabled,
-  } = useProgressNoteForm({ onSubmit, onSuccess, disabled });
+  } = useProgressNoteForm({ onSubmit, onSuccess, disabled, initialDate });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timezone = useUserTimezone();

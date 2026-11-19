@@ -270,3 +270,18 @@ IDs remain placeholders; their existence or ownership is not required.
 
 These collections are online-only in mobile sync v1 and are absent from its
 snapshot and apply allowlist. Released native builds can ignore them.
+
+## Crafting Streak Activity and Day Marks
+
+`crafting_activity` is read-only for clients. Each row is one UTC 15-minute
+`slot` (`YYYY-MM-DD HH:MM:00.000Z`) in which the owner saved a change to a
+crafting collection. Clients convert slots to local days in the user's time zone.
+
+`crafting_day_marks` stores manual crafting days as `day` (`YYYY-MM-DD`, local to
+the user). Owners create with `{ user, day }` and remove by deleting the record.
+Updates are rejected. Creates outside UTC today minus 8 days through UTC today
+plus 1 day return HTTP 400, as does a duplicate day.
+
+The streak counts a day with a progress note, an activity slot, or a mark. Both
+collections are online-only in mobile sync v1 and are absent from its snapshot
+and apply allowlist. Released native builds can ignore them.

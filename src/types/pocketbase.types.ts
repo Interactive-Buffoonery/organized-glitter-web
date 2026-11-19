@@ -30,6 +30,8 @@ export const Collections = {
 	ColoringSymbolRequests: "coloring_symbol_requests",
 	ColoringTags: "coloring_tags",
 	Companies: "companies",
+	CraftingActivity: "crafting_activity",
+	CraftingDayMarks: "crafting_day_marks",
 	MobileSyncReceipts: "mobile_sync_receipts",
 	ProgressNotes: "progress_notes",
 	ProjectTags: "project_tags",
@@ -437,6 +439,22 @@ export type ColoringTagsRecord = {
 	user: RecordIdString
 }
 
+export type CraftingActivityRecord = {
+	created: IsoAutoDateString
+	id: string
+	slot: IsoDateString
+	updated: IsoAutoDateString
+	user: RecordIdString
+}
+
+export type CraftingDayMarksRecord = {
+	created: IsoAutoDateString
+	day: string
+	id: string
+	updated: IsoAutoDateString
+	user: RecordIdString
+}
+
 export type CompaniesRecord = {
 	created: IsoAutoDateString
 	id: string
@@ -667,6 +685,8 @@ export type ColoringPagesResponse<Texpand = unknown> = Required<ColoringPagesRec
 export type ColoringSymbolRequestsResponse<Texpand = unknown> = Required<ColoringSymbolRequestsRecord> & BaseSystemFields<Texpand>
 export type ColoringTagsResponse<Texpand = unknown> = Required<ColoringTagsRecord> & BaseSystemFields<Texpand>
 export type CompaniesResponse<Texpand = unknown> = Required<CompaniesRecord> & BaseSystemFields<Texpand>
+export type CraftingActivityResponse<Texpand = unknown> = Required<CraftingActivityRecord> & BaseSystemFields<Texpand>
+export type CraftingDayMarksResponse<Texpand = unknown> = Required<CraftingDayMarksRecord> & BaseSystemFields<Texpand>
 export type MobileSyncReceiptsResponse<Texpand = unknown> = Required<MobileSyncReceiptsRecord> & BaseSystemFields<Texpand>
 export type ProgressNotesResponse<Texpand = unknown> = Required<ProgressNotesRecord> & BaseSystemFields<Texpand>
 export type ProjectTagsResponse<Texpand = unknown> = Required<ProjectTagsRecord> & BaseSystemFields<Texpand>
@@ -741,6 +761,8 @@ export type CollectionRecords = {
 	coloring_symbol_requests: ColoringSymbolRequestsRecord
 	coloring_tags: ColoringTagsRecord
 	companies: CompaniesRecord
+	crafting_activity: CraftingActivityRecord
+	crafting_day_marks: CraftingDayMarksRecord
 	mobile_sync_receipts: MobileSyncReceiptsRecord
 	progress_notes: ProgressNotesRecord
 	project_tags: ProjectTagsRecord
@@ -778,6 +800,8 @@ export type CollectionResponses = {
 	coloring_symbol_requests: ColoringSymbolRequestsResponse
 	coloring_tags: ColoringTagsResponse
 	companies: CompaniesResponse
+	crafting_activity: CraftingActivityResponse
+	crafting_day_marks: CraftingDayMarksResponse
 	mobile_sync_receipts: MobileSyncReceiptsResponse
 	progress_notes: ProgressNotesResponse
 	project_tags: ProjectTagsResponse

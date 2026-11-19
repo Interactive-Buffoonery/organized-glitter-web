@@ -78,4 +78,18 @@ describe('useProgressNoteForm image cropping state', () => {
     expect(result.current.isFormDisabled).toBe(false);
     expect(successMock).not.toHaveBeenCalled();
   });
+
+  it('starts and resets on a provided day instead of today', async () => {
+    const { result } = renderHook(() =>
+      useProgressNoteForm({
+        onSubmit: submitMock,
+        onSuccess: successMock,
+        initialDate: '2026-04-19',
+      })
+    );
+    expect(result.current.date).toBe('2026-04-19');
+    act(() => result.current.handleDateChange('2026-04-20'));
+    act(() => result.current.resetForm());
+    expect(result.current.date).toBe('2026-04-19');
+  });
 });

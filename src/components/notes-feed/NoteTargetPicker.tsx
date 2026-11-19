@@ -22,6 +22,7 @@ interface NoteTargetPickerProps {
   onOpenChange: (open: boolean) => void;
   mode?: PickerMode;
   verticals?: VerticalToggles;
+  initialDate?: string;
 }
 
 const TARGETS_MODE: PickerMode = { kind: 'targets' };
@@ -165,6 +166,7 @@ export function NoteTargetPicker({
   onOpenChange,
   mode = TARGETS_MODE,
   verticals,
+  initialDate,
 }: NoteTargetPickerProps) {
   const isMobile = useIsMobile();
   const [selectedTarget, setSelectedTarget] = useState<NoteTarget | null>(null);
@@ -286,6 +288,7 @@ export function NoteTargetPicker({
         onSubmit={handleSubmit}
         disabled={isSubmitting}
         target={selectedTarget ?? undefined}
+        initialDate={initialDate}
       />
     </>
   );

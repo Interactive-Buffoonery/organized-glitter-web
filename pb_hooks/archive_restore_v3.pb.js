@@ -1191,5 +1191,6 @@ routerAdd(
     return e.json(200, response);
   },
   $apis.requireAuth('users'),
-  $apis.bodyLimit(52 * 1024 * 1024)
+  $apis.bodyLimit(52 * 1024 * 1024),
+  e => require(`${__hooks}/crafting_activity.js`).afterRoute(e)
 );

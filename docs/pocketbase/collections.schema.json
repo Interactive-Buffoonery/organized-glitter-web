@@ -5242,5 +5242,162 @@
     "createRule": "@request.auth.verified = true && user = @request.auth.id && @request.body.user = @request.auth.id && (page = \"\" || page.book.user = @request.auth.id)",
     "updateRule": null,
     "deleteRule": null
+  },
+  {
+    "name": "crafting_activity",
+    "id": "pbc_3829104471",
+    "type": "base",
+    "system": false,
+    "fields": [
+      {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "help": "",
+        "hidden": false,
+        "id": "text3829104401",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "name": "user",
+        "type": "relation",
+        "id": "relation3829104402",
+        "hidden": false,
+        "presentable": false,
+        "system": false,
+        "required": true,
+        "help": "",
+        "minSelect": 0,
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "collectionId": "_pb_users_auth_"
+      },
+      {
+        "name": "slot",
+        "type": "date",
+        "id": "date3829104403",
+        "hidden": false,
+        "presentable": false,
+        "system": false,
+        "required": true,
+        "help": "",
+        "min": "",
+        "max": ""
+      },
+      {
+        "hidden": false,
+        "id": "autodate3829104404",
+        "name": "created",
+        "onCreate": true,
+        "onUpdate": false,
+        "presentable": false,
+        "system": false,
+        "type": "autodate"
+      },
+      {
+        "hidden": false,
+        "id": "autodate3829104405",
+        "name": "updated",
+        "onCreate": true,
+        "onUpdate": true,
+        "presentable": false,
+        "system": false,
+        "type": "autodate"
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX idx_crafting_activity_user_slot ON crafting_activity (user, slot)"
+    ],
+    "listRule": "@request.auth.verified = true && user = @request.auth.id",
+    "viewRule": "@request.auth.verified = true && user = @request.auth.id",
+    "createRule": null,
+    "updateRule": null,
+    "deleteRule": null
+  },
+  {
+    "name": "crafting_day_marks",
+    "id": "pbc_3829104472",
+    "type": "base",
+    "system": false,
+    "fields": [
+      {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "help": "",
+        "hidden": false,
+        "id": "text3829104411",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "name": "user",
+        "type": "relation",
+        "id": "relation3829104412",
+        "hidden": false,
+        "presentable": false,
+        "system": false,
+        "required": true,
+        "help": "",
+        "minSelect": 0,
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "collectionId": "_pb_users_auth_"
+      },
+      {
+        "name": "day",
+        "type": "text",
+        "id": "text3829104413",
+        "hidden": false,
+        "presentable": false,
+        "system": false,
+        "required": true,
+        "help": "",
+        "autogeneratePattern": "",
+        "min": 10,
+        "max": 10,
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "primaryKey": false
+      },
+      {
+        "hidden": false,
+        "id": "autodate3829104414",
+        "name": "created",
+        "onCreate": true,
+        "onUpdate": false,
+        "presentable": false,
+        "system": false,
+        "type": "autodate"
+      },
+      {
+        "hidden": false,
+        "id": "autodate3829104415",
+        "name": "updated",
+        "onCreate": true,
+        "onUpdate": true,
+        "presentable": false,
+        "system": false,
+        "type": "autodate"
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX idx_crafting_day_marks_user_day ON crafting_day_marks (user, day)"
+    ],
+    "listRule": "@request.auth.verified = true && user = @request.auth.id",
+    "viewRule": "@request.auth.verified = true && user = @request.auth.id",
+    "createRule": "@request.auth.verified = true && user = @request.auth.id",
+    "updateRule": null,
+    "deleteRule": "@request.auth.verified = true && user = @request.auth.id"
   }
 ]

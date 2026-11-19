@@ -80,6 +80,7 @@ try {
     'color_keys.pb.js',
     'color_keys.js',
     'archive_color_keys.js',
+    'crafting_activity.js',
   ]) {
     copyFileSync(path.join(root, 'pb_hooks', name), path.join(hooksDir, name));
   }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -46,7 +46,7 @@ function markSeen(userId: string) {
 export function WhatsNewGate() {
   const { user, isAuthenticated, initialCheckComplete } = useAuth();
   const { pathname } = useLocation();
-  const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const userId = user?.id;
 
   // ponytail: automated browsers skip the note so seeded e2e sessions are not blocked by it.
@@ -59,15 +59,11 @@ export function WhatsNewGate() {
     ALLOWED_PATHS.has(pathname) &&
     !hasSeen(userId);
 
-  useEffect(() => {
-    if (shouldShow) setOpen(true);
-  }, [shouldShow]);
-
-  if (!open || !userId) return null;
+  if (!shouldShow || dismissed) return null;
 
   const close = () => {
     markSeen(userId);
-    setOpen(false);
+    setDismissed(true);
   };
 
   const contactEmail = getContactEmail();

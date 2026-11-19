@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
@@ -98,6 +98,26 @@ describe('WhatsNewGate', () => {
 
     state.user = null;
     renderAt();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('closes when the page changes away from the home pages', () => {
+    let navigate: NavigateFunction = () => {};
+    const CaptureNavigate = () => {
+      navigate = useNavigate();
+      return null;
+    };
+    render(
+      <MemoryRouter initialEntries={['/overview']}>
+        <CaptureNavigate />
+        <WhatsNewGate />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('dialog', { name: "What's new" })).toBeInTheDocument();
+
+    act(() => {
+      void navigate('/projects');
+    });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

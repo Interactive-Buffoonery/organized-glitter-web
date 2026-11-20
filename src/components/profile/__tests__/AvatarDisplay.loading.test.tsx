@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import AvatarDisplay from '../AvatarDisplay';
 
 vi.mock('@/components/image/PrivateFileImage', () => ({
-  PrivateFileImage: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} />,
+  PrivateFileImage: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
+    <img {...props} alt={props.alt} />
+  ),
 }));
 
 describe('uploaded avatar loading', () => {

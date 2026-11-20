@@ -4,6 +4,13 @@ import { describe, expect, it } from 'vitest';
 import MarkdownContent from '../MarkdownContent';
 
 describe('MarkdownContent', () => {
+  it('allows long download URLs to wrap within a narrow column', () => {
+    const { container } = render(
+      <MarkdownContent content={'https://example.com/' + 'a'.repeat(300)} />
+    );
+    expect(container.firstElementChild).toHaveClass('[overflow-wrap:anywhere]');
+  });
+
   it('does not render raw HTML from note content', () => {
     render(<MarkdownContent content={'<img src=x onerror=alert(1)>Safe text'} />);
 

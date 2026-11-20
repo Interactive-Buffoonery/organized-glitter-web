@@ -39,7 +39,7 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = memo(
             src={config.uploadUrl}
             alt="User avatar"
             className={`rounded-full object-cover ${className}`}
-            style={sizeStyle}
+            style={{ ...sizeStyle, display: 'none' }}
             onError={e => {
               logger.log('[AvatarDisplay] Failed to load avatar image');
               // Fallback to initials avatar if upload fails to load
@@ -53,12 +53,12 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = memo(
             onLoad={e => {
               logger.log('[AvatarDisplay] Successfully loaded avatar image');
               const target = e.currentTarget;
-              target.style.display = '';
+              target.style.display = 'block';
               const fallbackDiv = target.nextElementSibling as HTMLElement | null;
               if (fallbackDiv) fallbackDiv.style.display = 'none';
             }}
           />
-          {/* Fallback initials (initially hidden) */}
+          {/* Fallback initials while the upload loads */}
           <div
             className={`flex items-center justify-center overflow-hidden rounded-full font-semibold ${className}`}
             style={{
@@ -69,7 +69,7 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = memo(
               position: 'absolute',
               top: 0,
               left: 0,
-              display: 'none',
+              display: 'flex',
             }}
           >
             {config?.initials || fallbackInitials}

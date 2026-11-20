@@ -17,7 +17,12 @@ const MarkdownContent = ({ content, className }: MarkdownContentProps) => {
   }
 
   return (
-    <div className={cn('text-foreground space-y-2 text-base leading-relaxed', className)}>
+    <div
+      className={cn(
+        'text-foreground min-w-0 space-y-2 text-base leading-relaxed [overflow-wrap:anywhere]',
+        className
+      )}
+    >
       <ReactMarkdown
         allowedElements={['a', 'br', 'del', 'em', 'h3', 'li', 'ol', 'p', 'strong', 'ul']}
         remarkPlugins={[remarkGfm, remarkBreaks]}

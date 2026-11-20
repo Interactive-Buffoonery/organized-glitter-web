@@ -13,6 +13,7 @@ interface MainLayoutProps {
   showLoader?: boolean;
   hideNav?: boolean;
   hideFooter?: boolean;
+  authPending?: boolean;
   rootClassName?: string;
 }
 
@@ -23,13 +24,15 @@ const MainLayout = memo(
     showLoader = false,
     hideNav = false,
     hideFooter = false,
+    authPending = false,
     rootClassName,
   }: MainLayoutProps) => {
     const { user, isLoading } = useAuth();
     const { isMobile, isTablet } = useMobileDevice();
 
     const isLoggedIn = !!user;
-    const showBottomNav = isLoggedIn && (isMobile || isTablet);
+    const showBottomNav = !authPending && isLoggedIn && (isMobile || isTablet);
+    const reserveBottomNavSpace = (isLoggedIn || authPending) && (isMobile || isTablet);
     const rootLayoutClassName = cn(
       'aurora-bg flex flex-1 flex-col',
       hideNav && 'site-header-safe-area',
@@ -48,7 +51,7 @@ const MainLayout = memo(
       return (
         <div className={rootLayoutClassName}>
           {skipLink}
-          {!hideNav && <SiteHeader currentPage={currentPage} />}
+          {!hideNav && <SiteHeader currentPage={currentPage} authPending={authPending} />}
           <main id="main-content" tabIndex={-1} className="flex-grow">
             <LoadingState />
           </main>
@@ -59,16 +62,18 @@ const MainLayout = memo(
     return (
       <div className={rootLayoutClassName}>
         {skipLink}
-        {!hideNav && <SiteHeader currentPage={currentPage} />}
+        {!hideNav && <SiteHeader currentPage={currentPage} authPending={authPending} />}
         <main
           id="main-content"
           tabIndex={-1}
           className="flex-grow"
-          style={showBottomNav ? { paddingBottom: 'var(--bottom-nav-total-height)' } : undefined}
+          style={
+            reserveBottomNavSpace ? { paddingBottom: 'var(--bottom-nav-total-height)' } : undefined
+          }
         >
           {children}
         </main>
-        {!hideFooter && !showBottomNav && <SiteFooter currentPage={currentPage} />}
+        {!authPending && !hideFooter && !showBottomNav && <SiteFooter currentPage={currentPage} />}
         {showBottomNav && <BottomNavigation />}
       </div>
     );

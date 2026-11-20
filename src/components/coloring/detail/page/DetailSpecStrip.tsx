@@ -3,13 +3,13 @@ import { Button } from '@/components/ui/button';
 export function DetailSpecStrip({
   items,
 }: {
-  items: { label: string; value?: string; onClick: () => void; disabled?: boolean }[];
+  items: { id: string; label: string; value?: string; onClick: () => void; disabled?: boolean }[];
 }) {
   return (
     <div className="border-border bg-card/60 grid grid-cols-3 overflow-hidden rounded-lg border">
       {items.map(item => (
         <Button
-          key={item.label}
+          key={item.id}
           type="button"
           variant="ghost"
           disabled={item.disabled}

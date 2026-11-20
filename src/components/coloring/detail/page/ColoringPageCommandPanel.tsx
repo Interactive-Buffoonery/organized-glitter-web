@@ -103,6 +103,7 @@ export function ColoringPageCommandPanel({
         <DetailSpecStrip
           items={[
             {
+              id: 'medium',
               label: 'medium',
               value: selectedMediums.length
                 ? selectedMediums.map(medium => medium.name).join(', ')
@@ -111,6 +112,7 @@ export function ColoringPageCommandPanel({
               disabled: isMediumsLoading,
             },
             {
+              id: 'colors',
               label: 'colors',
               value: keys.isError
                 ? 'Unavailable'
@@ -125,6 +127,7 @@ export function ColoringPageCommandPanel({
                   ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
             },
             {
+              id: 'photos',
               label: page.photos.length === 1 ? 'photo' : 'photos',
               value: page.photos.length ? String(page.photos.length) : undefined,
               onClick: onPhotos,

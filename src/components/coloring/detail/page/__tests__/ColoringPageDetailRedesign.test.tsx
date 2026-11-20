@@ -14,12 +14,34 @@ describe('Coloring page detail redesign', () => {
     const action = vi.fn();
     render(
       <DetailSpecStrip
-        items={['medium', 'colors', 'photos'].map(label => ({ label, onClick: action }))}
+        items={['medium', 'colors', 'photos'].map(label => ({
+          id: label,
+          label,
+          onClick: action,
+        }))}
       />
     );
     expect(screen.getAllByText('Add')).toHaveLength(3);
     await userEvent.click(screen.getByRole('button', { name: 'Add medium' }));
     expect(action).toHaveBeenCalledOnce();
+  });
+
+  it('keeps keyboard focus on the photo spec as the count changes', async () => {
+    const onClick = vi.fn();
+    const { rerender } = render(
+      <DetailSpecStrip items={[{ id: 'photos', label: 'photo', value: '1', onClick }]} />
+    );
+    const button = screen.getByRole('button', { name: '1 photo' });
+    await userEvent.tab();
+    expect(button).toHaveFocus();
+
+    rerender(<DetailSpecStrip items={[{ id: 'photos', label: 'photos', value: '2', onClick }]} />);
+    expect(screen.getByRole('button', { name: '2 photos' })).toBe(button);
+    expect(button).toHaveFocus();
+
+    rerender(<DetailSpecStrip items={[{ id: 'photos', label: 'photo', value: '1', onClick }]} />);
+    expect(screen.getByRole('button', { name: '1 photo' })).toBe(button);
+    expect(button).toHaveFocus();
   });
 
   it.each([

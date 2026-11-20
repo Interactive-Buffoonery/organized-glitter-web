@@ -34,6 +34,31 @@ vi.mock('@/components/notes/RichTextEditor.lazy', () => ({
 afterEach(clearSessionDrafts);
 
 describe('ProjectNotes rich text', () => {
+  it('shows the pinned empty prompt for whitespace notes', () => {
+    render(<ProjectNotes notes={'  \n '} variant="pinned" />);
+    expect(screen.getByText('Add a note about this kit.')).toBeInTheDocument();
+  });
+
+  it('explains legacy HTML in the pinned project note', () => {
+    render(<ProjectNotes notes="<p>Existing project details</p>" variant="pinned" />);
+    expect(
+      screen.getByText('This note uses an older format. Edit it to view or update its contents.')
+    ).toBeInTheDocument();
+  });
+
+  it('preserves the pinned legacy explanation while read-only during save', async () => {
+    const notes = '<p>Original <strong>project details</strong></p>';
+    const user = userEvent.setup();
+    const { rerender } = render(<ProjectNotes notes={notes} variant="pinned" />);
+    await user.click(screen.getByRole('button', { name: 'Edit notes' }));
+    expect(screen.getByRole('textbox', { name: 'Project notes' })).toHaveValue(notes);
+    rerender(<ProjectNotes notes={notes} variant="pinned" readOnly />);
+    expect(
+      screen.getByText('This note uses an older format. Edit it to view or update its contents.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit notes' })).not.toBeInTheDocument();
+  });
+
   it('restores and re-registers unsaved notes for the same account under StrictMode', () => {
     const key = 'project-notes:one';
     const unregister = registerSessionDraft(key, 'account-a', () => 'Unsent **note**');

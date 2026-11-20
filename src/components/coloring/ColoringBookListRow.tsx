@@ -8,7 +8,6 @@ import { getColoringBookStatusColor, getColoringBookStatusLabel } from '@/utils/
 import { getColoringBookDetailPath } from '@/pages/coloringBookNavigation';
 import type { ColoringBookCardData } from './coloringBookCardTypes';
 import {
-  formatColoringCompletionPercent,
   getColoringActivityLabel,
   getColoringProgressLabel,
   getColoringPublisherLabel,
@@ -64,9 +63,6 @@ function ColoringBookListRow({ book }: ColoringBookListRowProps) {
             className="h-1.5 flex-1"
             aria-label={`Completion for ${book.title}`}
           />
-          <span className="text-muted-foreground w-10 text-right text-xs tabular-nums">
-            {formatColoringCompletionPercent(book)}
-          </span>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">

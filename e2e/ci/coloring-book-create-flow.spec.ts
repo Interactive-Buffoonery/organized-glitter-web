@@ -100,6 +100,7 @@ test.describe('coloring book UI creation', () => {
       .locator('[data-sonner-toast]')
       .filter({ hasText: 'Coloring book added' });
     await page.mouse.move(0, 0);
+    await page.bringToFront();
     await expect(creationNotice).not.toBeVisible({ timeout: 10_000 });
 
     for (const viewport of [

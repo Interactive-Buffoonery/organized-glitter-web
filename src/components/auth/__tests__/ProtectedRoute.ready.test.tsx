@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
@@ -26,6 +26,12 @@ vi.mock('@/hooks/useLocationMismatchWarning', () => ({
   useLocationMismatchWarning: vi.fn(),
 }));
 
+vi.mock('@/hooks/use-mobile', () => ({
+  useMobileDevice: () => ({ isMobile: true, isTablet: false }),
+}));
+vi.mock('@/components/ui/theme-toggle', () => ({ ThemeToggle: () => null }));
+vi.mock('@/components/layout/AuthMenu', () => ({ AuthMenu: () => null }));
+
 import { ProtectedRoute } from '../ProtectedRoute';
 
 describe('ProtectedRoute mount readiness', () => {
@@ -37,20 +43,55 @@ describe('ProtectedRoute mount readiness', () => {
     authState.initialCheckComplete = false;
   });
 
-  it('hides splash without marking ready while auth settles', () => {
+  it.each([null, { id: 'returning-user' }])(
+    'keeps a neutral real header while auth settles for %s',
+    user => {
+      authState.user = user;
+      render(
+        <MemoryRouter>
+          <ProtectedRoute>
+            <div>Protected page</div>
+          </ProtectedRoute>
+        </MemoryRouter>
+      );
+
+      expect(screen.getByRole('banner')).toHaveTextContent('Organized Glitter');
+      expect(screen.getByRole('link', { name: 'Organized Glitter home' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Login' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Get Started' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
+      expect(screen.getByText('Organized Glitter')).toHaveClass('inline');
+      expect(screen.getByRole('main')).toHaveStyle({
+        paddingBottom: 'var(--bottom-nav-total-height)',
+      });
+      expect(useHideSplashMock).toHaveBeenCalled();
+      expect(useHideSplashMock.mock.calls.every(call => call.length === 0)).toBe(true);
+      expect(useAppReadyMock).not.toHaveBeenCalled();
+      expect(screen.getByRole('status')).toHaveTextContent('Loading…');
+      expect(screen.getByRole('status').querySelector('.sr-only')).toBeNull();
+      expect(screen.queryByText('Protected page')).not.toBeInTheDocument();
+    }
+  );
+
+  it('redirects a resolved signed-out session without exposing protected content', () => {
+    authState.isLoading = false;
+    authState.initialCheckComplete = true;
     render(
-      <MemoryRouter>
-        <ProtectedRoute>
-          <div>Protected page</div>
-        </ProtectedRoute>
+      <MemoryRouter initialEntries={['/private']}>
+        <Routes>
+          <Route
+            path="/private"
+            element={
+              <ProtectedRoute>
+                <div>Protected page</div>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/login" element={<div>Login destination</div>} />
+        </Routes>
       </MemoryRouter>
     );
-
-    expect(useHideSplashMock).toHaveBeenCalled();
-    expect(useHideSplashMock.mock.calls.every(call => call.length === 0)).toBe(true);
-    expect(useAppReadyMock).not.toHaveBeenCalled();
-    expect(screen.getByRole('status')).toHaveTextContent('Loading…');
-    expect(screen.getByRole('status').querySelector('.sr-only')).toBeNull();
+    expect(screen.getByText('Login destination')).toBeInTheDocument();
     expect(screen.queryByText('Protected page')).not.toBeInTheDocument();
   });
 

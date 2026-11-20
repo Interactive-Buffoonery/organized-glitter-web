@@ -7,9 +7,6 @@ import { formatDateOnlyForDisplay } from '@/utils/date/timezoneUtils';
 import { countUnit } from '@/utils/countUnit';
 import type { ColoringBookCardData } from './coloringBookCardTypes';
 
-export const formatColoringCompletionPercent = (book: ColoringBookCardData): string =>
-  `${Math.round(book.completionPercentage ?? 0)}%`;
-
 export const getColoringCompletedPages = (book: ColoringBookCardData): number =>
   Math.max(0, Math.min(book.completedPages ?? 0, book.totalPages));
 

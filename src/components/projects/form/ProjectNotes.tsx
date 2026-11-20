@@ -104,10 +104,19 @@ const ProjectNotes = ({
     }
   };
 
+  const hasLegacyHtml = /^<\/?[a-z][a-z0-9-]*(?:\s[^<>]*|\/?)>/i.test(notes.trim());
+  const legacyMessage = (
+    <p className="text-muted-foreground">
+      This note uses an older format. Edit it to view or update its contents.
+    </p>
+  );
+
   if (readOnly) {
     return (
       <div>
-        {notes ? (
+        {variant === 'pinned' && hasLegacyHtml ? (
+          legacyMessage
+        ) : notes ? (
           <MarkdownContent content={notes} />
         ) : (
           <span className="text-muted-foreground italic">
@@ -150,8 +159,6 @@ const ProjectNotes = ({
     );
   }
 
-  const hasLegacyHtml = /^<\/?[a-z][a-z0-9-]*(?:\s[^<>]*|\/?)>/i.test(notes.trim());
-
   if (variant === 'pinned') {
     return (
       <div className="relative text-sm">
@@ -164,9 +171,7 @@ const ProjectNotes = ({
           Edit
         </button>
         {hasLegacyHtml ? (
-          <p className="text-muted-foreground">
-            This note uses an older format. Edit it to view or update its contents.
-          </p>
+          legacyMessage
         ) : notes.trim() ? (
           <MarkdownContent content={notes} />
         ) : (

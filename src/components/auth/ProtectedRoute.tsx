@@ -49,7 +49,7 @@ const ProtectedRouteInner: React.FC<ProtectedRouteProps> = ({ children }) => {
       timestamp: new Date().toISOString(),
     });
     return (
-      <MainLayout>
+      <MainLayout authPending>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2">
           <div className="flex items-center justify-center gap-2" role="status" aria-live="polite">
             <LoadingSpinner className="size-12" />

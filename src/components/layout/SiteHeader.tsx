@@ -12,6 +12,7 @@ import { getPageScrollY } from '@/utils/scrollPosition';
 
 interface SiteHeaderProps {
   currentPage?: string;
+  authPending?: boolean;
 }
 
 /**
@@ -22,10 +23,10 @@ interface SiteHeaderProps {
  * @param currentPage - Optional name of the current page; when `'Login'` or `'Register'` and the user is not authenticated, the header shows only the theme toggle instead of login/register buttons.
  * @returns The site header element containing the brand link, authentication/menu controls, and theme toggle.
  */
-export function SiteHeader({ currentPage = '' }: SiteHeaderProps) {
+export function SiteHeader({ currentPage = '', authPending = false }: SiteHeaderProps) {
   const { user } = useAuth();
   const location = useLocation();
-  const isLoggedIn = !!user;
+  const isLoggedIn = !authPending && !!user;
   const [logoFailed, setLogoFailed] = useState(false);
   const [scrolled, setScrolled] = useState(() => getPageScrollY() > 20);
 
@@ -53,7 +54,7 @@ export function SiteHeader({ currentPage = '' }: SiteHeaderProps) {
   }, []);
 
   const isAuthPage = currentPage === 'Login' || currentPage === 'Register';
-  const shouldShowMobileBrandTitle = isLoggedIn || isAuthPage || logoFailed;
+  const shouldShowMobileBrandTitle = authPending || isLoggedIn || isAuthPage || logoFailed;
 
   const avatarConfig = useMemo(() => {
     if (!user) return undefined;
@@ -127,7 +128,9 @@ export function SiteHeader({ currentPage = '' }: SiteHeaderProps) {
         )}
 
         <div className="flex items-center gap-2">
-          {isLoggedIn && avatarConfig ? (
+          {authPending ? (
+            <ThemeToggle />
+          ) : isLoggedIn && avatarConfig ? (
             <>
               <div className="hidden items-center gap-2 lg:flex">
                 <AuthMenu

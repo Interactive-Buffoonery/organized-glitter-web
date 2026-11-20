@@ -99,7 +99,7 @@ function ColoringBooksTableComponent({
       </div>
 
       <div className="bg-card hidden overflow-x-auto rounded-xl border lg:block">
-        <table className="min-w-[64rem] caption-bottom text-sm">
+        <table className="w-full min-w-[64rem] caption-bottom text-sm">
           <TableHeader>
             <TableRow>
               {TABLE_COLUMNS.map(column => (

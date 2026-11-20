@@ -9,6 +9,23 @@ vi.mock('@/components/image/PrivateFileImage', () => ({
 }));
 
 describe('uploaded avatar loading', () => {
+  it('restores initials while a replacement avatar loads', () => {
+    const config = {
+      type: 'upload' as const,
+      uploadUrl: 'https://example.com/avatar.jpg',
+      initials: 'AB',
+    };
+    const { rerender } = render(<AvatarDisplay config={config} />);
+    fireEvent.load(screen.getByAltText('User avatar'));
+    expect(screen.getByText('AB')).not.toBeVisible();
+
+    rerender(
+      <AvatarDisplay config={{ ...config, uploadUrl: 'https://example.com/new-avatar.jpg' }} />
+    );
+    expect(screen.getByText('AB')).toBeVisible();
+    expect(screen.getByAltText('User avatar')).not.toBeVisible();
+  });
+
   it('shows initials until the image loads', () => {
     render(
       <AvatarDisplay

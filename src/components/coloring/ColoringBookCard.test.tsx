@@ -29,7 +29,7 @@ describe('coloring book card', () => {
   it('clamps completed pages to the page total', () => {
     const book = {
       id: 'book-example',
-      title: 'Example book',
+      title: 'Our Very Own Star: The Sun',
       status: 'in_progress',
       totalPages: 10,
       completedPages: 12,
@@ -39,6 +39,7 @@ describe('coloring book card', () => {
         <ColoringBookCard book={book} />
       </MemoryRouter>
     );
+    expect(screen.getByRole('heading', { name: book.title })).toBeVisible();
     expect(screen.getByText('10 of 10')).toBeInTheDocument();
   });
 });

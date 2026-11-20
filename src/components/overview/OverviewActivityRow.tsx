@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PrivateFileImage } from '@/components/image/PrivateFileImage';
 import { ChevronRight, Image as ImageIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -9,6 +10,9 @@ interface OverviewActivityRowProps {
 }
 
 export function OverviewActivityRow({ item }: OverviewActivityRowProps) {
+  const [loadedThumbnail, setLoadedThumbnail] = useState<string | null>(null);
+  const thumbnailReady = Boolean(item.thumbnailUrl && loadedThumbnail === item.thumbnailUrl);
+
   return (
     <li className="border-border/60 border-b last:border-b-0">
       <Link
@@ -17,18 +21,22 @@ export function OverviewActivityRow({ item }: OverviewActivityRowProps) {
       >
         <span className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-3 @min-[28rem]/activity:grid-cols-[4rem_minmax(0,1fr)] @min-[28rem]/activity:gap-4">
           <span className="bg-muted relative block aspect-square overflow-hidden rounded-lg">
-            {item.thumbnailUrl ? (
+            {!thumbnailReady && (
+              <span className="text-muted-foreground flex size-full items-center justify-center">
+                <ImageIcon aria-hidden="true" className="size-5" />
+              </span>
+            )}
+            {item.thumbnailUrl && (
               <PrivateFileImage
                 src={item.thumbnailUrl}
                 alt=""
                 loading="lazy"
                 decoding="async"
-                className="size-full object-cover"
+                className="absolute inset-0 size-full object-cover"
+                style={{ visibility: thumbnailReady ? undefined : 'hidden' }}
+                onLoad={() => setLoadedThumbnail(item.thumbnailUrl)}
+                onError={() => setLoadedThumbnail(null)}
               />
-            ) : (
-              <span className="text-muted-foreground flex size-full items-center justify-center">
-                <ImageIcon aria-hidden="true" className="size-5" />
-              </span>
             )}
           </span>
 

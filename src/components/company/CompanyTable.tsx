@@ -20,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Trash2, Link2, Loader2, FileText } from 'lucide-react';
+import { Trash2, ExternalLink, Loader2, FileText } from 'lucide-react';
 import { CompaniesService } from '@/services/pocketbase/companies.service';
 import { createLogger } from '@/utils/logger';
 import { useAuth } from '@/hooks/useAuth';
@@ -228,7 +228,7 @@ const CompanyTable = ({ companies, loading }: CompanyTableProps) => {
                     rel="noopener noreferrer"
                     className="text-link flex items-center hover:underline"
                   >
-                    <Link2 className="mr-1 size-4" />
+                    <ExternalLink aria-hidden="true" className="mr-1 size-4 shrink-0" />
                     {company.website_url}
                   </a>
                 ) : (

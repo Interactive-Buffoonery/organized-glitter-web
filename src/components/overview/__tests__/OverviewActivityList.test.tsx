@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { OverviewActivityList } from '../OverviewActivityList';
@@ -40,6 +40,16 @@ describe('Overview activity clarity', () => {
     expect(screen.queryByText('In progress')).not.toBeInTheDocument();
     expect(screen.queryByText('Open')).not.toBeInTheDocument();
   });
+  it('keeps the thumbnail hidden until it loads and restores the placeholder on error', () => {
+    const { container } = show([{ ...item, thumbnailUrl: 'https://example.com/kit.jpg' }]);
+    const thumbnail = container.querySelector('img')!;
+    expect(thumbnail).not.toBeVisible();
+    fireEvent.load(thumbnail);
+    expect(thumbnail).toBeVisible();
+    fireEvent.error(thumbnail);
+    expect(thumbnail).not.toBeVisible();
+  });
+
   it('offers a route to the library when nothing is active', () => {
     show([]);
     expect(screen.getByRole('link', { name: 'Browse your library' })).toHaveAttribute(

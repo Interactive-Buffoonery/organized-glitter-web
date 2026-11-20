@@ -125,7 +125,7 @@ export function ColoringPageCommandPanel({
                   ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
             },
             {
-              label: 'photos',
+              label: page.photos.length === 1 ? 'photo' : 'photos',
               value: page.photos.length ? String(page.photos.length) : undefined,
               onClick: onPhotos,
             },

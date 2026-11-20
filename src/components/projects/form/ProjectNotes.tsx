@@ -150,6 +150,8 @@ const ProjectNotes = ({
     );
   }
 
+  const hasLegacyHtml = /^<\/?[a-z][a-z0-9-]*(?:\s[^<>]*|\/?)>/i.test(notes.trim());
+
   if (variant === 'pinned') {
     return (
       <div className="relative text-sm">
@@ -161,7 +163,11 @@ const ProjectNotes = ({
         >
           Edit
         </button>
-        {notes.trim() ? (
+        {hasLegacyHtml ? (
+          <p className="text-muted-foreground">
+            This note uses an older format. Edit it to view or update its contents.
+          </p>
+        ) : notes.trim() ? (
           <MarkdownContent content={notes} />
         ) : (
           <p className="text-muted-foreground">
@@ -177,7 +183,6 @@ const ProjectNotes = ({
     // primary content); always visible when empty (the affordance IS the
     // primary content, since the placeholder copy points at it).
     const hasNotes = !!notes.trim();
-    const hasLegacyHtml = /^<\/?[a-z][a-z0-9-]*(?:\s[^<>]*|\/?)>/i.test(notes.trim());
     const emptyEditButtonClass =
       'text-muted-foreground hover:bg-muted/60 hover:text-foreground grid size-7 shrink-0 place-items-center rounded-md transition-colors pointer-coarse:size-11';
 

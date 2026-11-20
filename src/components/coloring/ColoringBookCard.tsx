@@ -61,7 +61,7 @@ export function ColoringBookCard({ book, skipImageLoading = false }: ColoringBoo
       <div className="w-full min-w-0 p-3">
         <div className="space-y-2">
           <div className="flex min-h-9 items-start">
-            <h3 className="group-hover:text-link line-clamp-2 text-sm leading-tight font-semibold transition-colors duration-200">
+            <h3 className="group-hover:text-link text-sm leading-tight font-semibold wrap-anywhere transition-colors duration-200">
               {book.title}
             </h3>
           </div>

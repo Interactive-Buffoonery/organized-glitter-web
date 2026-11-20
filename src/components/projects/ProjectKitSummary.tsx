@@ -1,4 +1,5 @@
 import { useState, type RefObject } from 'react';
+import { ArrowUpRight } from 'lucide-react';
 import { SectionHeading } from '@/components/shared/Section';
 import { Button } from '@/components/ui/button';
 import { InlineTagManager } from '@/components/tags/InlineTagManager';
@@ -136,7 +137,8 @@ export function ProjectKitAbout({ project }: { project: ProjectType }) {
                     rel="noopener noreferrer"
                     className="decoration-primary/50 inline-flex min-h-11 items-center truncate underline underline-offset-4"
                   >
-                    {new URL(href).hostname} ↗
+                    <span className="truncate">{new URL(href).hostname}</span>
+                    <ArrowUpRight aria-hidden="true" className="ml-1 size-3.5 shrink-0" />
                   </a>
                   <Button
                     type="button"

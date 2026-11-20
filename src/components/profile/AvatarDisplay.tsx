@@ -33,9 +33,8 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = memo(
     // Handle uploaded avatar
     if (config?.type === 'upload' && config.uploadUrl) {
       return (
-        <div style={sizeStyle} className="relative">
+        <div key={config.uploadUrl} style={sizeStyle} className="relative">
           <PrivateFileImage
-            key={config.uploadUrl}
             src={config.uploadUrl}
             alt="User avatar"
             className={`rounded-full object-cover ${className}`}

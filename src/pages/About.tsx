@@ -40,7 +40,7 @@ const About = () => {
               <figure className="flex justify-start gap-4 md:flex-col md:items-center md:justify-center">
                 <div className="bg-primary/15 border-card size-24 overflow-hidden rounded-2xl border-[3px] shadow-md md:size-36">
                   <img
-                    src="/images/chibi-wave.png"
+                    src="/images/chibi-wave.webp"
                     alt="Chibi version of Sarah waving"
                     className="size-full object-cover object-top"
                     loading="lazy"

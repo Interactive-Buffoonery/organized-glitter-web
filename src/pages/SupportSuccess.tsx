@@ -19,7 +19,7 @@ const SupportSuccess: React.FC = () => {
       <div className="container mx-auto max-w-2xl px-4 py-8 md:py-12">
         <GlassPanel className="space-y-6 p-6 text-center md:p-10">
           <img
-            src="/images/chibi-wave.png"
+            src="/images/chibi-wave.webp"
             alt=""
             className="bg-primary/15 border-card mx-auto size-20 rounded-2xl border-[3px] object-cover object-top shadow-md"
           />

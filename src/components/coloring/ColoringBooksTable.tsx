@@ -14,7 +14,6 @@ import { getColoringBookDetailPath } from '@/pages/coloringBookNavigation';
 import type { ColoringBookCardData } from './coloringBookCardTypes';
 import ColoringBookListRow from './ColoringBookListRow';
 import {
-  formatColoringCompletionPercent,
   getColoringActivityLabel,
   getColoringBookFormatLabel,
   getColoringProgressLabel,
@@ -175,9 +174,6 @@ function ColoringBooksTableComponent({
                       <div className="flex items-center justify-between gap-2 text-xs">
                         <span className="text-muted-foreground">
                           {getColoringProgressLabel(book)}
-                        </span>
-                        <span className="tabular-nums">
-                          {formatColoringCompletionPercent(book)}
                         </span>
                       </div>
                       <Progress

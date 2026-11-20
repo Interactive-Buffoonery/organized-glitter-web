@@ -1,4 +1,5 @@
 import React from 'react';
+import MainLayout from '@/components/layout/MainLayout';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHideSplash } from '@/hooks/useAppReady';
@@ -48,18 +49,20 @@ const ProtectedRouteInner: React.FC<ProtectedRouteProps> = ({ children }) => {
       timestamp: new Date().toISOString(),
     });
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-2">
-        <div className="flex items-center justify-center gap-2" role="status" aria-live="polite">
-          <LoadingSpinner className="size-12" />
-          <span className="text-muted-foreground">Loading…</span>
+      <MainLayout>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-2" role="status" aria-live="polite">
+            <LoadingSpinner className="size-12" />
+            <span className="text-muted-foreground">Loading…</span>
+          </div>
+          {import.meta.env.DEV && (
+            <p className="text-muted-foreground text-xs">
+              Route: {location.pathname} | Loading: {isLoading.toString()} | InitialCheck:{' '}
+              {initialCheckComplete.toString()} | HasUser: {(!!user).toString()}
+            </p>
+          )}
         </div>
-        {import.meta.env.DEV && (
-          <p className="text-muted-foreground text-xs">
-            Route: {location.pathname} | Loading: {isLoading.toString()} | InitialCheck:{' '}
-            {initialCheckComplete.toString()} | HasUser: {(!!user).toString()}
-          </p>
-        )}
-      </div>
+      </MainLayout>
     );
   }
 

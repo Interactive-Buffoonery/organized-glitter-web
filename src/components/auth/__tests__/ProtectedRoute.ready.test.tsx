@@ -26,6 +26,15 @@ vi.mock('@/hooks/useLocationMismatchWarning', () => ({
   useLocationMismatchWarning: vi.fn(),
 }));
 
+vi.mock('@/components/layout/MainLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div>
+      <header>App navigation</header>
+      {children}
+    </div>
+  ),
+}));
+
 import { ProtectedRoute } from '../ProtectedRoute';
 
 describe('ProtectedRoute mount readiness', () => {
@@ -46,6 +55,7 @@ describe('ProtectedRoute mount readiness', () => {
       </MemoryRouter>
     );
 
+    expect(screen.getByRole('banner')).toHaveTextContent('App navigation');
     expect(useHideSplashMock).toHaveBeenCalled();
     expect(useHideSplashMock.mock.calls.every(call => call.length === 0)).toBe(true);
     expect(useAppReadyMock).not.toHaveBeenCalled();

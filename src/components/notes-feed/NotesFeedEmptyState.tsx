@@ -6,9 +6,9 @@ import { GlassPanel } from '@/components/ui/glass-panel';
 type NotesFeedEmptyStateCraft = 'all' | 'diamond' | 'coloring';
 
 const emptyStateCopy: Record<NotesFeedEmptyStateCraft, string> = {
-  all: 'Add a progress note to a diamond painting or coloring page, and it will show up here, also.',
-  diamond: 'Add a progress note to a diamond painting, and it will show up here, also.',
-  coloring: 'Add a progress note to a coloring page, and it will show up here, also.',
+  all: 'Add a progress note to a diamond painting or coloring page, and it will show up here.',
+  diamond: 'Add a progress note to a diamond painting, and it will show up here.',
+  coloring: 'Add a progress note to a coloring page, and it will show up here.',
 };
 
 interface NotesFeedEmptyStateProps {

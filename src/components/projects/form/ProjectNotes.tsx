@@ -161,7 +161,7 @@ const ProjectNotes = ({
         >
           Edit
         </button>
-        {notes ? (
+        {notes.trim() ? (
           <MarkdownContent content={notes} />
         ) : (
           <p className="text-muted-foreground">

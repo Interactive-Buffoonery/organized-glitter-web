@@ -34,6 +34,11 @@ vi.mock('@/components/notes/RichTextEditor.lazy', () => ({
 afterEach(clearSessionDrafts);
 
 describe('ProjectNotes rich text', () => {
+  it('shows the pinned empty prompt for whitespace notes', () => {
+    render(<ProjectNotes notes={'  \n '} variant="pinned" />);
+    expect(screen.getByText('Add a note about this kit.')).toBeInTheDocument();
+  });
+
   it('restores and re-registers unsaved notes for the same account under StrictMode', () => {
     const key = 'project-notes:one';
     const unregister = registerSessionDraft(key, 'account-a', () => 'Unsent **note**');

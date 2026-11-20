@@ -133,7 +133,7 @@ const Support = () => {
               sarah
             </p>
             <img
-              src="/images/chibi-wave.png"
+              src="/images/chibi-wave.webp"
               alt=""
               className="bg-primary/15 border-card size-14 rounded-xl border-2 object-cover object-top shadow-sm"
               loading="lazy"

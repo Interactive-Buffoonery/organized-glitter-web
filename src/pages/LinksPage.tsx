@@ -31,7 +31,7 @@ const sectionHeadingClasses =
 // Configuration for easy updates
 const profileConfig = {
   name: 'Sarah | Organized Glitter',
-  avatar: '/images/chibi-wave.png',
+  avatar: '/images/chibi-wave.webp',
   social: {
     instagram: 'https://www.instagram.com/organized_glitter',
   },

@@ -160,7 +160,7 @@ export default defineConfig(({ mode }) => {
           cleanupOutdatedCaches: true,
           skipWaiting: true,
           clientsClaim: true,
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}', 'images/chibi-wave.webp'],
           // dist/index.html is the static landing; app routes fall back to the SPA shell.
           navigateFallback: 'app.html',
           navigateFallbackAllowlist: APP_ROUTE_PATHS.filter(route => route !== '/').map(

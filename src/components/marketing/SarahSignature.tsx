@@ -9,7 +9,7 @@ export function SarahSignature() {
           <span className="tape tape--peach sig-panel__tape sig-panel__tape--tr" aria-hidden />
           <div className="sig-avatar">
             <img
-              src="/images/chibi-wave.png"
+              src="/images/chibi-wave.webp"
               alt=""
               className="size-full object-cover object-top"
             />

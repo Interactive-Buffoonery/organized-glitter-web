@@ -16,10 +16,12 @@ import { TagNameField } from './TagNameField';
 import { TAG_NAME_MAX_LENGTH, validateTagName } from './tagNameValidation';
 import { ColorPicker } from './ColorPicker';
 import { useUpdateTag } from '@/hooks/mutations/useUpdateTag';
+import { useUpdateColoringTag } from '@/hooks/mutations/coloring/useUpdateColoringTag';
 import { logger } from '@/utils/logger';
 
 interface EditTagDialogProps {
   tag: Tag;
+  vocabulary?: 'diamond' | 'coloring';
 }
 
 /**
@@ -41,7 +43,7 @@ interface EditTagDialogProps {
  * appropriate UI state management (dialog remains open for retry on errors).
  */
 
-const EditTagDialog = ({ tag }: EditTagDialogProps) => {
+const EditTagDialog = ({ tag, vocabulary = 'diamond' }: EditTagDialogProps) => {
   const [tagName, setTagName] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -51,7 +53,10 @@ const EditTagDialog = ({ tag }: EditTagDialogProps) => {
     hasSubmitted || tagName.trim().length > TAG_NAME_MAX_LENGTH
       ? validateTagName(tagName)
       : undefined;
-  const updateTagMutation = useUpdateTag();
+  const updateDiamondTagMutation = useUpdateTag();
+  const updateColoringTagMutation = useUpdateColoringTag();
+  const updateTagMutation =
+    vocabulary === 'coloring' ? updateColoringTagMutation : updateDiamondTagMutation;
 
   const handleOpenChange = (open: boolean) => {
     setHasSubmitted(false);
@@ -118,7 +123,7 @@ const EditTagDialog = ({ tag }: EditTagDialogProps) => {
           className="text-primary hover:bg-primary/10 hover:text-primary"
         >
           <Pencil className="size-4" />
-          <span className="sr-only">Edit</span>
+          <span className="sr-only">Edit {tag.name}</span>
         </Button>
       </DialogTrigger>
       <DialogContent layout="keyboard-safe">

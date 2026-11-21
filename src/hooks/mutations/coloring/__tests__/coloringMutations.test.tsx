@@ -27,6 +27,7 @@ const {
   },
   coloringTagsMock: {
     deleteColoringTag: vi.fn(),
+    updateColoringTag: vi.fn(),
   },
   notifyMock: vi.fn(),
   pageProgressNotesMock: {
@@ -81,6 +82,7 @@ import { queryKeys } from '../../../queries/queryKeys';
 import { useCreateColoringBook } from '../useCreateColoringBook';
 import { useUpdateColoringBook } from '../useUpdateColoringBook';
 import { useDeleteColoringBook } from '../useDeleteColoringBook';
+import { useUpdateColoringTag } from '../useUpdateColoringTag';
 import { useColoringBook } from '../../../queries/coloring/useColoringBook';
 import { useColoringPages } from '../../../queries/coloring/useColoringPages';
 import { useColoringPage } from '../../../queries/coloring/useColoringPage';
@@ -272,4 +274,46 @@ describe('coloring mutation hooks', () => {
       expect(coloringMock.deleteBook).toHaveBeenCalledExactlyOnceWith(book.id);
     }
   );
+
+  it('updates a coloring tag and merges the new name and color into cached tag lists', async () => {
+    const client = makeClient();
+    const listKey = queryKeys.coloring.tags.list('user-1');
+    const baseTag = {
+      userId: 'user-1',
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    };
+    client.setQueryData(listKey, [
+      { ...baseTag, id: 'tag-1', name: 'cozy', slug: 'cozy', color: '#14b8a6' },
+      { ...baseTag, id: 'tag-2', name: 'floral', slug: 'floral', color: '#3B82F6' },
+    ]);
+    coloringTagsMock.updateColoringTag.mockResolvedValue({
+      status: 'success',
+      data: { ...baseTag, id: 'tag-1', name: 'animals', slug: 'animals', color: '#EF4444' },
+      error: null,
+    });
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateColoringTag(), { wrapper: makeWrapper(client) });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        id: 'tag-1',
+        updates: { name: 'animals', color: '#EF4444' },
+      });
+    });
+
+    expect(coloringTagsMock.updateColoringTag).toHaveBeenCalledExactlyOnceWith('tag-1', {
+      name: 'animals',
+      color: '#EF4444',
+    });
+    expect(client.getQueryData(listKey)).toEqual([
+      expect.objectContaining({ id: 'tag-1', name: 'animals', color: '#EF4444' }),
+      expect.objectContaining({ id: 'tag-2', name: 'floral' }),
+    ]);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.coloring.tags.all });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.coloring.books.all });
+    expect(notifyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'success', title: 'Coloring tag updated' })
+    );
+  });
 });

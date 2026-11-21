@@ -324,32 +324,17 @@ const TagTable = ({ tags, coloringTags = EMPTY_COLORING_TAGS, loading }: TagTabl
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-x-1">
-                    {vocabulary === 'diamond' ? (
-                      <>
-                        <EditTagDialog tag={tag} />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteTag(tag, vocabulary)}
-                          className="text-destructive-text hover:bg-destructive/10 hover:text-destructive-text"
-                        >
-                          <Trash2 className="size-4" />
-                          <span className="sr-only">Delete {tag.name}</span>
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteTag(tag, vocabulary)}
-                        className="text-destructive-text hover:bg-destructive/10 hover:text-destructive-text"
-                      >
-                        <Trash2 className="size-4" />
-                        <span className="sr-only">Delete {tag.name}</span>
-                      </Button>
-                    )}
+                    <EditTagDialog tag={tag} vocabulary={vocabulary} />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteTag(tag, vocabulary)}
+                      className="text-destructive-text hover:bg-destructive/10 hover:text-destructive-text"
+                    >
+                      <Trash2 className="size-4" />
+                      <span className="sr-only">Delete {tag.name}</span>
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>

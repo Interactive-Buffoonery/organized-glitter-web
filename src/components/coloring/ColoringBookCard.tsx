@@ -9,7 +9,10 @@ import { ColoringService } from '@/services/pocketbase/coloring.service';
 import { getColoringBookDetailPath } from '@/pages/coloringBookNavigation';
 import type { ColoringBookCardData } from './coloringBookCardTypes';
 import { StatusPill } from '@/components/shared/StatusPill';
-import { getColoringCompletedPages } from './coloringBookPresentation';
+import {
+  getColoringBookMetadataLabel,
+  getColoringCompletedPages,
+} from './coloringBookPresentation';
 
 export type { ColoringBookCardData } from './coloringBookCardTypes';
 
@@ -67,7 +70,7 @@ export function ColoringBookCard({ book, skipImageLoading = false }: ColoringBoo
           </div>
 
           <p className="text-muted-foreground flex h-5 items-center truncate text-xs">
-            {[book.publisherName, book.illustratorName].filter(Boolean).join(' · ') || ' '}
+            {getColoringBookMetadataLabel(book) || ' '}
           </p>
 
           <div className="flex items-center gap-2">

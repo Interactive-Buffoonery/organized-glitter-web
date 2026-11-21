@@ -9,8 +9,8 @@ import { getColoringBookDetailPath } from '@/pages/coloringBookNavigation';
 import type { ColoringBookCardData } from './coloringBookCardTypes';
 import {
   getColoringActivityLabel,
+  getColoringBookMetadataLabel,
   getColoringProgressLabel,
-  getColoringPublisherLabel,
 } from './coloringBookPresentation';
 
 interface ColoringBookListRowProps {
@@ -53,7 +53,7 @@ function ColoringBookListRow({ book }: ColoringBookListRowProps) {
             {book.title}
           </h3>
           <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">
-            {getColoringPublisherLabel(book)}
+            {getColoringBookMetadataLabel(book) || 'No publisher'}
           </p>
         </div>
 

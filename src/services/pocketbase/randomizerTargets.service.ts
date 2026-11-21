@@ -1,3 +1,4 @@
+import { COLORING_BOOK_FORMAT_OPTIONS, optionLabel } from '@/constants/coloringBookMetadata';
 import { getFileUrl, pb, resolveFileUrl } from '@/lib/pocketbase';
 import {
   Collections,
@@ -100,7 +101,12 @@ function toDiamondTarget(record: ExpandedProject): RandomizerTarget {
 }
 
 function toBookTarget(record: ExpandedColoringBook): RandomizerTarget {
-  const subtitle = bookSubtitle(record);
+  const subtitle = [
+    bookSubtitle(record),
+    optionLabel(COLORING_BOOK_FORMAT_OPTIONS, record.book_format),
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const imageUrl = record.cover_image
     ? resolveFileUrl(Collections.ColoringBooks, record.id, record.cover_image, '300x400')
     : undefined;

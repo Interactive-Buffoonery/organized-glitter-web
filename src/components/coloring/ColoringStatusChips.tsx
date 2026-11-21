@@ -11,7 +11,7 @@ import { queryKeys } from '@/hooks/queries/queryKeys';
 import { queryFreshness } from '@/hooks/queries/shared/queryUtils';
 import type { ColoringBooksStatusOptions } from '@/types/pocketbase.types';
 
-const statuses: Array<ColoringBooksStatusOptions | 'all'> = [
+const baseStatuses: Array<ColoringBooksStatusOptions | 'all'> = [
   'all',
   'wishlist',
   'purchased',
@@ -22,6 +22,13 @@ const statuses: Array<ColoringBooksStatusOptions | 'all'> = [
 export function ColoringStatusChips({ userId }: { userId: string }) {
   const { filters, isNavigationContextReady } = useColoringFilters();
   const { updateStatuses } = useColoringFilterHelpers();
+  const isShown = (status: ColoringBooksStatusOptions, isSwitchOn: boolean) =>
+    isSwitchOn || filters.selectedStatuses.includes(status);
+  const statuses = [
+    ...baseStatuses,
+    ...(isShown('archived', filters.includeArchived) ? (['archived'] as const) : []),
+    ...(isShown('destashed', filters.includeDestashed) ? (['destashed'] as const) : []),
+  ];
   const counts = useQueries({
     queries: statuses.map(status => {
       const config = buildColoringBookListQueryConfig(

@@ -42,4 +42,42 @@ describe('coloring book card', () => {
     expect(screen.getByRole('heading', { name: book.title })).toBeVisible();
     expect(screen.getByText('10 of 10')).toBeInTheDocument();
   });
+
+  it('shows the format in grid and list metadata', () => {
+    const book = {
+      id: 'book-example',
+      title: 'Example Book',
+      status: 'in_stash',
+      totalPages: 10,
+      publisherName: 'Example Press',
+      bookFormat: 'pdf',
+    } as ColoringBookCardData;
+    render(
+      <MemoryRouter>
+        <ColoringBookCard book={book} />
+        <ColoringBookListRow book={book} />
+      </MemoryRouter>
+    );
+    expect(screen.getAllByText('PDF · Example Press')).toHaveLength(2);
+  });
+
+  it('shows the illustrator in list metadata instead of No publisher', () => {
+    render(
+      <MemoryRouter>
+        <ColoringBookListRow
+          book={
+            {
+              id: 'book-example',
+              title: 'Example Book',
+              status: 'in_stash',
+              totalPages: 10,
+              illustratorName: 'Example Illustrator',
+            } as ColoringBookCardData
+          }
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Example Illustrator')).toBeInTheDocument();
+    expect(screen.queryByText('No publisher')).not.toBeInTheDocument();
+  });
 });

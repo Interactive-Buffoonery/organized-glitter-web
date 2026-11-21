@@ -4,11 +4,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { getColoringPageCommandEffects } from '@/features/coloring-progress/coloringProgressCommands';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import type { ColoringPageDTO } from '@/services/pocketbase/coloring.service';
+import { DEFAULT_RANDOMIZER_ELIGIBILITY } from '@/types/randomizer';
 
 import {
   beginColoringPageMutation,
   cacheUpdatedColoringPage,
   clearDeletedColoringBook,
+  refreshColoringBookAfterFormSave,
   restoreColoringPage,
 } from '../coloringMutationCache';
 
@@ -24,6 +26,20 @@ const page = {
 } as ColoringPageDTO;
 
 describe('coloring mutation cache', () => {
+  it('refreshes coloring randomizer targets after a book save', async () => {
+    const client = makeClient();
+    const key = queryKeys.randomizerTargets.list(
+      'example-user',
+      'coloring-book',
+      DEFAULT_RANDOMIZER_ELIGIBILITY
+    );
+    client.setQueryData(key, []);
+
+    await refreshColoringBookAfterFormSave(client, 'book-1', 'update');
+
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  });
+
   it('restores the prior page after an optimistic update fails', async () => {
     const client = makeClient();
     const key = queryKeys.coloring.pages.detail(page.id);

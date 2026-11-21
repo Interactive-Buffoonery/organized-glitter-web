@@ -22,12 +22,15 @@ const baseStatuses: Array<ColoringBooksStatusOptions | 'all'> = [
 export function ColoringStatusChips({ userId }: { userId: string }) {
   const { filters, isNavigationContextReady } = useColoringFilters();
   const { updateStatuses } = useColoringFilterHelpers();
-  const isShown = (status: ColoringBooksStatusOptions, isSwitchOn: boolean) =>
-    isSwitchOn || filters.selectedStatuses.includes(status);
+  const switchFor: Partial<Record<ColoringBooksStatusOptions | 'all', boolean>> = {
+    archived: filters.includeArchived,
+    destashed: filters.includeDestashed,
+  };
   const statuses = [
     ...baseStatuses,
-    ...(isShown('archived', filters.includeArchived) ? (['archived'] as const) : []),
-    ...(isShown('destashed', filters.includeDestashed) ? (['destashed'] as const) : []),
+    ...(['archived', 'destashed'] as const).filter(
+      status => switchFor[status] || filters.selectedStatuses.includes(status)
+    ),
   ];
   const counts = useQueries({
     queries: statuses.map(status => {
@@ -59,7 +62,7 @@ export function ColoringStatusChips({ userId }: { userId: string }) {
       options={statuses.map((status, index) => ({
         value: status,
         label: status === 'all' ? 'All' : COLORING_BOOK_STATUS_LABEL[status],
-        count: counts[index].data?.totalItems,
+        count: switchFor[status] === false ? undefined : counts[index].data?.totalItems,
       }))}
       onChange={status =>
         updateStatuses(

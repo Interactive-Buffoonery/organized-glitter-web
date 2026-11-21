@@ -88,6 +88,7 @@ describe('getInitialColoringFiltersFromUrl', () => {
       selectedIllustrators: ['i1'],
       selectedTags: ['t1'],
       mysteryOnly: true,
+      includeArchived: true,
       searchTerm: 'Disney',
       sortField: 'title',
       sortDirection: 'asc',
@@ -122,7 +123,7 @@ describe('ColoringFilterProvider', () => {
     saveColoringNavigationContextMock.mockReset();
   });
 
-  it('clears archive switches and resets page when a status is selected', () => {
+  it('keeps archive switches and resets page when a status is selected', () => {
     const { result } = renderColoringHook(() => ({
       ...useColoringFilters(),
       helpers: useColoringFilterHelpers(),
@@ -135,8 +136,8 @@ describe('ColoringFilterProvider', () => {
 
     expect(result.current.filters).toMatchObject({
       selectedStatuses: ['in_progress'],
-      includeArchived: false,
-      includeDestashed: false,
+      includeArchived: true,
+      includeDestashed: true,
       currentPage: 1,
     });
   });

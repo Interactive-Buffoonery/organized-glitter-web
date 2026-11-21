@@ -30,7 +30,6 @@ import {
   getDefaultColoringFilters,
   getDefaultColoringViewType,
   normalizeColoringPagination,
-  normalizeColoringStatusFilters,
 } from './types';
 import {
   getInitialColoringFiltersFromUrl,
@@ -165,12 +164,10 @@ export const ColoringFilterProvider: React.FC<ColoringFilterProviderProps> = ({
     urlProvidedInitial || !user?.id
   );
 
-  const [filters, setFiltersState] = useState<ColoringFilterState>(() =>
-    normalizeColoringStatusFilters({
-      ...getDefaultColoringFilters(),
-      ...resolvedInitialFilters,
-    })
-  );
+  const [filters, setFiltersState] = useState<ColoringFilterState>(() => ({
+    ...getDefaultColoringFilters(),
+    ...resolvedInitialFilters,
+  }));
   const [viewType, setViewTypeState] = useState<ColoringViewType>(() =>
     getDefaultColoringViewType(isMobilePhone)
   );
@@ -214,13 +211,11 @@ export const ColoringFilterProvider: React.FC<ColoringFilterProviderProps> = ({
       const { currentPage: _legacyCurrentPage, ...savedPreferences } = saved as typeof saved & {
         currentPage?: unknown;
       };
-      setFiltersState(prev =>
-        normalizeColoringStatusFilters({
-          ...prev,
-          ...savedPreferences,
-          pageSize: normalizeColoringPagination(1, saved.pageSize).pageSize,
-        })
-      );
+      setFiltersState(prev => ({
+        ...prev,
+        ...savedPreferences,
+        pageSize: normalizeColoringPagination(1, saved.pageSize).pageSize,
+      }));
     }
     setIsNavigationContextReady(true);
   }, [
@@ -258,10 +253,10 @@ export const ColoringFilterProvider: React.FC<ColoringFilterProviderProps> = ({
     }
 
     const urlFilters = getInitialColoringFiltersFromUrl(searchParams);
-    const nextFilters = normalizeColoringStatusFilters({
+    const nextFilters = {
       ...getDefaultColoringFilters(),
       ...urlFilters,
-    });
+    };
     setFiltersState(current => (deepEqual(current, nextFilters) ? current : nextFilters));
   }, [searchParams, searchString]);
 
@@ -337,10 +332,10 @@ export const ColoringFilterProvider: React.FC<ColoringFilterProviderProps> = ({
       logger.debug('Filter state update requested');
       setFiltersState(currentFilters => {
         const updateObj = typeof updates === 'function' ? updates(currentFilters) : updates;
-        let newFilters: ColoringFilterState = normalizeColoringStatusFilters({
+        let newFilters: ColoringFilterState = {
           ...currentFilters,
           ...updateObj,
-        });
+        };
         if (!queryInputsEqual(currentFilters, newFilters)) {
           newFilters = { ...newFilters, currentPage: 1 };
         }

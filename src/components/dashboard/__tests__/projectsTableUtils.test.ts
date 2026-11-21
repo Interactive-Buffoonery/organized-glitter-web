@@ -6,7 +6,7 @@ const wishlistKit = {
   id: 'kit',
   title: 'Wishlist kit',
   status: 'wishlist',
-  createdAt: '2026-11-21 12:00:00.000Z',
+  createdAt: '2026-11-21',
   datePurchased: '2025-10-26',
 } as ProjectType;
 

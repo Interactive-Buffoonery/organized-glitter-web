@@ -46,7 +46,7 @@ sets retries to zero and runs a list preflight, so a bad filter or retry cannot
 turn a missing test into a green result. Required seed fixtures are checked
 before Playwright starts.
 
-`pnpm qa:browser:full` runs the same 29 tests as smoke. Release PRs rely on the
+`pnpm qa:browser:full` runs the same 30 tests as smoke. Release PRs rely on the
 separate blog, standalone 404, PWA navigation, cold-load, and protected-file
 rotation gates for anything smoke does not cover.
 

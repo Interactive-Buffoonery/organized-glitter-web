@@ -7,9 +7,102 @@ import { ColoringPageDateLine } from '../ColoringPageDateLine';
 import DetailJournalThread from '../DetailJournalThread';
 import { FinishDatePrompt } from '../FinishDatePrompt';
 import { ColoringPageDetailHeader } from '../ColoringPageDetailHeader';
+import { ColoringPageCommandPanel } from '../ColoringPageCommandPanel';
+import { useColoringPageLifecycleDates } from '@/hooks/coloring/useColoringPageLifecycleDates';
+import { useColoringPageMediumSelection } from '@/hooks/coloring/useColoringPageMediumSelection';
+import { useColoringPageMysteryReveal } from '@/hooks/coloring/useColoringPageMysteryReveal';
+import { useColoringPageStatusAction } from '@/hooks/coloring/useColoringPageStatusAction';
 import type { ColoringBookDTO, ColoringPageDTO } from '@/services/pocketbase/coloring.service';
 
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: null }) }));
+vi.mock('@/hooks/queries/coloring/useColorKeys', () => ({ useColorKeys: () => ({}) }));
+
+const noMediums: string[] = [];
+
+function CommandPanelWithDates({
+  status,
+  startedAt,
+  completedAt,
+}: Pick<ColoringPageDTO, 'status' | 'startedAt' | 'completedAt'>) {
+  const page: ColoringPageDTO = {
+    id: 'page',
+    bookId: 'book',
+    pageNumber: 7,
+    photos: [],
+    mediumIds: noMediums,
+    revealedSubject: '',
+    revealedAt: '',
+    createdAt: '',
+    updatedAt: '',
+    status,
+    startedAt,
+    completedAt,
+  };
+  const executor = { isPending: false, execute: vi.fn() };
+  const userTimezone = 'America/New_York';
+  return (
+    <ColoringPageCommandPanel
+      page={page}
+      book={{ id: 'book', title: 'Book', totalPages: 30 } as ColoringBookDTO}
+      mediums={[]}
+      isMediumsLoading={false}
+      userTimezone={userTimezone}
+      statusAction={useColoringPageStatusAction(page, executor)}
+      lifecycleDates={useColoringPageLifecycleDates(page, userTimezone, executor)}
+      mediumSelection={useColoringPageMediumSelection(page, executor)}
+      mysteryReveal={useColoringPageMysteryReveal(page, executor)}
+      returnTo="/coloring-books"
+      editOpen={false}
+      onEditOpenChange={vi.fn()}
+      onPhotos={vi.fn()}
+    />
+  );
+}
+
 describe('Coloring page detail redesign', () => {
+  it.each([
+    ['2026-03-07', 'Finished same day'],
+    ['2026-03-08', 'Finished in 1 day'],
+    ['2026-03-09', 'Finished in 2 days'],
+  ])('shows elapsed days for a page finished on %s', (completedAt, label) => {
+    render(
+      <MemoryRouter>
+        <CommandPanelWithDates
+          status="completed"
+          startedAt="2026-03-07"
+          completedAt={completedAt}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  it.each(['in_progress', 'on_hold'] as const)(
+    'shows Day 1 in the account timezone for %s',
+    status => {
+      vi.setSystemTime(new Date('2026-03-08T02:00:00Z'));
+      try {
+        render(
+          <MemoryRouter>
+            <CommandPanelWithDates status={status} startedAt="2026-03-07" completedAt="" />
+          </MemoryRouter>
+        );
+        expect(screen.getByText('Day 1')).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it.each(['not_started', 'palette_chosen'] as const)('omits the day label for %s', status => {
+    render(
+      <MemoryRouter>
+        <CommandPanelWithDates status={status} startedAt="2020-03-07" completedAt="" />
+      </MemoryRouter>
+    );
+    expect(screen.queryByText(/^Day \d+$/)).not.toBeInTheDocument();
+  });
+
   it('offers Add for every empty spec and invokes its action', async () => {
     const action = vi.fn();
     render(

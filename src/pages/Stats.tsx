@@ -41,6 +41,7 @@ import type {
   CompletionTimeStatsResponse,
   CompletionsByMonthResponse,
   CompletionsYearlyResponse,
+  StatsSizeBucket,
   StatsSplitItem,
   StatsSummaryResponse,
   StatsTimeScope,
@@ -269,6 +270,11 @@ function DiamondRegion({
 }) {
   const summary = queries.summary.data;
   const collection = queries.collection.data;
+  const mostCommonSize = collection?.sizeBuckets.reduce<StatsSizeBucket | undefined>(
+    (mostCommon, bucket) =>
+      bucket.key !== 'unknown' && bucket.count > (mostCommon?.count ?? 0) ? bucket : mostCommon,
+    undefined
+  );
   const groups: MostRepresentedGroup[] = [
     {
       key: 'companies',
@@ -387,7 +393,7 @@ function DiamondRegion({
               />
               <StatsKeyValueRow
                 label="Most common size"
-                value={topLabel(sizeGroup(collection).items, '-')}
+                value={mostCommonSize?.label ?? '-'}
                 valueClassName="max-w-44 text-sm whitespace-normal"
               />
               <StatsKeyValueRow

@@ -3,18 +3,21 @@ import { FILTER_STATUS_ACTIVE_FILL } from '@/utils/statusColors';
 import React, { useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { useProjectStatus } from '@/hooks/useProjectStatus';
+import type { DashboardValidSortField } from '@/features/dashboard/dashboard.constants';
 import { ProjectType } from '@/types/project';
 import { getLifecycleDate, getSizeAndShapeLabel } from './projectsTableUtils';
 import ProjectThumbnail from './ProjectThumbnail';
 
 interface ProjectTableCardProps {
   project: ProjectType;
+  sortField?: DashboardValidSortField;
   onNavigate: (projectId: string) => void;
   isRecentlyEdited?: boolean;
 }
 
 const ProjectTableCardComponent = ({
   project,
+  sortField,
   onNavigate,
   isRecentlyEdited = false,
 }: ProjectTableCardProps) => {
@@ -31,7 +34,7 @@ const ProjectTableCardComponent = ({
         ? 'Kitted Up'
         : getStatusLabel(project.status);
 
-  const lifecycleDate = getLifecycleDate(project);
+  const lifecycleDate = getLifecycleDate(project, sortField);
   const sizeAndShape = getSizeAndShapeLabel(project);
   const artistLabel = project.artist && project.artist !== '-' ? project.artist : null;
   const companyAndArtist = [project.company, artistLabel].filter(Boolean).join(' · ') || '-';

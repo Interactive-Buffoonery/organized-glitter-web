@@ -99,6 +99,7 @@ const ProjectsTable = ({
               )}
               <ProjectTableCard
                 project={project}
+                sortField={sortField}
                 onNavigate={onNavigate}
                 isRecentlyEdited={project.id === recentlyEditedProjectId}
               />
@@ -137,7 +138,7 @@ const ProjectsTable = ({
                   : project.status === 'kitted'
                     ? 'Kitted Up'
                     : getStatusLabel(project.status);
-              const lifecycleDate = getLifecycleDate(project);
+              const lifecycleDate = getLifecycleDate(project, sortField);
               const artistLabel = project.artist && project.artist !== '-' ? project.artist : null;
               const divider = dividerByIndex.get(index);
 

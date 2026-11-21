@@ -2,12 +2,14 @@ import React, { useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { StatusPill } from '@/components/shared/StatusPill';
 import { FILTER_STATUS_ACTIVE_FILL, PROJECT_FILTER_STATUS_LABEL } from '@/utils/statusColors';
+import type { DashboardValidSortField } from '@/features/dashboard/dashboard.constants';
 import { ProjectType } from '@/types/project';
 import { getLifecycleDate, getSizeAndShapeLabel } from './projectsTableUtils';
 import ProjectThumbnail from './ProjectThumbnail';
 
 interface ProjectListRowProps {
   project: ProjectType;
+  sortField?: DashboardValidSortField;
   onClick?: () => void;
   onNavigate?: (projectId: string) => void;
   skipImageLoading?: boolean;
@@ -16,6 +18,7 @@ interface ProjectListRowProps {
 
 const ProjectListRowComponent = ({
   project,
+  sortField,
   onClick,
   onNavigate,
   skipImageLoading = false,
@@ -58,7 +61,7 @@ const ProjectListRowComponent = ({
   const artistLabel = project.artist && project.artist !== '-' ? project.artist : null;
   const companyAndArtist = [project.company, artistLabel].filter(Boolean).join(' · ');
   const sizeAndShape = getSizeAndShapeLabel(project);
-  const lifecycleDate = getLifecycleDate(project);
+  const lifecycleDate = getLifecycleDate(project, sortField);
 
   const linkLabel = [
     `Open project ${project.title}`,

@@ -1,3 +1,4 @@
+import type { DashboardValidSortField } from '@/features/dashboard/dashboard.constants';
 import type { ProjectType } from '@/types/project';
 import { formatDateOnlyForDisplay } from '@/utils/date/timezoneUtils';
 
@@ -43,9 +44,18 @@ const firstAvailable = (candidates: LifecycleCandidate[]): LifecycleDate | null 
   return null;
 };
 
-export const getLifecycleDate = (project: ProjectType): LifecycleDate | null => {
+export const getLifecycleDate = (
+  project: ProjectType,
+  sortField?: DashboardValidSortField
+): LifecycleDate | null => {
   const added: LifecycleCandidate = { label: 'Added', date: project.createdAt };
   const purchased: LifecycleCandidate = { label: 'Purchased', date: project.datePurchased };
+
+  if (sortField === 'date_purchased') {
+    const purchasedDate = firstAvailable([purchased]);
+    if (purchasedDate) return purchasedDate;
+  }
+
   const received: LifecycleCandidate = { label: 'Received', date: project.dateReceived };
   const started: LifecycleCandidate = { label: 'Started', date: project.dateStarted };
   const finished: LifecycleCandidate = { label: 'Finished', date: project.dateCompleted };

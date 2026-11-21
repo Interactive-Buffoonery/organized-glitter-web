@@ -1,24 +1,28 @@
 import { StatusPill } from '@/components/shared/StatusPill';
 import { FILTER_STATUS_ACTIVE_FILL } from '@/utils/statusColors';
-import React, { useCallback } from 'react';
+import React, { useCallback, useId } from 'react';
 import { cn } from '@/lib/utils';
 import { useProjectStatus } from '@/hooks/useProjectStatus';
+import type { DashboardValidSortField } from '@/features/dashboard/dashboard.constants';
 import { ProjectType } from '@/types/project';
 import { getLifecycleDate, getSizeAndShapeLabel } from './projectsTableUtils';
 import ProjectThumbnail from './ProjectThumbnail';
 
 interface ProjectTableCardProps {
   project: ProjectType;
+  sortField?: DashboardValidSortField;
   onNavigate: (projectId: string) => void;
   isRecentlyEdited?: boolean;
 }
 
 const ProjectTableCardComponent = ({
   project,
+  sortField,
   onNavigate,
   isRecentlyEdited = false,
 }: ProjectTableCardProps) => {
   const { getStatusLabel } = useProjectStatus();
+  const lifecycleDateId = useId();
 
   const openProject = useCallback(() => {
     onNavigate(project.id);
@@ -31,7 +35,7 @@ const ProjectTableCardComponent = ({
         ? 'Kitted Up'
         : getStatusLabel(project.status);
 
-  const lifecycleDate = getLifecycleDate(project);
+  const lifecycleDate = getLifecycleDate(project, sortField);
   const sizeAndShape = getSizeAndShapeLabel(project);
   const artistLabel = project.artist && project.artist !== '-' ? project.artist : null;
   const companyAndArtist = [project.company, artistLabel].filter(Boolean).join(' · ') || '-';
@@ -47,6 +51,7 @@ const ProjectTableCardComponent = ({
           : 'border-border bg-card hover:border-primary/20'
       )}
       aria-label={`Open project ${project.title}`}
+      aria-describedby={lifecycleDate ? lifecycleDateId : undefined}
     >
       <div className="bg-muted relative size-24 flex-shrink-0">
         <ProjectThumbnail imageUrl={project.imageUrl} title={project.title} />
@@ -63,7 +68,7 @@ const ProjectTableCardComponent = ({
             {lifecycleDate && (
               <>
                 <span className="mx-1.5">·</span>
-                <span>
+                <span id={lifecycleDateId}>
                   {lifecycleDate.label} <span className="tabular-nums">{lifecycleDate.value}</span>
                 </span>
               </>

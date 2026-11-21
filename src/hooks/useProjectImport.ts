@@ -330,7 +330,9 @@ export const useProjectImport = () => {
           });
 
           // Add validation issues to our tracking
-          allValidationIssues.push(...projectValidation.issues);
+          allValidationIssues.push(
+            ...projectValidation.issues.map(issue => ({ ...issue, row: parsedProject.csvRow }))
+          );
 
           // Map tag names to IDs using validated names
           const projectTagIds = (parsedProject.tagNames || [])

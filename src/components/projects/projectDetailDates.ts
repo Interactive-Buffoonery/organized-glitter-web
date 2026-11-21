@@ -20,16 +20,18 @@ export function getProjectDayLabel(project: ProjectType, today: string) {
   const start = getDateFieldSelectedDate(project.dateStarted.slice(0, 10));
   const end = getDateFieldSelectedDate((project.dateCompleted || today).slice(0, 10));
   if (!start || !end) return null;
-  const day =
-    Math.floor(
-      (Date.UTC(end.year, end.month - 1, end.day) -
-        Date.UTC(start.year, start.month - 1, start.day)) /
-        86400000
-    ) + 1;
-  if (day < 1) return null;
-  if (project.status === 'completed' && project.dateCompleted)
-    return `Finished in ${day} ${day === 1 ? 'day' : 'days'}`;
-  return project.status === 'progress' || project.status === 'onhold' ? `Day ${day}` : null;
+  const elapsedDays =
+    (Date.UTC(end.year, end.month - 1, end.day) -
+      Date.UTC(start.year, start.month - 1, start.day)) /
+    86400000;
+  if (elapsedDays < 0) return null;
+  if (project.status === 'completed' && project.dateCompleted) {
+    if (elapsedDays === 0) return 'Finished same day';
+    return `Finished in ${elapsedDays} ${elapsedDays === 1 ? 'day' : 'days'}`;
+  }
+  return project.status === 'progress' || project.status === 'onhold'
+    ? `Day ${elapsedDays + 1}`
+    : null;
 }
 
 export function formatKitDate(value: string, timezone: string) {

@@ -15,13 +15,17 @@ describe('project journal dates', () => {
       'Day 3'
     );
   });
-  it('freezes the duration for a finished kit', () => {
+  it.each([
+    ['2026-03-07', 'Finished same day'],
+    ['2026-03-08', 'Finished in 1 day'],
+    ['2026-03-09', 'Finished in 2 days'],
+  ])('uses elapsed calendar days for a kit finished on %s', (dateCompleted, label) => {
     expect(
       getProjectDayLabel(
-        { ...project, status: 'completed', dateStarted: '2026-03-07', dateCompleted: '2026-03-09' },
+        { ...project, status: 'completed', dateStarted: '2026-03-07', dateCompleted },
         '2026-10-26'
       )
-    ).toBe('Finished in 3 days');
+    ).toBe(label);
   });
   it('does not invent a day counter without a valid start date', () => {
     expect(getProjectDayLabel(project, '2026-10-26')).toBeNull();
@@ -42,4 +46,5 @@ describe('project journal dates', () => {
 
 it('formats a compact saved date without losing its calendar day', () => {
   expect(formatKitDate('2026-01-12', 'America/New_York')).toBe('Jan 12');
+  expect(formatKitDate('2026-01-12', 'Pacific/Kiritimati')).toBe('Jan 12');
 });

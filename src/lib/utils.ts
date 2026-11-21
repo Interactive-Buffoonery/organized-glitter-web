@@ -20,5 +20,5 @@ export function formatStatsNumber(value: number | null | undefined): string {
 export function formatStatsDays(value: number | null | undefined): string {
   if (value === null || value === undefined) return '-';
   const rounded = Math.round(value * 10) / 10;
-  return `${numberFormatter.format(rounded)} days`;
+  return `${numberFormatter.format(rounded)} ${rounded === 1 ? 'day' : 'days'}`;
 }

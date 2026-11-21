@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { useCollectionStats } from '@/hooks/queries/useStats';
+import { useCollectionStats, useCompletionsByMonth } from '@/hooks/queries/useStats';
 import type { StatsSizeBucket } from '@/types/stats';
 import Stats from '../Stats';
 
@@ -17,7 +17,7 @@ vi.mock('@/hooks/queries/useStats', () => {
   const emptyQuery = () => ({ isLoading: false, isError: false, refetch: vi.fn() });
   return {
     useStatsSummary: emptyQuery,
-    useCompletionsByMonth: emptyQuery,
+    useCompletionsByMonth: vi.fn(emptyQuery),
     useCompletionsYearly: emptyQuery,
     useCompletionTimeStats: emptyQuery,
     useCollectionStats: vi.fn(),
@@ -69,4 +69,26 @@ describe('Most common size', () => {
   it('shows a placeholder when no bucket has any kits', () => {
     expect(renderWithSizeBuckets([{ ...mini, count: 0 }])).toHaveTextContent('-');
   });
+});
+
+it('uses singular and plural elapsed days in monthly stats', () => {
+  const months = [0, 1, 2].map((days, index) => ({
+    month: index + 1,
+    label: ['Jan', 'Feb', 'Mar'][index],
+    count: 1,
+    previousYearCount: 0,
+    previousYearDelta: 1,
+    averageCompletionDays: days,
+  }));
+  vi.mocked(useCompletionsByMonth).mockReturnValue({
+    data: { generatedAt: '', year: new Date().getFullYear(), total: 3, months },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  } as ReturnType<typeof useCompletionsByMonth>);
+  renderWithSizeBuckets([]);
+  const table = within(screen.getByRole('table'));
+  expect(table.getByRole('cell', { name: '0 days' })).toBeInTheDocument();
+  expect(table.getByRole('cell', { name: '1 day' })).toBeInTheDocument();
+  expect(table.getByRole('cell', { name: '2 days' })).toBeInTheDocument();
 });

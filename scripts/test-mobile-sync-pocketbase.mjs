@@ -279,12 +279,14 @@ try {
       context
     );
   const ownerProjects = ownerClient.collection('projects');
-  assertDateSentinels(await ownerProjects.getOne(project.id), 1, 'omitted dates store 1');
+  const omittedDimensions = await ownerProjects.getOne(project.id);
+  assertDateSentinels(omittedDimensions, 1, 'omitted dates store 1');
   const datedProject = await ownerProjects.create({
     user: owner.id,
     title: 'Project with dates',
     status: 'completed',
     kit_category: 'full',
+    width: 30.5,
     ...dateValues('2026-09-27 12:00:00.000Z'),
   });
   assertDateSentinels(datedProject, 0, 'filled dates store 0');
@@ -294,7 +296,10 @@ try {
     0,
     'adding dates stores 0'
   );
-  const clearedProject = await ownerProjects.update(ownedSortProject.id, dateValues(''));
+  const clearedProject = await ownerProjects.update(ownedSortProject.id, {
+    ...dateValues(''),
+    width: 0,
+  });
   assertDateSentinels(clearedProject, 1, 'clearing dates stores 1');
   const assertFinishDateCounts = async () => {
     const missing = ownerClient.filter('user = {:user} && date_completed_has_value = 1', {
@@ -344,6 +349,7 @@ try {
     'renamed sort'
   );
   const datedBeforeMigration = await ownerProjects.getOne(datedProject.id);
+  const negativeWidth = await admin.collection('projects').update(poisoned.id, { width: -1 });
   const legacyDb = new DatabaseSync(path.join(dataDir, 'data.db'));
   try {
     legacyDb.exec('PRAGMA busy_timeout = 5000');
@@ -359,6 +365,15 @@ try {
     staleDateSentinels.run(0, 0, 0, 0, project.id);
     staleDateSentinels.run(0, 0, 0, 0, ownedSortProject.id);
     staleDateSentinels.run(1, 1, 1, 1, datedProject.id);
+    const restoredDates = legacyDb.prepare(
+      'UPDATE projects SET date_purchased = ?, date_completed = ? WHERE id = ?'
+    );
+    restoredDates.run('0001-01-01 00:00:00Z', '0001-01-01 00:00:00.000Z', project.id);
+    restoredDates.run(' ', 'not a date', ownedSortProject.id);
+    legacyDb
+      .prepare('UPDATE projects SET width_has_value = 0 WHERE id IN (?, ?, ?)')
+      .run(project.id, ownedSortProject.id, poisoned.id);
+    legacyDb.prepare('UPDATE projects SET width_has_value = 1 WHERE id = ?').run(datedProject.id);
   } finally {
     legacyDb.close();
   }
@@ -381,6 +396,47 @@ try {
   assert.equal(migrated.status, 0, migrated.stderr || migrated.stdout);
   const migratedBlank = await ownerProjects.getOne(ownedSortProject.id);
   const migratedDated = await ownerProjects.getOne(datedProject.id);
+  const migratedZeroDate = await ownerProjects.getOne(project.id);
+  const migratedNegativeWidth = await ownerProjects.getOne(poisoned.id);
+  assert.deepEqual(
+    {
+      hookWidths: [omittedDimensions, clearedProject, negativeWidth, datedProject].map(
+        record => record.width_has_value
+      ),
+      zeroDateSentinels: dateFields.map(field => migratedZeroDate[`${field}_has_value`]),
+      garbageDateSentinels: dateFields.map(field => migratedBlank[`${field}_has_value`]),
+      migratedWidths: [migratedZeroDate, migratedBlank, migratedNegativeWidth, migratedDated].map(
+        record => record.width_has_value
+      ),
+    },
+    {
+      hookWidths: [1, 1, 1, 0],
+      zeroDateSentinels: [1, 1, 1, 1],
+      garbageDateSentinels: [1, 1, 1, 1],
+      migratedWidths: [1, 1, 1, 0],
+    }
+  );
+  assert.equal(migratedZeroDate.date_purchased, '');
+  assert.equal(migratedZeroDate.date_completed, '');
+  const migratedDb = new DatabaseSync(path.join(dataDir, 'data.db'), { readOnly: true });
+  try {
+    const storedDates = migratedDb.prepare(
+      'SELECT date_purchased, date_completed FROM projects WHERE id = ?'
+    );
+    assert.deepEqual(Object.values(storedDates.get(project.id)), [
+      '0001-01-01 00:00:00Z',
+      '0001-01-01 00:00:00.000Z',
+    ]);
+    assert.deepEqual(Object.values(storedDates.get(ownedSortProject.id)), [' ', 'not a date']);
+  } finally {
+    migratedDb.close();
+  }
+  assert.deepEqual(
+    [migratedZeroDate, migratedBlank, migratedNegativeWidth, migratedDated].map(
+      record => record.width
+    ),
+    [0, 0, -1, 30.5]
+  );
   assertDateSentinels(migratedBlank, 1, 'migration repairs blank dates');
   assertDateSentinels(migratedDated, 0, 'migration repairs filled dates');
   for (const field of [...dateFields, 'updated']) {

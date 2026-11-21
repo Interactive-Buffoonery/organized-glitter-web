@@ -69,7 +69,7 @@ export function ColoringBookCard({ book, skipImageLoading = false }: ColoringBoo
             </h3>
           </div>
 
-          <p className="text-muted-foreground flex h-5 items-center truncate text-xs">
+          <p className="text-muted-foreground h-5 truncate text-xs leading-5">
             {getColoringBookMetadataLabel(book) || ' '}
           </p>
 

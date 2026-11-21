@@ -135,8 +135,14 @@ function WheelKeyRows({
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{target.title}</span>
             {(target.subtitle || target.statusLabel) && (
-              <span className="text-muted-foreground block truncate text-xs">
-                {[target.subtitle, target.statusLabel].filter(Boolean).join(' | ')}
+              <span className="text-muted-foreground flex min-w-0 text-xs whitespace-pre">
+                {target.subtitle && <span className="truncate">{target.subtitle}</span>}
+                {target.statusLabel && (
+                  <span className="shrink-0">
+                    {target.subtitle && ' | '}
+                    {target.statusLabel}
+                  </span>
+                )}
               </span>
             )}
           </span>

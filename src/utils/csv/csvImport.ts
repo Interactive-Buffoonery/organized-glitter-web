@@ -302,31 +302,78 @@ const getTextFieldValue = (
   return value ? restoreCsvFormulaTextField(value) : undefined;
 };
 
-const ISO_DATE_PREFIX = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ]|$)/;
-const US_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/;
+const TIME = String.raw`(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?`;
+const ISO_DATE = new RegExp(
+  String.raw`^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ]${TIME}(?:Z|[+-](?:[01]\d|2[0-3]):?[0-5]\d)?)?$`,
+  'i'
+);
+const US_DATE = new RegExp(
+  String.raw`^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:,?\s+(?:(?:0?[1-9]|1[0-2]):[0-5]\d(?::[0-5]\d)?\s*[ap]m|${TIME}))?$`,
+  'i'
+);
+const MONTH_DAY_YEAR = /^([a-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/i;
+const DAY_MONTH_YEAR = /^(\d{1,2})[-\s]([a-z]{3,9})\.?[-\s](\d{2}|\d{4})$/i;
+const MONTHS = [
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+];
+
+const monthNumber = (name: string) => {
+  const index = MONTHS.findIndex(month => month.startsWith(name.toLowerCase()));
+  return index < 0 ? undefined : String(index + 1);
+};
+
+const fullYear = (year: string) =>
+  year.length === 4 ? year : String(Number(year) + (Number(year) < 50 ? 2000 : 1900));
 
 const toDateOnly = (year: string, month: string, day: string) =>
-  `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  `${fullYear(year)}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+// ponytail: formats without an explicit parser only pass when the parsed day and month
+// appear in the text, which catches rollover; add a parser if a real export trips it.
+const writesSameDay = (text: string, date: Date) => {
+  const numbers = text.match(/\d+/g)?.map(Number) ?? [];
+  const month = date.getMonth();
+  return (
+    numbers.includes(date.getDate()) &&
+    (numbers.includes(month + 1) || text.toLowerCase().includes(MONTHS[month].slice(0, 3)))
+  );
+};
 
 /**
  * Keep the calendar day as written, so validation can reject impossible dates
- * and no timezone moves the day.
+ * and no timezone moves the day. Text that cannot be read safely is returned
+ * as is, so validation reports it.
  */
 const validateDate = (dateStr: string): string | undefined => {
   if (!dateStr) return undefined;
 
-  const iso = dateStr.match(ISO_DATE_PREFIX);
+  const iso = dateStr.match(ISO_DATE);
   if (iso) return toDateOnly(iso[1], iso[2], iso[3]);
+  if (/^\d{4}-\d{1,2}-\d{1,2}/.test(dateStr)) return dateStr;
 
   const us = dateStr.match(US_DATE);
-  if (us) {
-    const shortYear = Number(us[3]);
-    const year = us[3].length === 4 ? us[3] : String(shortYear + (shortYear < 50 ? 2000 : 1900));
-    return toDateOnly(year, us[1], us[2]);
-  }
+  if (us) return toDateOnly(us[3], us[1], us[2]);
 
-  // ponytail: month-name dates go through Date, which rolls "Feb 30" into March;
-  // add a month-name parser if people import those.
+  const monthFirst = dateStr.match(MONTH_DAY_YEAR);
+  const dayFirst = dateStr.match(DAY_MONTH_YEAR);
+  const named = monthFirst
+    ? { day: monthFirst[2], month: monthNumber(monthFirst[1]), year: monthFirst[3] }
+    : dayFirst && { day: dayFirst[1], month: monthNumber(dayFirst[2]), year: dayFirst[3] };
+  if (named) return named.month ? toDateOnly(named.year, named.month, named.day) : dateStr;
+
   const parsed = new Date(dateStr);
-  return Number.isNaN(parsed.getTime()) ? dateStr : formatLocalDate(parsed, 'yyyy-MM-dd');
+  return Number.isNaN(parsed.getTime()) || !writesSameDay(dateStr, parsed)
+    ? dateStr
+    : formatLocalDate(parsed, 'yyyy-MM-dd');
 };

@@ -129,10 +129,33 @@ describe('CSV calendar dates', () => {
     ['2/29/24', '2024-02-29'],
     ['2024-02-29T00:00:00.000Z', '2024-02-29'],
     ['12/5/2025', '2025-12-05'],
+    ['2024-02-29T23:30:00-05:00', '2024-02-29'],
+    ['2/30/2026 12:00 AM', '2026-02-30'],
+    ['2/29/2024 11:59 PM', '2024-02-29'],
+    ['Feb 29, 2024', '2024-02-29'],
+    ['February 29, 2024', '2024-02-29'],
+    ['29-Feb-24', '2024-02-29'],
+    ['Feb 30, 2026', '2026-02-30'],
+    ['30-Feb-26', '2026-02-30'],
+    ['2024/02/29', '2024-02-29'],
   ])('keeps the written calendar day of %s', async (cell, expected) => {
-    const { projects } = await parseCsvToProjects(`Title,Date Purchased\nKit,${cell}`);
+    const { projects } = await parseCsvToProjects(`Title,Date Purchased\nKit,"${cell}"`);
 
     expect(projects[0].datePurchased).toBe(expected);
+  });
+});
+
+describe('CSV dates that cannot be read safely', () => {
+  it.each([
+    '2024-02-29Tgarbage',
+    '2024-02-29T25:00:00Z',
+    '2/29/2024 13:00 PM',
+    'Febtober 3, 2024',
+    '2026/02/30',
+  ])('keeps %s for a validation note', async cell => {
+    const { projects } = await parseCsvToProjects(`Title,Date Purchased\nKit,"${cell}"`);
+
+    expect(projects[0].datePurchased).toBe(cell);
   });
 });
 

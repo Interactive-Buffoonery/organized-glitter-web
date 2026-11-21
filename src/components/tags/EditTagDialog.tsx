@@ -29,7 +29,7 @@ interface EditTagDialogProps {
  *
  * This component implements a two-level error handling approach:
  *
- * 1. Global Error Handling (useUpdateTag hook):
+ * 1. Global Error Handling (useUpdateTag / useUpdateColoringTag hooks):
  *    - Provides comprehensive error categorization and user-friendly toast notifications
  *    - Handles authentication errors, duplicate name errors, and general failures
  *    - Automatically invalidates relevant queries on success
@@ -87,15 +87,15 @@ const EditTagDialog = ({ tag, vocabulary = 'diamond' }: EditTagDialogProps) => {
       {
         onSuccess: () => {
           setIsDialogOpen(false);
-          // Global success toast notification is handled by useUpdateTag hook.
+          // Global success toast notification is handled by the update hook.
         },
         onError: (error: unknown) => {
           // Component-level error handling for immediate user feedback
-          // This works alongside the global error handling in useUpdateTag hook
+          // This works alongside the global error handling in the update hook
           logger.error('EditTagDialog: Failed to update tag:', { error });
 
           // Keep dialog open so user can retry
-          // Global error toast is already shown by useUpdateTag hook, but we ensure
+          // Global error toast is already shown by the update hook, but we ensure
           // the user can immediately see the form is still available for retry
           const errorMessage =
             error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -107,7 +107,7 @@ const EditTagDialog = ({ tag, vocabulary = 'diamond' }: EditTagDialogProps) => {
             return;
           }
 
-          // For other errors, the global toast notification from useUpdateTag provides feedback
+          // For other errors, the global toast notification from the update hook provides feedback
           // Dialog remains open for user to retry or cancel
         },
       }

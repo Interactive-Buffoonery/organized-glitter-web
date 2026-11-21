@@ -90,3 +90,45 @@ describe.each([
     });
   });
 });
+
+describe.each([
+  { name: 'CSV content', parse: parseCsvToProjects },
+  {
+    name: 'CSV file',
+    parse: (csv: string) =>
+      parseCsvFileToProjects(new File([csv], 'lines.csv', { type: 'text/csv' })),
+  },
+])('CSV record lines from $name', ({ parse }) => {
+  it.each(['\n', '\r\n'])('reports the physical start line of each record (%j)', async newline => {
+    const csv = [
+      'Title,Notes,Date Purchased',
+      'Kit A,,2026-02-30',
+      '',
+      'Kit B,"first line',
+      'second line",2026-02-30',
+      'Kit C,,2026-02-30',
+    ].join(newline);
+
+    const { projects } = await parse(csv);
+
+    expect(projects.map(project => [project.title, project.csvRow])).toEqual([
+      ['Kit A', 2],
+      ['Kit B', 4],
+      ['Kit C', 6],
+    ]);
+  });
+});
+
+describe('CSV calendar dates', () => {
+  it.each([
+    ['2/30/26', '2026-02-30'],
+    ['2026-02-30T00:00:00.000Z', '2026-02-30'],
+    ['2/29/24', '2024-02-29'],
+    ['2024-02-29T00:00:00.000Z', '2024-02-29'],
+    ['12/5/2025', '2025-12-05'],
+  ])('keeps the written calendar day of %s', async (cell, expected) => {
+    const { projects } = await parseCsvToProjects(`Title,Date Purchased\nKit,${cell}`);
+
+    expect(projects[0].datePurchased).toBe(expected);
+  });
+});

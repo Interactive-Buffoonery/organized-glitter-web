@@ -2,14 +2,19 @@ import { ProjectType } from '@/types/project';
 import Papa from 'papaparse';
 import { EXPECTED_COLUMNS } from '@/utils/csv/csvColumns';
 import { logger } from '@/utils/logger';
-import { safeDateString } from '@/utils/date/dateHelpers';
+import { formatLocalDate } from '@/utils/date/timezoneUtils';
 import { normalizeStatus, validateKitCategoryValue } from '@/utils/csv/csvValidation';
 import { restoreCsvFormulaTextField } from '@/utils/csv/csvFormulaSafety';
 
 export type ParsedCsvProject = Partial<ProjectType> & { csvRow: number };
 
-// ponytail: counts parsed rows; blank lines skipped by Papa shift later row numbers
-const HEADER_ROW = 1;
+const countNewlines = (text: string) => text.split('\n').length - 1;
+
+const withoutTrailingNewline = (text: string, end: number) => {
+  if (text[end - 1] === '\n') end--;
+  if (text[end - 1] === '\r') end--;
+  return end;
+};
 
 export interface ParsedCsvData {
   projects: ParsedCsvProject[];
@@ -193,21 +198,32 @@ export const parseCsvToProjects = (
       return;
     }
 
+    const content = csvContent.replace(/^\uFEFF/, '');
     const projects: ParsedCsvProject[] = [];
     const parsingWarnings: Papa.ParseError[] = [];
-    let csvRow = HEADER_ROW;
+    let scannedTo = 0;
+    let newlinesBeforeScan = 0;
 
-    Papa.parse(csvContent, {
+    Papa.parse(content, {
       header: true,
       skipEmptyLines: true,
       transformHeader: (header: string) => header.toLowerCase().trim(),
       step: results => {
         parsingWarnings.push(...results.errors);
-        csvRow++;
-        const project = parseProjectFromRow(results.data as Record<string, string>);
-        if (project) projects.push({ ...project, csvRow });
+        const row = results.data as Record<string, string>;
+        const recordEnd = withoutTrailingNewline(content, results.meta.cursor);
+        newlinesBeforeScan += countNewlines(content.slice(scannedTo, recordEnd));
+        scannedTo = recordEnd;
+        const csvRow = newlinesBeforeScan + 1 - countNewlines(Object.values(row).join(''));
+
+        try {
+          const project = parseProjectFromRow(row);
+          if (project) projects.push({ ...project, csvRow });
+        } catch (error) {
+          logger.warn('Error processing CSV row:', error, row);
+        }
         if (onProgress) {
-          const progress = Math.round((results.meta.cursor / csvContent.length) * 100);
+          const progress = Math.round((results.meta.cursor / content.length) * 100);
           onProgress(Math.min(progress, 99));
         }
       },
@@ -235,60 +251,19 @@ export const parseCsvToProjects = (
 };
 
 /**
- * Parse CSV file with streaming support for large files
- * @param file The CSV file to parse
- * @param onProgress Optional progress callback
- * @returns Promise that resolves to an object containing projects and all unique tag names
+ * Parse a CSV file. Import files are size-capped, so the text is read whole and
+ * shares one parser that knows each record's line.
  */
-export const parseCsvFileToProjects = (
+export const parseCsvFileToProjects = async (
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<ParsedCsvData> => {
-  return new Promise((resolve, reject) => {
-    const projects: ParsedCsvProject[] = [];
-    let rowCount = 0;
-    let csvRow = HEADER_ROW;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header: string) => header.toLowerCase().trim(),
-      step: results => {
-        // Process each row as it's parsed (streaming)
-        const row = results.data as Record<string, string>;
-        csvRow++;
-
-        try {
-          const project = parseProjectFromRow(row);
-          if (project) {
-            projects.push({ ...project, csvRow });
-            rowCount++;
-          }
-
-          // Report progress every 100 rows
-          if (onProgress && rowCount % 100 === 0) {
-            // Approximate progress based on bytes read vs file size
-            const progress = Math.round((results.meta.cursor / file.size) * 100);
-            onProgress(Math.min(progress, 99)); // Cap at 99% until complete
-          }
-        } catch (error) {
-          logger.warn('Error processing CSV row:', error, row);
-        }
-      },
-      complete: () => {
-        if (onProgress) {
-          onProgress(100);
-        }
-        const allTagNamesArrays = projects.map(p => p.tagNames || []);
-        const allUniqueTagNames = Array.from(new Set(allTagNamesArrays.flat()));
-        resolve({ projects, allUniqueTagNames });
-      },
-      error: (error: unknown) => {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        reject(new Error(`CSV file parsing failed: ${errorMessage}`));
-      },
-    });
-  });
+  const csvContent = await file.text();
+  if (!csvContent.trim()) {
+    onProgress?.(100);
+    return { projects: [], allUniqueTagNames: [] };
+  }
+  return parseCsvToProjects(csvContent, onProgress);
 };
 
 /**
@@ -315,12 +290,31 @@ const getTextFieldValue = (
   return value ? restoreCsvFormulaTextField(value) : undefined;
 };
 
+const ISO_DATE_PREFIX = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ]|$)/;
+const US_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/;
+
+const toDateOnly = (year: string, month: string, day: string) =>
+  `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
 /**
- * Normalize a date string, keeping unparseable input so validation can report it
+ * Keep the calendar day as written, so validation can reject impossible dates
+ * and no timezone moves the day.
  */
 const validateDate = (dateStr: string): string | undefined => {
   if (!dateStr) return undefined;
 
-  // Use timezone-safe conversion (defaults to UTC for backwards compatibility)
-  return safeDateString(dateStr) || dateStr;
+  const iso = dateStr.match(ISO_DATE_PREFIX);
+  if (iso) return toDateOnly(iso[1], iso[2], iso[3]);
+
+  const us = dateStr.match(US_DATE);
+  if (us) {
+    const shortYear = Number(us[3]);
+    const year = us[3].length === 4 ? us[3] : String(shortYear + (shortYear < 50 ? 2000 : 1900));
+    return toDateOnly(year, us[1], us[2]);
+  }
+
+  // ponytail: month-name dates go through Date, which rolls "Feb 30" into March;
+  // add a month-name parser if people import those.
+  const parsed = new Date(dateStr);
+  return Number.isNaN(parsed.getTime()) ? dateStr : formatLocalDate(parsed, 'yyyy-MM-dd');
 };

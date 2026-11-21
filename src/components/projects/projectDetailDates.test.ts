@@ -27,6 +27,19 @@ describe('project journal dates', () => {
       )
     ).toBe(label);
   });
+  it('reads the calendar dates from PocketBase datetime values', () => {
+    expect(
+      getProjectDayLabel(
+        {
+          ...project,
+          status: 'completed',
+          dateStarted: '2026-03-07 00:00:00.000Z',
+          dateCompleted: '2026-03-09 00:00:00.000Z',
+        },
+        '2026-10-26'
+      )
+    ).toBe('Finished in 2 days');
+  });
   it('does not invent a day counter without a valid start date', () => {
     expect(getProjectDayLabel(project, '2026-10-26')).toBeNull();
     expect(getProjectDayLabel({ ...project, dateStarted: '2027-01-01' }, '2026-10-26')).toBeNull();

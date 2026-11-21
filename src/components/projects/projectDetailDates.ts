@@ -2,6 +2,7 @@ import { formatDateInUserTimezone } from '@/utils/date/timezoneUtils';
 import type { ProjectType } from '@/types/project';
 import type { DateFieldKey } from '@/hooks/mutations/projectCommands';
 import { getDateFieldSelectedDate } from '@/components/ui/date-field-utils';
+import { getActivityDayLabel } from '@/components/shared/activityDayLabel';
 
 export const PROJECT_DATES: { key: DateFieldKey; label: string; addLabel: string }[] = [
   { key: 'datePurchased', label: 'Bought', addLabel: 'add purchase date' },
@@ -16,21 +17,11 @@ export function getVisibleProjectDates(project: ProjectType) {
 }
 
 export function getProjectDayLabel(project: ProjectType, today: string) {
-  if (!project.dateStarted) return null;
-  const start = getDateFieldSelectedDate(project.dateStarted.slice(0, 10));
-  const end = getDateFieldSelectedDate((project.dateCompleted || today).slice(0, 10));
-  if (!start || !end) return null;
-  const elapsedDays =
-    (Date.UTC(end.year, end.month - 1, end.day) -
-      Date.UTC(start.year, start.month - 1, start.day)) /
-    86400000;
-  if (elapsedDays < 0) return null;
-  if (project.status === 'completed' && project.dateCompleted) {
-    if (elapsedDays === 0) return 'Finished same day';
-    return `Finished in ${elapsedDays} ${elapsedDays === 1 ? 'day' : 'days'}`;
+  if (project.status === 'completed') {
+    return getActivityDayLabel(project.dateStarted, project.dateCompleted, true);
   }
   return project.status === 'progress' || project.status === 'onhold'
-    ? `Day ${elapsedDays + 1}`
+    ? getActivityDayLabel(project.dateStarted, project.dateCompleted || today, false)
     : null;
 }
 

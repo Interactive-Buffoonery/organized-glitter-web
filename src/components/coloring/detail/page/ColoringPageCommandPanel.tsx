@@ -12,11 +12,12 @@ import type { UseColoringPageStatusActionResult } from '@/hooks/coloring/useColo
 import { useColorKeys } from '@/hooks/queries/coloring/useColorKeys';
 import { useAuth } from '@/hooks/useAuth';
 import { SectionHeading } from '@/components/shared/Section';
+import { getActivityDayLabel } from '@/components/shared/activityDayLabel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { ColoringBookDTO, ColoringPageDTO } from '@/services/pocketbase/coloring.service';
 import type { ColoringMediumRecord } from '@/types/coloringMedium';
 import { getColoringBookDetailPath } from '@/pages/coloringBookNavigation';
-import { formatDateInUserTimezone, getCurrentDateInUserTimezone } from '@/utils/date/timezoneUtils';
+import { getCurrentDateInUserTimezone } from '@/utils/date/timezoneUtils';
 import { ColoringPageLifecycleDateSection } from './ColoringPageLifecycleDateSection';
 import { ColoringPageMediumPicker } from './ColoringPageMediumPicker';
 import { ColoringPageMysteryRevealSection } from './ColoringPageMysteryRevealSection';
@@ -63,14 +64,11 @@ export function ColoringPageCommandPanel({
     mediumSelection.selectedMediumIds.includes(medium.id)
   );
   const today = getCurrentDateInUserTimezone(userTimezone);
-  const start =
-    page.startedAt && formatDateInUserTimezone(page.startedAt, userTimezone, 'yyyy-MM-dd');
-  const end = page.completedAt
-    ? formatDateInUserTimezone(page.completedAt, userTimezone, 'yyyy-MM-dd')
-    : today;
-  const day = start
-    ? Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1)
-    : null;
+  const isCompleted = page.status === 'completed';
+  const dayLabel =
+    isCompleted || page.status === 'in_progress'
+      ? getActivityDayLabel(page.startedAt, isCompleted ? page.completedAt : today, isCompleted)
+      : null;
   const editDate = () => setEditor('dates');
   return (
     <aside className="space-y-6 lg:sticky lg:top-24" aria-label="Page details">
@@ -87,7 +85,9 @@ export function ColoringPageCommandPanel({
             }
             disabled={statusAction.isPending}
           />
-          {day && <span className="text-muted-foreground text-sm tabular-nums">Day {day}</span>}
+          {dayLabel && (
+            <span className="text-muted-foreground text-sm tabular-nums">{dayLabel}</span>
+          )}
         </div>
         <FinishDatePrompt
           key={`${page.id}:${page.status}`}

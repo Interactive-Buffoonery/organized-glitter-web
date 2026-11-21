@@ -271,7 +271,8 @@ function DiamondRegion({
   const summary = queries.summary.data;
   const collection = queries.collection.data;
   const mostCommonSize = collection?.sizeBuckets.reduce<StatsSizeBucket | undefined>(
-    (mostCommon, bucket) => (bucket.count > (mostCommon?.count ?? 0) ? bucket : mostCommon),
+    (mostCommon, bucket) =>
+      bucket.key !== 'unknown' && bucket.count > (mostCommon?.count ?? 0) ? bucket : mostCommon,
     undefined
   );
   const groups: MostRepresentedGroup[] = [

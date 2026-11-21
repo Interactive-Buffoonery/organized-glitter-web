@@ -55,6 +55,7 @@ describe('Most common size', () => {
   const mini: StatsSizeBucket = { key: 'mini', label: '<30 cm', count: 1 };
   const large: StatsSizeBucket = { key: 'large', label: '70-109.9 cm', count: 17 };
   const huge: StatsSizeBucket = { key: 'huge', label: '110+ cm', count: 14 };
+  const unknown: StatsSizeBucket = { key: 'unknown', label: 'Unknown', count: 20 };
 
   it('shows the bucket with the highest count', () => {
     expect(renderWithSizeBuckets([mini, large, huge])).toHaveTextContent(large.label);
@@ -68,6 +69,14 @@ describe('Most common size', () => {
 
   it('shows a placeholder when no bucket has any kits', () => {
     expect(renderWithSizeBuckets([{ ...mini, count: 0 }])).toHaveTextContent('-');
+  });
+
+  it('shows the most common measured size when more kits have an unknown size', () => {
+    expect(renderWithSizeBuckets([{ ...large, count: 5 }, unknown])).toHaveTextContent(large.label);
+  });
+
+  it('shows a placeholder when all kits have an unknown size', () => {
+    expect(renderWithSizeBuckets([{ ...large, count: 0 }, unknown])).toHaveTextContent('-');
   });
 });
 

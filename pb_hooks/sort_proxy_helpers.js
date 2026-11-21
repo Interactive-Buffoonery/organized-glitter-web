@@ -25,10 +25,10 @@ function syncProject(e) {
     const record = e.record;
     const title = record.get('title') || '';
     const status = record.get('status') || '';
-    const datePurchased = record.get('date_purchased') || '';
-    const dateReceived = record.get('date_received') || '';
-    const dateStarted = record.get('date_started') || '';
-    const dateCompleted = record.get('date_completed') || '';
+    const datePurchased = record.getString('date_purchased');
+    const dateReceived = record.getString('date_received');
+    const dateStarted = record.getString('date_started');
+    const dateCompleted = record.getString('date_completed');
     const width = record.get('width');
     const statusOrderByStatus = {
       wishlist: 1,

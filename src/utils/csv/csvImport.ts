@@ -8,7 +8,7 @@ import { restoreCsvFormulaTextField } from '@/utils/csv/csvFormulaSafety';
 
 export type ParsedCsvProject = Partial<ProjectType> & { csvRow: number };
 
-const countNewlines = (text: string) => text.split('\n').length - 1;
+const countLineBreaks = (text: string) => text.match(/\r\n|\r|\n/g)?.length ?? 0;
 
 const withoutTrailingNewline = (text: string, end: number) => {
   if (text[end - 1] === '\n') end--;
@@ -212,9 +212,9 @@ export const parseCsvToProjects = (
         parsingWarnings.push(...results.errors);
         const row = results.data as Record<string, string>;
         const recordEnd = withoutTrailingNewline(content, results.meta.cursor);
-        newlinesBeforeScan += countNewlines(content.slice(scannedTo, recordEnd));
+        newlinesBeforeScan += countLineBreaks(content.slice(scannedTo, recordEnd));
         scannedTo = recordEnd;
-        const csvRow = newlinesBeforeScan + 1 - countNewlines(Object.values(row).join(''));
+        const csvRow = newlinesBeforeScan + 1 - countLineBreaks(Object.values(row).join('\0'));
 
         try {
           const project = parseProjectFromRow(row);
@@ -250,6 +250,18 @@ export const parseCsvToProjects = (
   });
 };
 
+/** Decode like FileReader.readAsText: a UTF-16 byte order mark picks the encoding, otherwise UTF-8. */
+const readCsvText = async (file: File) => {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const encoding =
+    bytes[0] === 0xff && bytes[1] === 0xfe
+      ? 'utf-16le'
+      : bytes[0] === 0xfe && bytes[1] === 0xff
+        ? 'utf-16be'
+        : 'utf-8';
+  return new TextDecoder(encoding).decode(bytes);
+};
+
 /**
  * Parse a CSV file. Import files are size-capped, so the text is read whole and
  * shares one parser that knows each record's line.
@@ -258,7 +270,7 @@ export const parseCsvFileToProjects = async (
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<ParsedCsvData> => {
-  const csvContent = await file.text();
+  const csvContent = await readCsvText(file);
   if (!csvContent.trim()) {
     onProgress?.(100);
     return { projects: [], allUniqueTagNames: [] };

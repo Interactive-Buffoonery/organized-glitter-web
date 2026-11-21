@@ -99,24 +99,27 @@ describe.each([
       parseCsvFileToProjects(new File([csv], 'lines.csv', { type: 'text/csv' })),
   },
 ])('CSV record lines from $name', ({ parse }) => {
-  it.each(['\n', '\r\n'])('reports the physical start line of each record (%j)', async newline => {
-    const csv = [
-      'Title,Notes,Date Purchased',
-      'Kit A,,2026-02-30',
-      '',
-      'Kit B,"first line',
-      'second line",2026-02-30',
-      'Kit C,,2026-02-30',
-    ].join(newline);
+  it.each(['\n', '\r\n', '\r'])(
+    'reports the physical start line of each record (%j)',
+    async newline => {
+      const csv = [
+        'Title,Notes,Date Purchased',
+        'Kit A,,2026-02-30',
+        '',
+        'Kit B,"first line',
+        'second line",2026-02-30',
+        'Kit C,,2026-02-30',
+      ].join(newline);
 
-    const { projects } = await parse(csv);
+      const { projects } = await parse(csv);
 
-    expect(projects.map(project => [project.title, project.csvRow])).toEqual([
-      ['Kit A', 2],
-      ['Kit B', 4],
-      ['Kit C', 6],
-    ]);
-  });
+      expect(projects.map(project => [project.title, project.csvRow])).toEqual([
+        ['Kit A', 2],
+        ['Kit B', 4],
+        ['Kit C', 6],
+      ]);
+    }
+  );
 });
 
 describe('CSV calendar dates', () => {
@@ -130,5 +133,29 @@ describe('CSV calendar dates', () => {
     const { projects } = await parseCsvToProjects(`Title,Date Purchased\nKit,${cell}`);
 
     expect(projects[0].datePurchased).toBe(expected);
+  });
+});
+
+describe('UTF-16 CSV files', () => {
+  const encode = (text: string, bigEndian: boolean) => {
+    const bytes = [bigEndian ? 0xfe : 0xff, bigEndian ? 0xff : 0xfe];
+    for (const char of text) {
+      const code = char.charCodeAt(0);
+      bytes.push(...(bigEndian ? [code >> 8, code & 0xff] : [code & 0xff, code >> 8]));
+    }
+    return new Uint8Array(bytes);
+  };
+
+  it.each([false, true])('reads a byte order mark (big endian: %s)', async bigEndian => {
+    const file = new File(
+      [encode('Title,Date Purchased\r\nKit é,2024-02-29\r\n', bigEndian)],
+      'utf16.csv'
+    );
+
+    const { projects } = await parseCsvFileToProjects(file);
+
+    expect(projects).toEqual([
+      expect.objectContaining({ title: 'Kit é', datePurchased: '2024-02-29', csvRow: 2 }),
+    ]);
   });
 });

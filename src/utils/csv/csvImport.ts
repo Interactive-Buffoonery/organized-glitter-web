@@ -6,8 +6,13 @@ import { safeDateString } from '@/utils/date/dateHelpers';
 import { normalizeStatus, validateKitCategoryValue } from '@/utils/csv/csvValidation';
 import { restoreCsvFormulaTextField } from '@/utils/csv/csvFormulaSafety';
 
+export type ParsedCsvProject = Partial<ProjectType> & { csvRow: number };
+
+// ponytail: counts parsed rows; blank lines skipped by Papa shift later row numbers
+const HEADER_ROW = 1;
+
 export interface ParsedCsvData {
-  projects: Partial<ProjectType>[];
+  projects: ParsedCsvProject[];
   allUniqueTagNames: string[];
 }
 
@@ -188,8 +193,9 @@ export const parseCsvToProjects = (
       return;
     }
 
-    const projects: Partial<ProjectType>[] = [];
+    const projects: ParsedCsvProject[] = [];
     const parsingWarnings: Papa.ParseError[] = [];
+    let csvRow = HEADER_ROW;
 
     Papa.parse(csvContent, {
       header: true,
@@ -197,8 +203,9 @@ export const parseCsvToProjects = (
       transformHeader: (header: string) => header.toLowerCase().trim(),
       step: results => {
         parsingWarnings.push(...results.errors);
+        csvRow++;
         const project = parseProjectFromRow(results.data as Record<string, string>);
-        if (project) projects.push(project);
+        if (project) projects.push({ ...project, csvRow });
         if (onProgress) {
           const progress = Math.round((results.meta.cursor / csvContent.length) * 100);
           onProgress(Math.min(progress, 99));
@@ -238,8 +245,9 @@ export const parseCsvFileToProjects = (
   onProgress?: (progress: number) => void
 ): Promise<ParsedCsvData> => {
   return new Promise((resolve, reject) => {
-    const projects: Partial<ProjectType>[] = [];
+    const projects: ParsedCsvProject[] = [];
     let rowCount = 0;
+    let csvRow = HEADER_ROW;
 
     Papa.parse(file, {
       header: true,
@@ -248,11 +256,12 @@ export const parseCsvFileToProjects = (
       step: results => {
         // Process each row as it's parsed (streaming)
         const row = results.data as Record<string, string>;
+        csvRow++;
 
         try {
           const project = parseProjectFromRow(row);
           if (project) {
-            projects.push(project);
+            projects.push({ ...project, csvRow });
             rowCount++;
           }
 
@@ -307,12 +316,11 @@ const getTextFieldValue = (
 };
 
 /**
- * Validate and format a date string
+ * Normalize a date string, keeping unparseable input so validation can report it
  */
 const validateDate = (dateStr: string): string | undefined => {
   if (!dateStr) return undefined;
 
   // Use timezone-safe conversion (defaults to UTC for backwards compatibility)
-  const result = safeDateString(dateStr);
-  return result || undefined;
+  return safeDateString(dateStr) || dateStr;
 };

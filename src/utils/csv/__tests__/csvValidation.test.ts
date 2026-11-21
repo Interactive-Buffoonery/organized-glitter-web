@@ -46,3 +46,32 @@ describe('CSV enum aliases', () => {
     }
   );
 });
+
+describe('CSV date validation', () => {
+  it.each(['datePurchased', 'dateReceived', 'dateStarted', 'dateCompleted'])(
+    'flags an impossible calendar date in %s and keeps the rest of the row',
+    field => {
+      const result = validateProjectData({
+        title: 'Imported project',
+        status: 'stash',
+        [field]: '2026-02-30',
+      });
+
+      expect(result.correctedData).toMatchObject({
+        title: 'Imported project',
+        status: 'stash',
+        [field]: null,
+      });
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ field, originalValue: '2026-02-30', severity: 'error' })
+      );
+    }
+  );
+
+  it('keeps a real calendar date without an issue', () => {
+    const result = validateProjectData({ title: 'Imported project', datePurchased: '2024-02-29' });
+
+    expect(result.correctedData.datePurchased).toBe('2024-02-29');
+    expect(result.issues.filter(issue => issue.field === 'datePurchased')).toHaveLength(0);
+  });
+});

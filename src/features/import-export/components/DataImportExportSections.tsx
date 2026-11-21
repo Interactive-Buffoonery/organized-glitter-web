@@ -397,8 +397,9 @@ function CsvImportResultAlert({
                 <ul className="mt-2 list-disc space-y-1 pl-5">
                   {importStats.validationIssues.slice(0, 4).map(issue => (
                     <li
-                      key={`${issue.field}-${issue.originalValue}-${issue.correctedValue ?? ''}-${issue.message}`}
+                      key={`${issue.row ?? ''}-${issue.field}-${issue.originalValue}-${issue.correctedValue ?? ''}-${issue.message}`}
                     >
+                      {issue.row ? `Row ${issue.row}, ` : ''}
                       {issue.field}: {issue.message}
                     </li>
                   ))}

@@ -15,6 +15,7 @@ type ProjectRecord = {
   title: string;
   image?: string;
   status?: string;
+  date_purchased?: string;
 };
 
 type ProgressNoteRecord = {
@@ -360,5 +361,21 @@ test.describe('local import/export workflows', () => {
     } finally {
       await restoreContext.close();
     }
+  });
+
+  test('warns about an impossible CSV date and saves the project without it', async ({ page }) => {
+    const title = `${runPrefix} Impossible Date`;
+    const csvPath = path.join(tempDir, 'impossible-date.csv');
+    await writeFile(csvPath, `Title,Status,Date Purchased\n"${title}",stash,2/30/26\n`);
+
+    await openDataSettings(page);
+    await uploadFile(page, 'Organized Glitter CSV file', csvPath);
+    await page.getByRole('button', { name: /^Import CSV$/ }).click();
+
+    await expect(page.getByText(/Imported 1, failed 0/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Row 2, datePurchased: Invalid date/)).toBeVisible();
+    const project = await getProjectByTitle(pb, title);
+    expect(project).toMatchObject({ title, status: 'stash' });
+    expect(project.date_purchased ?? '').toBe('');
   });
 });

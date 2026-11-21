@@ -30,6 +30,7 @@ interface ProjectsGridProps {
     totalPages: number;
     isLoadingProjects: boolean;
     isFetchingProjects: boolean;
+    isPlaceholderProjects?: boolean;
     errorProjects: Error | null;
     refetchProjects: () => void;
   };
@@ -89,10 +90,13 @@ const ProjectsGridComponent: React.FC<ProjectsGridProps> = ({
     projects,
     isLoadingProjects: loading,
     isFetchingProjects,
+    isPlaceholderProjects = false,
     totalItems,
     totalPages,
   } = dashboardData;
   const { viewType, sortField, currentPage, pageSize, sortDirection } = filters;
+  const [rowsSortField, setRowsSortField] = React.useState(sortField);
+  if (!isPlaceholderProjects && rowsSortField !== sortField) setRowsSortField(sortField);
   const getPageHref = React.useCallback(
     (page: number) => {
       const params = setDiamondDashboardParams(new URLSearchParams(location.search), {
@@ -106,7 +110,7 @@ const ProjectsGridComponent: React.FC<ProjectsGridProps> = ({
   );
 
   const { count: undatedCount } = useUndatedProjectCount(user?.id, sortField, filters);
-  const dividerConfig = useSortDividers(sortField, projects, {
+  const dividerConfig = useSortDividers(rowsSortField, projects, {
     totalUndatedCount: undatedCount,
   });
 
@@ -364,7 +368,7 @@ const ProjectsGridComponent: React.FC<ProjectsGridProps> = ({
           <ProjectListRow
             key={project.id}
             project={project}
-            sortField={sortField}
+            sortField={rowsSortField}
             onNavigate={handleProjectNavigate}
             isRecentlyEdited={project.id === recentlyEditedProjectId}
           />
@@ -379,6 +383,7 @@ const ProjectsGridComponent: React.FC<ProjectsGridProps> = ({
         <ProjectsTable
           projects={projects}
           sortField={sortField}
+          rowsSortField={rowsSortField}
           sortDirection={sortDirection}
           onSort={handleTableSort}
           onNavigate={handleProjectNavigate}

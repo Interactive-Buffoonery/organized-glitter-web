@@ -19,6 +19,8 @@ const EMPTY_DIVIDERS: DividerPoint[] = [];
 interface ProjectsTableProps {
   projects: ProjectType[];
   sortField: DashboardValidSortField;
+  /** Sort that produced the rows on screen; differs from sortField while new rows load. */
+  rowsSortField?: DashboardValidSortField;
   sortDirection: 'asc' | 'desc';
   onSort: (sortField: DashboardValidSortField, sortDirection: 'asc' | 'desc') => void;
   onNavigate: (projectId: string) => void;
@@ -39,6 +41,7 @@ const SortIndicator = ({ active, direction }: { active: boolean; direction: 'asc
 const ProjectsTable = ({
   projects,
   sortField,
+  rowsSortField = sortField,
   sortDirection,
   onSort,
   onNavigate,
@@ -99,7 +102,7 @@ const ProjectsTable = ({
               )}
               <ProjectTableCard
                 project={project}
-                sortField={sortField}
+                sortField={rowsSortField}
                 onNavigate={onNavigate}
                 isRecentlyEdited={project.id === recentlyEditedProjectId}
               />
@@ -138,7 +141,7 @@ const ProjectsTable = ({
                   : project.status === 'kitted'
                     ? 'Kitted Up'
                     : getStatusLabel(project.status);
-              const lifecycleDate = getLifecycleDate(project, sortField);
+              const lifecycleDate = getLifecycleDate(project, rowsSortField);
               const artistLabel = project.artist && project.artist !== '-' ? project.artist : null;
               const divider = dividerByIndex.get(index);
 

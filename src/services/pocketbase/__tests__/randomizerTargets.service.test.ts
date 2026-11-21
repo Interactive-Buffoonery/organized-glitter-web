@@ -78,6 +78,6 @@ describe('RandomizerTargetsService', () => {
       eligibility
     );
 
-    expect(target.subtitle).toBe('Example Press · PDF');
+    expect(target.subtitle).toBe('PDF · Example Press');
   });
 });

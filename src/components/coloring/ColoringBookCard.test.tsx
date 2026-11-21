@@ -58,7 +58,7 @@ describe('coloring book card', () => {
         <ColoringBookListRow book={book} />
       </MemoryRouter>
     );
-    expect(screen.getAllByText('Example Press · PDF')).toHaveLength(2);
+    expect(screen.getAllByText('PDF · Example Press')).toHaveLength(2);
   });
 
   it('shows the illustrator in list metadata instead of No publisher', () => {

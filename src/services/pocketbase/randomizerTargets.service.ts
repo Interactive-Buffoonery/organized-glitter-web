@@ -102,8 +102,8 @@ function toDiamondTarget(record: ExpandedProject): RandomizerTarget {
 
 function toBookTarget(record: ExpandedColoringBook): RandomizerTarget {
   const subtitle = [
-    bookSubtitle(record),
     optionLabel(COLORING_BOOK_FORMAT_OPTIONS, record.book_format),
+    bookSubtitle(record),
   ]
     .filter(Boolean)
     .join(' · ');

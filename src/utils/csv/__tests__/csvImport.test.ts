@@ -138,6 +138,11 @@ describe('CSV calendar dates', () => {
     ['Feb 30, 2026', '2026-02-30'],
     ['30-Feb-26', '2026-02-30'],
     ['2024/02/29', '2024-02-29'],
+    ['2026/02/30', '2026-02-30'],
+    ['2024-02-29T24:00:00Z', '2024-02-29'],
+    ['Feb 29, 2024 23:59:00 GMT', '2024-02-29'],
+    ['Feb 30, 2026 3:02 PM', '2026-02-30'],
+    ['2026/02/30 03:02:00', '2026-02-30'],
   ])('keeps the written calendar day of %s', async (cell, expected) => {
     const { projects } = await parseCsvToProjects(`Title,Date Purchased\nKit,"${cell}"`);
 
@@ -149,9 +154,10 @@ describe('CSV dates that cannot be read safely', () => {
   it.each([
     '2024-02-29Tgarbage',
     '2024-02-29T25:00:00Z',
+    '2024-02-29T1:00:00Z',
+    '2024-02-29T24:00:01Z',
     '2/29/2024 13:00 PM',
     'Febtober 3, 2024',
-    '2026/02/30',
   ])('keeps %s for a validation note', async cell => {
     const { projects } = await parseCsvToProjects(`Title,Date Purchased\nKit,"${cell}"`);
 

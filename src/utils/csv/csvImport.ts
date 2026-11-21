@@ -2,7 +2,6 @@ import { ProjectType } from '@/types/project';
 import Papa from 'papaparse';
 import { EXPECTED_COLUMNS } from '@/utils/csv/csvColumns';
 import { logger } from '@/utils/logger';
-import { formatLocalDate } from '@/utils/date/timezoneUtils';
 import { normalizeStatus, validateKitCategoryValue } from '@/utils/csv/csvValidation';
 import { restoreCsvFormulaTextField } from '@/utils/csv/csvFormulaSafety';
 
@@ -302,17 +301,14 @@ const getTextFieldValue = (
   return value ? restoreCsvFormulaTextField(value) : undefined;
 };
 
-const TIME = String.raw`(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?`;
-const ISO_DATE = new RegExp(
-  String.raw`^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ]${TIME}(?:Z|[+-](?:[01]\d|2[0-3]):?[0-5]\d)?)?$`,
-  'i'
-);
-const US_DATE = new RegExp(
-  String.raw`^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:,?\s+(?:(?:0?[1-9]|1[0-2]):[0-5]\d(?::[0-5]\d)?\s*[ap]m|${TIME}))?$`,
-  'i'
-);
-const MONTH_DAY_YEAR = /^([a-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/i;
-const DAY_MONTH_YEAR = /^(\d{1,2})[-\s]([a-z]{3,9})\.?[-\s](\d{2}|\d{4})$/i;
+const DATE_PARTS = [
+  /^(?<year>\d{4})(?<sep>[-/])(?<month>\d{1,2})\k<sep>(?<day>\d{1,2})/,
+  /^(?<month>\d{1,2})\/(?<day>\d{1,2})\/(?<year>\d{4}|\d{2})/,
+  /^(?<monthName>[a-z]{3,9})\.?\s+(?<day>\d{1,2}),?\s+(?<year>\d{4})/i,
+  /^(?<day>\d{1,2})[-\s](?<monthName>[a-z]{3,9})\.?[-\s](?<year>\d{4}|\d{2})/i,
+];
+const TIME_SUFFIX =
+  /^(?:T(?=\d{2})|,?\s+)(\d{1,2}):([0-5]\d)(?::([0-5]\d)(?:\.(\d+))?)?(?:\s*([ap]m))?(?:\s*(?:Z|GMT|UTC))?(?:\s*[+-](?:[01]\d|2[0-3]):?[0-5]\d)?$/i;
 const MONTHS = [
   'january',
   'february',
@@ -336,44 +332,31 @@ const monthNumber = (name: string) => {
 const fullYear = (year: string) =>
   year.length === 4 ? year : String(Number(year) + (Number(year) < 50 ? 2000 : 1900));
 
-const toDateOnly = (year: string, month: string, day: string) =>
-  `${fullYear(year)}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-
-// ponytail: formats without an explicit parser only pass when the parsed day and month
-// appear in the text, which catches rollover; add a parser if a real export trips it.
-const writesSameDay = (text: string, date: Date) => {
-  const numbers = text.match(/\d+/g)?.map(Number) ?? [];
-  const month = date.getMonth();
-  return (
-    numbers.includes(date.getDate()) &&
-    (numbers.includes(month + 1) || text.toLowerCase().includes(MONTHS[month].slice(0, 3)))
-  );
+const isReadableTime = (suffix: string) => {
+  if (!suffix) return true;
+  const time = suffix.match(TIME_SUFFIX);
+  if (!time) return false;
+  const [, hour, minutes, seconds = '00', fraction = '', meridiem] = time;
+  if (meridiem) return Number(hour) >= 1 && Number(hour) <= 12;
+  const endOfDay = `${hour}:${minutes}:${seconds}` === '24:00:00' && !/[1-9]/.test(fraction);
+  return Number(hour) < 24 || endOfDay;
 };
 
 /**
- * Keep the calendar day as written, so validation can reject impossible dates
- * and no timezone moves the day. Text that cannot be read safely is returned
- * as is, so validation reports it.
+ * Read the calendar day from the date part alone, so no time or timezone can
+ * move it and validation can reject impossible dates. Text that cannot be
+ * read safely is returned as is, so validation reports it.
  */
 const validateDate = (dateStr: string): string | undefined => {
   if (!dateStr) return undefined;
 
-  const iso = dateStr.match(ISO_DATE);
-  if (iso) return toDateOnly(iso[1], iso[2], iso[3]);
-  if (/^\d{4}-\d{1,2}-\d{1,2}/.test(dateStr)) return dateStr;
-
-  const us = dateStr.match(US_DATE);
-  if (us) return toDateOnly(us[3], us[1], us[2]);
-
-  const monthFirst = dateStr.match(MONTH_DAY_YEAR);
-  const dayFirst = dateStr.match(DAY_MONTH_YEAR);
-  const named = monthFirst
-    ? { day: monthFirst[2], month: monthNumber(monthFirst[1]), year: monthFirst[3] }
-    : dayFirst && { day: dayFirst[1], month: monthNumber(dayFirst[2]), year: dayFirst[3] };
-  if (named) return named.month ? toDateOnly(named.year, named.month, named.day) : dateStr;
-
-  const parsed = new Date(dateStr);
-  return Number.isNaN(parsed.getTime()) || !writesSameDay(dateStr, parsed)
-    ? dateStr
-    : formatLocalDate(parsed, 'yyyy-MM-dd');
+  for (const pattern of DATE_PARTS) {
+    const match = dateStr.match(pattern);
+    if (!match?.groups) continue;
+    const { year, day, monthName } = match.groups;
+    const month = monthName ? monthNumber(monthName) : match.groups.month;
+    if (!month || !isReadableTime(dateStr.slice(match[0].length))) return dateStr;
+    return `${fullYear(year)}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  return dateStr;
 };

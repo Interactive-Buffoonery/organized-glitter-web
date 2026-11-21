@@ -66,7 +66,7 @@ export function ColoringPageCommandPanel({
   const today = getCurrentDateInUserTimezone(userTimezone);
   const isCompleted = page.status === 'completed';
   const dayLabel =
-    isCompleted || page.status === 'in_progress'
+    isCompleted || page.status === 'in_progress' || page.status === 'on_hold'
       ? getActivityDayLabel(page.startedAt, isCompleted ? page.completedAt : today, isCompleted)
       : null;
   const editDate = () => setEditor('dates');

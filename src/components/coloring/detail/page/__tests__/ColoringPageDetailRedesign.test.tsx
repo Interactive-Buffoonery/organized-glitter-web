@@ -77,18 +77,30 @@ describe('Coloring page detail redesign', () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
-  it('keeps counting from Day 1 for an in-progress page in the account timezone', () => {
-    vi.setSystemTime(new Date('2026-03-08T02:00:00Z'));
-    try {
-      render(
-        <MemoryRouter>
-          <CommandPanelWithDates status="in_progress" startedAt="2026-03-07" completedAt="" />
-        </MemoryRouter>
-      );
-      expect(screen.getByText('Day 1')).toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
+  it.each(['in_progress', 'on_hold'] as const)(
+    'shows Day 1 in the account timezone for %s',
+    status => {
+      vi.setSystemTime(new Date('2026-03-08T02:00:00Z'));
+      try {
+        render(
+          <MemoryRouter>
+            <CommandPanelWithDates status={status} startedAt="2026-03-07" completedAt="" />
+          </MemoryRouter>
+        );
+        expect(screen.getByText('Day 1')).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
     }
+  );
+
+  it.each(['not_started', 'palette_chosen'] as const)('omits the day label for %s', status => {
+    render(
+      <MemoryRouter>
+        <CommandPanelWithDates status={status} startedAt="2020-03-07" completedAt="" />
+      </MemoryRouter>
+    );
+    expect(screen.queryByText(/^Day \d+$/)).not.toBeInTheDocument();
   });
 
   it('offers Add for every empty spec and invokes its action', async () => {

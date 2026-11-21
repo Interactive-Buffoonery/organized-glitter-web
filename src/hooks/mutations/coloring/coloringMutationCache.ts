@@ -133,7 +133,12 @@ export const clearDeletedColoringBook = async (
   });
   void settleInvalidations(
     queryClient,
-    [queryKeys.coloring.books.lists(), queryKeys.coloring.tags.stats(), queryKeys.notesFeed.all],
+    [
+      queryKeys.coloring.books.lists(),
+      queryKeys.coloring.tags.stats(),
+      queryKeys.notesFeed.all,
+      queryKeys.randomizerTargets.all,
+    ],
     'Coloring book cache refresh failed after delete'
   );
 };
@@ -150,6 +155,7 @@ export const refreshColoringBookAfterFormSave = (
       queryKeys.coloring.pages.all,
       queryKeys.coloring.books.detail(bookId),
       queryKeys.coloring.tags.stats(),
+      queryKeys.randomizerTargets.all,
     ],
     operation === 'create'
       ? 'Post-create coloring book cache invalidation failed'

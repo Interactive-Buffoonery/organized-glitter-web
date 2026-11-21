@@ -16,6 +16,7 @@
  */
 
 import type { ProjectFilterCriteria } from '@/types/projectFilters';
+import type { RandomizerEligibility, RandomizerMode } from '@/types/randomizer';
 import { DashboardValidSortField } from '@/features/dashboard/dashboard.constants';
 
 /**
@@ -398,6 +399,14 @@ export const queryKeys = {
       ] as const,
     randomizerNextUp: (userId: string) =>
       [...queryKeys.dashboardSettings.all, 'randomizerNextUp', createUserKeyHash(userId)] as const,
+  },
+
+  randomizerTargets: {
+    all: ['randomizer-targets'] as const,
+    presence: (userId: string, mode: RandomizerMode) =>
+      [...queryKeys.randomizerTargets.all, 'presence', userId, mode] as const,
+    list: (userId: string, mode: RandomizerMode, eligibility: RandomizerEligibility) =>
+      [...queryKeys.randomizerTargets.all, userId, mode, eligibility] as const,
   },
 
   // Stats and analytics keys

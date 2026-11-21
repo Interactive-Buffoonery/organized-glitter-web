@@ -1,0 +1,72 @@
+import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { useCollectionStats } from '@/hooks/queries/useStats';
+import type { StatsSizeBucket } from '@/types/stats';
+import Stats from '../Stats';
+
+vi.mock('@/components/layout/MainLayout', () => ({
+  default: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock('@/hooks/useAppReady', () => ({ useAppReady: vi.fn() }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'owner' } }) }));
+vi.mock('@/hooks/useEnabledVerticals', () => ({
+  useEnabledVerticals: () => ({ diamond_painting: true, coloring_books: false }),
+}));
+vi.mock('@/hooks/queries/useStats', () => {
+  const emptyQuery = () => ({ isLoading: false, isError: false, refetch: vi.fn() });
+  return {
+    useStatsSummary: emptyQuery,
+    useCompletionsByMonth: emptyQuery,
+    useCompletionsYearly: emptyQuery,
+    useCompletionTimeStats: emptyQuery,
+    useCollectionStats: vi.fn(),
+    useColoringStatsSummary: emptyQuery,
+    useColoringCompletionsByMonth: emptyQuery,
+    useColoringCompletionsYearly: emptyQuery,
+    useColoringCompletionTimeStats: emptyQuery,
+    useColoringCollectionStats: emptyQuery,
+  };
+});
+
+function renderWithSizeBuckets(sizeBuckets: StatsSizeBucket[]) {
+  vi.mocked(useCollectionStats).mockReturnValue({
+    data: {
+      generatedAt: '',
+      topCompaniesGroup: { total: 0, items: [], otherCount: 0 },
+      topArtistsGroup: { total: 0, items: [], otherCount: 0 },
+      topTagsGroup: { total: 0, items: [], otherCount: 0 },
+      topCompanies: [],
+      topArtists: [],
+      topTags: [],
+      drillShapeSplit: [],
+      kitCategorySplit: [],
+      sizeBuckets,
+    },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  } as ReturnType<typeof useCollectionStats>);
+  render(<Stats />);
+  return screen.getByText('Most common size').nextElementSibling;
+}
+
+describe('Most common size', () => {
+  const mini: StatsSizeBucket = { key: 'mini', label: '<30 cm', count: 1 };
+  const large: StatsSizeBucket = { key: 'large', label: '70-109.9 cm', count: 17 };
+  const huge: StatsSizeBucket = { key: 'huge', label: '110+ cm', count: 14 };
+
+  it('shows the bucket with the highest count', () => {
+    expect(renderWithSizeBuckets([mini, large, huge])).toHaveTextContent(large.label);
+  });
+
+  it('breaks ties in favor of the first bucket in display order', () => {
+    expect(renderWithSizeBuckets([mini, large, { ...huge, count: 17 }])).toHaveTextContent(
+      large.label
+    );
+  });
+
+  it('shows a placeholder when no bucket has any kits', () => {
+    expect(renderWithSizeBuckets([{ ...mini, count: 0 }])).toHaveTextContent('-');
+  });
+});

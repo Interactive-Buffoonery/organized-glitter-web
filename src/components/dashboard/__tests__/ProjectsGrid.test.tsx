@@ -7,6 +7,7 @@ import type { DashboardValidSortField } from '@/features/dashboard/dashboard.con
 import ProjectsGrid from '../ProjectsGrid';
 
 const filters = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
+const undatedCount = vi.hoisted(() => ({ current: 0 }));
 
 vi.mock('@posthog/react', () => ({ usePostHog: () => ({ capture: vi.fn() }) }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'user' } }) }));
@@ -15,7 +16,7 @@ vi.mock('@/contexts/RecentlyEditedContext', () => ({
   useRecentlyEdited: () => ({ recentlyEditedProjectId: null }),
 }));
 vi.mock('@/hooks/queries/useUndatedProjectCount', () => ({
-  useUndatedProjectCount: () => ({ count: 0 }),
+  useUndatedProjectCount: () => ({ count: undatedCount.current }),
 }));
 vi.mock('@/hooks/useDashboardEmptyState', () => ({ useDashboardEmptyState: () => ({}) }));
 vi.mock('@/contexts/FilterContext', () => ({
@@ -36,28 +37,30 @@ const wishlistKit = {
   datePurchased: '2025-10-26',
 } as ProjectType;
 
+const grid = (isPlaceholderProjects: boolean, projects: ProjectType[] = [wishlistKit]) => (
+  <MemoryRouter>
+    <ProjectsGrid
+      dashboardData={{
+        projects,
+        totalItems: projects.length,
+        totalPages: 1,
+        isLoadingProjects: false,
+        isFetchingProjects: isPlaceholderProjects,
+        isPlaceholderProjects,
+        errorProjects: null,
+        refetchProjects: vi.fn(),
+      }}
+    />
+  </MemoryRouter>
+);
+
 const renderGrid = (
   viewType: 'table' | 'list',
   sortField: DashboardValidSortField,
   isPlaceholderProjects = false
 ) => {
   filters.current = { ...getDefaultFilters(), viewType, sortField };
-  return render(
-    <MemoryRouter>
-      <ProjectsGrid
-        dashboardData={{
-          projects: [wishlistKit],
-          totalItems: 1,
-          totalPages: 1,
-          isLoadingProjects: false,
-          isFetchingProjects: isPlaceholderProjects,
-          isPlaceholderProjects,
-          errorProjects: null,
-          refetchProjects: vi.fn(),
-        }}
-      />
-    </MemoryRouter>
-  );
+  return render(grid(isPlaceholderProjects));
 };
 
 const lifecycleTexts = () => [
@@ -89,23 +92,30 @@ describe('ProjectsGrid lifecycle labels', () => {
   it('keeps labels for the sort that produced placeholder rows', () => {
     const { rerender } = renderGrid('table', 'last_updated');
     filters.current = { ...filters.current, sortField: 'date_purchased' };
-    rerender(
-      <MemoryRouter>
-        <ProjectsGrid
-          dashboardData={{
-            projects: [wishlistKit],
-            totalItems: 1,
-            totalPages: 1,
-            isLoadingProjects: false,
-            isFetchingProjects: true,
-            isPlaceholderProjects: true,
-            errorProjects: null,
-            refetchProjects: vi.fn(),
-          }}
-        />
-      </MemoryRouter>
-    );
+    rerender(grid(true));
 
     expect(lifecycleTexts().join(' | ')).not.toMatch(/Purchased/);
+  });
+
+  it('leaves out the server count for undated placeholder rows', () => {
+    const unpurchasedKit = {
+      ...wishlistKit,
+      id: 'unpurchased',
+      title: 'Unpurchased kit',
+      datePurchased: undefined,
+    };
+    const projects = [wishlistKit, unpurchasedKit];
+    filters.current = { ...getDefaultFilters(), viewType: 'list', sortField: 'date_purchased' };
+    undatedCount.current = 5;
+    const { rerender } = render(grid(false, projects));
+    expect(screen.getByText(/Kits with no purchase date/).textContent).toContain('5 total');
+
+    filters.current = { ...filters.current, sortField: 'date_received' };
+    undatedCount.current = 9;
+    rerender(grid(true, projects));
+
+    const divider = screen.getByText(/Kits with no purchase date/).textContent;
+    expect(divider).not.toMatch(/9|5 total/);
+    expect(divider).toContain('1 on this page');
   });
 });

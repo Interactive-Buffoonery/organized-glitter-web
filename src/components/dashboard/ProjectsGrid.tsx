@@ -111,7 +111,7 @@ const ProjectsGridComponent: React.FC<ProjectsGridProps> = ({
 
   const { count: undatedCount } = useUndatedProjectCount(user?.id, sortField, filters);
   const dividerConfig = useSortDividers(rowsSortField, projects, {
-    totalUndatedCount: undatedCount,
+    totalUndatedCount: isPlaceholderProjects ? null : undatedCount,
   });
 
   const handleProjectNavigate = React.useCallback(

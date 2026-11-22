@@ -9,7 +9,7 @@ export interface ProjectsTableColumn {
 }
 
 export const PROJECTS_TABLE_COLUMNS: readonly ProjectsTableColumn[] = [
-  { id: 'thumbnail', label: 'Thumbnail', className: 'w-16' },
+  { id: 'thumbnail', label: 'Thumbnail', className: 'w-24' },
   { id: 'title', label: 'Kit', sortField: 'kit_name' },
   {
     id: 'status',

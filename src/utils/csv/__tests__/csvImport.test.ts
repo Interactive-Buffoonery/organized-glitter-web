@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseCsvFileToProjects, parseCsvToProjects } from '@/utils/csv/csvImport';
+import {
+  findLibraryMatches,
+  parseCsvFileToProjects,
+  parseCsvToProjects,
+} from '@/utils/csv/csvImport';
 
 describe.each([
   { name: 'CSV content', parse: parseCsvToProjects },
@@ -186,5 +190,70 @@ describe('UTF-16 CSV files', () => {
     expect(projects).toEqual([
       expect.objectContaining({ title: 'Kit é', datePurchased: '2024-02-29', csvRow: 2 }),
     ]);
+  });
+});
+
+describe('library matching', () => {
+  const kit = { title: 'Galaxy Cat', company: 'Acme' };
+
+  it.each([
+    ['width', { width: 30 }, { width: 40 }],
+    ['height', { height: 30 }, { height: 40 }],
+    ['drill shape', { drillShape: 'round' }, { drillShape: 'square' }],
+    ['product URL', { sourceUrl: 'https://a.test/1' }, { sourceUrl: 'https://a.test/2' }],
+    ['purchase date', { datePurchased: '2024-01-05' }, { datePurchased: '2025-03-09' }],
+  ])('treats a conflicting %s as a different kit', (_, row, library) => {
+    expect(findLibraryMatches([{ ...kit, ...row }], [{ ...kit, ...library }])).toEqual([false]);
+  });
+
+  it('ignores a field that is blank on either side', () => {
+    const detailed = { width: 30, drillShape: 'round', datePurchased: '2024-01-05' };
+    expect(
+      findLibraryMatches(
+        [{ ...kit, ...detailed }, kit],
+        [kit, { ...kit, ...detailed, datePurchased: '2024-01-05 00:00:00.000Z' }]
+      )
+    ).toEqual([true, true]);
+  });
+
+  it('gives each library kit to the row whose details fit it', () => {
+    const library = [
+      { ...kit, datePurchased: '2024-01-05' },
+      { ...kit, datePurchased: '2025-03-09' },
+    ];
+    expect(findLibraryMatches([kit, { ...kit, datePurchased: '2024-01-05' }], library)).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  it('keeps one library kit to one row', () => {
+    expect(findLibraryMatches([kit, kit, kit], [kit])).toEqual([true, false, false]);
+  });
+
+  it('does not merge title and company across a pipe', () => {
+    expect(
+      findLibraryMatches(
+        [{ title: 'Moon|Fox', company: 'Acme' }],
+        [{ title: 'Moon', company: 'Fox|Acme' }]
+      )
+    ).toEqual([false]);
+  });
+
+  it('checks the original title before the shortened one, using one kit per row', () => {
+    const fullTitle = 'x'.repeat(220);
+    const shortTitle = `${'x'.repeat(197)}...`;
+    const row = { title: shortTitle, originalTitle: fullTitle };
+
+    expect(findLibraryMatches([row, row], [{ title: fullTitle }, { title: shortTitle }])).toEqual([
+      true,
+      true,
+    ]);
+    expect(findLibraryMatches([row], [{ title: fullTitle }, { title: shortTitle }])).toEqual([
+      true,
+    ]);
+    expect(
+      findLibraryMatches([row, row, row], [{ title: fullTitle }, { title: shortTitle }])
+    ).toEqual([true, true, false]);
   });
 });

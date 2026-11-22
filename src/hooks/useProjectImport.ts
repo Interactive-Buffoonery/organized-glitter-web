@@ -181,12 +181,14 @@ export const useProjectImport = () => {
       // logCSVTagDebugInfo removed for PocketBase migration
 
       // Step 2: Parse CSV file directly using Papa Parse with progress callback
-      const { projects: parsedCsvProjects, allUniqueTagNames }: ParsedCsvData =
-        await parseCsvFileToProjects(file, parseProgress => {
+      const { projects: parsedCsvProjects }: ParsedCsvData = await parseCsvFileToProjects(
+        file,
+        parseProgress => {
           // Papa Parse progress is for parsing, we'll map it to ~10% of total progress initially
           const mappedProgress = Math.round(parseProgress * 0.1);
           setProgress(mappedProgress);
-        });
+        }
+      );
 
       if (!parsedCsvProjects || parsedCsvProjects.length === 0) {
         notify({
@@ -198,20 +200,88 @@ export const useProjectImport = () => {
         return false;
       }
 
+      // Convert parsed projects to ProjectCreateDTO format with validation
+      let allValidationIssues: ValidationIssue[] = [];
+      const projectsToCreate: ProjectCreateDTO[] = parsedCsvProjects.map(
+        (parsedProject): ProjectCreateDTO => {
+          // Validate and normalize project data
+          const projectValidation = validateProjectData({
+            title: parsedProject.title,
+            drillShape: parsedProject.drillShape,
+            status: parsedProject.status,
+            kitCategory: parsedProject.kitCategory,
+            datePurchased: parsedProject.datePurchased,
+            dateReceived: parsedProject.dateReceived,
+            dateStarted: parsedProject.dateStarted,
+            dateCompleted: parsedProject.dateCompleted,
+            generalNotes: parsedProject.generalNotes,
+            sourceUrl: parsedProject.sourceUrl,
+          });
+
+          // Add validation issues to our tracking
+          allValidationIssues.push(
+            ...projectValidation.issues.map(issue => ({ ...issue, row: parsedProject.csvRow }))
+          );
+
+          return {
+            userId: user.id,
+            title: projectValidation.correctedData.title || 'Untitled Project',
+            company: parsedProject.company,
+            artist: parsedProject.artist,
+            drillShape: projectValidation.correctedData.drillShape ?? undefined,
+            width: parsedProject.width,
+            height: parsedProject.height,
+            status: projectValidation.correctedData.status,
+            datePurchased: projectValidation.correctedData.datePurchased ?? undefined,
+            dateReceived: projectValidation.correctedData.dateReceived ?? undefined,
+            dateStarted: projectValidation.correctedData.dateStarted ?? undefined,
+            dateCompleted: projectValidation.correctedData.dateCompleted ?? undefined,
+            generalNotes: projectValidation.correctedData.generalNotes ?? undefined,
+            imageUrl: parsedProject.imageUrl,
+            sourceUrl: projectValidation.correctedData.sourceUrl ?? undefined,
+            totalDiamonds: parsedProject.totalDiamonds,
+            colorCount: parsedProject.colorCount,
+            kitCategory: projectValidation.correctedData.kitCategory,
+          };
+        }
+      );
+
+      const libraryMatches = findLibraryMatches(
+        projectsToCreate.map((project, index) => ({
+          ...project,
+          // Matches persistence, which saves the company "other" as no company
+          company: project.company === 'other' ? undefined : project.company,
+          originalTitle: parsedCsvProjects[index].title,
+        })),
+        await projectsService.getLibraryMatchFields(user.id)
+      );
+      const skippedRows = parsedCsvProjects
+        .filter((_, index) => libraryMatches[index])
+        .map(({ csvRow, title }) => ({ row: csvRow, title }));
+      const skippedRowNumbers = new Set(skippedRows.map(({ row }) => row));
+      allValidationIssues = allValidationIssues.filter(
+        issue => !issue.row || !skippedRowNumbers.has(issue.row)
+      );
+      const attemptedRows = parsedCsvProjects.filter((_, index) => !libraryMatches[index]);
+      const attemptedTagNames = Array.from(
+        new Set(attemptedRows.flatMap(row => row.tagNames || []))
+      );
+      const skipped = skippedRows.length;
+
       // --- BEGIN BATCH TAG PROCESSING ---
       logger.debug('Starting batch tag processing...', {
-        allUniqueTagNamesCount: allUniqueTagNames.length,
+        attemptedTagNamesCount: attemptedTagNames.length,
       });
 
       // Get existing tags first to include them in validation
       const existingUserTags = await ImportTagsService.listUserTags(user.id);
 
       // Combine CSV tag names with existing tag names for validation
-      const allTagNamesForValidation = [...allUniqueTagNames, ...existingUserTags.map(t => t.name)];
+      const allTagNamesForValidation = [...attemptedTagNames, ...existingUserTags.map(t => t.name)];
 
       // Validate all tag names (CSV + existing)
       const tagValidationResult = validateTagNames(allTagNamesForValidation);
-      let allValidationIssues: ValidationIssue[] = [...tagValidationResult.issues];
+      allValidationIssues.push(...tagValidationResult.issues);
 
       // Use validated tag names
       const validatedTagNamesMap = new Map(
@@ -239,7 +309,7 @@ export const useProjectImport = () => {
         });
 
         const newTagNamesToCreate: string[] = [];
-        allUniqueTagNames.forEach(originalName => {
+        attemptedTagNames.forEach(originalName => {
           const normalizedName = validatedTagNamesMap.get(originalName) || originalName;
           if (normalizedName && normalizedName.trim() !== '' && !tagNameMap.has(normalizedName)) {
             // Ensure normalized name is not empty and not already mapped
@@ -313,73 +383,16 @@ export const useProjectImport = () => {
       }
       // --- END BATCH TAG PROCESSING ---
 
-      // Convert parsed projects to ProjectCreateDTO format with validation
-      const projectsToCreate: ProjectCreateDTO[] = parsedCsvProjects.map(
-        (parsedProject): ProjectCreateDTO => {
-          // Validate and normalize project data
-          const projectValidation = validateProjectData({
-            title: parsedProject.title,
-            drillShape: parsedProject.drillShape,
-            status: parsedProject.status,
-            kitCategory: parsedProject.kitCategory,
-            datePurchased: parsedProject.datePurchased,
-            dateReceived: parsedProject.dateReceived,
-            dateStarted: parsedProject.dateStarted,
-            dateCompleted: parsedProject.dateCompleted,
-            generalNotes: parsedProject.generalNotes,
-            sourceUrl: parsedProject.sourceUrl,
-          });
-
-          // Add validation issues to our tracking
-          allValidationIssues.push(
-            ...projectValidation.issues.map(issue => ({ ...issue, row: parsedProject.csvRow }))
-          );
-
-          // Map tag names to IDs using validated names
-          const projectTagIds = (parsedProject.tagNames || [])
-            .map(originalName => {
-              const normalizedName = validatedTagNamesMap.get(originalName) || originalName;
-              return tagNameMap.get(normalizedName);
-            })
-            .filter(id => !!id) as string[];
-
-          return {
-            userId: user.id,
-            title: projectValidation.correctedData.title || 'Untitled Project',
-            company: parsedProject.company,
-            artist: parsedProject.artist,
-            drillShape: projectValidation.correctedData.drillShape ?? undefined,
-            width: parsedProject.width,
-            height: parsedProject.height,
-            status: projectValidation.correctedData.status,
-            datePurchased: projectValidation.correctedData.datePurchased ?? undefined,
-            dateReceived: projectValidation.correctedData.dateReceived ?? undefined,
-            dateStarted: projectValidation.correctedData.dateStarted ?? undefined,
-            dateCompleted: projectValidation.correctedData.dateCompleted ?? undefined,
-            generalNotes: projectValidation.correctedData.generalNotes ?? undefined,
-            imageUrl: parsedProject.imageUrl,
-            sourceUrl: projectValidation.correctedData.sourceUrl ?? undefined,
-            totalDiamonds: parsedProject.totalDiamonds,
-            colorCount: parsedProject.colorCount,
-            kitCategory: projectValidation.correctedData.kitCategory,
-            tagIds: projectTagIds, // Pass resolved tag IDs
-          };
-        }
-      );
-
-      const libraryMatches = findLibraryMatches(
-        projectsToCreate,
-        await projectsService.getAllForUser(user.id)
-      );
-      const skippedRows = parsedCsvProjects
-        .filter((_, index) => libraryMatches[index])
-        .map(({ csvRow, title }) => ({ row: csvRow, title }));
-      const skippedRowNumbers = new Set(skippedRows.map(({ row }) => row));
-      allValidationIssues = allValidationIssues.filter(
-        issue => !issue.row || !skippedRowNumbers.has(issue.row)
-      );
-      const projectsToImport = projectsToCreate.filter((_, index) => !libraryMatches[index]);
-      const skipped = skippedRows.length;
+      const projectsToImport: ProjectCreateDTO[] = projectsToCreate
+        .filter((_, index) => !libraryMatches[index])
+        .map((project, index) => ({
+          ...project,
+          tagIds: (attemptedRows[index].tagNames || [])
+            .map(originalName =>
+              tagNameMap.get(validatedTagNamesMap.get(originalName) || originalName)
+            )
+            .filter((id): id is string => !!id),
+        }));
 
       const totalProjects = projectsToCreate.length;
       setImportStats(prev => ({ ...prev, total: totalProjects, skipped, skippedRows }));
@@ -463,9 +476,13 @@ export const useProjectImport = () => {
         columnAnalysis,
       });
 
-      let successMessage = `Successfully imported ${successCount} out of ${projectsToImport.length} projects. View them in your library.`;
-      if (skipped > 0) {
-        successMessage += ` Skipped ${skipped} already in your library.`;
+      const skippedMessage = `Skipped ${skipped} ${skipped === 1 ? 'row' : 'rows'} already in your library.`;
+      let successMessage =
+        projectsToImport.length === 0
+          ? skippedMessage
+          : `Successfully imported ${successCount} out of ${projectsToImport.length} projects. View them in your library.`;
+      if (skipped > 0 && projectsToImport.length > 0) {
+        successMessage += ` ${skippedMessage}`;
       }
 
       const totalIssues = tagWarnings.length + allValidationIssues.length;
@@ -475,7 +492,7 @@ export const useProjectImport = () => {
 
       // Add column mapping summary to success message
       const mappedColumns = importStats.columnAnalysis?.detectedColumns.length || 0;
-      if (mappedColumns > 0) {
+      if (mappedColumns > 0 && projectsToImport.length > 0) {
         successMessage += ` Mapped ${mappedColumns} CSV columns successfully.`;
       }
 

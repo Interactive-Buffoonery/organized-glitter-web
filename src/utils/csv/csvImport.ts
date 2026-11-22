@@ -361,33 +361,82 @@ const validateDate = (dateStr: string): string | undefined => {
   return dateStr;
 };
 
-interface LibraryMatchCandidate {
+export interface LibraryMatchFields {
   title?: string;
   company?: string;
+  width?: number;
+  height?: number;
+  drillShape?: string;
+  sourceUrl?: string;
+  datePurchased?: string;
 }
 
-const libraryMatchKey = ({ title, company }: LibraryMatchCandidate) =>
-  [title, company]
-    .map(value => (value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase())
-    .join('|');
+const normalizeMatchText = (value?: string) =>
+  (value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+
+/** Details that tell two copies of the same kit apart. Blank means unknown. */
+const kitDetails = (kit: LibraryMatchFields) => [
+  kit.width ? String(kit.width) : '',
+  kit.height ? String(kit.height) : '',
+  normalizeMatchText(kit.drillShape),
+  (kit.sourceUrl ?? '').trim(),
+  (kit.datePurchased ?? '').slice(0, 10),
+];
+
+const agreement = (row: string[], kit: string[]) => {
+  let shared = 0;
+  for (let i = 0; i < row.length; i++) {
+    if (!row[i] || !kit[i]) continue;
+    if (row[i] !== kit[i]) return -1;
+    shared++;
+  }
+  return shared;
+};
 
 /**
- * Flags rows whose title and company match a kit already in the library.
- * Each library kit absorbs one row, so extra copies in the file still import.
+ * Flags rows that match a kit already in the library by title and company,
+ * unless a detail known on both sides (size, drill shape, product URL,
+ * purchase date) conflicts. Each library kit absorbs at most one row, and a
+ * shortened row tries its original title first.
  */
+// ponytail: greedy (most detailed rows pick first, best-fitting kit wins), not maximum bipartite matching
 export const findLibraryMatches = (
-  rows: readonly LibraryMatchCandidate[],
-  library: readonly LibraryMatchCandidate[]
+  rows: readonly (LibraryMatchFields & { originalTitle?: string })[],
+  library: readonly LibraryMatchFields[]
 ): boolean[] => {
-  const unmatchedCopies = new Map<string, number>();
+  const kitsByTitle = new Map<string, Map<string, string[][]>>();
   for (const kit of library) {
-    const key = libraryMatchKey(kit);
-    unmatchedCopies.set(key, (unmatchedCopies.get(key) ?? 0) + 1);
+    const title = normalizeMatchText(kit.title);
+    const company = normalizeMatchText(kit.company);
+    const kitsByCompany = kitsByTitle.get(title) ?? new Map<string, string[][]>();
+    kitsByCompany.set(company, [...(kitsByCompany.get(company) ?? []), kitDetails(kit)]);
+    kitsByTitle.set(title, kitsByCompany);
   }
-  return rows.map(row => {
-    const key = libraryMatchKey(row);
-    const copies = unmatchedCopies.get(key) ?? 0;
-    if (copies > 0) unmatchedCopies.set(key, copies - 1);
-    return copies > 0;
-  });
+
+  const rowDetails = rows.map(kitDetails);
+  const known = (details: string[]) => details.filter(Boolean).length;
+  const order = rows
+    .map((_, index) => index)
+    .sort((a, b) => known(rowDetails[b]) - known(rowDetails[a]));
+
+  const matches = rows.map(() => false);
+  for (const index of order) {
+    const row = rows[index];
+    const titles = new Set([row.originalTitle, row.title].filter(Boolean).map(normalizeMatchText));
+    for (const title of titles) {
+      const kits = kitsByTitle.get(title)?.get(normalizeMatchText(row.company)) ?? [];
+      let best = -1;
+      let bestAgreement = -1;
+      kits.forEach((kit, kitIndex) => {
+        const shared = agreement(rowDetails[index], kit);
+        if (shared > bestAgreement) [best, bestAgreement] = [kitIndex, shared];
+      });
+      if (best >= 0) {
+        kits.splice(best, 1);
+        matches[index] = true;
+        break;
+      }
+    }
+  }
+  return matches;
 };

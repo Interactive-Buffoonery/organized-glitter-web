@@ -60,5 +60,6 @@ describe('CsvImportResultAlert', () => {
     expect(screen.getByText('Skipped, already in your library')).toBeVisible();
     expect(screen.getByText('Row 2, Galaxy Cat')).toBeVisible();
     expect(screen.getByText('Row 3, Moon Fox')).toBeVisible();
+    expect(screen.getByText('Row 2, Galaxy Cat')).toHaveClass('[overflow-wrap:anywhere]');
   });
 });

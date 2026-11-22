@@ -355,7 +355,7 @@ function SkippedRowList({ rows }: { rows: NonNullable<ProjectImportStats['skippe
   return (
     <ul className="mt-2 list-disc space-y-1 pl-5">
       {rows.map(({ row, title }) => (
-        <li key={row}>
+        <li key={row} className="[overflow-wrap:anywhere]">
           Row {row}, {title}
         </li>
       ))}

@@ -652,6 +652,35 @@ export class ProjectsService {
       return records.map(r => toExpandedProject(r));
     }, 'Projects.getAllForUser');
   }
+
+  /** Get only the fields an import needs to recognize kits already in the library */
+  async getLibraryMatchFields(
+    userId: string
+  ): Promise<
+    Pick<
+      Project,
+      'title' | 'company' | 'width' | 'height' | 'drillShape' | 'sourceUrl' | 'datePurchased'
+    >[]
+  > {
+    return ErrorHandler.handleAsync(async () => {
+      const records = await pb.collection('projects').getFullList<ProjectsResponse>({
+        filter: pb.filter('user = {:userId}', { userId }),
+        fields:
+          'title,company,width,height,drill_shape,source_url,date_purchased,expand.company.name',
+        expand: 'company',
+        requestKey: null,
+      });
+      return records.map(record => ({
+        title: record.title || '',
+        company: (record.expand as { company?: { name?: string } } | undefined)?.company?.name,
+        width: record.width || undefined,
+        height: record.height || undefined,
+        drillShape: record.drill_shape || undefined,
+        sourceUrl: record.source_url || undefined,
+        datePurchased: normalizeDateOnlyValue(record.date_purchased) || undefined,
+      }));
+    }, 'Projects.getLibraryMatchFields');
+  }
   /** Check if a project has related records in another collection */
   async hasRelatedRecords(projectId: string, collection: string): Promise<boolean> {
     return ErrorHandler.handleAsync(async () => {

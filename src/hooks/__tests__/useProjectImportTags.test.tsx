@@ -54,10 +54,10 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
 );
 
-async function importTag(tagName: string) {
+async function importTag(...tagNames: string[]) {
   mocks.parseCsv.mockResolvedValue({
-    projects: [{ title: 'Galaxy Cat', tagNames: [tagName] }],
-    allUniqueTagNames: [tagName],
+    projects: [{ title: 'Galaxy Cat', tagNames }],
+    allUniqueTagNames: tagNames,
   });
   const { result } = renderHook(() => useProjectImport(), { wrapper });
   await act(async () => {
@@ -89,5 +89,11 @@ describe('CSV import tags', () => {
 
     expect(await importTag('cats')).toEqual(['tag-cats']);
     expect(mocks.createTag).not.toHaveBeenCalled();
+  });
+
+  it('links a tag once when a row lists it in two spellings', async () => {
+    mocks.listUserTags.mockResolvedValue([{ id: 'tag-cats', name: 'cats' }]);
+
+    expect(await importTag('cats', 'CATS')).toEqual(['tag-cats']);
   });
 });

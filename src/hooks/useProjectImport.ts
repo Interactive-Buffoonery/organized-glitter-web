@@ -330,11 +330,9 @@ export const useProjectImport = () => {
           allValidationIssues.push(...projectValidation.issues);
 
           // Map tag names to IDs using validated names
-          const projectTagIds = (parsedProject.tagNames || [])
-            .map(originalName => {
-              return resolveTagId(originalName);
-            })
-            .filter(id => !!id) as string[];
+          const projectTagIds = [
+            ...new Set((parsedProject.tagNames || []).map(resolveTagId)),
+          ].filter((id): id is string => !!id);
 
           return {
             userId: user.id,

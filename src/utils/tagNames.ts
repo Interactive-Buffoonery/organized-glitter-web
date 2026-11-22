@@ -14,8 +14,11 @@ const byNameThenId = (a: NamedTag, b: NamedTag) =>
 
 // Exact spelling wins, so legacy pairs like `cats` and `Cats` each keep their own tag.
 export function findTagByName<T extends NamedTag>(tags: T[], name: string): T | undefined {
-  const exact = name.normalize('NFC').trim();
-  const sameSpelling = tags.find(tag => tag.name.normalize('NFC').trim() === exact);
+  const raw = name.trim();
+  const composed = raw.normalize('NFC');
+  const sameSpelling =
+    tags.find(tag => tag.name.trim() === raw) ??
+    tags.find(tag => tag.name.trim().normalize('NFC') === composed);
   if (sameSpelling) return sameSpelling;
   const key = tagNameKey(name);
   return tags.filter(tag => tagNameKey(tag.name) === key).sort(byNameThenId)[0];
@@ -65,14 +68,14 @@ export async function resolveTagIds<T extends NamedTag>(
   const existing = await listTags();
   if (isServiceResponseError(existing)) throw existing.error;
   const known: NamedTag[] = [...existing.data];
-  const ids: string[] = [];
+  const ids = new Set<string>();
 
   for (const tagName of names) {
     const name = tagName.trim();
     if (!name) continue;
     const match = findTagByName(known, name);
     if (match) {
-      ids.push(match.id);
+      ids.add(match.id);
       continue;
     }
 
@@ -80,8 +83,8 @@ export async function resolveTagIds<T extends NamedTag>(
     const created = await createTagOrReuseMatch(name, () => create({ name }), listTags);
     if (isServiceResponseError(created)) throw created.error;
     known.push(created.data);
-    ids.push(created.data.id);
+    ids.add(created.data.id);
   }
 
-  return ids;
+  return [...ids];
 }

@@ -57,6 +57,15 @@ describe('findTagByName', () => {
       findTagByName([capitalCats, cats], 'CATS')
     );
   });
+
+  it('prefers the raw spelling over another Unicode composition of it', () => {
+    const composed = { id: 'tag-nfc', name: 'Caf\u00e9' };
+    const decomposed = { id: 'tag-nfd', name: 'Cafe\u0301' };
+
+    expect(findTagByName([composed, decomposed], 'Cafe\u0301')).toBe(decomposed);
+    expect(findTagByName([decomposed, composed], 'Caf\u00e9')).toBe(composed);
+    expect(findTagByName([composed], 'Cafe\u0301')).toBe(composed);
+  });
 });
 
 describe('createTagOrReuseMatch', () => {
@@ -95,7 +104,7 @@ describe('resolveTagIds', () => {
       create
     );
 
-    expect(ids).toEqual(['tag-padded', 'tag-padded']);
+    expect(ids).toEqual(['tag-padded']);
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -110,7 +119,17 @@ describe('resolveTagIds', () => {
       create
     );
 
-    expect(ids).toEqual(['tag-Dogs', 'tag-Dogs']);
+    expect(ids).toEqual(['tag-Dogs']);
     expect(create).toHaveBeenCalledOnce();
+  });
+
+  it('returns each tag id once, in first-seen order', async () => {
+    const ids = await resolveTagIds(
+      ['cats', 'dogs', 'Cats'],
+      async () => createSuccessResponse([cats, { id: 'tag-dogs', name: 'dogs' }]),
+      vi.fn()
+    );
+
+    expect(ids).toEqual(['tag-cats', 'tag-dogs']);
   });
 });

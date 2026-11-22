@@ -11,6 +11,7 @@ import { DashboardShell, type DashboardMode } from '@/components/dashboard/Dashb
 import ProjectsSection from '@/components/dashboard/ProjectsSection';
 import MainLayout from '@/components/layout/MainLayout';
 import LoadingState from '@/components/projects/LoadingState';
+import { ColoringTrackerOff } from '@/components/routing/ColoringTrackerOff';
 import {
   ColoringFilterProvider,
   getInitialColoringFiltersFromUrl,
@@ -292,7 +293,7 @@ const Dashboard: React.FC = () => {
   }
 
   if (!isLoadingVerticals && activeMode === 'coloring-books' && !canUseColoring) {
-    return <Navigate to="/dashboard" replace />;
+    return <ColoringTrackerOff title="Library" />;
   }
 
   if (!isLoadingVerticals && activeMode === 'diamond' && !canUseDiamond && canUseColoring) {

@@ -23,8 +23,8 @@ const DashboardFilterSheet = ({
   isLoadingProjects,
 }: DashboardFilterSheetProps) => {
   const isMobile = useIsMobile();
-  const { filters } = useFilters();
-  const { resetDashboardFilterPanel } = useFilterHelpers();
+  const { filters, activeFilterCount } = useFilters();
+  const { clearActiveFilters } = useFilterHelpers();
   const posthog = usePostHog();
   const [open, setOpen] = useState(false);
   const titleId = useId();
@@ -116,8 +116,8 @@ const DashboardFilterSheet = ({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => resetDashboardFilterPanel()}
-                disabled={filterPanelSummary.count === 0}
+                onClick={clearActiveFilters}
+                disabled={activeFilterCount === 0}
               >
                 Reset
               </Button>

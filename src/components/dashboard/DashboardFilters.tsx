@@ -45,7 +45,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
       updateArtist,
       updateDrillShape,
       updateYearFinished,
-      resetDashboardFilterPanel,
+      clearActiveFilters,
       updateViewType,
       updateTags,
     } = useFilterHelpers();
@@ -222,7 +222,7 @@ const DashboardFiltersComponent: React.FC<DashboardFiltersProps> = React.memo(
             <Button
               type="button"
               variant="outline"
-              onClick={() => resetDashboardFilterPanel()}
+              onClick={clearActiveFilters}
               className="w-full"
               data-testid="reset-filters-button"
             >

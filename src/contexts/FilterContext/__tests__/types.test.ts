@@ -3,7 +3,6 @@ import {
   getActiveFilterResetPatch,
   getDefaultFilters,
   getDashboardFilterPanelSummary,
-  getDashboardFilterPanelResetPatch,
 } from '../types';
 
 describe('getActiveFilterResetPatch', () => {
@@ -74,17 +73,5 @@ describe('dashboard filter panel search scope', () => {
     });
     expect(summary.count).toBe(1);
     expect(summary.triggerLabel).toBe('Open filters. 1 filter active');
-  });
-  it('resets broader search while preserving search text and ordering', () => {
-    const filters = {
-      ...getDefaultFilters(),
-      searchTerm: 'garden',
-      searchAllFields: true,
-      sortField: 'title' as const,
-    };
-    const next = { ...filters, ...getDashboardFilterPanelResetPatch() };
-    expect(next.searchAllFields).toBe(false);
-    expect(next.searchTerm).toBe('garden');
-    expect(next.sortField).toBe('title');
   });
 });

@@ -170,7 +170,7 @@ export const getDashboardFilterPanelSummary = (filters: FilterState) => {
   };
 };
 
-const DASHBOARD_FILTER_PANEL_KEYS: Array<keyof FilterState> = [
+const ACTIVE_FILTER_KEYS: Array<keyof FilterState> = [
   'activeStatus',
   'selectedCompany',
   'selectedArtist',
@@ -181,21 +181,8 @@ const DASHBOARD_FILTER_PANEL_KEYS: Array<keyof FilterState> = [
   'includeArchived',
   'selectedTags',
   'searchAllFields',
+  'searchTerm',
 ];
-
-const ACTIVE_FILTER_KEYS: Array<keyof FilterState> = [...DASHBOARD_FILTER_PANEL_KEYS, 'searchTerm'];
-
-/**
- * Reset only the fields owned by the dashboard filter panel. Header-owned
- * search/sort state is intentionally preserved so "Reset All Filters" does not
- * wipe controls the user cannot currently see inside the panel.
- */
-export const getDashboardFilterPanelResetPatch = (): Partial<FilterState> => {
-  const defaults = getDefaultFilters();
-  return Object.fromEntries(
-    DASHBOARD_FILTER_PANEL_KEYS.map(key => [key, defaults[key]])
-  ) as Partial<FilterState>;
-};
 
 /**
  * Clear only active narrowing filters while preserving dashboard presentation

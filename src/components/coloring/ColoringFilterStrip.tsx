@@ -344,7 +344,7 @@ export function ColoringControlsRow({ showFilterTrigger = false }: ColoringContr
 
 function ColoringFilterSheetTrigger() {
   const posthog = usePostHog();
-  const { filters } = useColoringFilters();
+  const { filters, activeFilterCount } = useColoringFilters();
   const { clearActiveFilters } = useColoringFilterHelpers();
   const [open, setOpen] = useState(false);
   const titleId = useId();
@@ -426,11 +426,11 @@ function ColoringFilterSheetTrigger() {
                   posthog.capture(AnalyticsEvent.COLORING_BOOKS_FILTERS_CLEARED, {
                     craft: 'coloring',
                     surface: 'coloring_books',
-                    active_filter_count: panelCount,
+                    active_filter_count: activeFilterCount,
                   });
                   clearActiveFilters();
                 }}
-                disabled={panelCount === 0}
+                disabled={activeFilterCount === 0}
               >
                 Reset
               </Button>

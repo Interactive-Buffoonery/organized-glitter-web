@@ -6,7 +6,6 @@ import {
   DashboardViewType,
   FilterState,
   getActiveFilterResetPatch,
-  getDashboardFilterPanelResetPatch,
   getDefaultFilters,
 } from './types';
 import { ProjectFilterStatus } from '@/types/project';
@@ -154,7 +153,6 @@ export const useFilterHelpers = () => {
         setFilters(getActiveFilterResetPatch());
         resetSearchDraft();
       },
-      resetDashboardFilterPanel: () => setFilters(getDashboardFilterPanelResetPatch()),
     }),
     [setFilters, setPage, setPageSize, resetSearchDraft]
   );

@@ -103,6 +103,9 @@ Conventions: [`docs/agents/code-conventions.md`](./docs/agents/code-conventions.
 - Surface async errors through notifications or error boundaries.
 - Do not add `stores/` for server state.
 - Write tests before the code they verify when adding new behavior.
+- For date or CSV parsing changes, list the accepted formats and the time and
+  zone rules in the PR body, and add tests for impossible dates, month names,
+  UTF-16, CR-only lines and ISO offsets before the first review.
 
 ## UI
 

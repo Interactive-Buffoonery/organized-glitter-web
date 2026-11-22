@@ -107,8 +107,8 @@ const ProjectsTable = ({
         })}
       </div>
 
-      <div className="bg-card hidden overflow-x-auto rounded-xl border lg:block">
-        <table className="w-full min-w-[68rem] caption-bottom text-sm">
+      <div className="bg-card hidden rounded-xl border lg:block">
+        <table className="w-full table-fixed caption-bottom text-sm">
           <TableHeader>
             <TableRow>
               {PROJECTS_TABLE_COLUMNS.map(column => (
@@ -174,15 +174,15 @@ const ProjectsTable = ({
                           event.stopPropagation();
                           onNavigate(project.id);
                         }}
-                        className="focus-visible:ring-ring w-full text-left focus-visible:ring-2 focus-visible:outline-none"
+                        className="focus-visible:ring-ring block w-full text-left focus-visible:ring-2 focus-visible:outline-none"
                         aria-label={`Open project ${project.title}`}
                       >
                         <div className="space-y-0.5">
-                          <p className="line-clamp-1 font-medium">{project.title}</p>
+                          <p className="truncate font-medium" title={project.title}>
+                            {project.title}
+                          </p>
                           {artistLabel && (
-                            <p className="text-muted-foreground line-clamp-1 text-xs">
-                              {artistLabel}
-                            </p>
+                            <p className="text-muted-foreground truncate text-xs">{artistLabel}</p>
                           )}
                         </div>
                       </button>
@@ -195,15 +195,15 @@ const ProjectsTable = ({
                       />
                     </TableCell>
 
-                    <TableCell>
+                    <TableCell className="wrap-anywhere whitespace-normal">
                       {project.company || (
                         <span className="text-muted-foreground">Not specified</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs tabular-nums">
+                    <TableCell className="text-xs whitespace-normal tabular-nums">
                       {getSizeAndShapeLabel(project)}
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="text-xs whitespace-normal">
                       {lifecycleDate ? (
                         <div className="space-y-0.5">
                           <div className="text-muted-foreground">{lifecycleDate.label}</div>

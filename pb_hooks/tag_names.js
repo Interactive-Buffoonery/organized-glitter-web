@@ -1,4 +1,7 @@
 // Request hooks only, so archive restores and existing case-duplicate tags keep working.
+// Keep tagNameKey in step with src/utils/tagNames.ts.
+const tagNameKey = name => name.normalize('NFC').trim().toLowerCase();
+
 function rejectDuplicateTagName(e) {
   if (e.hasSuperuserAuth()) return;
   // Request hooks run before API rules, so only answer for the caller's own tags.
@@ -6,25 +9,23 @@ function rejectDuplicateTagName(e) {
   if (!e.auth || e.auth.id !== owner) return;
   if (!e.record.isNew() && e.record.original().getString('user') !== owner) return;
 
-  const name = e.record.getString('name').trim();
-  if (!name) return;
-  if (!e.record.isNew()) {
-    const previousName = e.record.original().getString('name').trim();
-    if (previousName.toLowerCase() === name.toLowerCase()) return;
-  }
+  const key = tagNameKey(e.record.getString('name'));
+  if (!key) return;
+  if (!e.record.isNew() && tagNameKey(e.record.original().getString('name')) === key) return;
 
-  // ponytail: SQLite lower() folds ASCII only; non-ASCII case variants still pass.
-  const matches = arrayOf(new DynamicModel({ name: '' }));
+  // ponytail: scans every tag the owner has, fine for hundreds; add a normalized key column if lists reach many thousands.
+  const rows = arrayOf(new DynamicModel({ name: '' }));
   e.app
     .db()
     .newQuery(
-      `SELECT name FROM ${e.collection.name} WHERE user = {:user} AND lower(trim(name)) = lower({:name}) AND id != {:id} LIMIT 1`
+      `SELECT name FROM ${e.collection.name} WHERE user = {:user} AND id != {:id} ORDER BY created, id`
     )
-    .bind({ user: owner, name, id: e.record.id || '' })
-    .all(matches);
-  if (matches.length === 0) return;
+    .bind({ user: owner, id: e.record.id || '' })
+    .all(rows);
+  const match = rows.find(row => tagNameKey(row.name) === key);
+  if (!match) return;
 
-  throw new BadRequestError(`A tag named "${matches[0].name}" already exists.`, {
+  throw new BadRequestError(`A tag named "${match.name}" already exists.`, {
     name: new ValidationError('validation_not_unique', 'Tag name already exists.'),
   });
 }

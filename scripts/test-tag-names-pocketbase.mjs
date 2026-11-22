@@ -97,6 +97,11 @@ try {
 
     await rejectsDuplicate(tags.create(tag('CATS')), 'cats');
     await rejectsDuplicate(tags.create(tag('  Cats  ')), 'cats');
+    await rejectsDuplicate(tags.create(tag('\tcats\n')), 'cats');
+
+    await tags.create(tag('Étoiles'));
+    await rejectsDuplicate(tags.create(tag('étoiles')), 'Étoiles');
+    await rejectsDuplicate(tags.create(tag('Étoiles')), 'Étoiles');
 
     const dogs = await tags.create(tag('dogs'));
     await rejectsDuplicate(tags.update(dogs.id, { name: ' CaTs' }), 'cats');

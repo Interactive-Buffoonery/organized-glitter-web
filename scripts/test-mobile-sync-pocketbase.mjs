@@ -26,6 +26,8 @@ const port = socket.address().port;
 await new Promise(resolve => socket.close(resolve));
 const url = `http://127.0.0.1:${port}`;
 const password = 'mobile-sync-test-password-123';
+// Choose a server day that differs from UTC so the UTC fallback test can distinguish both.
+const timezone = new Date().getUTCHours() < 11 ? 'Etc/GMT+12' : 'Pacific/Kiritimati';
 const setup = spawnSync(
   binary,
   ['superuser', 'upsert', 'sync-admin@example.test', password, `--dir=${dataDir}`],
@@ -42,7 +44,7 @@ const server = spawn(
     `--hooksDir=${hooksDir}`,
     '--automigrate=false',
   ],
-  { stdio: ['ignore', 'pipe', 'pipe'] }
+  { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, TZ: timezone } }
 );
 server.stdout.on('data', chunk => (output += chunk.toString()));
 server.stderr.on('data', chunk => (output += chunk.toString()));
@@ -73,8 +75,6 @@ try {
     });
   const owner = await createUser('sync-owner');
   const other = await createUser('sync-other');
-  // Choose an account day that differs from UTC throughout the test.
-  const timezone = new Date().getUTCHours() < 11 ? 'Etc/GMT+12' : 'Pacific/Kiritimati';
   await admin.collection('users').update(owner.id, { timezone });
   const accountDate = new Intl.DateTimeFormat('sv-SE', {
     timeZone: timezone,
@@ -487,16 +487,81 @@ try {
   await statusPages.update(webPage.id, { status: 'on_hold' });
   const recompleted = await statusPages.update(webPage.id, { status: 'completed' });
   assert.equal(recompleted.completed_at, historicalDate, 'keep an existing completion date');
+  await statusPages.update(webPage.id, { status: 'in_progress' });
+  const cleared = await statusPages.update(webPage.id, { status: 'completed', completed_at: '' });
+  assert.equal(cleared.status, 'completed');
+  assert.equal(cleared.completed_at, '', 'completing with an explicit clear removes the old date');
 
+  const lifecycleBase = record =>
+    Object.fromEntries(Object.keys(pageBaseline).map(key => [key, record[key]]));
+  const pendingReopen = {
+    operationId: 'test-operation-queued-reopen',
+    collection: 'coloring_pages',
+    recordId: syncPage.id,
+    base: { ...lifecycleBase(syncPage), status: 'completed', completed_at: null },
+    patch: { status: 'in_progress' },
+  };
   const syncCompletion = await request(ownerClient, 'apply', {
     operationId: 'test-operation-page-complete',
     collection: 'coloring_pages',
     recordId: syncPage.id,
-    base: Object.fromEntries(Object.keys(pageBaseline).map(key => [key, syncPage[key]])),
+    base: lifecycleBase(syncPage),
     patch: { status: 'completed' },
   });
   assert.equal(syncCompletion.status, 200, await syncCompletion.clone().text());
-  assert.equal((await syncCompletion.json()).record.completed_at, finished.completed_at);
+  const syncedPage = (await syncCompletion.json()).record;
+  assert.equal(syncedPage.completed_at, finished.completed_at);
+  assert.ok(!Object.hasOwn(syncedPage, 'mobile_completion_date_generated'));
+  const checkConflict = async (operation, message) => {
+    const response = await request(ownerClient, 'apply', operation);
+    assert.equal(response.status, 409, message);
+    assert.equal((await response.json()).reason, 'field_conflict', message);
+  };
+  await checkConflict(
+    { ...pendingReopen, patch: { status: 'in_progress', completed_at: '' } },
+    'the queued operation cannot overwrite the generated date'
+  );
+  await checkConflict(
+    { ...pendingReopen, base: { ...pendingReopen.base, started_at: historicalDate } },
+    'the queued operation still checks the full lifecycle group'
+  );
+  const queuedReopen = await request(ownerClient, 'apply', pendingReopen);
+  assert.equal(queuedReopen.status, 200, await queuedReopen.clone().text());
+  const reopenedSyncPage = (await queuedReopen.json()).record;
+  assert.equal(reopenedSyncPage.status, 'in_progress');
+  assert.equal(reopenedSyncPage.completed_at, syncedPage.completed_at);
+
+  // An explicit date equal to the account day has the same value as a generated date.
+  await statusPages.update(webPage.id, { completed_at: finished.completed_at });
+  await checkConflict(
+    {
+      ...pendingReopen,
+      operationId: 'test-operation-explicit-date',
+      recordId: webPage.id,
+      base: { ...lifecycleBase(cleared), completed_at: null },
+    },
+    'a status-only patch conflicts with a concurrent explicit date, even for today'
+  );
+
+  await statusPages.update(syncPage.id, { status: 'completed', completed_at: '' });
+  const clearedSyncPage = await statusPages.update(syncPage.id, { status: 'in_progress' });
+  const secondCompletion = await request(ownerClient, 'apply', {
+    operationId: 'test-operation-second-completion',
+    collection: 'coloring_pages',
+    recordId: syncPage.id,
+    base: lifecycleBase(clearedSyncPage),
+    patch: { status: 'completed' },
+  });
+  assert.equal(secondCompletion.status, 200, await secondCompletion.clone().text());
+  const secondSyncedPage = (await secondCompletion.json()).record;
+  await statusPages.update(syncPage.id, {
+    completed_at: secondSyncedPage.completed_at,
+    mobile_completion_date_generated: true,
+  });
+  await checkConflict(
+    { ...pendingReopen, operationId: 'test-operation-after-date-edit' },
+    'an explicit date edit clears the marker, even when it writes the same date'
+  );
   const createdComplete = await statusPages.create({
     book: statusBook.id,
     page_number: 3,
@@ -504,6 +569,25 @@ try {
   });
   assert.equal(createdComplete.completed_at, finished.completed_at, 'create completed');
   await ownerClient.collection('coloring_books').delete(statusBook.id);
+
+  const utcBook = await otherClient.collection('coloring_books').create({
+    user: other.id,
+    title: 'Default timezone completion',
+    total_pages: 1,
+  });
+  assert.equal((await admin.collection('users').getOne(other.id)).timezone, '');
+  const utcPages = otherClient.collection('coloring_pages');
+  const utcPage = await utcPages.getFirstListItem(
+    otherClient.filter('book = {:id}', { id: utcBook.id })
+  );
+  const utcDayBefore = new Date().toISOString().slice(0, 10);
+  const utcCompletion = await utcPages.update(utcPage.id, { status: 'completed' });
+  const utcDayAfter = new Date().toISOString().slice(0, 10);
+  assert.ok(
+    [utcDayBefore, utcDayAfter].some(day => utcCompletion.completed_at === `${day} 00:00:00.000Z`),
+    'an account with no saved timezone gets the UTC completion day'
+  );
+  await otherClient.collection('coloring_books').delete(utcBook.id);
 
   const completionDate = '2026-01-02 12:00:00.000Z';
   const correctedDate = '2026-01-03 12:00:00.000Z';

@@ -57,7 +57,10 @@ most 32 KiB.
 
 The server checks owner and changed fields in one transaction, then applies a
 partial update through normal PocketBase save hooks. Changes to other fields
-can merge. A changed field or lifecycle group returns HTTP 409 with
+can merge. A coloring-page status-only patch with an empty base completion
+date can follow a mobile completion that generated the date on the page's
+last save. The rest of the lifecycle group still has to match.
+A changed field or lifecycle group returns HTTP 409 with
 `reason = "field_conflict"` and `record` containing the current
 record. An operation ID reused with a different payload returns HTTP 409 with
 `reason = "operation_id_reused"`. A missing or inaccessible record returns

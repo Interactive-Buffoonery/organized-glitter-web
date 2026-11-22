@@ -415,6 +415,14 @@ onRecordUpdate(e => {
   }
 }, 'coloring_books');
 
+onRecordUpdateRequest(e => {
+  require(`${__hooks}/lifecycle_status.js`).setColoringPageCompletionIntent(
+    e.record,
+    e.requestInfo().body
+  );
+  e.next();
+}, 'coloring_pages');
+
 onRecordCreate(e => {
   const isArchiveRestore = e.context.value('organized_glitter_archive_restore') === true;
   if (!e.record.getString('status')) {

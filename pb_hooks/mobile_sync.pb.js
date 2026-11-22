@@ -357,6 +357,9 @@ routerAdd(
     const patchKeys = Object.keys(sourcePatch).sort();
     if (patchKeys.length < 1 || patchKeys.length > 20)
       throw new BadRequestError('Invalid mobile sync fields.');
+    const isColoringPage = body.collection === 'coloring_pages';
+    const statusOnlyPagePatch =
+      isColoringPage && patchKeys.length === 1 && patchKeys[0] === 'status';
     const sourceBase = base;
     const checks = {};
     for (let i = 0; i < patchKeys.length; i += 1) {
@@ -525,8 +528,15 @@ routerAdd(
         return;
       }
       const current = record.publicExport();
+      // A queued status edit can predate the completion response and its generated date.
+      const followsGeneratedDate =
+        statusOnlyPagePatch &&
+        canonicalBase.status === 'completed' &&
+        (canonicalBase.completed_at === null || canonicalBase.completed_at === '') &&
+        record.getBool('mobile_completion_date_generated');
       for (let i = 0; i < checkKeys.length; i += 1) {
         const key = checkKeys[i];
+        if (key === 'completed_at' && followsGeneratedDate) continue;
         const expected = canonicalBase[key];
         const stored = current[key];
         const emptyStored =
@@ -569,6 +579,13 @@ routerAdd(
       }
       for (let i = 0; i < patchKeys.length; i += 1)
         record.set(patchKeys[i], canonicalPatch[patchKeys[i]]);
+      if (isColoringPage) {
+        require(`${__hooks}/lifecycle_status.js`).setColoringPageCompletionIntent(
+          record,
+          canonicalPatch,
+          statusOnlyPagePatch
+        );
+      }
       txApp.save(record);
       const saved = txApp.findRecordById(body.collection, body.recordId).publicExport();
       const receiptCollection = txApp.findCollectionByNameOrId('mobile_sync_receipts');

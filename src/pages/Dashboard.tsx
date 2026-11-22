@@ -293,7 +293,7 @@ const Dashboard: React.FC = () => {
   }
 
   if (!isLoadingVerticals && activeMode === 'coloring-books' && !canUseColoring) {
-    return <ColoringTrackerOff title="Library" />;
+    return <ColoringTrackerOff title="Library" currentPage="Library" />;
   }
 
   if (!isLoadingVerticals && activeMode === 'diamond' && !canUseDiamond && canUseColoring) {

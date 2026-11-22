@@ -188,7 +188,7 @@ const ProjectsGridComponent: React.FC<ProjectsGridProps> = ({
             ))}
           </div>
 
-          <div className="bg-card hidden rounded-xl border lg:block">
+          <div className="bg-card hidden overflow-clip rounded-xl border lg:block">
             <table className="w-full table-fixed caption-bottom text-sm">
               <TableHeader>
                 <TableRow>

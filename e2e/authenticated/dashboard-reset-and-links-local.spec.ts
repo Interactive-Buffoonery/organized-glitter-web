@@ -76,15 +76,51 @@ for (const path of ['/dashboard', '/projects/new']) {
     });
 
     await page.goto(`${path}?craft=coloring`);
-    await expect(page.getByText('The coloring tracker is off.')).toBeVisible();
+    const notice = page.getByRole('status').filter({ hasText: 'The coloring tracker is off.' });
+    await expect(notice).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`${path}\\?craft=coloring$`));
-    await page.getByRole('link', { name: 'Open tracker settings' }).click();
+    if (path === '/dashboard') {
+      const navigation = page.getByRole('navigation', { name: 'Primary navigation' });
+      await expect(navigation.getByRole('link', { name: 'Library' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      );
+    }
+    await notice.getByRole('link', { name: 'Open tracker settings' }).click();
     const toggle = page.getByRole('switch', { name: 'Coloring books' });
     await expect(toggle).toBeEnabled();
     await expect(toggle).not.toBeChecked();
     await expect(toggle).toBeInViewport();
   });
 }
+
+test('focuses the coloring switch after tracker settings load in a new tab', async ({
+  context,
+}) => {
+  const page = await context.newPage();
+  const trackerSettings = Promise.withResolvers<void>();
+  await page.route('**/api/collections/user_dashboard_settings/records?*', async route => {
+    const response = await route.fetch();
+    const data = await response.json();
+    for (const item of data.items ?? []) {
+      item.vertical_enabled = { diamond_painting: true, coloring_books: false };
+    }
+    await trackerSettings.promise;
+    await route.fulfill({ response, json: data });
+  });
+
+  try {
+    await page.goto('/profile#vertical-coloring');
+    const toggle = page.getByRole('switch', { name: 'Coloring books' });
+    await expect(toggle).toBeDisabled();
+    trackerSettings.resolve();
+    await expect(toggle).toBeEnabled();
+    await expect(toggle).toBeFocused();
+    await expect(toggle).toBeInViewport();
+  } finally {
+    trackerSettings.resolve();
+  }
+});
 
 test('keeps table metadata visible with a 240-character kit title', async ({ page }) => {
   assertLocalE2ETargets({ appUrl, pocketBaseUrl, specName: 'Dashboard long title' });

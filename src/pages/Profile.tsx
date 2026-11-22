@@ -60,15 +60,6 @@ const Profile = () => {
     refetch: refetchProfile,
   } = useUserProfileQuery(user?.id);
 
-  useEffect(() => {
-    if (!user || profileLoading || activeTab !== 'preferences') return;
-    if (location.hash !== '#vertical-coloring') return;
-
-    const toggle = document.getElementById('vertical-coloring');
-    toggle?.focus({ preventScroll: true });
-    toggle?.scrollIntoView({ block: 'center' });
-  }, [activeTab, location.hash, profileLoading, user]);
-
   // Local form state derived from profile data
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -266,7 +257,7 @@ const Profile = () => {
                   </SettingsSection>
 
                   <SettingsSection title="Trackers">
-                    <VerticalToggles />
+                    <VerticalToggles focusColoring={location.hash === '#vertical-coloring'} />
                   </SettingsSection>
                 </GlassPanel>
               </TabsContent>

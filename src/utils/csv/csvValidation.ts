@@ -331,7 +331,7 @@ function validateProjectTitle(value: string | null | undefined): {
       originalValue: value,
       correctedValue: truncated,
       severity: 'warning' as const,
-      message: `Project title too long (${trimmed.length} chars). Truncated to: "${truncated}"`,
+      message: `Title shortened to the ${FIELD_LIMITS.PROJECT_TITLE_MAX_LENGTH} character limit.`,
     },
   };
 }

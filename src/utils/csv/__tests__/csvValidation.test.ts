@@ -75,3 +75,18 @@ describe('CSV date validation', () => {
     expect(result.issues.filter(issue => issue.field === 'datePurchased')).toHaveLength(0);
   });
 });
+
+describe('CSV title validation', () => {
+  it('reports a title shortened to the length limit', () => {
+    const result = validateProjectData({ title: 'Galaxy Cat '.repeat(24) });
+
+    expect(result.correctedData.title.length).toBeLessThanOrEqual(200);
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        field: 'title',
+        severity: 'warning',
+        message: 'Title shortened to the 200 character limit.',
+      }),
+    ]);
+  });
+});

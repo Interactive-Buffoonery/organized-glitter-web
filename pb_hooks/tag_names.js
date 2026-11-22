@@ -1,6 +1,10 @@
 // Request hooks only, so archive restores and existing case-duplicate tags keep working.
 function rejectDuplicateTagName(e) {
   if (e.hasSuperuserAuth()) return;
+  // Request hooks run before API rules, so only answer for the caller's own tags.
+  const owner = e.record.getString('user');
+  if (!e.auth || e.auth.id !== owner) return;
+  if (!e.record.isNew() && e.record.original().getString('user') !== owner) return;
 
   const name = e.record.getString('name').trim();
   if (!name) return;
@@ -16,7 +20,7 @@ function rejectDuplicateTagName(e) {
     .newQuery(
       `SELECT name FROM ${e.collection.name} WHERE user = {:user} AND lower(trim(name)) = lower({:name}) AND id != {:id} LIMIT 1`
     )
-    .bind({ user: e.record.getString('user'), name, id: e.record.id || '' })
+    .bind({ user: owner, name, id: e.record.id || '' })
     .all(matches);
   if (matches.length === 0) return;
 

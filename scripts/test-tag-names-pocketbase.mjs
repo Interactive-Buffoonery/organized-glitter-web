@@ -105,6 +105,19 @@ try {
 
     await other.client.collection(collection).create(tag('CATS', other.user.id));
 
+    // Another account cannot use the duplicate check to read owner tag names.
+    const ownerFish = await tags.create(tag('fish'));
+    for (const attempt of [
+      () => other.client.collection(collection).create(tag('Cats')),
+      () => other.client.collection(collection).update(ownerFish.id, { name: 'Cats' }),
+    ]) {
+      await assert.rejects(attempt(), error => {
+        assert.notEqual(error.response.data?.name?.code, 'validation_not_unique');
+        assert.doesNotMatch(error.response.message, /cats/i);
+        return true;
+      });
+    }
+
     // Existing case duplicates stay untouched and editable.
     const legacy = await admin.collection(collection).create(tag('BIRDS'));
     assert.equal((await tags.update(legacy.id, { color: '#ff0000' })).color, '#ff0000');

@@ -420,7 +420,7 @@ onRecordCreate(e => {
   if (!e.record.getString('status')) {
     e.record.set('status', 'not_started');
   }
-  require(`${__hooks}/lifecycle_status.js`).applyCompletionStatus(e, 'completed_at', false);
+  require(`${__hooks}/lifecycle_status.js`).applyColoringPageCompletion(e, false);
 
   const status = e.record.getString('status');
   const now = new Date().toISOString();
@@ -479,9 +479,7 @@ onRecordCreate(e => {
 
 onRecordUpdate(e => {
   const isArchiveRestore = e.context.value('organized_glitter_archive_restore') === true;
-  require(`${__hooks}/lifecycle_status.js`).applyCompletionStatus(e, 'completed_at', true);
-  const previousStatus = e.record.original().getString('status');
-  const nextStatus = e.record.getString('status');
+  require(`${__hooks}/lifecycle_status.js`).applyColoringPageCompletion(e, true);
   const now = new Date().toISOString();
 
   e.next();

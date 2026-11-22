@@ -346,6 +346,19 @@ try {
     { key: 'completed', label: 'Completed', count: 0 },
   ]);
 
+  // Model restored or legacy records that predate status-driven completion dates.
+  await admin.collection('coloring_pages').update(firstCompletedPage.id, { status: 'on_hold' });
+  await createColoringPage(admin, firstBook, { pageNumber: 3, status: 'completed' });
+  const legacySummary = await getStats(firstClient, '/api/stats/coloring/summary', '?year=2026');
+  assert.equal(legacySummary.pageStatusBreakdown.completed, 1);
+  assert.equal(legacySummary.metrics.completedPagesThisYear, 0);
+  assert.equal(legacySummary.metrics.allTimeCompletedPages, 0);
+  for (const endpoint of ['completions?year=2026', 'completions/yearly']) {
+    assert.equal((await getStats(firstClient, `/api/stats/coloring/${endpoint}`)).total, 0);
+  }
+  const legacyTimes = await getStats(firstClient, '/api/stats/coloring/completion-times');
+  assert.equal(legacyTimes.fastestPageCompletion, null);
+
   for (const status of ['stash', 'stash', 'purchased', 'kitted']) {
     await createProject(admin, firstUser, { title: `First user ${status}`, status });
   }

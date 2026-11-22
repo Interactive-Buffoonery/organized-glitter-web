@@ -73,6 +73,15 @@ try {
     });
   const owner = await createUser('sync-owner');
   const other = await createUser('sync-other');
+  // Choose an account day that differs from UTC throughout the test.
+  const timezone = new Date().getUTCHours() < 11 ? 'Etc/GMT+12' : 'Pacific/Kiritimati';
+  await admin.collection('users').update(owner.id, { timezone });
+  const accountDate = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
   const ownerClient = new PocketBase(url);
   await ownerClient.collection('users').authWithPassword(owner.email, password);
   const otherClient = new PocketBase(url);
@@ -444,6 +453,58 @@ try {
   await admin.collection('projects').delete(poisoned.id);
   const empty = await request(ownerClient, 'snapshot');
   assert.equal((await empty.json()).projects.length, 0);
+
+  const statusBook = await ownerClient.collection('coloring_books').create({
+    user: owner.id,
+    title: 'Page status lifecycle',
+    status: 'completed',
+    total_pages: 2,
+  });
+  const statusPages = ownerClient.collection('coloring_pages');
+  const [webPage, syncPage] = await statusPages.getFullList({
+    filter: ownerClient.filter('book = {:book}', { book: statusBook.id }),
+    sort: 'page_number',
+  });
+  assert.equal(webPage.status, 'not_started', 'book status does not complete its pages');
+  const summary = async () => {
+    const response = await fetch(
+      `${url}/api/stats/coloring/summary?year=${accountDate.slice(0, 4)}`,
+      { headers: { Authorization: ownerClient.authStore.token } }
+    );
+    assert.equal(response.status, 200);
+    return (await response.json()).metrics.completedPagesThisYear;
+  };
+  assert.equal(await summary(), 0);
+  const finished = await statusPages.update(webPage.id, { status: 'completed' });
+  assert.equal(finished.completed_at, `${accountDate} 00:00:00.000Z`, 'web completion date');
+  assert.equal(await summary(), 1, 'status-only completion appears in yearly Stats');
+
+  const reopened = await statusPages.update(webPage.id, { status: 'in_progress' });
+  assert.equal(reopened.completed_at, finished.completed_at, 'preserve the date on reopen');
+  assert.equal(await summary(), 0, 'reopened pages drop out of yearly Stats');
+  const historicalDate = '2025-03-09 00:00:00.000Z';
+  await statusPages.update(webPage.id, { completed_at: historicalDate });
+  await statusPages.update(webPage.id, { status: 'on_hold' });
+  const recompleted = await statusPages.update(webPage.id, { status: 'completed' });
+  assert.equal(recompleted.completed_at, historicalDate, 'keep an existing completion date');
+
+  const syncCompletion = await request(ownerClient, 'apply', {
+    operationId: 'test-operation-page-complete',
+    collection: 'coloring_pages',
+    recordId: syncPage.id,
+    base: Object.fromEntries(Object.keys(pageBaseline).map(key => [key, syncPage[key]])),
+    patch: { status: 'completed' },
+  });
+  assert.equal(syncCompletion.status, 200, await syncCompletion.clone().text());
+  assert.equal((await syncCompletion.json()).record.completed_at, finished.completed_at);
+  const createdComplete = await statusPages.create({
+    book: statusBook.id,
+    page_number: 3,
+    status: 'completed',
+  });
+  assert.equal(createdComplete.completed_at, finished.completed_at, 'create completed');
+  await ownerClient.collection('coloring_books').delete(statusBook.id);
+
   const completionDate = '2026-01-02 12:00:00.000Z';
   const correctedDate = '2026-01-03 12:00:00.000Z';
   const lifecycleBook = await admin.collection('coloring_books').create({

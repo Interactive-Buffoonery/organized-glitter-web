@@ -1109,13 +1109,15 @@ routerAdd(
       SELECT
         COUNT(DISTINCT cb.id) AS totalBooks,
         COALESCE(SUM(CASE
-          WHEN cp.completed_at IS NOT NULL
+          WHEN cp.status = 'completed'
+            AND cp.completed_at IS NOT NULL
             AND cp.completed_at != ''
             AND cp.completed_at >= {:yearStart}
             AND cp.completed_at < {:nextYearStart}
           THEN 1 ELSE 0 END), 0) AS completedPagesThisYear,
         COALESCE(SUM(CASE
-          WHEN cp.completed_at IS NOT NULL
+          WHEN cp.status = 'completed'
+            AND cp.completed_at IS NOT NULL
             AND cp.completed_at != ''
           THEN 1 ELSE 0 END), 0) AS allTimeCompletedPages
       FROM coloring_books cb
@@ -1255,6 +1257,7 @@ routerAdd(
       FROM coloring_pages cp
       JOIN coloring_books cb ON cb.id = cp.book
       WHERE cb.user = {:userId}
+        AND cp.status = 'completed'
         AND cp.completed_at IS NOT NULL
         AND cp.completed_at != ''
         AND cp.completed_at >= {:yearStart}
@@ -1274,6 +1277,7 @@ routerAdd(
       FROM coloring_pages cp
       JOIN coloring_books cb ON cb.id = cp.book
       WHERE cb.user = {:userId}
+        AND cp.status = 'completed'
         AND cp.completed_at IS NOT NULL
         AND cp.completed_at != ''
         AND cp.completed_at >= {:previousYearStart}
@@ -1336,6 +1340,7 @@ routerAdd(
       FROM coloring_pages cp
       JOIN coloring_books cb ON cb.id = cp.book
       WHERE cb.user = {:userId}
+        AND cp.status = 'completed'
         AND cp.completed_at IS NOT NULL
         AND cp.completed_at != ''
       GROUP BY year
@@ -1389,7 +1394,8 @@ routerAdd(
         `
       SELECT
         COALESCE(AVG(CASE
-          WHEN cp.started_at IS NOT NULL
+          WHEN cp.status = 'completed'
+            AND cp.started_at IS NOT NULL
             AND cp.started_at != ''
             AND cp.completed_at IS NOT NULL
             AND cp.completed_at != ''
@@ -1398,7 +1404,8 @@ routerAdd(
           ELSE NULL
         END), 0) AS averagePageCompletionDays,
         COALESCE(SUM(CASE
-          WHEN cp.started_at IS NOT NULL
+          WHEN cp.status = 'completed'
+            AND cp.started_at IS NOT NULL
             AND cp.started_at != ''
             AND cp.completed_at IS NOT NULL
             AND cp.completed_at != ''
@@ -1453,6 +1460,7 @@ routerAdd(
       FROM coloring_pages cp
       JOIN coloring_books cb ON cb.id = cp.book
       WHERE cb.user = {:userId}
+        AND cp.status = 'completed'
         AND cp.started_at IS NOT NULL
         AND cp.started_at != ''
         AND cp.completed_at IS NOT NULL
@@ -1476,6 +1484,7 @@ routerAdd(
       FROM coloring_pages cp
       JOIN coloring_books cb ON cb.id = cp.book
       WHERE cb.user = {:userId}
+        AND cp.status = 'completed'
         AND cp.completed_at IS NOT NULL
         AND cp.completed_at != ''
       GROUP BY year, month

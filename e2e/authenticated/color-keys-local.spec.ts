@@ -396,8 +396,46 @@ test('coloring detail: edit dates, reveal the subject and log progress', async (
     await expect(page.getByRole('button', { name: 'add finish date', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'add start date', exact: true })).toHaveCount(0);
 
+    const accountDate = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: pb.authStore.record?.timezone || 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const year = accountDate.slice(0, 4);
+    const stats = await pb.send<{ metrics: { completedPagesThisYear: number } }>(
+      '/api/stats/coloring/summary',
+      { query: { year } }
+    );
     await page.getByRole('combobox', { name: 'Change page status' }).click();
     await page.getByRole('option', { name: 'Completed', exact: true }).click();
+    await expect
+      .poll(async () => (await pb.collection('coloring_pages').getOne(pageId)).completed_at)
+      .toBe(`${accountDate} 00:00:00.000Z`);
+
+    await page.goto('/stats');
+    await page
+      .getByRole('group', { name: 'Craft scope' })
+      .getByText('Coloring', { exact: true })
+      .click();
+    await page.getByRole('group', { name: 'Time scope' }).getByText(year, { exact: true }).click();
+    const completed = stats.metrics.completedPagesThisYear + 1;
+    await expect(
+      page
+        .getByRole('region', { name: 'Coloring', exact: true })
+        .getByText(`Completed in ${year}`, {
+          exact: true,
+        })
+        .locator('..')
+        .locator('p')
+        .last()
+    ).toHaveText(
+      new RegExp(`^${completed.toLocaleString('en-US')}\\s*${completed === 1 ? 'page' : 'pages'}$`)
+    );
+
+    // An undated completion still offers the prompt for older records.
+    await pb.collection('coloring_pages').update(pageId, { completed_at: '' });
+    await page.goto(`/coloring/${book.id}/pages/${pageId}`);
     await expect(page.getByText('Did you finish it today?')).toBeVisible();
     await page.getByRole('button', { name: 'Pick a date', exact: true }).click();
     await page

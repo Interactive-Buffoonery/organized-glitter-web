@@ -118,18 +118,6 @@ export function getActiveColoringFilterCount(filters: ColoringFilterState): numb
   return count;
 }
 
-export function getColoringFilterPanelCount(filters: ColoringFilterState): number {
-  let count = 0;
-  if (filters.mysteryOnly) count++;
-  if (filters.selectedStatuses.length === 0 && filters.includeArchived) count++;
-  if (filters.selectedStatuses.length === 0 && filters.includeDestashed) count++;
-  count += filters.selectedStatuses.length;
-  count += filters.selectedPublishers.length;
-  count += filters.selectedIllustrators.length;
-  count += filters.selectedTags.length;
-  return count;
-}
-
 const ACTIVE_KEYS: Array<keyof ColoringFilterState> = [
   'selectedStatuses',
   'selectedPublishers',

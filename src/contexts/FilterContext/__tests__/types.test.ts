@@ -65,13 +65,13 @@ describe('dashboard filter panel search scope', () => {
     ).toBe(1);
   });
 
-  it('counts broader search but excludes the search text', () => {
+  it('counts both search text and broader search', () => {
     const summary = getDashboardFilterPanelSummary({
       ...getDefaultFilters(),
       searchTerm: 'garden',
       searchAllFields: true,
     });
-    expect(summary.count).toBe(1);
-    expect(summary.triggerLabel).toBe('Open filters. 1 filter active');
+    expect(summary.count).toBe(2);
+    expect(summary.triggerLabel).toBe('Open filters. 2 filters active');
   });
 });

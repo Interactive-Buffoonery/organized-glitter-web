@@ -14,7 +14,6 @@ export {
   COLORING_VIEW_TYPE_STORAGE_KEY,
   getDefaultColoringFilters,
   getActiveColoringFilterCount,
-  getColoringFilterPanelCount,
 } from './types';
 export {
   getColoringPaginationFromUrl,

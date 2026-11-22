@@ -46,9 +46,17 @@ for (const craft of ['diamond', 'coloring'] as const) {
     const param = coloring ? 'q' : 'search';
     await page.goto(`/dashboard?${coloring ? 'craft=coloring&' : ''}${param}=no+matching+title`);
     await expect(search).toHaveValue('no matching title');
-    await page.getByRole('button', { name: /open filters|filters \(/i }).click();
+    const trigger = page.getByRole('button', {
+      name: coloring ? 'Filters (1 active)' : 'Open filters. 1 filter active',
+      exact: true,
+    });
+    await trigger.click();
     const drawer = page.getByRole('dialog');
-    await drawer.getByRole('button', { name: 'Reset', exact: true }).click({ timeout: 5000 });
+    await expect(drawer.getByText(coloring ? '1 active' : '1 filter active')).toBeVisible();
+    const reset = drawer.getByRole('button', { name: 'Reset', exact: true });
+    await reset.click();
+    await expect(drawer.getByText('No filters active')).toBeVisible();
+    await expect(reset).toBeDisabled();
     await drawer.getByRole('button', { name: 'Close filters', exact: true }).last().click();
     await expect(search).toHaveValue('');
     await expect(page).not.toHaveURL(new RegExp(`[?&]${param}=`));

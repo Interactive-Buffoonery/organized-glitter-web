@@ -15,11 +15,7 @@ import LibraryViewToggle from '@/components/shared/LibraryViewToggle';
 import { cn } from '@/lib/utils';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import { getSearchAnalyticsProperties } from '@/services/coloring-analytics';
-import {
-  getColoringFilterPanelCount,
-  useColoringFilterHelpers,
-  useColoringFilters,
-} from '@/contexts/ColoringFilterContext';
+import { useColoringFilterHelpers, useColoringFilters } from '@/contexts/ColoringFilterContext';
 
 interface ColoringFilterPanelProps {
   /**
@@ -75,7 +71,6 @@ export function ColoringFilterPanel({
   );
   const tagOptions = useMemo(() => tags.map(tag => ({ label: tag.name, value: tag.id })), [tags]);
 
-  const panelCount = getColoringFilterPanelCount(filters);
   const captureFilterChange = useCallback(
     (filterName: string, valueCount?: number) => {
       posthog.capture(AnalyticsEvent.COLORING_BOOKS_FILTER_CHANGED, {
@@ -116,7 +111,7 @@ export function ColoringFilterPanel({
             <span aria-hidden="true" className="bg-primary h-[2px] w-[22px] rounded-sm" />
             Filters
           </h2>
-          {panelCount > 0 && <Badge variant="secondary">{panelCount} active</Badge>}
+          {activeFilterCount > 0 && <Badge variant="secondary">{activeFilterCount} active</Badge>}
         </div>
       )}
 
@@ -344,13 +339,11 @@ export function ColoringControlsRow({ showFilterTrigger = false }: ColoringContr
 
 function ColoringFilterSheetTrigger() {
   const posthog = usePostHog();
-  const { filters, activeFilterCount } = useColoringFilters();
+  const { activeFilterCount } = useColoringFilters();
   const { clearActiveFilters } = useColoringFilterHelpers();
   const [open, setOpen] = useState(false);
   const titleId = useId();
   const descriptionId = useId();
-
-  const panelCount = getColoringFilterPanelCount(filters);
 
   return (
     <>
@@ -359,26 +352,28 @@ function ColoringFilterSheetTrigger() {
         variant="outline"
         className={cn(
           'relative min-h-11 shrink-0',
-          panelCount > 0 && 'border-primary text-primary'
+          activeFilterCount > 0 && 'border-primary text-primary'
         )}
         onClick={() => {
           posthog.capture(AnalyticsEvent.COLORING_BOOKS_FILTER_DRAWER_OPENED, {
             craft: 'coloring',
             surface: 'coloring_books',
-            active_filter_count: panelCount,
+            active_filter_count: activeFilterCount,
           });
           setOpen(true);
         }}
-        aria-label={panelCount > 0 ? `Filters (${panelCount} active)` : 'Open filters'}
+        aria-label={
+          activeFilterCount > 0 ? `Filters (${activeFilterCount} active)` : 'Open filters'
+        }
       >
         <SlidersHorizontal className="size-5" />
         Filters
-        {panelCount > 0 && (
+        {activeFilterCount > 0 && (
           <span
             aria-hidden="true"
             className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] leading-none font-bold"
           >
-            {panelCount}
+            {activeFilterCount}
           </span>
         )}
       </Button>
@@ -400,7 +395,7 @@ function ColoringFilterSheetTrigger() {
                   Filters
                 </h2>
                 <p id={descriptionId} className="text-muted-foreground mt-0.5 text-xs">
-                  {panelCount === 0 ? 'No filters active' : `${panelCount} active`}
+                  {activeFilterCount === 0 ? 'No filters active' : `${activeFilterCount} active`}
                 </p>
               </div>
               <Button

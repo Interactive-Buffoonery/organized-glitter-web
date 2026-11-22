@@ -64,7 +64,7 @@ export function useCreateTag() {
         notify({
           kind: 'error',
           title: 'Tag name already exists',
-          description: 'A tag with this name already exists in your list',
+          description: errorMessage,
         });
       } else {
         notify({

@@ -84,4 +84,25 @@ describe('ColoringBookTagManager', () => {
     expect(onTagsChange).not.toHaveBeenCalled();
     expect(coloringTagsServiceMock.createColoringTag).not.toHaveBeenCalled();
   });
+
+  it('reuses an existing tag that differs only by case instead of creating one', async () => {
+    coloringTagsServiceMock.createColoringTag.mockClear();
+    // The tag exists on the server but is missing from the loaded suggestions.
+    let serverTags: Tag[] = [];
+    coloringTagsServiceMock.listColoringTags.mockImplementation(async () => ({
+      status: 'success',
+      data: serverTags,
+    }));
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initialTags={[]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Add tag' }));
+    await user.type(screen.getByPlaceholderText('Search or create tags...'), 'CATS');
+    const create = await screen.findByText(/Create "CATS"/);
+    serverTags = [tag('c', 'cats')];
+    await user.click(create);
+
+    await waitFor(() => expect(screen.getByTestId('selected')).toHaveTextContent(/^cats$/));
+    expect(coloringTagsServiceMock.createColoringTag).not.toHaveBeenCalled();
+  });
 });

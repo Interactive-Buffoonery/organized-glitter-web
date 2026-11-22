@@ -17,6 +17,7 @@ import {
 } from '@/features/import-export/importExportTelemetry';
 import { TAG_COLOR_PALETTE } from '@/utils/ui/tagColors'; // For default tag color
 import { ImportTagsService } from '@/services/pocketbase/importTags.service';
+import { planImportTags, tagNameKey } from '@/utils/tagNames';
 
 const logger = createLogger('ProjectImport');
 import { generateUniqueSlug } from '@/utils/ui/slugify';
@@ -217,34 +218,20 @@ export const useProjectImport = () => {
         tagValidationResult.validatedTags.map(({ original, normalized }) => [original, normalized])
       );
 
-      const tagNameMap = new Map<string, string>();
+      const normalizeTagName = (name: string) => validatedTagNamesMap.get(name) || name;
+      const { tagIds: tagNameMap, namesToCreate: newTagNamesToCreate } = planImportTags(
+        existingUserTags,
+        allUniqueTagNames,
+        normalizeTagName
+      );
       const currentTagWarnings: string[] = []; // Use a local var for warnings during this phase
 
       try {
-        // Build tag name map using normalized names
-        existingUserTags.forEach(tag => {
-          // Map by exact name
-          tagNameMap.set(tag.name, tag.id);
-
-          // Also map by normalized name to prevent duplicate creation
-          const normalizedTagName = validatedTagNamesMap.get(tag.name) || tag.name;
-          if (normalizedTagName !== tag.name) {
-            tagNameMap.set(normalizedTagName, tag.id);
-          }
-        });
         logger.debug('Built tag name map from existing tags.', {
           count: existingUserTags.length,
           mappedNames: [...tagNameMap.keys()],
         });
 
-        const newTagNamesToCreate: string[] = [];
-        allUniqueTagNames.forEach(originalName => {
-          const normalizedName = validatedTagNamesMap.get(originalName) || originalName;
-          if (normalizedName && normalizedName.trim() !== '' && !tagNameMap.has(normalizedName)) {
-            // Ensure normalized name is not empty and not already mapped
-            newTagNamesToCreate.push(normalizedName);
-          }
-        });
         logger.debug('Identified new tags to create.', {
           count: newTagNamesToCreate.length,
           newTagNamesToCreate,
@@ -284,7 +271,7 @@ export const useProjectImport = () => {
               ...newTagData,
               userId: user.id,
             });
-            tagNameMap.set(tagName, createdTag.id);
+            tagNameMap.set(tagNameKey(tagName), createdTag.id);
             createdTagsCount++;
             logger.debug(`Successfully created new tag: ${tagName}`, {
               id: createdTag.id,
@@ -335,8 +322,7 @@ export const useProjectImport = () => {
           // Map tag names to IDs using validated names
           const projectTagIds = (parsedProject.tagNames || [])
             .map(originalName => {
-              const normalizedName = validatedTagNamesMap.get(originalName) || originalName;
-              return tagNameMap.get(normalizedName);
+              return tagNameMap.get(tagNameKey(normalizeTagName(originalName)));
             })
             .filter(id => !!id) as string[];
 

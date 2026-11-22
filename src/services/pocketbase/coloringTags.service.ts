@@ -88,19 +88,6 @@ export class ColoringTagService {
     return withAuthentication(async userId => {
       try {
         const trimmedName = tagData.name.trim();
-        const existing = await pb.collection(COLORING_TAGS_COLLECTION).getList(1, 1, {
-          filter: pb.filter('user = {:userId} && name = {:name}', {
-            userId,
-            name: trimmedName,
-          }),
-        });
-
-        if (existing.items.length > 0) {
-          return createErrorResponse(
-            new Error(`A coloring tag named "${trimmedName}" already exists`)
-          );
-        }
-
         const tag = await pb.collection(COLORING_TAGS_COLLECTION).create<ColoringTagsResponse>({
           user: userId,
           name: trimmedName,
@@ -137,18 +124,6 @@ export class ColoringTagService {
         const updateData: Partial<{ name: string; slug: string; color: string }> = {};
         if (updates.name !== undefined) {
           const trimmedName = updates.name.trim();
-          const existing = await pb.collection(COLORING_TAGS_COLLECTION).getList(1, 1, {
-            filter: pb.filter('user = {:userId} && name = {:name} && id != {:tagId}', {
-              userId,
-              name: trimmedName,
-              tagId,
-            }),
-          });
-          if (existing.items.length > 0) {
-            return createErrorResponse(
-              new Error(`A coloring tag named "${trimmedName}" already exists`)
-            );
-          }
           updateData.name = trimmedName;
           updateData.slug = generateSlug(trimmedName);
         }

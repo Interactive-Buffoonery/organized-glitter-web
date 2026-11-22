@@ -16,6 +16,7 @@ import { notify } from '@/lib/notifications';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { ColoringTagService } from '@/services/pocketbase/coloringTags.service';
 import type { Tag } from '@/types/tag';
+import { findTagByName } from '@/utils/tagNames';
 import { Section } from './ColoringBookFormPrimitives';
 
 interface ColoringBookTagManagerProps {
@@ -99,6 +100,14 @@ export function ColoringBookTagManager({
     }
 
     setIsCreating(true);
+    const existing = await ColoringTagService.listColoringTags({ search: trimmedName });
+    const match = existing.status === 'success' ? findTagByName(existing.data, trimmedName) : null;
+    if (match) {
+      handleAddTag(match);
+      setIsCreating(false);
+      return;
+    }
+
     const response = await ColoringTagService.createColoringTag({ name: trimmedName });
     if (response.status === 'success') {
       await queryClient.invalidateQueries({ queryKey: queryKeys.coloring.tags.all });
@@ -182,8 +191,7 @@ export function ColoringBookTagManager({
                 </CommandGroup>
               ) : null}
 
-              {searchQuery.trim() &&
-              !suggestions.some(tag => tag.name.toLowerCase() === searchQuery.toLowerCase()) ? (
+              {searchQuery.trim() && !findTagByName(suggestions, searchQuery) ? (
                 <CommandGroup heading="Create New">
                   <CommandItem
                     key="create-new-coloring-tag-command-item"

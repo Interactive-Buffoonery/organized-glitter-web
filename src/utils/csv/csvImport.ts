@@ -55,16 +55,16 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
   // Also support legacy "Length" header for backward compatibility
   const width = getFieldValue(row, EXPECTED_COLUMNS.width.aliases);
   if (width) {
-    const widthValue = parseFloat(width);
-    if (!isNaN(widthValue)) {
+    const widthValue = parseLength(width);
+    if (widthValue !== undefined) {
       project.width = widthValue;
     }
   }
 
   const height = getFieldValue(row, EXPECTED_COLUMNS.height.aliases); // Support legacy "Length" header
   if (height) {
-    const heightValue = parseFloat(height);
-    if (!isNaN(heightValue)) {
+    const heightValue = parseLength(height);
+    if (heightValue !== undefined) {
       project.height = heightValue;
     }
   }
@@ -73,16 +73,11 @@ const parseProjectFromRow = (row: Record<string, string>): Partial<ProjectType> 
   const dimensions = getFieldValue(row, EXPECTED_COLUMNS.dimensions.aliases);
   if (dimensions && !project.width && !project.height) {
     // Match the complete pair so malformed values cannot supply partial dimensions.
-    const match = dimensions.match(/^(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)$/);
+    const match = dimensions.trim().match(DIMENSIONS_PATTERN);
     if (match) {
-      const widthValue = parseFloat(match[1]);
-      const heightValue = parseFloat(match[2]);
-      if (!isNaN(widthValue)) {
-        project.width = widthValue;
-      }
-      if (!isNaN(heightValue)) {
-        project.height = heightValue;
-      }
+      const [, widthText, widthUnit, heightText, heightUnit] = match;
+      project.width = toCentimeters(parseFloat(widthText), widthUnit ?? heightUnit);
+      project.height = toCentimeters(parseFloat(heightText), heightUnit ?? widthUnit);
     }
   }
 
@@ -361,6 +356,25 @@ const validateDate = (dateStr: string): string | undefined => {
   return dateStr;
 };
 
+const LENGTH_UNIT = String.raw`(inches|inch|in\.?|"|”|″|cm)`;
+const NUMBER = String.raw`(\d+(?:\.\d+)?)`;
+const LENGTH_PATTERN = new RegExp(`^${NUMBER}\\s*${LENGTH_UNIT}?$`, 'i');
+const DIMENSIONS_PATTERN = new RegExp(
+  `^${NUMBER}\\s*${LENGTH_UNIT}?\\s*[x×]\\s*${NUMBER}\\s*${LENGTH_UNIT}?$`,
+  'i'
+);
+
+/** The app stores sizes in centimeters, so an explicit inch unit is converted. */
+const toCentimeters = (value: number, unit?: string) =>
+  unit && unit.toLowerCase() !== 'cm' ? Math.round(value * 2.54 * 100) / 100 : value;
+
+const parseLength = (text: string): number | undefined => {
+  const match = text.trim().match(LENGTH_PATTERN);
+  if (match) return toCentimeters(parseFloat(match[1]), match[2]);
+  const value = parseFloat(text);
+  return isNaN(value) ? undefined : value;
+};
+
 export interface LibraryMatchFields {
   title?: string;
   company?: string;
@@ -374,20 +388,36 @@ export interface LibraryMatchFields {
 const normalizeMatchText = (value?: string) =>
   (value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
 
+/** Lowercases the host, drops a default port and one trailing path slash. */
+const canonicalUrl = (value?: string) => {
+  const trimmed = (value ?? '').trim();
+  try {
+    const url = new URL(trimmed);
+    return `${url.protocol}//${url.host}${url.pathname.replace(/(.)\/$/, '$1')}${url.search}${url.hash}`;
+  } catch {
+    return trimmed;
+  }
+};
+
 /** Details that tell two copies of the same kit apart. Blank means unknown. */
 const kitDetails = (kit: LibraryMatchFields) => [
-  kit.width ? String(kit.width) : '',
-  kit.height ? String(kit.height) : '',
+  kit.width || '',
+  kit.height || '',
   normalizeMatchText(kit.drillShape),
-  (kit.sourceUrl ?? '').trim(),
+  canonicalUrl(kit.sourceUrl),
   (kit.datePurchased ?? '').slice(0, 10),
 ];
 
-const agreement = (row: string[], kit: string[]) => {
+const sameDetail = (a: string | number, b: string | number) =>
+  typeof a === 'number' && typeof b === 'number'
+    ? Math.round(Math.abs(a - b) * 100) <= 10
+    : a === b;
+
+const agreement = (row: (string | number)[], kit: (string | number)[]) => {
   let shared = 0;
   for (let i = 0; i < row.length; i++) {
     if (!row[i] || !kit[i]) continue;
-    if (row[i] !== kit[i]) return -1;
+    if (!sameDetail(row[i], kit[i])) return -1;
     shared++;
   }
   return shared;
@@ -399,22 +429,22 @@ const agreement = (row: string[], kit: string[]) => {
  * purchase date) conflicts. Each library kit absorbs at most one row, and a
  * shortened row tries its original title first.
  */
-// ponytail: greedy (most detailed rows pick first, best-fitting kit wins), not maximum bipartite matching
+// ponytail: greedy (most detailed rows pick first, best-fitting kit wins); optimal bipartite matching if users report it
 export const findLibraryMatches = (
   rows: readonly (LibraryMatchFields & { originalTitle?: string })[],
   library: readonly LibraryMatchFields[]
 ): boolean[] => {
-  const kitsByTitle = new Map<string, Map<string, string[][]>>();
+  const kitsByTitle = new Map<string, Map<string, (string | number)[][]>>();
   for (const kit of library) {
     const title = normalizeMatchText(kit.title);
     const company = normalizeMatchText(kit.company);
-    const kitsByCompany = kitsByTitle.get(title) ?? new Map<string, string[][]>();
+    const kitsByCompany = kitsByTitle.get(title) ?? new Map<string, (string | number)[][]>();
     kitsByCompany.set(company, [...(kitsByCompany.get(company) ?? []), kitDetails(kit)]);
     kitsByTitle.set(title, kitsByCompany);
   }
 
   const rowDetails = rows.map(kitDetails);
-  const known = (details: string[]) => details.filter(Boolean).length;
+  const known = (details: (string | number)[]) => details.filter(Boolean).length;
   const order = rows
     .map((_, index) => index)
     .sort((a, b) => known(rowDetails[b]) - known(rowDetails[a]));

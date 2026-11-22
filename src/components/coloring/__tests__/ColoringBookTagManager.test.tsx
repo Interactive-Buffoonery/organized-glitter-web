@@ -105,4 +105,53 @@ describe('ColoringBookTagManager', () => {
     await waitFor(() => expect(screen.getByTestId('selected')).toHaveTextContent(/^cats$/));
     expect(coloringTagsServiceMock.createColoringTag).not.toHaveBeenCalled();
   });
+
+  it('reuses an accented tag that the server search filter misses', async () => {
+    coloringTagsServiceMock.createColoringTag.mockClear();
+    let serverTags: Tag[] = [];
+    // PocketBase `~` only folds ASCII case, so a search for "étoiles" misses "Étoiles".
+    coloringTagsServiceMock.listColoringTags.mockImplementation(
+      async (options?: { search?: string }) => ({
+        status: 'success',
+        data: options?.search
+          ? serverTags.filter(t => t.name.includes(options.search ?? ''))
+          : serverTags,
+      })
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initialTags={[]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Add tag' }));
+    await user.type(screen.getByPlaceholderText('Search or create tags...'), 'étoiles');
+    const create = await screen.findByText(/Create "étoiles"/);
+    serverTags = [tag('e', 'Étoiles')];
+    await user.click(create);
+
+    await waitFor(() => expect(screen.getByTestId('selected')).toHaveTextContent(/^Étoiles$/));
+    expect(coloringTagsServiceMock.createColoringTag).not.toHaveBeenCalled();
+  });
+
+  it('reuses the tag another device created at the same moment', async () => {
+    let serverTags: Tag[] = [];
+    coloringTagsServiceMock.listColoringTags.mockImplementation(async () => ({
+      status: 'success',
+      data: serverTags,
+    }));
+    coloringTagsServiceMock.createColoringTag.mockImplementation(async () => {
+      serverTags = [tag('c', 'cats')];
+      return {
+        status: 'error',
+        data: null,
+        error: new Error('A tag named "cats" already exists.'),
+      };
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initialTags={[]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Add tag' }));
+    await user.type(screen.getByPlaceholderText('Search or create tags...'), 'CATS');
+    await user.click(await screen.findByText(/Create "CATS"/));
+
+    await waitFor(() => expect(screen.getByTestId('selected')).toHaveTextContent(/^cats$/));
+  });
 });

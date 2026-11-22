@@ -16,7 +16,7 @@ import { notify } from '@/lib/notifications';
 import { queryKeys } from '@/hooks/queries/queryKeys';
 import { ColoringTagService } from '@/services/pocketbase/coloringTags.service';
 import type { Tag } from '@/types/tag';
-import { findTagByName } from '@/utils/tagNames';
+import { createTagOrReuseMatch, findTagByName } from '@/utils/tagNames';
 import { Section } from './ColoringBookFormPrimitives';
 
 interface ColoringBookTagManagerProps {
@@ -100,7 +100,8 @@ export function ColoringBookTagManager({
     }
 
     setIsCreating(true);
-    const existing = await ColoringTagService.listColoringTags({ search: trimmedName });
+    // PocketBase `~` only folds ASCII case, so match against the full list.
+    const existing = await ColoringTagService.listColoringTags();
     const match = existing.status === 'success' ? findTagByName(existing.data, trimmedName) : null;
     if (match) {
       handleAddTag(match);
@@ -108,7 +109,11 @@ export function ColoringBookTagManager({
       return;
     }
 
-    const response = await ColoringTagService.createColoringTag({ name: trimmedName });
+    const response = await createTagOrReuseMatch(
+      trimmedName,
+      () => ColoringTagService.createColoringTag({ name: trimmedName }),
+      () => ColoringTagService.listColoringTags()
+    );
     if (response.status === 'success') {
       await queryClient.invalidateQueries({ queryKey: queryKeys.coloring.tags.all });
       setAvailableTags(current =>

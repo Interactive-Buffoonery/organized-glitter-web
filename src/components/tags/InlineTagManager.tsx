@@ -15,7 +15,7 @@ import { Plus, Hash } from 'lucide-react';
 import { TagBadge } from './TagBadge';
 import { TagService } from '@/services/pocketbase/tags.service';
 import { Tag } from '@/types/tag';
-import { findTagByName } from '@/utils/tagNames';
+import { createTagOrReuseMatch, findTagByName } from '@/utils/tagNames';
 
 import { cn } from '@/lib/utils';
 import { logger } from '@/utils/logger';
@@ -235,7 +235,8 @@ export function InlineTagManager({
     setIsLoading(true);
     setIsCreating(true);
 
-    const existing = await TagService.getUserTags({ search: trimmedQuery });
+    // PocketBase `~` only folds ASCII case, so match against the full list.
+    const existing = await TagService.getUserTags();
     const match = existing.status === 'success' ? findTagByName(existing.data, trimmedQuery) : null;
     if (match) {
       await handleAddTag(match);
@@ -244,15 +245,18 @@ export function InlineTagManager({
       return;
     }
 
-    // Set default color to teal (#14b8a6) for new tags created on project pages
-    const createResponse = await TagService.createTag({
-      name: trimmedQuery,
-      color: '#14b8a6', // Use teal as the default color
-    });
+    const createResponse = await createTagOrReuseMatch(
+      trimmedQuery,
+      () => TagService.createTag({ name: trimmedQuery, color: '#14b8a6' }),
+      () => TagService.getUserTags()
+    );
 
     if (createResponse.status === 'success') {
       await handleAddTag(createResponse.data);
-      setAvailableTags(prev => [...prev, createResponse.data]);
+      setAvailableTags(prev => [
+        ...prev.filter(tag => tag.id !== createResponse.data.id),
+        createResponse.data,
+      ]);
     } else {
       notify({
         kind: 'error',

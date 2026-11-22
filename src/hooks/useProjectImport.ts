@@ -17,7 +17,8 @@ import {
 } from '@/features/import-export/importExportTelemetry';
 import { TAG_COLOR_PALETTE } from '@/utils/ui/tagColors'; // For default tag color
 import { ImportTagsService } from '@/services/pocketbase/importTags.service';
-import { planImportTags, tagNameKey } from '@/utils/tagNames';
+import { createTagOrReuseMatch, planImportTags } from '@/utils/tagNames';
+import { createErrorResponse, createSuccessResponse } from '@/types/shared';
 
 const logger = createLogger('ProjectImport');
 import { generateUniqueSlug } from '@/utils/ui/slugify';
@@ -219,17 +220,16 @@ export const useProjectImport = () => {
       );
 
       const normalizeTagName = (name: string) => validatedTagNamesMap.get(name) || name;
-      const { tagIds: tagNameMap, namesToCreate: newTagNamesToCreate } = planImportTags(
-        existingUserTags,
-        allUniqueTagNames,
-        normalizeTagName
-      );
+      const {
+        resolveTagId,
+        addTag,
+        namesToCreate: newTagNamesToCreate,
+      } = planImportTags(existingUserTags, allUniqueTagNames, normalizeTagName);
       const currentTagWarnings: string[] = []; // Use a local var for warnings during this phase
 
       try {
         logger.debug('Built tag name map from existing tags.', {
           count: existingUserTags.length,
-          mappedNames: [...tagNameMap.keys()],
         });
 
         logger.debug('Identified new tags to create.', {
@@ -267,11 +267,22 @@ export const useProjectImport = () => {
               slug: uniqueSlug,
               color: DEFAULT_TAG_COLOR_HEX,
             };
-            const createdTag = await ImportTagsService.createTag({
-              ...newTagData,
-              userId: user.id,
-            });
-            tagNameMap.set(tagNameKey(tagName), createdTag.id);
+            const toResponse = async <T>(request: () => Promise<T>) => {
+              try {
+                return createSuccessResponse(await request());
+              } catch (error) {
+                return createErrorResponse(error as Error);
+              }
+            };
+            const created = await createTagOrReuseMatch(
+              tagName,
+              () =>
+                toResponse(() => ImportTagsService.createTag({ ...newTagData, userId: user.id })),
+              () => toResponse(() => ImportTagsService.listUserTags(user.id))
+            );
+            if (created.status === 'error') throw created.error;
+            const createdTag = created.data;
+            addTag(createdTag);
             createdTagsCount++;
             logger.debug(`Successfully created new tag: ${tagName}`, {
               id: createdTag.id,
@@ -287,7 +298,6 @@ export const useProjectImport = () => {
           setProgress(Math.round(15 + (createdTagsCount / (newTagNamesToCreate.length || 1)) * 10));
         }
         logger.debug('Finished creating new tags and updated map.', {
-          finalMapSize: tagNameMap.size,
           createdCount: createdTagsCount,
         });
       } catch (batchTagError) {
@@ -322,7 +332,7 @@ export const useProjectImport = () => {
           // Map tag names to IDs using validated names
           const projectTagIds = (parsedProject.tagNames || [])
             .map(originalName => {
-              return tagNameMap.get(tagNameKey(normalizeTagName(originalName)));
+              return resolveTagId(originalName);
             })
             .filter(id => !!id) as string[];
 

@@ -41,4 +41,55 @@ describe('InlineTagManager', () => {
     await waitFor(() => expect(onTagsChange).toHaveBeenLastCalledWith([cats]));
     expect(tagServiceMock.createTag).not.toHaveBeenCalled();
   });
+
+  it('reuses an accented tag that the server search filter misses', async () => {
+    const etoiles = { id: 'tag-etoiles', name: 'Étoiles', color: '#888888' } as Tag;
+    let serverTags: Tag[] = [];
+    // PocketBase `~` only folds ASCII case, so a search for "étoiles" misses "Étoiles".
+    tagServiceMock.getUserTags.mockImplementation(async (options?: { search?: string }) => ({
+      status: 'success',
+      data: options?.search
+        ? serverTags.filter(tag => tag.name.includes(options.search ?? ''))
+        : serverTags,
+    }));
+    tagServiceMock.createTag.mockClear();
+    const onTagsChange = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(<InlineTagManager onTagsChange={onTagsChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Add tag/ }));
+    await user.type(screen.getByPlaceholderText('Search or create tags...'), 'étoiles');
+    const create = await screen.findByText(/Create "étoiles"/);
+    serverTags = [etoiles];
+    await user.click(create);
+
+    await waitFor(() => expect(onTagsChange).toHaveBeenLastCalledWith([etoiles]));
+    expect(tagServiceMock.createTag).not.toHaveBeenCalled();
+  });
+
+  it('reuses the tag another device created at the same moment', async () => {
+    const cats = { id: 'tag-cats', name: 'cats', color: '#888888' } as Tag;
+    let serverTags: Tag[] = [];
+    tagServiceMock.getUserTags.mockImplementation(async () => ({
+      status: 'success',
+      data: serverTags,
+    }));
+    tagServiceMock.createTag.mockImplementation(async () => {
+      serverTags = [cats];
+      return {
+        status: 'error',
+        data: null,
+        error: new Error('A tag named "cats" already exists.'),
+      };
+    });
+    const onTagsChange = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(<InlineTagManager onTagsChange={onTagsChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Add tag/ }));
+    await user.type(screen.getByPlaceholderText('Search or create tags...'), 'CATS');
+    await user.click(await screen.findByText(/Create "CATS"/));
+
+    await waitFor(() => expect(onTagsChange).toHaveBeenLastCalledWith([cats]));
+  });
 });

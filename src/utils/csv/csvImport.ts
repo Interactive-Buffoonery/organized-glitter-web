@@ -360,3 +360,34 @@ const validateDate = (dateStr: string): string | undefined => {
   }
   return dateStr;
 };
+
+interface LibraryMatchCandidate {
+  title?: string;
+  company?: string;
+}
+
+const libraryMatchKey = ({ title, company }: LibraryMatchCandidate) =>
+  [title, company]
+    .map(value => (value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase())
+    .join('|');
+
+/**
+ * Flags rows whose title and company match a kit already in the library.
+ * Each library kit absorbs one row, so extra copies in the file still import.
+ */
+export const findLibraryMatches = (
+  rows: readonly LibraryMatchCandidate[],
+  library: readonly LibraryMatchCandidate[]
+): boolean[] => {
+  const unmatchedCopies = new Map<string, number>();
+  for (const kit of library) {
+    const key = libraryMatchKey(kit);
+    unmatchedCopies.set(key, (unmatchedCopies.get(key) ?? 0) + 1);
+  }
+  return rows.map(row => {
+    const key = libraryMatchKey(row);
+    const copies = unmatchedCopies.get(key) ?? 0;
+    if (copies > 0) unmatchedCopies.set(key, copies - 1);
+    return copies > 0;
+  });
+};

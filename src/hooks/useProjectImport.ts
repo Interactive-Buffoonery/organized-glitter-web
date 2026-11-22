@@ -1,7 +1,7 @@
 import { notify } from '@/lib/notifications';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { parseCsvFileToProjects, ParsedCsvData } from '@/utils/csv/csvImport'; // Import ParsedCsvData
+import { findLibraryMatches, parseCsvFileToProjects, ParsedCsvData } from '@/utils/csv/csvImport';
 import { useImportCreateProject } from '@/hooks/useImportCreateProject';
 
 import { ProjectCreateDTO } from '@/types/project';
@@ -44,6 +44,7 @@ interface ImportStats {
   failed: number;
   total: number;
   skipped?: number;
+  skippedRows?: Array<{ row: number; title?: string }>;
   errors: string[];
   tagWarnings: string[];
   validationIssues: ValidationIssue[];
@@ -210,7 +211,7 @@ export const useProjectImport = () => {
 
       // Validate all tag names (CSV + existing)
       const tagValidationResult = validateTagNames(allTagNamesForValidation);
-      const allValidationIssues: ValidationIssue[] = [...tagValidationResult.issues];
+      let allValidationIssues: ValidationIssue[] = [...tagValidationResult.issues];
 
       // Use validated tag names
       const validatedTagNamesMap = new Map(
@@ -366,9 +367,22 @@ export const useProjectImport = () => {
         }
       );
 
-      // Initialize progress tracking
+      const libraryMatches = findLibraryMatches(
+        projectsToCreate,
+        await projectsService.getAllForUser(user.id)
+      );
+      const skippedRows = parsedCsvProjects
+        .filter((_, index) => libraryMatches[index])
+        .map(({ csvRow, title }) => ({ row: csvRow, title }));
+      const skippedRowNumbers = new Set(skippedRows.map(({ row }) => row));
+      allValidationIssues = allValidationIssues.filter(
+        issue => !issue.row || !skippedRowNumbers.has(issue.row)
+      );
+      const projectsToImport = projectsToCreate.filter((_, index) => !libraryMatches[index]);
+      const skipped = skippedRows.length;
+
       const totalProjects = projectsToCreate.length;
-      setImportStats(prev => ({ ...prev, total: totalProjects }));
+      setImportStats(prev => ({ ...prev, total: totalProjects, skipped, skippedRows }));
 
       // Import each project
       let successCount = 0;
@@ -380,8 +394,8 @@ export const useProjectImport = () => {
       // Start project import progress from ~25% (10% parsing, 15% tag batching)
       const baseProgressForProjectLoop = 25;
 
-      for (let i = 0; i < projectsToCreate.length; i++) {
-        const project = projectsToCreate[i];
+      for (let i = 0; i < projectsToImport.length; i++) {
+        const project = projectsToImport[i];
 
         // Update current project being imported
         setImportStats(prev => ({ ...prev, currentProject: project.title }));
@@ -414,7 +428,7 @@ export const useProjectImport = () => {
         // Update progress (remaining 75% for creating projects)
         const importProgress = Math.round(
           baseProgressForProjectLoop +
-            ((i + 1) / totalProjects) * (100 - baseProgressForProjectLoop)
+            ((i + 1) / projectsToImport.length) * (100 - baseProgressForProjectLoop)
         );
         setProgress(importProgress);
 
@@ -422,6 +436,8 @@ export const useProjectImport = () => {
           successful: successCount,
           failed: failedCount,
           total: totalProjects,
+          skipped,
+          skippedRows,
           errors,
           tagWarnings,
           validationIssues: allValidationIssues,
@@ -429,12 +445,28 @@ export const useProjectImport = () => {
           currentProject: project.title,
         });
 
-        if (i < projectsToCreate.length - 1) {
+        if (i < projectsToImport.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 200)); // Reduced delay, as tag creation is batched
         }
       }
 
+      setProgress(100);
+      setImportStats({
+        successful: successCount,
+        failed: failedCount,
+        total: totalProjects,
+        skipped,
+        skippedRows,
+        errors,
+        tagWarnings,
+        validationIssues: allValidationIssues,
+        columnAnalysis,
+      });
+
       let successMessage = `Successfully imported ${successCount} out of ${totalProjects} projects. View them in your library.`;
+      if (skipped > 0) {
+        successMessage += ` Skipped ${skipped} already in your library.`;
+      }
 
       const totalIssues = tagWarnings.length + allValidationIssues.length;
       if (totalIssues > 0) {
@@ -456,6 +488,7 @@ export const useProjectImport = () => {
           warnings: tagWarnings.length + allValidationIssues.length,
         }),
         records: successCount,
+        skipped,
         errors: failedCount,
         warnings: tagWarnings.length + allValidationIssues.length,
         duration_ms: getDurationMs(startedAt),
@@ -479,8 +512,6 @@ export const useProjectImport = () => {
         });
       }
 
-      // Clear current project when import completes
-      setImportStats(prev => ({ ...prev, currentProject: undefined }));
       await refreshImportExportQueriesBestEffort(
         () =>
           invalidateImportExportQueries(queryClient, [], {

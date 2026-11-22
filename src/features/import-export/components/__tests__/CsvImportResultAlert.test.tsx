@@ -35,4 +35,30 @@ describe('CsvImportResultAlert', () => {
 
     expect(screen.getByText(/Row 7, datePurchased/)).toBeVisible();
   });
+
+  it('lists rows skipped because the kit is already in the library', () => {
+    render(
+      <CsvImportResultAlert
+        importStats={{
+          total: 3,
+          successful: 1,
+          failed: 0,
+          skipped: 2,
+          skippedRows: [
+            { row: 2, title: 'Galaxy Cat' },
+            { row: 3, title: 'Moon Fox' },
+          ],
+          errors: [],
+          tagWarnings: [],
+          validationIssues: [],
+        }}
+      />
+    );
+
+    expect(screen.getByText('CSV import complete with notes')).toBeVisible();
+    expect(screen.getByText(/Imported 1, failed 0.*skipped 2/)).toBeVisible();
+    expect(screen.getByText('Skipped, already in your library')).toBeVisible();
+    expect(screen.getByText('Row 2, Galaxy Cat')).toBeVisible();
+    expect(screen.getByText('Row 3, Moon Fox')).toBeVisible();
+  });
 });

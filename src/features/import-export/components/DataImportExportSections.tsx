@@ -351,6 +351,18 @@ function ValidationNoteList({ issues }: { issues: ProjectImportStats['validation
   );
 }
 
+function SkippedRowList({ rows }: { rows: NonNullable<ProjectImportStats['skippedRows']> }) {
+  return (
+    <ul className="mt-2 list-disc space-y-1 pl-5">
+      {rows.map(({ row, title }) => (
+        <li key={row}>
+          Row {row}, {title}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function CsvImportResultAlert({
   importStats,
   title = 'CSV import complete',
@@ -360,8 +372,9 @@ export function CsvImportResultAlert({
 }) {
   const issueCount = importStats.validationIssues.length;
   const tagWarningCount = importStats.tagWarnings.length;
+  const skippedRows = importStats.skippedRows ?? [];
   const hasErrors = importStats.failed > 0 || importStats.errors.length > 0;
-  const hasWarnings = issueCount > 0 || tagWarningCount > 0;
+  const hasWarnings = issueCount > 0 || tagWarningCount > 0 || skippedRows.length > 0;
   let resultTitle = title;
   if (hasErrors) {
     resultTitle = 'CSV import completed with issues';
@@ -393,6 +406,7 @@ export function CsvImportResultAlert({
           ]}
         />
         {(importStats.errors.length > 0 ||
+          skippedRows.length > 0 ||
           importStats.tagWarnings.length > 0 ||
           importStats.validationIssues.length > 0) && (
           <div className="space-y-3">
@@ -404,6 +418,20 @@ export function CsvImportResultAlert({
                     <li key={error}>{error}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {skippedRows.length > 0 && (
+              <div>
+                <p className="font-medium">Skipped, already in your library</p>
+                <SkippedRowList rows={skippedRows.slice(0, 4)} />
+                {skippedRows.length > 4 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer font-medium">
+                      Show all {skippedRows.length} skipped rows
+                    </summary>
+                    <SkippedRowList rows={skippedRows} />
+                  </details>
+                )}
               </div>
             )}
             {importStats.validationIssues.length > 0 && (

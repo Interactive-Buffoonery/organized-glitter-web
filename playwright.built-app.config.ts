@@ -35,6 +35,12 @@ export default defineConfig({
       testMatch: 'pwa-navigation.spec.ts',
       use: { ...devices['Desktop Safari'] },
     },
+    // Chromium can route service worker fetches; WebKit cannot.
+    {
+      name: 'pwa-fail-open',
+      testMatch: 'pwa-fail-open.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   webServer: {
     command: 'pnpm exec vite build && node server/local-build-server.js',

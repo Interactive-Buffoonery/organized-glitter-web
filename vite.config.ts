@@ -7,11 +7,7 @@ import { APP_ROUTE_PATHS, PUBLIC_PAGE_PATHS } from './server/app-route-policy.js
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { writeFileSync, readFileSync } from 'node:fs';
-import {
-  buildContentSecurityPolicy,
-  configuredOrigin,
-  escapeOriginForRegExp,
-} from './server/deployment-config.js';
+import { buildContentSecurityPolicy, configuredOrigin } from './server/deployment-config.js';
 import { injectAppIconLinks } from './scripts/app-icon-links.mjs';
 import { ensureStartupScriptsBeforeAppModules } from './scripts/ensure-startup-script-order.mjs';
 import { staticPages } from './scripts/static-pages.mjs';
@@ -110,8 +106,6 @@ export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, projectRoot, ''), ...process.env } as Record<string, string>;
   if (isProduction && !env.VITE_POCKETBASE_URL)
     throw new Error('VITE_POCKETBASE_URL is required for production builds');
-  const backendOrigin = configuredOrigin(env.VITE_POCKETBASE_URL || 'http://localhost:8090')!;
-  const escapedBackend = escapeOriginForRegExp(backendOrigin);
 
   const resolvedBuildIdFromEnv =
     process.env.GITHUB_SHA || process.env.RAILWAY_GIT_COMMIT_SHA || process.env.VITE_APP_VERSION;
@@ -134,6 +128,16 @@ export default defineConfig(({ mode }) => {
     define: {
       __APP_BUILD_ID__: JSON.stringify(buildId),
       __APP_TEST_ENV__: JSON.stringify(process.env.APP_TEST_ENV || ''),
+      // dist/index.html is the static landing; app routes fall back to the SPA shell.
+      __SW_NAVIGATION_ALLOWLIST__: JSON.stringify(
+        APP_ROUTE_PATHS.filter(route => route !== '/').map(
+          route => `^${route.replace(/:[^/]+/g, '[^/?]+')}/?(?:\\?.*)?$`
+        )
+      ),
+      // Public routes need their own initial HTML, including with an active service worker.
+      __SW_NAVIGATION_DENYLIST__: JSON.stringify(
+        PUBLIC_PAGE_PATHS.map(route => `^${route}/?(?:\\?.*)?$`).concat('^/updates(?:/|\\?|$)')
+      ),
     },
     plugins: [
       staticPages(),
@@ -143,54 +147,20 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       react(),
       VitePWA({
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.ts',
         registerType: 'autoUpdate',
         devOptions: {
           enabled: true,
+          type: 'module',
         },
-        workbox: {
+        injectManifest: {
           // The post-build sourcemap step deletes all .map files (so none ship),
           // which would leave sw.js pointing at a now-404 sw.js.map. Disable the
           // service-worker sourcemap so no dangling reference is emitted.
           sourcemap: false,
-          // Activate the new SW immediately on update so a fresh page load
-          // serves new responses (with new headers like CSP) instead of
-          // waiting for every tab to close. Workbox precaches the full
-          // Response — headers and all — so a stale SW will replay an old
-          // CSP header even if the edge has a corrected one.
-          cleanupOutdatedCaches: true,
-          skipWaiting: true,
-          clientsClaim: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}', 'images/chibi-wave.webp'],
-          // dist/index.html is the static landing; app routes fall back to the SPA shell.
-          navigateFallback: 'app.html',
-          navigateFallbackAllowlist: APP_ROUTE_PATHS.filter(route => route !== '/').map(
-            route => new RegExp(`^${route.replace(/:[^/]+/g, '[^/?]+')}/?(?:\\?.*)?$`, 'i')
-          ),
-          // Public routes need their own initial HTML, including with an active service worker.
-          navigateFallbackDenylist: PUBLIC_PAGE_PATHS.map(
-            route => new RegExp(`^${route}/?(?:\\?.*)?$`, 'i')
-          ).concat(/^\/updates(?:\/|\?|$)/i),
-          inlineWorkboxRuntime: true,
-          // Silence noisy "No route found" by explicitly passing PocketBase API
-          // calls through to the network. registerRoute defaults to GET, so the
-          // collections endpoint needs one route per mutation method or the
-          // noise returns; files and health checks are read-only (GET).
-          runtimeCaching: (['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'HEAD'] as const)
-            .map(method => ({
-              urlPattern: new RegExp(`^${escapedBackend}/api/collections/`, 'i'),
-              handler: 'NetworkOnly' as const,
-              method,
-            }))
-            .concat({
-              urlPattern: new RegExp(`^${escapedBackend}/api/files/`, 'i'),
-              handler: 'NetworkOnly' as const,
-              method: 'GET' as const,
-            })
-            .concat({
-              urlPattern: new RegExp(`^${escapedBackend}/api/health$`, 'i'),
-              handler: 'NetworkOnly' as const,
-              method: 'GET' as const,
-            }),
         },
         includeAssets: ['site-icon.ico', 'site-touch-icon.png'],
         manifest: {

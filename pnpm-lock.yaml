@@ -371,6 +371,15 @@ importers:
       vitest-axe:
         specifier: ^0.1.0
         version: 0.1.0(vitest@4.1.11)
+      workbox-core:
+        specifier: ^7.4.1
+        version: 7.4.1
+      workbox-precaching:
+        specifier: ^7.4.1
+        version: 7.4.1
+      workbox-routing:
+        specifier: ^7.4.1
+        version: 7.4.1
       yaml:
         specifier: ^2.9.0
         version: 2.9.0

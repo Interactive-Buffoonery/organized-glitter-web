@@ -58,11 +58,10 @@ function htmlAssets(html) {
 }
 
 function precacheUrls(sw) {
-  const start = sw.indexOf('[{url:');
-  const end = sw.indexOf('}])', start);
+  const start = sw.indexOf('[{"revision":');
+  const end = sw.indexOf('}]', start);
   if (start < 0 || end < 0) throw new Error('Generated service worker precache list is missing');
-  const literal = sw.slice(start, end + 2);
-  const json = literal.replaceAll('{url:', '{"url":').replaceAll(',revision:', ',"revision":');
+  const json = sw.slice(start, end + 2);
   let entries;
   try {
     entries = JSON.parse(json);

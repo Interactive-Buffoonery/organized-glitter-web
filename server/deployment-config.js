@@ -59,7 +59,3 @@ export function analyticsProxyTarget(url, env = {}) {
   target.search = url.search;
   return target;
 }
-
-export function escapeOriginForRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}

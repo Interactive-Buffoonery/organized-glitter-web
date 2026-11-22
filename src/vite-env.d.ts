@@ -2,6 +2,8 @@
 
 declare const __APP_BUILD_ID__: string;
 declare const __APP_TEST_ENV__: string;
+declare const __SW_NAVIGATION_ALLOWLIST__: string[];
+declare const __SW_NAVIGATION_DENYLIST__: string[];
 
 declare module 'virtual:pwa-register' {
   export function registerSW(options?: {

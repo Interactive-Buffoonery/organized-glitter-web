@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getLibraryMatchFields: vi.fn(),
   createTag: vi.fn(),
   notify: vi.fn(),
+  listUserTags: vi.fn(),
 }));
 
 vi.mock('@/services/auth', () => ({
@@ -22,7 +23,7 @@ vi.mock('@/services/pocketbase/projects.service', () => ({
 }));
 vi.mock('@/services/pocketbase/importTags.service', () => ({
   ImportTagsService: {
-    listUserTags: vi.fn(async () => []),
+    listUserTags: mocks.listUserTags,
     slugExists: vi.fn(async () => false),
     createTag: mocks.createTag,
   },
@@ -63,6 +64,7 @@ describe('Organized Glitter CSV import', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.createProject.mockResolvedValue({ id: 'created' });
+    mocks.listUserTags.mockResolvedValue([]);
     mocks.createTag.mockImplementation(async ({ name }) => ({ id: `tag-${name}` }));
     mocks.getLibraryMatchFields.mockResolvedValue([]);
   });
@@ -170,5 +172,18 @@ describe('Organized Glitter CSV import', () => {
     expect(mocks.notify).toHaveBeenCalledWith(
       expect.objectContaining({ description: 'Skipped 1 row already in your library.' })
     );
+  });
+
+  it('skips tag work when every row is already in the library', async () => {
+    mocks.getLibraryMatchFields.mockResolvedValue([{ title: 'Galaxy Cat' }]);
+    mocks.listUserTags.mockRejectedValue(new Error('offline'));
+
+    const stats = await importCsv('Title,Tags\nGalaxy Cat,Old Tag\n');
+
+    expect(mocks.listUserTags).not.toHaveBeenCalled();
+    expect(mocks.notify).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Import failed' })
+    );
+    expect(stats).toMatchObject({ skipped: 1, errors: [] });
   });
 });

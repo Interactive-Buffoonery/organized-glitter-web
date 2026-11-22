@@ -273,8 +273,10 @@ export const useProjectImport = () => {
         attemptedTagNamesCount: attemptedTagNames.length,
       });
 
-      // Get existing tags first to include them in validation
-      const existingUserTags = await ImportTagsService.listUserTags(user.id);
+      // Get existing tags first to include them in validation. With nothing to
+      // import, skip tag work so a tag lookup failure cannot fail the import.
+      const existingUserTags =
+        attemptedRows.length > 0 ? await ImportTagsService.listUserTags(user.id) : [];
 
       // Combine CSV tag names with existing tag names for validation
       const allTagNamesForValidation = [...attemptedTagNames, ...existingUserTags.map(t => t.name)];

@@ -41,12 +41,12 @@ from the normal public project and disposable PocketBase smoke inventory.
 The smoke inventory covers public and authenticated accessibility, project
 create and edit persistence, cover upload, atomic project delete, coloring book
 creation, archive restore, import and export, session expiry, account deletion
-recovery, safe-area layout, and mobile WebKit menu and drawer interactions. It
-sets retries to zero and runs a list preflight, so a bad filter or retry cannot
+recovery, safe-area layout, Library filters and long titles, coloring tracker
+links, and mobile WebKit menu and drawer interactions. It sets retries to zero and runs a list preflight, so a bad filter or retry cannot
 turn a missing test into a green result. Required seed fixtures are checked
 before Playwright starts.
 
-`pnpm qa:browser:full` runs the same 29 tests as smoke. Release PRs rely on the
+`pnpm qa:browser:full` runs the same tests as smoke. Release PRs rely on the
 separate blog, standalone 404, PWA navigation, cold-load, and protected-file
 rotation gates for anything smoke does not cover.
 

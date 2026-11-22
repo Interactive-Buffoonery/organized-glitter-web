@@ -463,7 +463,7 @@ export const useProjectImport = () => {
         columnAnalysis,
       });
 
-      let successMessage = `Successfully imported ${successCount} out of ${totalProjects} projects. View them in your library.`;
+      let successMessage = `Successfully imported ${successCount} out of ${projectsToImport.length} projects. View them in your library.`;
       if (skipped > 0) {
         successMessage += ` Skipped ${skipped} already in your library.`;
       }

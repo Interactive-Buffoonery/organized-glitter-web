@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseCsvFileToProjects, parseCsvToProjects } from '@/utils/csv/csvImport';
+import {
+  findLibraryMatches,
+  parseCsvFileToProjects,
+  parseCsvToProjects,
+} from '@/utils/csv/csvImport';
 
 describe.each([
   { name: 'CSV content', parse: parseCsvToProjects },
@@ -185,6 +189,140 @@ describe('UTF-16 CSV files', () => {
 
     expect(projects).toEqual([
       expect.objectContaining({ title: 'Kit é', datePurchased: '2024-02-29', csvRow: 2 }),
+    ]);
+  });
+});
+
+describe('library matching', () => {
+  const kit = { title: 'Galaxy Cat', company: 'Acme' };
+
+  it.each([
+    ['width', { width: 30 }, { width: 40 }],
+    ['height', { height: 30 }, { height: 40 }],
+    ['drill shape', { drillShape: 'round' }, { drillShape: 'square' }],
+    ['product URL', { sourceUrl: 'https://a.test/1' }, { sourceUrl: 'https://a.test/2' }],
+    ['purchase date', { datePurchased: '2024-01-05' }, { datePurchased: '2025-03-09' }],
+  ])('treats a conflicting %s as a different kit', (_, row, library) => {
+    expect(findLibraryMatches([{ ...kit, ...row }], [{ ...kit, ...library }])).toEqual([false]);
+  });
+
+  it('ignores a field that is blank on either side', () => {
+    const detailed = { width: 30, drillShape: 'round', datePurchased: '2024-01-05' };
+    expect(
+      findLibraryMatches(
+        [{ ...kit, ...detailed }, kit],
+        [kit, { ...kit, ...detailed, datePurchased: '2024-01-05 00:00:00.000Z' }]
+      )
+    ).toEqual([true, true]);
+  });
+
+  it('gives each library kit to the row whose details fit it', () => {
+    const library = [
+      { ...kit, datePurchased: '2024-01-05' },
+      { ...kit, datePurchased: '2025-03-09' },
+    ];
+    expect(findLibraryMatches([kit, { ...kit, datePurchased: '2024-01-05' }], library)).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  it('keeps one library kit to one row', () => {
+    expect(findLibraryMatches([kit, kit, kit], [kit])).toEqual([true, false, false]);
+  });
+
+  it('does not merge title and company across a pipe', () => {
+    expect(
+      findLibraryMatches(
+        [{ title: 'Moon|Fox', company: 'Acme' }],
+        [{ title: 'Moon', company: 'Fox|Acme' }]
+      )
+    ).toEqual([false]);
+  });
+
+  it('checks the original title before the shortened one, using one kit per row', () => {
+    const fullTitle = 'x'.repeat(220);
+    const shortTitle = `${'x'.repeat(197)}...`;
+    const row = { title: shortTitle, originalTitle: fullTitle };
+
+    expect(findLibraryMatches([row, row], [{ title: fullTitle }, { title: shortTitle }])).toEqual([
+      true,
+      true,
+    ]);
+    expect(
+      findLibraryMatches(
+        [row, { title: shortTitle, originalTitle: shortTitle }],
+        [{ title: fullTitle }, { title: shortTitle }]
+      )
+    ).toEqual([true, true]);
+    expect(
+      findLibraryMatches([row, row, row], [{ title: fullTitle }, { title: shortTitle }])
+    ).toEqual([true, true, false]);
+  });
+
+  it('compares a stored purchase timestamp by its day', () => {
+    const library = [{ ...kit, datePurchased: '2024-01-05 00:00:00.000Z' }];
+    expect(findLibraryMatches([{ ...kit, datePurchased: '2024-01-05' }], library)).toEqual([true]);
+    expect(findLibraryMatches([{ ...kit, datePurchased: '2024-01-06' }], library)).toEqual([false]);
+  });
+
+  it('allows a tenth of a centimeter between sizes', () => {
+    const library = [{ ...kit, width: 25.4, height: 50.8 }];
+    expect(findLibraryMatches([{ ...kit, width: 25.45, height: 50.8 }], library)).toEqual([true]);
+    expect(findLibraryMatches([{ ...kit, width: 25.6, height: 50.8 }], library)).toEqual([false]);
+  });
+
+  it.each([
+    ['HTTPS://Shop.Example.com:443/kits/cat/', 'https://shop.example.com/kits/cat'],
+    ['https://shop.example.com/kits/cat?size=30', 'https://shop.example.com/kits/cat?size=30'],
+  ])('treats %s as the same product URL as %s', (rowUrl, libraryUrl) => {
+    expect(
+      findLibraryMatches([{ ...kit, sourceUrl: rowUrl }], [{ ...kit, sourceUrl: libraryUrl }])
+    ).toEqual([true]);
+  });
+
+  it.each([
+    ['https://shop.example.com/kits/cat', 'https://shop.example.com/kits/dog'],
+    ['https://shop.example.com/kits/cat?size=30', 'https://shop.example.com/kits/cat?size=40'],
+    ['https://shop.example.com/Kits/cat', 'https://shop.example.com/kits/cat'],
+    ['not a url', 'Not A URL'],
+  ])('keeps %s and %s as different product URLs', (rowUrl, libraryUrl) => {
+    expect(
+      findLibraryMatches([{ ...kit, sourceUrl: rowUrl }], [{ ...kit, sourceUrl: libraryUrl }])
+    ).toEqual([false]);
+  });
+});
+
+describe('dimension units', () => {
+  it.each([
+    ['Title,Dimensions\nKit,30x40 in\n', 76.2, 101.6],
+    ['Title,Dimensions\nKit,10 x 20 inches\n', 25.4, 50.8],
+    ['Title,Dimensions\nKit,10" x 20"\n', 25.4, 50.8],
+    ['Title,Dimensions\nKit,30x40 cm\n', 30, 40],
+    ['Title,Dimensions\nKit,30x40\n', 30, 40],
+    ['Title,Width,Height\nKit,10 inch,20 in\n', 25.4, 50.8],
+    ['Title,Width,Height\nKit,30,40\n', 30, 40],
+  ])('reads %j as centimeters', async (csv, width, height) => {
+    const {
+      projects: [project],
+    } = await parseCsvToProjects(csv);
+    expect(project.width).toBeCloseTo(width, 5);
+    expect(project.height).toBeCloseTo(height, 5);
+  });
+
+  it('keeps inch sizes apart from the same numbers in centimeters', async () => {
+    const {
+      projects: [inches],
+    } = await parseCsvToProjects('Title,Dimensions\nKit,30x40 in\n');
+    const {
+      projects: [converted],
+    } = await parseCsvToProjects('Title,Dimensions\nKit,10x20 in\n');
+
+    expect(findLibraryMatches([inches], [{ title: 'Kit', width: 30, height: 40 }])).toEqual([
+      false,
+    ]);
+    expect(findLibraryMatches([converted], [{ title: 'Kit', width: 25.4, height: 50.8 }])).toEqual([
+      true,
     ]);
   });
 });

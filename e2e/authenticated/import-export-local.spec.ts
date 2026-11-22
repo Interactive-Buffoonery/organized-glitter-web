@@ -378,4 +378,43 @@ test.describe('local import/export workflows', () => {
     expect(project).toMatchObject({ title, status: 'stash' });
     expect(project.date_purchased ?? '').toBe('');
   });
+
+  test('skips CSV rows that are already in the library', async ({ page }) => {
+    const title = `${runPrefix} Re-import`;
+    const csvPath = path.join(tempDir, 're-import.csv');
+    await writeFile(csvPath, `Title,Company\n"${title}",Acme\n`);
+
+    await openDataSettings(page);
+    await uploadFile(page, 'Organized Glitter CSV file', csvPath);
+    await page.getByRole('button', { name: /^Import CSV$/ }).click();
+    await expect(page.getByText(/Imported 1, failed 0/i)).toBeVisible({ timeout: 30_000 });
+
+    await uploadFile(page, 'Organized Glitter CSV file', csvPath);
+    await page.getByRole('button', { name: /^Import CSV$/ }).click();
+    await expect(page.getByText(/Imported 0, failed 0.*skipped 1/i)).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByText(`Row 2, ${title}`)).toBeVisible();
+    expect(await getProjectsByPrefix(pb)).toHaveLength(1);
+  });
+
+  test('reports a CSV title shortened to the length limit', async ({ page }) => {
+    const longTitle = `${runPrefix} ${'Sparkling Galaxy Canvas '.repeat(12)}`.slice(0, 240);
+    const csvPath = path.join(tempDir, 'long-title.csv');
+    await writeFile(csvPath, `Title\n"${longTitle}"\n`);
+
+    await openDataSettings(page);
+    await uploadFile(page, 'Organized Glitter CSV file', csvPath);
+    await page.getByRole('button', { name: /^Import CSV$/ }).click();
+
+    await expect(page.getByText(/Imported 1, failed 0, validation issues 1/i)).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(
+      page.getByText('Row 2, title: Title shortened to the 200 character limit.')
+    ).toBeVisible();
+    const [project] = await getProjectsByPrefix(pb);
+    expect(project.title.length).toBeLessThanOrEqual(200);
+    expect(longTitle.startsWith(project.title)).toBe(true);
+  });
 });

@@ -37,9 +37,10 @@ Coloring page payload rules:
   `useUpdateColoringPage`; raw PocketBase field names stay in the
   `src/features/coloring-progress` command module and service boundary.
 - `mediums` stores relation ids and maps to `mediumIds` in the DTO.
-- Saving a new nonempty `completed_at` sets page status to `completed`. Status
-  changes never synthesize or clear lifecycle dates. Clearing a date leaves
-  status unchanged.
+- Saving a new nonempty `completed_at` sets page status to `completed`.
+  Moving a page to Completed fills a missing date with the account's current
+  calendar day. Reopening keeps the date. An explicit date clear is saved and,
+  on its own, leaves the status unchanged.
 - After page updates, the service best-effort syncs parent book metrics. A
   metric sync failure is logged and does not fail the page update.
 

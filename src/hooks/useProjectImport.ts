@@ -17,6 +17,8 @@ import {
 } from '@/features/import-export/importExportTelemetry';
 import { TAG_COLOR_PALETTE } from '@/utils/ui/tagColors'; // For default tag color
 import { ImportTagsService } from '@/services/pocketbase/importTags.service';
+import { createTagOrReuseMatch, planImportTags } from '@/utils/tagNames';
+import { createErrorResponse, createSuccessResponse } from '@/types/shared';
 
 const logger = createLogger('ProjectImport');
 import { generateUniqueSlug } from '@/utils/ui/slugify';
@@ -217,34 +219,19 @@ export const useProjectImport = () => {
         tagValidationResult.validatedTags.map(({ original, normalized }) => [original, normalized])
       );
 
-      const tagNameMap = new Map<string, string>();
+      const normalizeTagName = (name: string) => validatedTagNamesMap.get(name) || name;
+      const {
+        resolveTagId,
+        addTag,
+        namesToCreate: newTagNamesToCreate,
+      } = planImportTags(existingUserTags, allUniqueTagNames, normalizeTagName);
       const currentTagWarnings: string[] = []; // Use a local var for warnings during this phase
 
       try {
-        // Build tag name map using normalized names
-        existingUserTags.forEach(tag => {
-          // Map by exact name
-          tagNameMap.set(tag.name, tag.id);
-
-          // Also map by normalized name to prevent duplicate creation
-          const normalizedTagName = validatedTagNamesMap.get(tag.name) || tag.name;
-          if (normalizedTagName !== tag.name) {
-            tagNameMap.set(normalizedTagName, tag.id);
-          }
-        });
         logger.debug('Built tag name map from existing tags.', {
           count: existingUserTags.length,
-          mappedNames: [...tagNameMap.keys()],
         });
 
-        const newTagNamesToCreate: string[] = [];
-        allUniqueTagNames.forEach(originalName => {
-          const normalizedName = validatedTagNamesMap.get(originalName) || originalName;
-          if (normalizedName && normalizedName.trim() !== '' && !tagNameMap.has(normalizedName)) {
-            // Ensure normalized name is not empty and not already mapped
-            newTagNamesToCreate.push(normalizedName);
-          }
-        });
         logger.debug('Identified new tags to create.', {
           count: newTagNamesToCreate.length,
           newTagNamesToCreate,
@@ -280,11 +267,22 @@ export const useProjectImport = () => {
               slug: uniqueSlug,
               color: DEFAULT_TAG_COLOR_HEX,
             };
-            const createdTag = await ImportTagsService.createTag({
-              ...newTagData,
-              userId: user.id,
-            });
-            tagNameMap.set(tagName, createdTag.id);
+            const toResponse = async <T>(request: () => Promise<T>) => {
+              try {
+                return createSuccessResponse(await request());
+              } catch (error) {
+                return createErrorResponse(error as Error);
+              }
+            };
+            const created = await createTagOrReuseMatch(
+              tagName,
+              () =>
+                toResponse(() => ImportTagsService.createTag({ ...newTagData, userId: user.id })),
+              () => toResponse(() => ImportTagsService.listUserTags(user.id))
+            );
+            if (created.status === 'error') throw created.error;
+            const createdTag = created.data;
+            addTag(createdTag);
             createdTagsCount++;
             logger.debug(`Successfully created new tag: ${tagName}`, {
               id: createdTag.id,
@@ -300,7 +298,6 @@ export const useProjectImport = () => {
           setProgress(Math.round(15 + (createdTagsCount / (newTagNamesToCreate.length || 1)) * 10));
         }
         logger.debug('Finished creating new tags and updated map.', {
-          finalMapSize: tagNameMap.size,
           createdCount: createdTagsCount,
         });
       } catch (batchTagError) {
@@ -333,12 +330,9 @@ export const useProjectImport = () => {
           allValidationIssues.push(...projectValidation.issues);
 
           // Map tag names to IDs using validated names
-          const projectTagIds = (parsedProject.tagNames || [])
-            .map(originalName => {
-              const normalizedName = validatedTagNamesMap.get(originalName) || originalName;
-              return tagNameMap.get(normalizedName);
-            })
-            .filter(id => !!id) as string[];
+          const projectTagIds = [
+            ...new Set((parsedProject.tagNames || []).map(resolveTagId)),
+          ].filter((id): id is string => !!id);
 
           return {
             userId: user.id,

@@ -208,6 +208,12 @@ coloring mediums while another record still references the item. Clients should
 surface the `400` response and ask the user to remove those references first.
 Superusers may bypass the guard for reviewed repair work.
 
+`tag_names.pb.js` rejects creating or renaming a diamond or coloring tag when the
+same user already has a tag with that name, ignoring case and surrounding
+whitespace. The `400` response names the existing tag. It runs on record API
+requests only, so archive restores and existing case-duplicate tags keep
+working, and a tag can still change the case of its own name.
+
 ## Local Hook Testing
 
 Local hook testing uses the persistent local database in `local-pb-db/pb_data`.

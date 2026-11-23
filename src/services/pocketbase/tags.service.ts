@@ -126,26 +126,12 @@ export class TagService {
   }
 
   /**
-   * Create new tag with secure validation
+   * Create new tag. PocketBase rejects names that match an existing tag, ignoring case.
    */
   static async createTag(tagData: TagFormValues): Promise<ServiceResponse<Tag>> {
     return withAuthentication(async (userId: string) => {
       try {
         const trimmedName = tagData.name.trim();
-
-        // Check for existing tag with the same name for this user
-        try {
-          const existingTags = await pb.collection(Collections.Tags).getList(1, 1, {
-            filter: pb.filter('user = {:userId} && name = {:name}', { userId, name: trimmedName }),
-          });
-
-          if (existingTags.items.length > 0) {
-            return createErrorResponse(new Error(`A tag named "${trimmedName}" already exists`));
-          }
-        } catch (error) {
-          logger.error('Error checking for existing tag:', error);
-          return createErrorResponse(new Error('Failed to check for existing tags'));
-        }
 
         // Generate slug client-side using shared utility
         const slug = generateSlug(trimmedName);
@@ -169,13 +155,6 @@ export class TagService {
         return createSuccessResponse(tag);
       } catch (error) {
         logger.error('Unexpected error during tag creation:', error);
-
-        // Check if it's a duplicate error
-        if (error instanceof Error && error.message.includes('duplicate')) {
-          return createErrorResponse(
-            new Error(`A tag named "${tagData.name.trim()}" already exists`)
-          );
-        }
 
         return createErrorResponse(error as Error);
       }
@@ -237,7 +216,7 @@ export class TagService {
   }
 
   /**
-   * Update tag with secure validation and duplicate checking
+   * Update tag with secure validation. PocketBase rejects duplicate names.
    */
   static async updateTag(
     tagId: string,
@@ -263,24 +242,6 @@ export class TagService {
         if (updates.name !== undefined) {
           const trimmedName = updates.name.trim();
 
-          // Check for existing tag with the same name for this user (excluding current tag)
-          try {
-            const existingTags = await pb.collection(Collections.Tags).getList(1, 1, {
-              filter: pb.filter('user = {:userId} && name = {:name} && id != {:tagId}', {
-                userId,
-                name: trimmedName,
-                tagId,
-              }),
-            });
-
-            if (existingTags.items.length > 0) {
-              return createErrorResponse(new Error(`A tag named "${trimmedName}" already exists`));
-            }
-          } catch (error) {
-            logger.error('Error checking for existing tag during update:', error);
-            return createErrorResponse(new Error('Failed to check for existing tags'));
-          }
-
           updateData.name = trimmedName;
           updateData.slug = generateSlug(trimmedName);
         }
@@ -295,12 +256,6 @@ export class TagService {
         return createSuccessResponse(tag);
       } catch (error) {
         logger.error('Error updating tag:', error);
-
-        // Check if it's a duplicate error
-        if (error instanceof Error && error.message.includes('duplicate')) {
-          const tagName = updates.name?.trim() || 'this tag';
-          return createErrorResponse(new Error(`A tag named "${tagName}" already exists`));
-        }
 
         return createErrorResponse(error as Error);
       }

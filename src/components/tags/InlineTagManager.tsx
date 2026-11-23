@@ -15,6 +15,7 @@ import { Plus, Hash } from 'lucide-react';
 import { TagBadge } from './TagBadge';
 import { TagService } from '@/services/pocketbase/tags.service';
 import { Tag } from '@/types/tag';
+import { createTagOrReuseMatch, findTagByName } from '@/utils/tagNames';
 
 import { cn } from '@/lib/utils';
 import { logger } from '@/utils/logger';
@@ -218,9 +219,7 @@ export function InlineTagManager({
 
     // Check if tag name already exists in current project tags (case-insensitive)
     const trimmedQuery = searchQuery.trim();
-    const existsInProject = projectTags.some(
-      tag => tag.name.toLowerCase() === trimmedQuery.toLowerCase()
-    );
+    const existsInProject = Boolean(findTagByName(projectTags, trimmedQuery));
 
     if (existsInProject) {
       notify({
@@ -236,15 +235,28 @@ export function InlineTagManager({
     setIsLoading(true);
     setIsCreating(true);
 
-    // Set default color to teal (#14b8a6) for new tags created on project pages
-    const createResponse = await TagService.createTag({
-      name: trimmedQuery,
-      color: '#14b8a6', // Use teal as the default color
-    });
+    // PocketBase `~` only folds ASCII case, so match against the full list.
+    const existing = await TagService.getUserTags();
+    const match = existing.status === 'success' ? findTagByName(existing.data, trimmedQuery) : null;
+    if (match) {
+      await handleAddTag(match);
+      setIsLoading(false);
+      setIsCreating(false);
+      return;
+    }
+
+    const createResponse = await createTagOrReuseMatch(
+      trimmedQuery,
+      () => TagService.createTag({ name: trimmedQuery, color: '#14b8a6' }),
+      () => TagService.getUserTags()
+    );
 
     if (createResponse.status === 'success') {
       await handleAddTag(createResponse.data);
-      setAvailableTags(prev => [...prev, createResponse.data]);
+      setAvailableTags(prev => [
+        ...prev.filter(tag => tag.id !== createResponse.data.id),
+        createResponse.data,
+      ]);
     } else {
       notify({
         kind: 'error',
@@ -389,33 +401,32 @@ export function InlineTagManager({
                 </CommandGroup>
               )}
 
-              {searchQuery.trim() &&
-                !suggestions.some(tag => tag.name.toLowerCase() === searchQuery.toLowerCase()) && (
-                  <CommandGroup heading="Create New">
-                    <CommandItem
-                      key="create-new-tag-command-item"
-                      onSelect={handleCreateAndAddTag}
-                      className={`flex cursor-pointer items-center gap-2 ${
-                        searchQuery.trim().length > 100 || isCreating
-                          ? 'cursor-not-allowed opacity-50'
-                          : ''
-                      }`}
-                      disabled={searchQuery.trim().length > 100 || isCreating}
-                    >
-                      <Hash className="size-3" />
-                      <span className="truncate">
-                        Create "
-                        {searchQuery.trim().length > 20
-                          ? searchQuery.trim().substring(0, 20) + '...'
-                          : searchQuery.trim()}
-                        "
-                      </span>
-                      {searchQuery.trim().length > 100 && (
-                        <span className="text-destructive-text ml-auto text-xs">Too long</span>
-                      )}
-                    </CommandItem>
-                  </CommandGroup>
-                )}
+              {searchQuery.trim() && !findTagByName(suggestions, searchQuery) && (
+                <CommandGroup heading="Create New">
+                  <CommandItem
+                    key="create-new-tag-command-item"
+                    onSelect={handleCreateAndAddTag}
+                    className={`flex cursor-pointer items-center gap-2 ${
+                      searchQuery.trim().length > 100 || isCreating
+                        ? 'cursor-not-allowed opacity-50'
+                        : ''
+                    }`}
+                    disabled={searchQuery.trim().length > 100 || isCreating}
+                  >
+                    <Hash className="size-3" />
+                    <span className="truncate">
+                      Create "
+                      {searchQuery.trim().length > 20
+                        ? searchQuery.trim().substring(0, 20) + '...'
+                        : searchQuery.trim()}
+                      "
+                    </span>
+                    {searchQuery.trim().length > 100 && (
+                      <span className="text-destructive-text ml-auto text-xs">Too long</span>
+                    )}
+                  </CommandItem>
+                </CommandGroup>
+              )}
 
               {suggestions.length === 0 && !searchQuery.trim() && (
                 <CommandEmpty>No tags found. Start typing to create one.</CommandEmpty>

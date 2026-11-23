@@ -32,6 +32,7 @@ import { ColoringPageProgressNotesService } from '@/services/pocketbase/coloring
 import { ArchiveFilesService } from '@/services/pocketbase/archiveFiles.service';
 import { TAG_COLOR_PALETTE } from '@/utils/ui/tagColors';
 import { isServiceResponseError, type ServiceResponse } from '@/types/shared';
+import { resolveTagIds } from '@/utils/tagNames';
 import type { Tag, TagFormValues } from '@/types/tag';
 import { preparePhotoFileForUpload } from '@/utils/image/preparePhotoFileForUpload';
 import {
@@ -329,39 +330,17 @@ interface TagResolver {
   createTag: (tagData: TagFormValues) => Promise<ServiceResponse<Tag>>;
 }
 
-async function getOrCreateTagIds(
+function getOrCreateTagIds(
   tagNames: string[],
   resolver: TagResolver,
   assertSession: () => void
 ): Promise<string[]> {
-  const existingResponse = await resolver.listTags();
-  if (isServiceResponseError(existingResponse)) {
-    throw existingResponse.error;
-  }
-
-  const byName = new Map(existingResponse.data.map(tag => [tag.name.toLowerCase(), tag.id]));
-  const ids: string[] = [];
-
-  for (const tagName of tagNames) {
-    const trimmed = tagName.trim();
-    if (!trimmed) continue;
-    const existingId = byName.get(trimmed.toLowerCase());
-    if (existingId) {
-      ids.push(existingId);
-      continue;
-    }
-
-    assertSession();
-    const created = await resolver.createTag({
-      name: trimmed,
-      color: DEFAULT_TAG_COLOR_HEX,
-    });
-    if (isServiceResponseError(created)) throw created.error;
-    byName.set(trimmed.toLowerCase(), created.data.id);
-    ids.push(created.data.id);
-  }
-
-  return ids;
+  return resolveTagIds(
+    tagNames,
+    resolver.listTags,
+    ({ name }) => resolver.createTag({ name, color: DEFAULT_TAG_COLOR_HEX }),
+    assertSession
+  );
 }
 
 function getOrCreateDiamondTagIds(

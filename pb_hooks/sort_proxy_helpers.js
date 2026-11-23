@@ -25,11 +25,11 @@ function syncProject(e) {
     const record = e.record;
     const title = record.get('title') || '';
     const status = record.get('status') || '';
-    const datePurchased = record.get('date_purchased') || '';
-    const dateReceived = record.get('date_received') || '';
-    const dateStarted = record.get('date_started') || '';
-    const dateCompleted = record.get('date_completed') || '';
-    const width = record.get('width');
+    const datePurchased = record.getString('date_purchased');
+    const dateReceived = record.getString('date_received');
+    const dateStarted = record.getString('date_started');
+    const dateCompleted = record.getString('date_completed');
+    const width = record.getFloat('width');
     const statusOrderByStatus = {
       wishlist: 1,
       purchased: 2,
@@ -55,7 +55,7 @@ function syncProject(e) {
     record.set('date_received_has_value', dateReceived ? 0 : 1);
     record.set('date_started_has_value', dateStarted ? 0 : 1);
     record.set('date_completed_has_value', dateCompleted ? 0 : 1);
-    record.set('width_has_value', width === null || width === undefined ? 1 : 0);
+    record.set('width_has_value', width > 0 ? 0 : 1);
   } catch (err) {
     e.app.logger().error('sort_proxy_sync: failed to compute', { error: String(err) });
   }

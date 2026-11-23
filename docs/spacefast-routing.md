@@ -36,6 +36,12 @@ to the precached landing. Returning members use Login, which forwards an
 existing session to `/overview`. `pnpm dev` still serves the SPA at `/`,
 `/privacy`, and `/terms`.
 
+Clean URLs would answer `/app.html` with a 308 to `/app`. The `/app /app.html 200`
+rule in `public/_redirects` keeps `/app.html` answering directly. Older service
+workers refetch `/app.html` when their precache is missing it, and browsers
+reject a redirected navigation, so that one reload after a deploy can recover
+them.
+
 Run `pnpm spacefast:stage` after building. It copies the Function and shared
 route policy into `dist` and embeds the built app shell, landing, 404 page, and HTML
 security headers in the Function bundle.

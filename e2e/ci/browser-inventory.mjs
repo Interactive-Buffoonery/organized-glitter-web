@@ -22,6 +22,7 @@ export const browserSpecInventory = {
     'cold-load.spec.ts',
     'dialog-motion/motion.spec.ts',
     'not-found.spec.ts',
+    'pwa-fail-open.spec.ts',
     'pwa-navigation.spec.ts',
   ],
   manualVisual: ['overview-layout.spec.ts', 'screen-review/screen-review.spec.ts'],

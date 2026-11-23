@@ -19,6 +19,15 @@ export const getColoringPublisherLabel = (book: ColoringBookCardData): string =>
 export const getColoringBookFormatLabel = (book: Pick<ColoringBookCardData, 'bookFormat'>) =>
   optionLabel(COLORING_BOOK_FORMAT_OPTIONS, book.bookFormat) || 'No format';
 
+export const getColoringBookMetadataLabel = (book: ColoringBookCardData): string =>
+  [
+    optionLabel(COLORING_BOOK_FORMAT_OPTIONS, book.bookFormat),
+    book.publisherName || book.series,
+    book.illustratorName,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
 export const getColoringBookLanguageLabel = (value?: string) =>
   optionLabel(COLORING_BOOK_LANGUAGE_OPTIONS, value);
 

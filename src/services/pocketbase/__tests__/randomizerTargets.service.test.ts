@@ -61,4 +61,23 @@ describe('RandomizerTargetsService', () => {
       })
     );
   });
+
+  it('includes the book format in coloring book target subtitles', async () => {
+    getFullListMock.mockResolvedValue([
+      {
+        id: 'book-example',
+        title: 'Example Book',
+        status: 'in_progress',
+        book_format: 'pdf',
+        expand: { publisher: { name: 'Example Press' } },
+      },
+    ]);
+
+    const [target] = await RandomizerTargetsService.listColoringBookTargets(
+      'user-123',
+      eligibility
+    );
+
+    expect(target.subtitle).toBe('PDF · Example Press');
+  });
 });

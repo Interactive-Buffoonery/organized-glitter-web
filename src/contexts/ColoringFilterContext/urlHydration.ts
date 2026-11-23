@@ -121,12 +121,12 @@ export function getInitialColoringFiltersFromUrl(
   if (mystery === 'true') overrides.mysteryOnly = true;
 
   const includeArchived = searchParams.get('includeArchived');
-  if (includeArchived === 'true' && !overrides.selectedStatuses?.length) {
+  if (includeArchived === 'true') {
     overrides.includeArchived = true;
   }
 
   const includeDestashed = searchParams.get('includeDestashed');
-  if (includeDestashed === 'true' && !overrides.selectedStatuses?.length) {
+  if (includeDestashed === 'true') {
     overrides.includeDestashed = true;
   }
 

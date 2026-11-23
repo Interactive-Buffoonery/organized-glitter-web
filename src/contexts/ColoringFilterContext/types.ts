@@ -78,16 +78,6 @@ export function getDefaultColoringFilters(): ColoringFilterState {
   };
 }
 
-export function normalizeColoringStatusFilters(filters: ColoringFilterState): ColoringFilterState {
-  if (
-    filters.selectedStatuses.length === 0 ||
-    (!filters.includeArchived && !filters.includeDestashed)
-  ) {
-    return filters;
-  }
-  return { ...filters, includeArchived: false, includeDestashed: false };
-}
-
 export function normalizeColoringPagination(
   currentPage: unknown,
   pageSize: unknown

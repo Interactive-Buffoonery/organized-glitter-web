@@ -106,6 +106,9 @@ Conventions: [`docs/agents/code-conventions.md`](./docs/agents/code-conventions.
 - For date or CSV parsing changes, list the accepted formats and the time and
   zone rules in the PR body, and add tests for impossible dates, month names,
   UTF-16, CR-only lines and ISO offsets before the first review.
+- For import, dedupe or match changes, list the match key and how each part is
+  normalized (case, whitespace, accents, units, URL form) in the PR body, and
+  add tests for each, plus re-importing an export, before the first review.
 
 ## UI
 

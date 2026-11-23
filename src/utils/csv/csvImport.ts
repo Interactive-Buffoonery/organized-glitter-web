@@ -2,12 +2,21 @@ import { ProjectType } from '@/types/project';
 import Papa from 'papaparse';
 import { EXPECTED_COLUMNS } from '@/utils/csv/csvColumns';
 import { logger } from '@/utils/logger';
-import { safeDateString } from '@/utils/date/dateHelpers';
 import { normalizeStatus, validateKitCategoryValue } from '@/utils/csv/csvValidation';
 import { restoreCsvFormulaTextField } from '@/utils/csv/csvFormulaSafety';
 
+export type ParsedCsvProject = Partial<ProjectType> & { csvRow: number };
+
+const countLineBreaks = (text: string) => text.match(/\r\n|\r|\n/g)?.length ?? 0;
+
+const withoutTrailingNewline = (text: string, end: number) => {
+  if (text[end - 1] === '\n') end--;
+  if (text[end - 1] === '\r') end--;
+  return end;
+};
+
 export interface ParsedCsvData {
-  projects: Partial<ProjectType>[];
+  projects: ParsedCsvProject[];
   allUniqueTagNames: string[];
 }
 
@@ -188,19 +197,32 @@ export const parseCsvToProjects = (
       return;
     }
 
-    const projects: Partial<ProjectType>[] = [];
+    const content = csvContent.replace(/^\uFEFF/, '');
+    const projects: ParsedCsvProject[] = [];
     const parsingWarnings: Papa.ParseError[] = [];
+    let scannedTo = 0;
+    let newlinesBeforeScan = 0;
 
-    Papa.parse(csvContent, {
+    Papa.parse(content, {
       header: true,
       skipEmptyLines: true,
       transformHeader: (header: string) => header.toLowerCase().trim(),
       step: results => {
         parsingWarnings.push(...results.errors);
-        const project = parseProjectFromRow(results.data as Record<string, string>);
-        if (project) projects.push(project);
+        const row = results.data as Record<string, string>;
+        const recordEnd = withoutTrailingNewline(content, results.meta.cursor);
+        newlinesBeforeScan += countLineBreaks(content.slice(scannedTo, recordEnd));
+        scannedTo = recordEnd;
+        const csvRow = newlinesBeforeScan + 1 - countLineBreaks(Object.values(row).join('\0'));
+
+        try {
+          const project = parseProjectFromRow(row);
+          if (project) projects.push({ ...project, csvRow });
+        } catch (error) {
+          logger.warn('Error processing CSV row:', error, row);
+        }
         if (onProgress) {
-          const progress = Math.round((results.meta.cursor / csvContent.length) * 100);
+          const progress = Math.round((results.meta.cursor / content.length) * 100);
           onProgress(Math.min(progress, 99));
         }
       },
@@ -227,59 +249,32 @@ export const parseCsvToProjects = (
   });
 };
 
+/** Decode like FileReader.readAsText: a UTF-16 byte order mark picks the encoding, otherwise UTF-8. */
+const readCsvText = async (file: File) => {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const encoding =
+    bytes[0] === 0xff && bytes[1] === 0xfe
+      ? 'utf-16le'
+      : bytes[0] === 0xfe && bytes[1] === 0xff
+        ? 'utf-16be'
+        : 'utf-8';
+  return new TextDecoder(encoding).decode(bytes);
+};
+
 /**
- * Parse CSV file with streaming support for large files
- * @param file The CSV file to parse
- * @param onProgress Optional progress callback
- * @returns Promise that resolves to an object containing projects and all unique tag names
+ * Parse a CSV file. Import files are size-capped, so the text is read whole and
+ * shares one parser that knows each record's line.
  */
-export const parseCsvFileToProjects = (
+export const parseCsvFileToProjects = async (
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<ParsedCsvData> => {
-  return new Promise((resolve, reject) => {
-    const projects: Partial<ProjectType>[] = [];
-    let rowCount = 0;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header: string) => header.toLowerCase().trim(),
-      step: results => {
-        // Process each row as it's parsed (streaming)
-        const row = results.data as Record<string, string>;
-
-        try {
-          const project = parseProjectFromRow(row);
-          if (project) {
-            projects.push(project);
-            rowCount++;
-          }
-
-          // Report progress every 100 rows
-          if (onProgress && rowCount % 100 === 0) {
-            // Approximate progress based on bytes read vs file size
-            const progress = Math.round((results.meta.cursor / file.size) * 100);
-            onProgress(Math.min(progress, 99)); // Cap at 99% until complete
-          }
-        } catch (error) {
-          logger.warn('Error processing CSV row:', error, row);
-        }
-      },
-      complete: () => {
-        if (onProgress) {
-          onProgress(100);
-        }
-        const allTagNamesArrays = projects.map(p => p.tagNames || []);
-        const allUniqueTagNames = Array.from(new Set(allTagNamesArrays.flat()));
-        resolve({ projects, allUniqueTagNames });
-      },
-      error: (error: unknown) => {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        reject(new Error(`CSV file parsing failed: ${errorMessage}`));
-      },
-    });
-  });
+  const csvContent = await readCsvText(file);
+  if (!csvContent.trim()) {
+    onProgress?.(100);
+    return { projects: [], allUniqueTagNames: [] };
+  }
+  return parseCsvToProjects(csvContent, onProgress);
 };
 
 /**
@@ -306,13 +301,62 @@ const getTextFieldValue = (
   return value ? restoreCsvFormulaTextField(value) : undefined;
 };
 
+const DATE_PARTS = [
+  /^(?<year>\d{4})(?<sep>[-/])(?<month>\d{1,2})\k<sep>(?<day>\d{1,2})/,
+  /^(?<month>\d{1,2})\/(?<day>\d{1,2})\/(?<year>\d{4}|\d{2})/,
+  /^(?<monthName>[a-z]{3,9})\.?\s+(?<day>\d{1,2}),?\s+(?<year>\d{4})/i,
+  /^(?<day>\d{1,2})[-\s](?<monthName>[a-z]{3,9})\.?[-\s](?<year>\d{4}|\d{2})/i,
+];
+const TIME_SUFFIX =
+  /^(?:T(?=\d{2})|,?\s+)(\d{1,2}):([0-5]\d)(?::([0-5]\d)(?:\.(\d+))?)?(?:\s*([ap]m))?(?:\s*(?:Z|GMT|UTC))?(?:\s*[+-](?:[01]\d|2[0-3]):?[0-5]\d)?$/i;
+const MONTHS = [
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+];
+
+const monthNumber = (name: string) => {
+  const index = MONTHS.findIndex(month => month.startsWith(name.toLowerCase()));
+  return index < 0 ? undefined : String(index + 1);
+};
+
+const fullYear = (year: string) =>
+  year.length === 4 ? year : String(Number(year) + (Number(year) < 50 ? 2000 : 1900));
+
+const isReadableTime = (suffix: string) => {
+  if (!suffix) return true;
+  const time = suffix.match(TIME_SUFFIX);
+  if (!time) return false;
+  const [, hour, minutes, seconds = '00', fraction = '', meridiem] = time;
+  if (meridiem) return Number(hour) >= 1 && Number(hour) <= 12;
+  const endOfDay = `${hour}:${minutes}:${seconds}` === '24:00:00' && !/[1-9]/.test(fraction);
+  return Number(hour) < 24 || endOfDay;
+};
+
 /**
- * Validate and format a date string
+ * Read the calendar day from the date part alone, so no time or timezone can
+ * move it and validation can reject impossible dates. Text that cannot be
+ * read safely is returned as is, so validation reports it.
  */
 const validateDate = (dateStr: string): string | undefined => {
   if (!dateStr) return undefined;
 
-  // Use timezone-safe conversion (defaults to UTC for backwards compatibility)
-  const result = safeDateString(dateStr);
-  return result || undefined;
+  for (const pattern of DATE_PARTS) {
+    const match = dateStr.match(pattern);
+    if (!match?.groups) continue;
+    const { year, day, monthName } = match.groups;
+    const month = monthName ? monthNumber(monthName) : match.groups.month;
+    if (!month || !isReadableTime(dateStr.slice(match[0].length))) return dateStr;
+    return `${fullYear(year)}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  return dateStr;
 };

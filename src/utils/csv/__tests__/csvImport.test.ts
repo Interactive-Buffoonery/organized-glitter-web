@@ -59,3 +59,132 @@ describe('CSV import serializers', () => {
     });
   });
 });
+
+describe.each([
+  { name: 'CSV content', parse: parseCsvToProjects },
+  {
+    name: 'CSV file',
+    parse: (csv: string) =>
+      parseCsvFileToProjects(new File([csv], 'dates.csv', { type: 'text/csv' })),
+  },
+])('invalid dates from $name', ({ parse }) => {
+  it('keeps unparseable date cells and the CSV row for validation', async () => {
+    const csv = [
+      'Title,Date Purchased,Date Received,Date Started,Date Completed',
+      ',2025-01-01,,,',
+      'Good kit,2025-10-26,,,',
+      'Bad kit,2026-02-30,not a date,2026-13-01,2025-04-31',
+    ].join('\n');
+
+    const { projects } = await parse(csv);
+
+    expect(projects).toHaveLength(2);
+    expect(projects[0]).toMatchObject({ csvRow: 3, datePurchased: '2025-10-26' });
+    expect(projects[1]).toMatchObject({
+      csvRow: 4,
+      title: 'Bad kit',
+      datePurchased: '2026-02-30',
+      dateReceived: 'not a date',
+      dateStarted: '2026-13-01',
+      dateCompleted: '2025-04-31',
+    });
+  });
+});
+
+describe.each([
+  { name: 'CSV content', parse: parseCsvToProjects },
+  {
+    name: 'CSV file',
+    parse: (csv: string) =>
+      parseCsvFileToProjects(new File([csv], 'lines.csv', { type: 'text/csv' })),
+  },
+])('CSV record lines from $name', ({ parse }) => {
+  it.each(['\n', '\r\n', '\r'])(
+    'reports the physical start line of each record (%j)',
+    async newline => {
+      const csv = [
+        'Title,Notes,Date Purchased',
+        'Kit A,,2026-02-30',
+        '',
+        'Kit B,"first line',
+        'second line",2026-02-30',
+        'Kit C,,2026-02-30',
+      ].join(newline);
+
+      const { projects } = await parse(csv);
+
+      expect(projects.map(project => [project.title, project.csvRow])).toEqual([
+        ['Kit A', 2],
+        ['Kit B', 4],
+        ['Kit C', 6],
+      ]);
+    }
+  );
+});
+
+describe('CSV calendar dates', () => {
+  it.each([
+    ['2/30/26', '2026-02-30'],
+    ['2026-02-30T00:00:00.000Z', '2026-02-30'],
+    ['2/29/24', '2024-02-29'],
+    ['2024-02-29T00:00:00.000Z', '2024-02-29'],
+    ['12/5/2025', '2025-12-05'],
+    ['2024-02-29T23:30:00-05:00', '2024-02-29'],
+    ['2/30/2026 12:00 AM', '2026-02-30'],
+    ['2/29/2024 11:59 PM', '2024-02-29'],
+    ['Feb 29, 2024', '2024-02-29'],
+    ['February 29, 2024', '2024-02-29'],
+    ['29-Feb-24', '2024-02-29'],
+    ['Feb 30, 2026', '2026-02-30'],
+    ['30-Feb-26', '2026-02-30'],
+    ['2024/02/29', '2024-02-29'],
+    ['2026/02/30', '2026-02-30'],
+    ['2024-02-29T24:00:00Z', '2024-02-29'],
+    ['Feb 29, 2024 23:59:00 GMT', '2024-02-29'],
+    ['Feb 30, 2026 3:02 PM', '2026-02-30'],
+    ['2026/02/30 03:02:00', '2026-02-30'],
+  ])('keeps the written calendar day of %s', async (cell, expected) => {
+    const { projects } = await parseCsvToProjects(`Title,Date Purchased\nKit,"${cell}"`);
+
+    expect(projects[0].datePurchased).toBe(expected);
+  });
+});
+
+describe('CSV dates that cannot be read safely', () => {
+  it.each([
+    '2024-02-29Tgarbage',
+    '2024-02-29T25:00:00Z',
+    '2024-02-29T1:00:00Z',
+    '2024-02-29T24:00:01Z',
+    '2/29/2024 13:00 PM',
+    'Febtober 3, 2024',
+  ])('keeps %s for a validation note', async cell => {
+    const { projects } = await parseCsvToProjects(`Title,Date Purchased\nKit,"${cell}"`);
+
+    expect(projects[0].datePurchased).toBe(cell);
+  });
+});
+
+describe('UTF-16 CSV files', () => {
+  const encode = (text: string, bigEndian: boolean) => {
+    const bytes = [bigEndian ? 0xfe : 0xff, bigEndian ? 0xff : 0xfe];
+    for (const char of text) {
+      const code = char.charCodeAt(0);
+      bytes.push(...(bigEndian ? [code >> 8, code & 0xff] : [code & 0xff, code >> 8]));
+    }
+    return new Uint8Array(bytes);
+  };
+
+  it.each([false, true])('reads a byte order mark (big endian: %s)', async bigEndian => {
+    const file = new File(
+      [encode('Title,Date Purchased\r\nKit é,2024-02-29\r\n', bigEndian)],
+      'utf16.csv'
+    );
+
+    const { projects } = await parseCsvFileToProjects(file);
+
+    expect(projects).toEqual([
+      expect.objectContaining({ title: 'Kit é', datePurchased: '2024-02-29', csvRow: 2 }),
+    ]);
+  });
+});

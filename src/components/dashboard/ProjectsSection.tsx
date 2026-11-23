@@ -20,6 +20,7 @@ interface ProjectsSectionProps {
     totalPages: number;
     isLoadingProjects: boolean;
     isFetchingProjects: boolean;
+    isPlaceholderProjects?: boolean;
     errorProjects: Error | null;
     refetchProjects: () => void;
   };

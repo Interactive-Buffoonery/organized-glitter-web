@@ -336,7 +336,22 @@ function ArchiveImportResultContent({ result }: { result: ArchiveImportResult })
   );
 }
 
-function CsvImportResultAlert({
+function ValidationNoteList({ issues }: { issues: ProjectImportStats['validationIssues'] }) {
+  return (
+    <ul className="mt-2 list-disc space-y-1 pl-5">
+      {issues.map(issue => (
+        <li
+          key={`${issue.row ?? ''}-${issue.field}-${issue.originalValue}-${issue.correctedValue ?? ''}-${issue.message}`}
+        >
+          {issue.row ? `Row ${issue.row}, ` : ''}
+          {issue.field}: {issue.message}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function CsvImportResultAlert({
   importStats,
   title = 'CSV import complete',
 }: {
@@ -394,15 +409,15 @@ function CsvImportResultAlert({
             {importStats.validationIssues.length > 0 && (
               <div>
                 <p className="font-medium">Validation notes</p>
-                <ul className="mt-2 list-disc space-y-1 pl-5">
-                  {importStats.validationIssues.slice(0, 4).map(issue => (
-                    <li
-                      key={`${issue.field}-${issue.originalValue}-${issue.correctedValue ?? ''}-${issue.message}`}
-                    >
-                      {issue.field}: {issue.message}
-                    </li>
-                  ))}
-                </ul>
+                <ValidationNoteList issues={importStats.validationIssues.slice(0, 4)} />
+                {issueCount > 4 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer font-medium">
+                      Show all {issueCount} validation notes
+                    </summary>
+                    <ValidationNoteList issues={importStats.validationIssues} />
+                  </details>
+                )}
               </div>
             )}
             {importStats.tagWarnings.length > 0 && (

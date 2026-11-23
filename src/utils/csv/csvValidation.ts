@@ -13,6 +13,7 @@ import {
   ProjectsStatusOptions,
   ProjectsKitCategoryOptions,
 } from '@/types/pocketbase.types';
+import { parseDateOnlyAsLocalDate } from '@/utils/date/timezoneUtils';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('CSVValidation');
@@ -27,6 +28,7 @@ const FIELD_LIMITS = {
 
 // Validation error types
 export interface ValidationIssue {
+  row?: number;
   field: string;
   originalValue: string;
   correctedValue?: string;
@@ -357,8 +359,8 @@ function validateDate(
     if (year < 1900 || year > 2100) {
       // Try to fix obvious typos like 0242 -> 2024
       const correctedYear = fixCommonYearTypos(year);
-      if (correctedYear) {
-        const correctedDate = `${correctedYear}${trimmed.substring(4)}`;
+      const correctedDate = correctedYear && `${correctedYear}${trimmed.substring(4)}`;
+      if (correctedDate && parseDateOnlyAsLocalDate(correctedDate)) {
         return {
           normalized: correctedDate,
           issue: {
@@ -370,8 +372,7 @@ function validateDate(
           },
         };
       }
-    } else {
-      // Valid date format
+    } else if (parseDateOnlyAsLocalDate(trimmed)) {
       return { normalized: trimmed };
     }
   }
@@ -383,7 +384,7 @@ function validateDate(
       field: fieldName,
       originalValue: value,
       severity: 'error' as const,
-      message: `Invalid date format "${value}". Expected YYYY-MM-DD format. Date cleared.`,
+      message: `Invalid date "${value}". Expected a real date in YYYY-MM-DD format. Date cleared.`,
     },
   };
 }

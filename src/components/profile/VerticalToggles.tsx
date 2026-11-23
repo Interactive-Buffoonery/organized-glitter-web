@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePostHog } from '@posthog/react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -18,11 +18,19 @@ type VerticalKey = 'diamond_painting' | 'coloring_books';
  * to persist a state where both trackers are off (would orphan the user
  * from any vertical), and surface that as inline copy without a toast.
  */
-export function VerticalToggles() {
+export function VerticalToggles({ focusColoring = false }: { focusColoring?: boolean }) {
   const posthog = usePostHog();
   const { user } = useAuth();
   const persisted = useEnabledVerticals(user?.id);
   const saveMutation = useSaveVerticalToggles(user?.id);
+  const coloringSwitch = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!focusColoring || persisted.isLoading) return;
+
+    coloringSwitch.current?.focus({ preventScroll: true });
+    coloringSwitch.current?.scrollIntoView({ block: 'center' });
+  }, [focusColoring, persisted.isLoading]);
 
   // Optimistic overrides keyed by vertical. While a save is in flight we
   // show this; once the mutation settles we clear it and read from
@@ -108,6 +116,7 @@ export function VerticalToggles() {
         </div>
         <Switch
           id="vertical-coloring"
+          ref={coloringSwitch}
           checked={coloring}
           onCheckedChange={next => void persist('coloring_books', next)}
           disabled={disabled || (coloring && !diamond)}

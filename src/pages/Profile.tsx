@@ -257,7 +257,7 @@ const Profile = () => {
                   </SettingsSection>
 
                   <SettingsSection title="Trackers">
-                    <VerticalToggles />
+                    <VerticalToggles focusColoring={location.hash === '#vertical-coloring'} />
                   </SettingsSection>
                 </GlassPanel>
               </TabsContent>

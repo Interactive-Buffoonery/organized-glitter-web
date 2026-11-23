@@ -9,8 +9,8 @@ export interface ProjectsTableColumn {
 }
 
 export const PROJECTS_TABLE_COLUMNS: readonly ProjectsTableColumn[] = [
-  { id: 'thumbnail', label: 'Thumbnail', className: 'w-16' },
-  { id: 'title', label: 'Kit', sortField: 'kit_name', className: 'min-w-[16rem]' },
+  { id: 'thumbnail', label: 'Thumbnail', className: 'w-24' },
+  { id: 'title', label: 'Kit', sortField: 'kit_name' },
   {
     id: 'status',
     label: 'Status',
@@ -18,8 +18,8 @@ export const PROJECTS_TABLE_COLUMNS: readonly ProjectsTableColumn[] = [
     className: 'w-28',
     headerClassName: 'text-center',
   },
-  { id: 'company', label: 'Company', sortField: 'company', className: 'w-40' },
-  { id: 'size-shape', label: 'Size · Shape', sortField: 'width', className: 'w-36' },
-  { id: 'date', label: 'Latest', className: 'w-36' },
-  { id: 'actions', label: '', className: 'w-12' },
+  { id: 'company', label: 'Company', sortField: 'company', className: 'w-[19%]' },
+  { id: 'size-shape', label: 'Size · Shape', sortField: 'width', className: 'w-[16%]' },
+  { id: 'date', label: 'Latest', className: 'w-[16%]' },
+  { id: 'actions', label: '', className: 'w-8' },
 ] as const;

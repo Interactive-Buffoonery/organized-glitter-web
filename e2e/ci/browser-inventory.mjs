@@ -4,6 +4,7 @@ export const browserSpecInventory = {
     'a11y/public-a11y.spec.ts',
     'authenticated/account-deletion-local.spec.ts',
     'authenticated/archive-v3-restore-local.spec.ts',
+    'authenticated/dashboard-reset-and-links-local.spec.ts',
     'authenticated/import-export-local.spec.ts',
     'authenticated/project-create-cover-local.spec.ts',
     'authenticated/project-delete-atomic-local.spec.ts',

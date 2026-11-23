@@ -74,15 +74,7 @@ export interface FilterState {
   viewType: DashboardViewType;
 }
 
-interface ActiveFilterCountOptions {
-  includeSearchTerm?: boolean;
-  includeSearchAllFields?: boolean;
-}
-
-const countFilters = (
-  filters: FilterState,
-  { includeSearchTerm = true, includeSearchAllFields = true }: ActiveFilterCountOptions = {}
-): number => {
+export const getActiveFilterCount = (filters: FilterState): number => {
   let count = 0;
 
   if (filters.activeStatus !== 'everything') count++;
@@ -93,18 +85,12 @@ const countFilters = (
   if (!filters.includeMiniKits) count++;
   if (filters.activeStatus === 'everything' && filters.includeDestashed) count++;
   if (filters.activeStatus === 'everything' && filters.includeArchived) count++;
-  if (includeSearchTerm && filters.searchTerm) count++;
-  if (includeSearchAllFields && filters.searchAllFields) count++;
+  if (filters.searchTerm) count++;
+  if (filters.searchAllFields) count++;
   count += filters.selectedTags.length;
 
   return count;
 };
-
-/**
- * Global active-filter count used by results summaries and any UI that should
- * reflect every narrowing control, including header-owned search state.
- */
-export const getActiveFilterCount = (filters: FilterState): number => countFilters(filters);
 
 export const getActiveFilterSummary = (filters: FilterState) => {
   const count = getActiveFilterCount(filters);
@@ -126,18 +112,8 @@ export const getActiveFilterSummary = (filters: FilterState) => {
   return `${count} ${count === 1 ? 'filter' : 'filters'} active`;
 };
 
-/**
- * Count only the controls rendered inside the dashboard filter panel/sheet.
- * Search text stays in the header; broader search belongs to this panel.
- */
-const getDashboardFilterPanelCount = (filters: FilterState): number =>
-  countFilters(filters, {
-    includeSearchTerm: false,
-    includeSearchAllFields: true,
-  });
-
 export const getDashboardFilterPanelSummary = (filters: FilterState) => {
-  const count = getDashboardFilterPanelCount(filters);
+  const count = getActiveFilterCount(filters);
   const tagCount = filters.selectedTags.length;
   const nonTagCount = count - tagCount;
 
@@ -170,7 +146,7 @@ export const getDashboardFilterPanelSummary = (filters: FilterState) => {
   };
 };
 
-const DASHBOARD_FILTER_PANEL_KEYS: Array<keyof FilterState> = [
+const ACTIVE_FILTER_KEYS: Array<keyof FilterState> = [
   'activeStatus',
   'selectedCompany',
   'selectedArtist',
@@ -181,21 +157,8 @@ const DASHBOARD_FILTER_PANEL_KEYS: Array<keyof FilterState> = [
   'includeArchived',
   'selectedTags',
   'searchAllFields',
+  'searchTerm',
 ];
-
-const ACTIVE_FILTER_KEYS: Array<keyof FilterState> = [...DASHBOARD_FILTER_PANEL_KEYS, 'searchTerm'];
-
-/**
- * Reset only the fields owned by the dashboard filter panel. Header-owned
- * search/sort state is intentionally preserved so "Reset All Filters" does not
- * wipe controls the user cannot currently see inside the panel.
- */
-export const getDashboardFilterPanelResetPatch = (): Partial<FilterState> => {
-  const defaults = getDefaultFilters();
-  return Object.fromEntries(
-    DASHBOARD_FILTER_PANEL_KEYS.map(key => [key, defaults[key]])
-  ) as Partial<FilterState>;
-};
 
 /**
  * Clear only active narrowing filters while preserving dashboard presentation

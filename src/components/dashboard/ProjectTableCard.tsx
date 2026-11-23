@@ -54,7 +54,10 @@ const ProjectTableCardComponent = ({
 
       <div className="flex min-w-0 flex-1 items-center gap-3 p-3">
         <div className="min-w-0 flex-1 space-y-1">
-          <h3 className="group-hover:text-link line-clamp-1 text-sm leading-tight font-semibold transition-colors duration-200">
+          <h3
+            className="group-hover:text-link line-clamp-2 text-sm leading-tight font-semibold wrap-anywhere transition-colors duration-200"
+            title={project.title}
+          >
             {project.title}
           </h3>
           <p className="text-muted-foreground line-clamp-1 text-xs">{companyAndArtist}</p>

@@ -1,5 +1,6 @@
 import { Navigate, useSearchParams } from 'react-router-dom';
 
+import { ColoringTrackerOff } from '@/components/routing/ColoringTrackerOff';
 import { useAuth } from '@/hooks/useAuth';
 import { useEnabledVerticals } from '@/hooks/useEnabledVerticals';
 import { usePageMetadata } from '@/hooks/usePageMetadata';
@@ -36,11 +37,7 @@ const NewProjectRouter = () => {
   }
 
   if (!coloring_books) {
-    return diamond_painting ? (
-      <Navigate to="/projects/new" replace />
-    ) : (
-      <Navigate to="/dashboard" replace />
-    );
+    return <ColoringTrackerOff title="New coloring book" />;
   }
 
   return <NewColoringBook />;

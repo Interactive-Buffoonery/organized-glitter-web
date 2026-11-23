@@ -20,6 +20,7 @@ import { useRecentlyEdited } from '@/contexts/RecentlyEditedContext';
 import { useDashboardEmptyState } from '@/hooks/useDashboardEmptyState';
 import { AnalyticsEvent } from '@/services/analytics-events';
 import { getPageScrollY } from '@/utils/scrollPosition';
+import { PROJECTS_TABLE_COLUMNS } from '@/features/dashboard/table-columns';
 import { setDiamondDashboardParams } from '@/contexts/FilterContext/urlHydration';
 
 interface ProjectsGridProps {
@@ -187,19 +188,22 @@ const ProjectsGridComponent: React.FC<ProjectsGridProps> = ({
             ))}
           </div>
 
-          <div className="bg-card hidden overflow-x-auto rounded-xl border lg:block">
-            <table className="min-w-[68rem] caption-bottom text-sm">
+          <div className="bg-card hidden overflow-clip rounded-xl border lg:block">
+            <table className="w-full table-fixed caption-bottom text-sm">
               <TableHeader>
                 <TableRow>
-                  <TableHead className={cn(stickyHeadClass, 'w-16')}>Thumbnail</TableHead>
-                  <TableHead className={cn(stickyHeadClass, 'min-w-[16rem]')}>Kit</TableHead>
-                  <TableHead className={cn(stickyHeadClass, 'w-28 text-center')}>Status</TableHead>
-                  <TableHead className={cn(stickyHeadClass, 'w-40')}>Company</TableHead>
-                  <TableHead className={cn(stickyHeadClass, 'w-36')}>Size · Shape</TableHead>
-                  <TableHead className={cn(stickyHeadClass, 'w-36')}>Latest</TableHead>
-                  <TableHead className={cn(stickyHeadClass, 'w-12')}>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
+                  {PROJECTS_TABLE_COLUMNS.map(column => (
+                    <TableHead
+                      key={column.id}
+                      className={cn(stickyHeadClass, column.className, column.headerClassName)}
+                    >
+                      {column.id === 'actions' ? (
+                        <span className="sr-only">Actions</span>
+                      ) : (
+                        column.label
+                      )}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -210,15 +214,15 @@ const ProjectsGridComponent: React.FC<ProjectsGridProps> = ({
                     </TableCell>
                     <TableCell>
                       <div className="space-y-2">
-                        <div className="bg-muted h-4 w-40 animate-pulse rounded" />
-                        <div className="bg-muted h-3 w-24 animate-pulse rounded" />
+                        <div className="bg-muted h-4 w-40 max-w-full animate-pulse rounded" />
+                        <div className="bg-muted h-3 w-24 max-w-full animate-pulse rounded" />
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="bg-muted mx-auto h-6 w-20 animate-pulse rounded-full" />
                     </TableCell>
                     <TableCell>
-                      <div className="bg-muted h-4 w-24 animate-pulse rounded" />
+                      <div className="bg-muted h-4 w-24 max-w-full animate-pulse rounded" />
                     </TableCell>
                     <TableCell>
                       <div className="bg-muted h-4 w-20 animate-pulse rounded" />

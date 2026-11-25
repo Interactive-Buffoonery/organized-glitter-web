@@ -16,10 +16,12 @@ import { TagNameField } from './TagNameField';
 import { TAG_NAME_MAX_LENGTH, validateTagName } from './tagNameValidation';
 import { ColorPicker } from './ColorPicker';
 import { useUpdateTag } from '@/hooks/mutations/useUpdateTag';
+import { useUpdateColoringTag } from '@/hooks/mutations/coloring/useUpdateColoringTag';
 import { logger } from '@/utils/logger';
 
 interface EditTagDialogProps {
   tag: Tag;
+  vocabulary?: 'diamond' | 'coloring';
 }
 
 /**
@@ -27,7 +29,7 @@ interface EditTagDialogProps {
  *
  * This component implements a two-level error handling approach:
  *
- * 1. Global Error Handling (useUpdateTag hook):
+ * 1. Global Error Handling (useUpdateTag / useUpdateColoringTag hooks):
  *    - Provides comprehensive error categorization and user-friendly toast notifications
  *    - Handles authentication errors, duplicate name errors, and general failures
  *    - Automatically invalidates relevant queries on success
@@ -41,7 +43,7 @@ interface EditTagDialogProps {
  * appropriate UI state management (dialog remains open for retry on errors).
  */
 
-const EditTagDialog = ({ tag }: EditTagDialogProps) => {
+const EditTagDialog = ({ tag, vocabulary = 'diamond' }: EditTagDialogProps) => {
   const [tagName, setTagName] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -51,7 +53,10 @@ const EditTagDialog = ({ tag }: EditTagDialogProps) => {
     hasSubmitted || tagName.trim().length > TAG_NAME_MAX_LENGTH
       ? validateTagName(tagName)
       : undefined;
-  const updateTagMutation = useUpdateTag();
+  const updateDiamondTagMutation = useUpdateTag();
+  const updateColoringTagMutation = useUpdateColoringTag();
+  const updateTagMutation =
+    vocabulary === 'coloring' ? updateColoringTagMutation : updateDiamondTagMutation;
 
   const handleOpenChange = (open: boolean) => {
     setHasSubmitted(false);
@@ -82,15 +87,15 @@ const EditTagDialog = ({ tag }: EditTagDialogProps) => {
       {
         onSuccess: () => {
           setIsDialogOpen(false);
-          // Global success toast notification is handled by useUpdateTag hook.
+          // Global success toast notification is handled by the update hook.
         },
         onError: (error: unknown) => {
           // Component-level error handling for immediate user feedback
-          // This works alongside the global error handling in useUpdateTag hook
+          // This works alongside the global error handling in the update hook
           logger.error('EditTagDialog: Failed to update tag:', { error });
 
           // Keep dialog open so user can retry
-          // Global error toast is already shown by useUpdateTag hook, but we ensure
+          // Global error toast is already shown by the update hook, but we ensure
           // the user can immediately see the form is still available for retry
           const errorMessage =
             error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -102,7 +107,7 @@ const EditTagDialog = ({ tag }: EditTagDialogProps) => {
             return;
           }
 
-          // For other errors, the global toast notification from useUpdateTag provides feedback
+          // For other errors, the global toast notification from the update hook provides feedback
           // Dialog remains open for user to retry or cancel
         },
       }
@@ -118,7 +123,7 @@ const EditTagDialog = ({ tag }: EditTagDialogProps) => {
           className="text-primary hover:bg-primary/10 hover:text-primary"
         >
           <Pencil className="size-4" />
-          <span className="sr-only">Edit</span>
+          <span className="sr-only">Edit {tag.name}</span>
         </Button>
       </DialogTrigger>
       <DialogContent layout="keyboard-safe">

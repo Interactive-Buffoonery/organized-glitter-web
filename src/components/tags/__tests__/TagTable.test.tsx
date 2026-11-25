@@ -62,7 +62,11 @@ vi.mock('@/utils/logger', () => ({
 }));
 
 vi.mock('../EditTagDialog', () => ({
-  default: () => null,
+  default: ({ tag, vocabulary }: { tag: Tag; vocabulary: string }) => (
+    <button type="button" data-vocabulary={vocabulary}>
+      Edit {tag.name}
+    </button>
+  ),
 }));
 
 const mockTag: Tag = {
@@ -135,5 +139,22 @@ describe('TagTable dashboard link', () => {
       expect.objectContaining({ onSettled: expect.any(Function) })
     );
     expect(deleteTagMutateMock).not.toHaveBeenCalled();
+  });
+
+  it('offers editing for coloring tags with the coloring vocabulary', () => {
+    render(
+      <MemoryRouter>
+        <TagTable tags={[mockTag]} coloringTags={[mockColoringTag]} loading={false} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('button', { name: 'Edit landscape' })).toHaveAttribute(
+      'data-vocabulary',
+      'diamond'
+    );
+    expect(screen.getByRole('button', { name: 'Edit cozy' })).toHaveAttribute(
+      'data-vocabulary',
+      'coloring'
+    );
   });
 });

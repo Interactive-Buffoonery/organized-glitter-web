@@ -171,7 +171,7 @@
     "pocketbase": "^0.28.1",
     "posthog-js": "^1.450.0",
     "react": "^19.3.1",
-    "react-aria-components": "^1.17.0",
+    "react-aria-components": "^1.22.1",
     "react-dom": "^19.3.1",
     "react-easy-crop": "^6.2.4",
     "react-hook-form": "^7.91.0",
